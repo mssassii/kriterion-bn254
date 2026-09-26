@@ -1,363 +1,474 @@
-# Intuition: chunked one-hot projectivization of ArgoMAC
+# Intuition: CRT-residue delivery of the affine encodings of ArgoMAC
 
-This entry garbles BN254 scalar multiplication at **3,363,376 bytes** of public ciphertext.
-Garbling makes at most **1,305,053** oracle queries (gate 1,759,967) and evaluation at most
-**990,093** (gate 1,055,879). Both figures are the exact bounds carried in the types of
+This entry garbles BN254 scalar multiplication at **182,936 bytes** of public ciphertext.
+Garbling makes at most **995,088** oracle queries (gate 1,759,967) and evaluation at most
+**987,209** (gate 1,055,879). Both figures are the exact bounds carried in the types of
 `garbleProgram` and `evaluateProgram`.
 
-This note explains the design, the byte count, the query count and the privacy argument.
-Section 7 states what is proved: every obligation.
+The entry keeps the ArgoMAC structure of xinshu's entry (`xinshudong/bn254-entry`, commit
+`bf53ea4`, 3,363,376 bytes): 91 digit MACs whose rows read affine encodings of the input
+coordinates. It changes how the evaluator obtains those encodings. xinshu's entry delivers them
+through switch systems whose published size grows with the number of encodings times the number of
+chunks. This entry delivers them through the CRT-residue projectivization of Duty-Free Bits
+(Khambhati, Bhattacharya and Heath), as ePrint 2026/2100 (Khambhati, Feickert, Lewe and Tiwari) does
+for the field encodings of Argo MAC: each input coordinate is turned once into one-hot labels of its
+residues modulo 85 small moduli, and each encoding then costs one 78-byte record. The conversion of
+a coordinate is 56,736 bytes whatever the number of encodings. The rows are gated by masks keyed by
+the curve check, the exception gadget is a hash digest, and the oracle is the field hash alone. The
+proof architecture (the obligation, the lazy oracle, the chain of games, the public-first hop, the
+opening and the closed simulator machine) is xinshu's, adapted to the CRT layer.
+
+Every field of the challenge's `Solution` record is proved in Lean, with no `sorry`, and the entry
+depends only on the axioms `propext`, `Classical.choice` and `Quot.sound`.
 
 ---
 
-## 1. Starting point: where the ArgoMAC baseline spends its bytes
+## 1. What the evaluator must learn
 
-The baseline follows the BaBe/ArgoMAC paper. The evaluator holds one Lamport label for each of
-the 508 input bits (254 bits of `x`, then 254 bits of `y`). The garbled circuit has to turn those
-labels into 91 elliptic-curve MACs, one per base-7 digit of the secret scalar. The output point
-is then rebuilt from the MACs by Horner's rule.
+ArgoMAC (Eagen and Lai) turns the evaluator's 508 Lamport labels (254 bits of `x`, 254 of `y`) into
+91 elliptic-curve MACs, one per digit of the secret scalar in base `2 − ω` (liucheng's 91-digit
+decomposition). Each digit's MAC is three rows `X, Y, Z`, low-degree polynomials in the input
+`(x, y)` whose coefficients depend on the digit. The rows read *affine encodings*: values
+`a_e·v + b_e` with `v = x` or `v = y`, a secret slope `a_e` and a secret offset `b_e`, which the
+evaluator learns without learning `a_e` or `b_e`.
 
-Each digit's MAC comes from three Jacobian rows (`X`, `Y`, `Z`). Each row is a low-degree
-polynomial in `(x, y)` with published coefficients `γ`. The rows read nine *affine encodings* of
-the input coordinates, values of the form `a_e · x + b_e` or `a_e · y + b_e`. With 91 digits,
-plus five values for the curve-membership check, there are **824 affine encodings**: 458 of `x`
-and 366 of `y`.
+The rows are the Jacobian rows of BABE as Lazar introduced them to the contest, with two changes
+that reduce them to 8 encodings and 4 published constants per digit: the `Y` row is garbled with four
+encodings by adding `r4·(y² − x³ − 3)`, which vanishes on the curve, for a uniform randomiser `r4`
+(Lazar published this four-encoding row first; its privacy uses that no point of BN254 has `x = 0`,
+because 3 is a quadratic non-residue modulo `p`); and Lazar's coefficient cut puts each coefficient
+into a slope instead of publishing it. Per digit the
+rows read 5 encodings of `x` and 3 of `y`. With the 5 encodings of the curve check (`x3, x5, x7` of
+`x`, `y4, y6` of `y`) there are 733 encodings: `S_x = 458` of `x` and `S_y = 275` of `y`.
 
-In the baseline, each encoding comes from its own bit-adaptor table: 254 rows, one per input
-bit, each a masked field element. These per-encoding tables are almost all of the baseline's
-ciphertext. The published row constants (`91 · 11` field elements), the curve check and the
-doubling-exception gadget together take under 33 KB.
-
-**Plan B keeps everything above the affine encodings unchanged.** That covers the 11 published
-`γ` per digit, the Jacobian rows, the curve check, the EncPRF gate and the exception gadget.
-Plan B only replaces how the 824 encodings reach the evaluator.
-
----
-
-## 2. The construction: one-hot switch systems over a plain group
-
-### 2.1 Cutting a coordinate into chunks
-
-Each 254-bit coordinate is cut into `C` chunks of `b` bits. This entry uses `b = 2` and
-`C = 127`. Chunk `c` of `x` is a number `α_c < 2^b`, and
-
-```
-x = Σ_c 2^(b·c) · α_c        (in F_p)
-```
-
-This identity holds because the Lamport bits are the canonical little-endian digits of
-`x.val < p < 2^254`. `Proof/Correctness/CanonicalBits.lean` proves it. Nothing is reduced
-modulo anything but `p`.
-
-### 2.2 `bin-to-hot`: bit labels to a one-hot label vector
-
-For each chunk, the `b` bit labels are folded into `2^b` *one-hot* labels. Entry `j` carries
-the "active" label when `j = α_c` and a "zero" label otherwise. The fold doubles the vector once
-per bit, and each level uses free XOR:
-
-```
-M_r        := π_{i0}(Z_r) ⊕ π_{i1}(Z_r)       two fixed-key permutations per entry
-right child := M_r ,  left child := Z_r ⊕ M_r
-join_j      := (⊕_r M_r) ⊕ (zero label of bit j)   one published 128-bit block per level
-```
-
-Level 0 is free, so a chunk of width `b` publishes `b − 1` blocks. The evaluator mirrors the
-fold. It hashes every entry except the active one and recovers the active entry's material from
-the published join.
-
-The two-permutation step (`π_{i0} ⊕ π_{i1}` rather than one Davies–Meyer call) keeps the left
-child from being a raw permutation image. A single permutation would let one inverse query
-recover the free-XOR offset Δ.
-
-### 2.3 `scale-hot`: one published join per chunk, over `F_p^824`
-
-The key cost fact: a switch system over a **plain** group publishes a single join, whatever the
-one-hot length. For chunk `c`, every one-hot entry `j` hashes its label into a mask vector
-`Y_{c,j} ∈ F_p^824`, with one field element per affine encoding. The garbler publishes
-
-```
-J_c := Σ_j Y_{c,j} + s_c ,      s_c := (a_e · 2^(b·c))_e        (824 field elements)
-```
-
-The evaluator holds the labels of every inactive entry, so it can compute `Y_{c,j}` for every
-`j ≠ α_c`. It recovers the active entry as `J_c − Σ_{j ≠ α_c} Y_{c,j}` and folds the one-hot
-against the chunk index for free:
-
-```
-Σ_j ι(j) · L_{c,j} = Σ_j ι(j) · Y_{c,j} + α_c · s_c ,     ι(j) = (j : F_p)
-```
-
-Summing over the chunks gives, for every encoding `e`,
-
-```
-Σ_c Σ_j ι(j) · L_{c,j}[e] = O[e] + a_e · x ,     O[e] := Σ_c Σ_j ι(j) · Y_{c,j}[e]
-```
-
-`O[e]` is known to the garbler at garbling time, and in the underlying scheme the offsets `b_e`
-are free garbler randomness. So the garbler *defines* `b_e := O[e]`: the offset costs no bytes.
-It then derives the slopes `a_e` from these offsets and publishes the joins last.
-
-Each mask element is a Rule-S sample: three Davies–Meyer blocks read as one 384-bit integer and
-reduced mod `p`. Rejection sampling is never used, because correctness must hold on every tape.
-
-### 2.4 Two switch systems per coordinate: the curve check gates the point rows
-
-Each coordinate carries **two** systems, so there are four *lanes*.
-
-* **System A** (`curveX`, `curveY`) is keyed on the raw Lamport labels. It delivers the five
-  curve-check encodings. The check publishes `t + mask · (x³ + 3 − y²)`, which is the bridge key
-  `t` exactly on the curve and uniform off it.
-* **System B** (`pointX`, `pointY`) is keyed on EncPRF-whitened labels. Their one-time pads are
-  derived from `H(t)`, and system B delivers the 819 point-row encodings. An evaluator who cannot
-  produce `t` holds only garbage labels for system B.
-
-The whitening applies one pad per (coordinate, position) to *both* labels of a pair, so it keeps
-the free-XOR offset that the fold needs. The exception gadget still reads the bit-dependent
-EncPRF labels, as in the baseline.
-
-### 2.5 The input interface
-
-The encoding key is exactly the 508 Lamport label pairs `(Z_j, Z_j ⊕ Δ_coord)`, and `Encode`
-selects one label per bit. The private coins hold the offsets, row randomizers, gadget pads,
-bridge key, curve mask and the free-XOR label material. The library supplies the three public
-oracle families (fixed-key permutations, EncPRF permutations, and the field hash) separately.
+In xinshu's entry each coordinate is cut into chunks, and each chunk publishes one join holding one
+field element per encoding. The size is about `chunks · encodings · 32` bytes. The CRT delivery
+separates the two factors: the chunks are converted once per coordinate, and the encodings are paid
+per encoding.
 
 ---
 
-## 3. Why the ciphertext is 3,363,376 bytes
+## 2. The CRT idea
+
+Let `M = m_1 · ... · m_85` be the product of 85 pairwise coprime moduli (section 3.6). If the
+evaluator holds, for each modulus `m`, the residue `(a_e·v + O_e) mod m` of an integer
+`a_e·v + O_e` below `M`, the Chinese remainder theorem gives the integer, and its value modulo `p`
+is the encoding `a_e·v + (O_e mod p)`.
+
+The construction obtains those residues in two layers.
+
+1. **Conversion** (per coordinate, independent of the encodings). From the Lamport labels of `v`,
+   the evaluator obtains, for each odd modulus `m`, a *one-hot vector* of `m` labels indexed by
+   `Z_m` whose *hot* index is `v mod m`. For `m = 256` the one-hot vector is the leaf vector of the
+   lowest 8-bit chunk. Section 3.
+2. **Body** (per modulus, all encodings at once). Each slot `ρ` of a one-hot vector hashes to a
+   *pad vector*: one digit modulo `m` for each encoding. The garbler publishes, per encoding and
+   modulus, one residue join. The evaluator can hash every slot except the hot one, and the join
+   supplies what it misses. Section 4.
+
+The conversion of a coordinate publishes 3,546 blocks (56,736 bytes). The body publishes, per
+encoding, the 85 residue joins and one hint bit, packed into a 78-byte record.
+
+---
+
+## 3. The conversion
+
+### 3.1 Labels
+
+A label is a 128-bit block. Each coordinate has one global offset `Δ`. For an input bit `b` with
+garbler label (mask) `Z`, the evaluator holds `Z ⊕ b·Δ` (free XOR). A *one-hot vector* of `N` labels
+for a value `α < N` has the garbler's masks at every index and the evaluator's labels equal to them
+except at the hot index `α`, where they differ by `Δ`. The evaluator can hash the *cold* labels but
+never the hot one.
+
+An *arithmetic label* for a value `w` in `Z_{2^l}` is a vector of 128 *lanes* in `Z_{2^l}`: garbler
+mask `A`, evaluator label `A + w·Δ⃗`, where `Δ⃗` is `Δ` read lane by lane as 0 or 1 (Heath's word
+labels). Sums of arithmetic labels and products by public integers need no queries and publish
+nothing.
+
+A *cast* hashes a boolean leaf label into `128·l` bits and reads them as the lanes of an arithmetic
+label over `Z_{2^l}`. The lanes are aligned to the 128-bit blocks of the answers: `⌊128/l⌋` lanes per
+block, so no lane straddles two blocks. A *pin* of `l` blocks gives the evaluator the cast of the hot
+leaf: `P = Σ_α A_α + Δ⃗`, from which the evaluator subtracts the casts of all cold leaves.
+
+### 3.2 Chunks and trees
+
+Each coordinate `v` (its 254 little-endian bits) is cut into 32 chunks: 31 of 8 bits and one of 6.
+Per chunk, a *tree* turns the chunk's bit labels into a one-hot vector over its `2^k` values. A level
+of `2^n` labels grows by one bit as in xinshu's `bin-to-hot`: every slot `s` hashes to a material
+`y_s`; the new level has `G_s ⊕ y_s` at `s` and `y_s` at `s + 2^n`; the garbler publishes one join,
+`(⊕_s y_s) ⊕ z` with `z` the mask of the new bit. The evaluator hashes every slot except the active
+one and solves the active material from the join. A tree over `k` bits starts from the free pair
+`(z_0 ⊕ Δ, z_0)` and publishes `k − 1` joins.
+
+Every leaf of a chunk is then cast to an arithmetic label over `Z_{2^14}` (8 answers per leaf), and
+the chunk publishes a 14-block pin. The evaluator ends with the arithmetic labels
+`A_{c,α} + [α = α_c]·Δ⃗` of every leaf `α` of chunk `c`, where `α_c` is the chunk's value.
+
+### 3.3 Truth-table words
+
+For each odd modulus `m` the garbler and the evaluator form the same free linear combination of the
+chunk casts, with public coefficients `T_{c,m}(α) = (α·2^{8c}) mod m`:
+
+```
+W_m = Σ_c Σ_α T_{c,m}(α) · A_{c,α}      (reduced to ℓ_m bits)
+```
+
+Since exactly one leaf per chunk is hot, the evaluator's word is an arithmetic label of
+`σ_m = Σ_c T_{c,m}(α_c)`, and `σ_m ≡ v (mod m)` with `σ_m ≤ 32·(m − 1) < 2^{ℓ_m}`, where
+`ℓ_m = bitlen(32·(m − 1))` is 10 to 14 bits. These per-modulus tables (Heath's) keep the words short.
+They cost nothing.
+
+### 3.4 Extraction
+
+The word `W_m` must become boolean labels of the bits of `σ_m`. Extraction does this in three
+*stages*, as in the Duty-Free Bits reference code: stage 0 extracts bits `0..6` (width 7, casts of
+width `ℓ`); stage 1 extracts bits `7..ℓ − 2` (width `ℓ − 8`, casts of width `ℓ − 7`); stage 2 takes
+the top bit for free. A stage over `w` bits reduces the remaining word to `w` bits, takes its low
+lane bit as the first bit label, builds a tree over `w` bits, casts every leaf, and publishes the
+tree's `w − 1` joins and a pin. The evaluator's order is forced by data dependencies: at level `n` it
+reads the class sums of the leaves below the active node from the pin, peels bit `n` from them, and
+only then solves the level's join. The remaining word is then divided by `2^w` (exact, since the
+extracted part is subtracted first).
+
+### 3.5 From bits to a one-hot vector over `Z_m`
+
+- **Kept one-hot.** Stage 0's leaf vector is a one-hot vector of `σ_m mod 2^7`.
+- **Growth.** For `ℓ = 13` and `ℓ = 14` it grows by one or two more bits (bits 7 and 8, from stage 1)
+  with the tree step and one join per bit, to `k0 = max(7, ℓ − 5)` bits.
+- **Reindex.** Slot `ρ < m` of the new vector is the XOR of the kept slots `α ≡ ρ (mod m)`. Since
+  `2^{k0} ≥ m` for every modulus, no class is empty, and the hot slot is `(σ_m mod 2^{k0}) mod m`.
+  Free.
+- **Folds.** Each remaining bit `j = k0..ℓ − 1` rotates the hot index by `b_j · (2^j mod m)`: every
+  slot hashes to a material, the garbler publishes one join, the evaluator solves the hot material,
+  and the new vector is `h'[ρ] = h[ρ] ⊕ u_ρ ⊕ u_{ρ − s_j}` (the fold of the Duty-Free Bits code).
+
+The result is a one-hot vector over `Z_m` whose hot index is `σ_m mod m = v mod m`. The active slot at
+a tree level of `2^n` entries is `value mod 2^n` at every level; the construction states it that way
+throughout (a reference evaluator that read the second grown level from the low 7 bits failed at
+`v = p − 1`).
+
+### 3.6 The table
+
+The moduli are every prime from 17 to 439 (79 primes), the prime powers 49, 81, 121, 125, 169, and
+256: 85 pairwise coprime moduli whose product `M` has 623 bits (`log2 M = 622.26`). Every odd modulus
+follows one closed-form schedule: `ℓ = bitlen(32·(m − 1))`, stage widths `(7, ℓ − 8, 1)`,
+`k0 = max(7, ℓ − 5)`, growth `k0 − 7` bits, folds `ℓ − k0` bits. A modulus publishes `4ℓ − 17`
+blocks (23 to 39). With the chunks' 670 blocks this gives the 3,546 blocks of one coordinate.
+
+---
+
+## 4. The body, the records and the wrap hint
+
+### 4.1 Pad vectors and residues
+
+For each modulus `m` and each slot `ρ` of its one-hot vector, the slot's label is hashed into a pad
+integer of `256·q` bits (`q` answers), read as `S` digits modulo `m` (one per encoding of the
+coordinate) by the *fraction reading*: digit `e` is `⌊u·m^S/2^{256q}⌋ / m^e mod m`. The number of
+answers is `q = ⌈(bitlen(m^S) + 120)/256⌉` for odd `m` (120 bits of slack; the largest pad is 4,352
+bits) and `q = ⌈S/32⌉` for 256 (one byte per encoding).
+
+The garbler's residue of encoding `e` is `R_{e,m} = Σ_ρ ρ·V_ρ[e] mod m`, and it publishes the join
+`J_{e,m} = Σ_ρ V_ρ[e] + a_e mod m`. The evaluator hashes the `m − 1` cold slots and computes
+
+```
+L_{e,m} = Σ_{ρ≠hot} ρ·V_ρ[e] + hot · (J_{e,m} − Σ_{ρ≠hot} V_ρ[e])  =  R_{e,m} + (v mod m)·a_e   (mod m)
+```
+
+This is xinshu's scale-hot evaluation over `Z_m` instead of `F_p`.
+
+### 4.2 Reconstruction and the wrap hint
+
+The garbler's CRT offset is `O_e = crt(R_{e,·})`, uniform below `M`; the evaluator's CRT value is
+`w = crt(L_{e,·}) = (a_e·v + O_e) mod M`. The integer `a_e·v` is at most `(p − 1)²`, so `a_e·v + O_e`
+exceeds `M` only when `O_e > M − B` with `B = (p − 1)² + 1`. The garbler publishes the *wrap hint*
+`h_e = [O_e > M − B]`, and the evaluator adds `M` to `w` when `h_e = 1` and `w < B`. Since `2B ≤ M`,
+this recovers `a_e·v + O_e` exactly as a natural (`wrapHint_exact`), and its value modulo `p` is the
+delivered encoding `a_e·v + (O_e mod p)`. The hint is set with probability `(p − 1)²/M`, about `2^-115`, so it is
+nearly always 0; it costs no bytes because it shares the record (section 4.3).
+
+### 4.3 Records
+
+The record of encoding `e` is `h_e·M + Σ_i J_{e,i}·Π_{i'<i} m_{i'}` (mixed radix in modulus order),
+a natural below `2M < 2^624`, published in 78 bytes. The evaluator reads `h_e = ⌊record/M⌋` and the
+joins by division.
+
+---
+
+## 5. Gating the rows: masks keyed by the curve check
+
+The point rows are correct only on the curve. The curve check (xinshu's) turns the 5 curve
+encodings into a value `t'` that equals the garbler's secret `t` exactly when the input is on the
+curve. The evaluator hashes the low 128 bits of `t'` under a key tag into a mask key `K`, and reads
+from `K` a mask `π_e` for each of the 728 row encodings (the curve encodings carry no mask). The
+garbler sets the row offset to `b_e = (O_e mod p) − π_e`; the evaluator's row value is its delivered
+encoding minus `π_e`. Off the curve `t' ≠ t`, the evaluator cannot compute `K`, and every row value
+is masked. This is the masking of Duty-Free Bits' Embryo construction, with the curve check as the
+validity test. It replaces xinshu's gating, in which the point encodings' switch system runs on
+labels whitened by pads keyed on `H(t)`.
+
+Masks are read by xinshu's three-block rule `sampleFp` (three 128-bit blocks, reduced modulo `p`).
+Per digit, the three *collectors* (the `X` row's `x9`, the `Y` row's mixed encoding and the `Z` row's
+`x9`, 273 in all) each take two answers of their own; the other 455 row encodings are paired, three
+answers per pair, the last one alone in two answers: 1,229 answers.
+
+---
+
+## 6. The exception digest
+
+A digit's MAC fails at one *exceptional* input of the curve, which the garbler knows. xinshu's gadget
+lets the evaluator detect it through a 6-byte entry per digit. Here the entry is unlocked by a hash
+digest of the input's own labels: each of the 508 labels `Z_{κ,i} ⊕ b·Δ_κ` is hashed with the bit `b`
+in the tag, the digit's key is the XOR of the 508 hashes at the exceptional input's bits, and the
+entry's mask byte is the low byte of the hash of that key. The garbler hashes both labels of every
+position (1,016 queries) and one final per nonzero digit; the evaluator hashes its 508 labels and 91
+finals (599 queries). At a digit's exceptional input the evaluator's key equals the digit's key, and
+the entry unmasks.
+
+---
+
+## 7. One random function
+
+Every query of the entry is to the challenge's field hash. The two permutation families are unused,
+and the entry's index types for them are `Empty`. A query is made at `label + 2^128·tag`, where the
+tag names the site: family (chunk tree, chunk cast, extraction tree, extraction cast, growth, fold,
+body, masks, digest labels, digest finals, key), coordinate, modulus index, stage, level, slot and
+part. Tags are below `2^40`, so the inputs are below `p` and distinct sites never share an input.
+Correctness does not use this; privacy does (section 11).
+
+---
+
+## 8. Why the ciphertext is 182,936 bytes
 
 | Field | Contents | Bytes |
-|---|---|---|
-| `curve` | 3 curve-check constants | 96 |
-| `rows` | 91 digits × 11 constants × 32 B | 32,032 |
-| `exception` | 91 digits × 6-byte gadget entry | 546 |
-| 4 × `hot` | 4 lanes × `(254 − C)` fold joins × 16 B | 8,128 |
-| `scale` | `C` chunk words × 824 elements × 254 bits = 26,162 B | 3,322,574 |
-| **total** | `48,930 + 26,098 · C` at `C = 127` | **3,363,376** |
+|---|---|---:|
+| `curve` | 3 curve-check constants × 32 | 96 |
+| `rows` | 91 digits × 4 constants × 32 | 11,648 |
+| `exception` | 91 digits × 6-byte entry | 546 |
+| `crtX` | conversion of `x`: 3,546 blocks × 16 | 56,736 |
+| `crtY` | conversion of `y`: 3,546 blocks × 16 | 56,736 |
+| `recX` | 458 records × 78 | 35,724 |
+| `recY` | 275 records × 78 | 21,450 |
+| **total** | | **182,936** |
 
-Every field has a fixed width and there are no tags. So every public value encodes to the same
-length, and the byte-count theorem (`PlanB.Wire.ciphertextSize`) does not mention `garble` at
-all. Each chunk word packs its 824 field elements at 254 bits each, the exact bit length, without
-padding each element to 32 bytes.
-
-**The size is dominated by the chunk count.** Each chunk publishes one `F_p^824` join, whatever
-its width. So fewer, wider chunks mean fewer bytes: `C = 10` would give about 0.31 MB. The price
-of a wide chunk is paid in **queries**, not bytes. Section 4 shows that the query gates are what
-fix the chunk width.
+Every field has a fixed width and there is no tag, so every public value encodes to the same
+length (`Wire.encoding_length`). The conversion blocks are 62 percent of the total and do not depend
+on the number of encodings; each further encoding would cost 78 bytes.
 
 ---
 
-## 4. Query counts, and why the chunks are 2 bits wide
+## 9. Query counts
 
-The challenge bounds garbling at 1,759,967 queries and evaluation at 1,055,879. Each count is
-exact for the construction as written. Each distinct question is asked once, and a program
-reuses an answer only where it keeps that answer in a local table.
+Per coordinate, the garbler hashes every slot of every structure and the evaluator every slot but
+the hot one:
 
-| Family | Garbling | Evaluation |
-|---|---|---|
-| `scale-hot` masks: `3 · 824` blocks per switch | `3·824·Σ_c 2^(b_c)` = 1,255,776 | `3·824·Σ_c (2^(b_c) − 1)` = 941,832 |
-| `bin-to-hot` fold: 2 permutations per entry, level `j ≥ 1` | `4·Σ_c (2^(b_c+1) − 4)` = 2,032 | `4·Σ_c (2^(b_c+1) − 2b_c − 2)` = 1,016 |
-| Exception gadget: 508 labels per nonzero digit | ≤ 91 · 508 = 46,228 | 91 · 508 = 46,228 |
-| EncPRF pads: whitening shares the bit-0 pad | 1,016 | ≤ 1,016 (508 + one per set bit) |
-| Bridge-key hash `H(t)` | 1 | 1 |
-| **total** | **1,305,053** (25.8% under) | **990,093** (6.2% under) |
+| Part | Garbling `x` | Garbling `y` | Evaluation `x` | Evaluation `y` |
+|---|---:|---:|---:|---:|
+| chunk trees and casts | 71,936 | 71,936 | 71,458 | 71,458 |
+| extraction, growth, folds (84 odd moduli) | 207,160 | 207,160 | 204,924 | 204,924 |
+| body pads (85 moduli) | 267,916 | 166,643 | 266,721 | 165,895 |
+| **coordinate** | **547,012** | **445,739** | **543,103** | **442,277** |
 
-The switch masks dominate: `3 · 824` queries per switch, and `Σ_c 2^(b_c) ≥ 508` for any
-chunking of 254 bits, with equality only for widths 1 and 2. The evaluator pays for every
-**inactive** switch, not only the active one, because it must strip each inactive mask from
-the join. At `b = 3` evaluation would need 1,510,893 queries. At `b = 2` it fits with a 6% margin.
-Width 1 would also fit, but at `C = 254` it doubles the byte count. So `b = 2`, `C = 127` is the
-smallest ciphertext that fits both gates.
+| Fixed part | Garbling | Evaluation |
+|---|---:|---:|
+| mask key | 1 | 1 |
+| masks | 1,229 | 1,229 |
+| exception digest | 1,107 | 599 |
 
-The three-block sampler is kept. With `N = 824 · 508 = 418,592` sampled masks, the reduction
-bias is `N · (2^384 mod p) / 2^384 = 2^-111.9`.
-
-### How the programs are written
-
-The pure definitions recompute oracle values freely. For example, `offsets`, `scaleJoins` and
-`evalCoord` rerun a whole fold for each of the 824 elements. So they are not query programs.
-`Construction/OraclePrograms.lean` writes the garbler and the evaluator in a small free monad
-(`FreeQuery`) that:
-
-* runs each fold level by level and stores the answers;
-* asks each switch's mask vector once and reads it for the offsets, the join and the recovery;
-* shares the whitening pad with the bit-0 EncPRF pad;
-* asks the gadget labels once per digit.
-
-The program then assembles the public value from these answer tables. Two facts make it valid:
-
-* **Exact budget.** A separate predicate, `Bounded program n`, says that every path asks at most
-  `n` questions. `toProgram` turns a bounded free program into the library's indexed
-  `QueryProgram` at exactly that index.
-* **Equal output.** Each table's *real* counterpart, built from the oracle, is the pure
-  definition by `rfl`. The theorems `garbleProgram_correct` and `evaluateProgram_correct` show
-  that the programs equal the scheme for every complete oracle.
-
-An off-curve input is refused before any query is made.
+Totals: 995,088 garbling and 987,209 evaluation queries. The evaluation count is the same for every
+input, since every one-hot vector has exactly one hot slot. The budgets are sums over the 85 moduli
+in `Construction/CRT/Entry.lean`, evaluated by the kernel in `Construction/CRT/BudgetFacts.lean`.
 
 ---
 
-## 5. Perfect correctness
+## 10. Perfect correctness
 
-Correctness is exact for every tape, oracle and input, and nothing in it is probabilistic.
+Correctness holds for every tape, every hash function and every input on the curve (the evaluator
+refuses an off-curve input before its first query). It is stated wire by wire for an arbitrary hash
+function, with the answers at the hot positions as free parameters:
 
-* Every wire is an `F_p` element and every gate is `F_p`-linear. So the one-hot fold is an
-  identity (`Finset.sum_eq_single`), not an estimate. There is no working modulus and no
-  wraparound.
-* The switch resolution order depends only on the evaluator's cleartext input.
-* An off-curve input returns `some none` before the garbled program is touched.
-* The two Jacobian degeneracies go through the exception gadget, whose entry is a deterministic
-  function of the tape and the input.
+- every tree, growth and fold level gives the evaluator `mask ⊕ bit·Δ` at every slot and the solved
+  hot material;
+- every cast and pin gives `A + [hot]·Δ⃗`; every word is an arithmetic label of `σ_m`;
+- every extraction stage gives the bit labels of its bits and the exact remainder;
+- the body gives `R_{e,m} + (v mod m)·a_e mod m`, and `wrapHint_exact` gives `a_e·v + O_e`;
+- the curve check releases `t`, the key and masks match the garbler's, the rows are the Jacobian rows
+  at every on-curve input, the digest unlocks every exceptional digit, and the decoder's chain gives
+  the scalar multiple.
 
-These facts are proved in `Proof/Correctness/` and reach `Solution.perfectCorrectness` through
-the Lamport label adapter (`Lamport.restore_selected`).
-
----
-
-## 6. The privacy argument
-
-### 6.1 What has to be shown
-
-The adversary and the simulator share **one fixed lazy oracle**.
-
-- Every adversary query is answered by that oracle.
-- The simulator can only query it, look entries up, and *program* fresh points. A permutation
-  program needs a fresh input and a fresh output; a failed program ends the ideal experiment
-  with `false`.
-- The simulator is one closed arithmetic machine. Its code size plus both stage fuels must fit
-  in `2^60`.
-- Its first stage sees only the byte count. Its second stage sees the chosen input `u` and the
-  output `f_k(u)`.
-
-The advantage against it must satisfy `Adv · 2^100 ≤ T + 1`, where `T` is the adversary
-machine's code size plus its two fuels. Since `T + 1 ≥ q + 2`, a constant term below `2·2^-100`
-and a linear term below `2^-100` per query would suffice. The entry is far inside both.
-
-### 6.2 The simulator
-
-**Stage 1 programs nothing and asks nothing.** It publishes a table whose every field is drawn
-uniformly in source form:
-
-- the curve and row constants and the gadget bytes;
-- the fold joins;
-- the `127 × 824` scale joins as canonical field elements, packed exactly as the construction
-  packs them.
-
-It also keeps a uniform Lamport key.
-
-The table is right because of one global step. If *every* garbler switch mask is replaced by a
-uniform field element before the game starts, the real table becomes exactly uniform.
-- This replacement costs `N·δ₃ = 2^-111.86` with `N = 824·508`. It is affordable only because
-  the 2-bit chunks keep `N` small.
-- It is non-adaptive: no mask is singled out. That is what lets the published joins be exactly
-  uniform *for every way the adversary later chooses its input*.
-
-**Stage 2 opens the rows to `f_k(u)`.**
-
-- *Off the curve*, it returns the selected labels and nothing else. The real evaluator's
-  bridge value is then wrong, so every point-lane label is hidden in the real game too.
-- *On the curve*, it proceeds as follows.
-
-1. It replays the honest evaluator on the shared oracle:
-   - system A;
-   - the bridge hash;
-   - the 508 whitening pads;
-   - system B.
-2. It leaves out the 819 designated queries: at the inactive switch `j* = α₀ ⊕ 1` of chunk 0
-   in lane `pointX`, the three blocks of each digit's three *collector* elements.
-3. It picks the digit points that the rows must reach:
-   - the 90 tail points exactly as the garbler picks its mask points, i.e. the offsets of a
-     uniform coin;
-   - the head point by the group-law clamp `D₀ = Q − β·H(tail)`, so that Horner's rule returns
-     `Q = f_k(u)`;
-   - a Jacobian lift of each point with a fresh randomiser.
-4. It solves for the designated masks. Each row has a private unit-coefficient collector, and
-   the designated switch enters the evaluator's sum with coefficient `±1`, so the needed mask is
-   a subtraction.
-5. It programs each designated point with a uniform preimage of that mask under the three-block
-   sampler.
-
-The programmed switch is inactive, and that is deliberate. The evaluator never queries an
-active switch: it recovers the active entry from the join. Programming an active point would
-change nothing the adversary computes.
-
-- Flipping the low bit of `α₀` keeps the programmed input on the *visible* fold material.
-- The three-block sampler makes the programmed value's law exactly that of three fresh blocks
-  conditioned on their reduction.
-
-### 6.3 The chain of games
-
-| hop | change | cost |
-|---|---|---|
-| `R = G0` | the scored lazy real game equals the tape-sampled real game | 0 (proved) |
-| `G0 → G0U` | every garbler scale mask becomes uniform `F_p` | `N·δ₃` |
-| `G0U → G1U` | the entries the evaluator cannot compute are deleted at the input choice | `3q/2^128 + q/(p−1)` |
-| `G1U → HW` | public-first: the published cells and visible masks are jointly uniform for every selection rule; the gadget switches from the garbler's entries to uniform bytes; off the curve, the adversary's system-A masks go from swapped-uniform to Rule-S samples | `4q₁/2^128 + 182/(r−1) + N·δ₃` |
-| `HW → H` | the real digit rows are replaced by the tail, clamp and lift sampler | `364/(r−1)` |
-| `H → I^U` | the 819 programs can abort, charged per stage-1 query at its own candidate index | `2q₁/(2^128 − q₁)` |
-| `I^U → I` | the other masks go back to lazily queried values | `N·δ₃ + q₁·(1/2^128 + 1/(2^128 − q₁))` |
-| `I → M` | the machine's bounded samplers | `≤ 2^-128` |
-
-Four points in this chain are worth stating.
-
-- **The abort term.** A designated index names its switch. Each stage-1 query is therefore
-  charged to at most one of the `4·819` candidate indices. Its recorded pair collides with the
-  program only if the hidden label `E*` equals its domain, or equals its range shifted by the
-  programmed limb. The limb is drawn independently of `E*`, so both cases cost the label's
-  min-entropy, `1/(2^128 − q₁)`. The limb's own point masses are *not* small enough to use
-  directly.
-- **The doubling case.** If the adversary's input doubles a digit (the digit's point equals its
-  mask point), the real rows are `(0,0,0)`, which a lift never produces. The real gadget then
-  unlocks the true digit, while the simulator's gadget bytes are uniform. The simulator does not
-  reproduce the case. It is charged twice, once in each hop where it makes a difference:
-  - `182/(r−1)` in the public-first hop, where the gadget becomes uniform;
-  - inside `364/(r−1)`, together with the offset restrictions, in the opening hop, where the rows
-    become lifts.
-- **The constant part** is `3·N·δ₃ + 182/(r−1) + 364/(r−1) + 2^-128 ≈ 2^-110.28`, more than 10 bits
-  under its allowance.
-- **The linear part** is 11 units of `q/2^128`, about `2^-124.5` per query.
-
-### 6.4 The machine
-
-The simulator's machine samples about `10^5` field cells by bounded rejection, serialises the
-table, and in stage 2 replays about `9.4·10^5` lazy queries and makes 819 programs. Its designed
-total is `size + 1 + fuels = 83,344,643,287 ≈ 2^36.3`, far inside `2^60`.
-
-The machine reaches `FixedIndex` through `Fintype.equivFin`, and it embeds those ordinals as
-constants. Its law, `MachineLaw planBSimulator 2^-128`, is proved: stage 1 and stage 2 of the
-machine are the abstract simulator's stages run on bounded samplers, and the samplers' cutoff
-mass is below `2^-128`.
+Nothing in the chain depends on the tags, the pad slack or the oracle's values. The statement over an
+arbitrary hash function also serves the privacy proof, which runs the garbler on answer tables with
+the hot positions overridden.
 
 ---
 
-## 7. Status
+## 11. The privacy argument
 
-Every obligation of `Kriterion.Solution` is proved. These are:
+### 11.1 The chain
+
+The obligation, the lazy oracle and the shape of the chain are xinshu's. The chain is
+
+```
+G0 → G0T → G0U → G1U → HW → H → I → M
+```
+
+- `G0 → G0T`: the mask key's input is a labelled query, so the real game is the game on an answer
+  table indexed by tags, except when `t` equals one of the garbler's 995,088 inputs.
+- `G0T → G0U`: every pad vector and every mask, read from a uniform integer by a slightly biased
+  reading, is swapped for an exactly uniform value (the pad-slack and `sampleFp` biases).
+- `G0U → G1U`: the garbler's hidden entries (the hot slot of every one-hot structure, the other
+  bit's digest positions and the other digits' finals, and off the curve the key and the masks) are
+  deleted from the oracle. The adversary finds one only by guessing a label `E ⊕ Δ` or a field
+  element, `4/2^128 + 1/(p − 1)` per query. One event is charged once instead of per query: a curve
+  encoding's CRT offset in the wrap window, where its hint could pin the curve mask; its mass is below
+  the wrap-hint term of section 11.3.
+- `G1U → HW`: the public-first hop. The published value is drawn first, uniform, and the view is
+  reconstructed from it (sections 11.2 to 11.5).
+- `HW → H`: the rows are replaced by the lift sampler; xinshu's opening and kernel bound.
+- `H → I`: the pads are swapped back.
+- `I → M`: the closed simulator machine (section 12).
+
+### 11.2 The conversion core: solving inverts garbling
+
+Fix the input. Every join and pin of the conversion and every residue join of the body is a hidden
+answer (the hot slot's material, the hot leaf's cast or the hot pad vector) combined with values
+the evaluator can compute. The map from the hidden answers to the published conversion material is
+a bijection between sets of equal size, and its inverse is the honest evaluator's own solving
+procedure, which recovers every hidden answer from the published values. This is the correctness
+statement of section 10 read with the hot answers as free parameters. A bijection sends the uniform
+law to the uniform law, so the published conversion material is exactly uniform and independent of
+everything else the evaluator sees. The fused extraction, whose evaluator uses a pin before the join
+of the same level, needs no special treatment: the argument uses only that the procedure is a function
+of the published values that recovers every hidden answer.
+
+In the random-oracle model this replaces the circular correlation robustness that Duty-Free Bits
+assumes: the hidden answers are never installed, the view does not involve `Δ`, and a query at a
+hidden label succeeds with probability `2^-128`.
+
+### 11.3 The wrap hint in the proof
+
+After the pad swap the CRT offset `O` is uniform below `M`. The map `O ↦ w = (a·v + O) mod M` is a
+bijection, and off the event `O > M − B` the real hint is 0, the real integer is `w` and the row
+offset is `(w − a·v) mod p`: exactly the ideal values with `w` uniform. The event has probability
+`(p − 1)²/M` per encoding. The chain charges it for all 733 encodings, twice, because the proof flags
+the two-sided window `[0, B − 1) ∪ (M − B, M)` of the CRT values (it cannot see `a_e·v`, so a value
+with the hint set may land at either end), plus `273·p/M` for the collectors' constants:
+`smudgeError = (1466·(p − 1)² + 273·p)/M ≈ 2^-104.55`.
+
+### 11.4 What the simulator programs
+
+In the ideal game the simulator learns the output only after the adversary's input. It replays the
+honest evaluator on the lazy oracle up to and including the non-collector masks, reconstructs every
+row value, solves the target of each digit's three collectors from the output, and programs each
+collector's mask: 546 hash answers, each pair a uniform `sampleFp` preimage of the needed field
+element (xinshu's preimage machinery). The CRT layer itself is never programmed. This works because
+each row is affine in its collector's value with a nonzero coefficient (1, `y` or 1; `y ≠ 0` on
+BN254), and the collector's mask pays for the row's constant: for a fixed delivered value, the map
+from the constant to the mask is a bijection of `F_p`.
+
+### 11.5 Off the curve
+
+Off the curve the evaluator evaluates the whole CRT layer on its raw labels, and by sections 11.2
+and 11.3 everything it obtains there is uniform. It cannot compute `K`, so every mask is hidden, the
+row offsets contain hidden masks, and the row constants are uniform. The curve check's delivered
+value is uniform. The simulator returns labels only.
+
+### 11.6 The budget
+
+The error terms, as stated in `Proof/Privacy/CRT/Glue/Budget.lean`:
+
+| Hop | Term | Value |
+|---|---|---:|
+| `G0 → G0T` | `995,088/p` | `2^-233.67` |
+| `G0T → G0U`, `G1U → HW`, `H → I` | pad and mask swap, three times | `2^-113.07` each |
+| `G0U → G1U` | per query `4/2^128 + 1/(p − 1)` | `2^-126` per query |
+| `G0U → G1U` | the curve encodings' wrap window (section 11.1) | `2^-104.55` |
+| `G1U → HW` | stage-1 touches, per stage-1 query | `2^-126` per query |
+| `G1U → HW` | wrap hint and collectors (section 11.3) | `2^-104.55` |
+| `G1U → HW` | doubling `273/(r − 1)`, coincidences `94/2^128` | `2^-245.5`, `2^-121.4` |
+| `HW → H` | output kernel `364/(r − 1)` | `2^-245.1` |
+| `I → M` | sampler cutoff | `2^-128` |
+
+The constant part is about `2^-103.54`, 0.086 of the unit `2^-100` (the two wrap-hint terms are
+almost all of it), and the linear part is `2^-125` per stage-1 query (the hidden hop's charge and the
+stage-1 touch) and `2^-126` per stage-2 query, so `Adv · 2^100 ≤ q₁ + q₂ + 1`, which is at most the
+adversary's step count plus one. Each share is one closed inequality of naturals decided by the
+kernel (`chainError_budget`).
+
+---
+
+## 12. The simulator machine
+
+The machine is written in xinshu's structured assembly (`Prog`, compiled to the library's flat code
+table with a compiler-correctness theorem, one cost on every non-aborting path) with his two-stage
+layout.
+
+- **Stage 1** draws the public value: the curve and row constants as field elements by bounded
+  rejection, the exception bytes, the joins and pins as coin words, each record's 85 residue digits
+  by bounded rejection below `m_i` (so the record is uniform below `M`, with hint 0), and the Lamport
+  key; it serializes them with `Wire.encoding`, computing each 624-bit record by Horner's rule over
+  128-bit limbs.
+- **Stage 2** replays the honest CRT evaluator on the shared lazy oracle: 986,064 queries (the
+  conversion and body of both coordinates, the key and the 683 non-collector mask answers). The
+  machine has 256-bit words and no division; it reads pad digits by the fraction reading with one
+  multi-limb multiply-add primitive and a Barrett reduction, and reconstructs with Garner's method,
+  the hint and the reduction modulo `p`. It then solves the collectors, samples their preimages and
+  makes the 546 programs.
+
+The machine is one closed `BoundedMachine.Simulator` (`CrtTop.crtSimulator`). Its law has xinshu's
+three parts: stage 1's law (the drawn value has exactly the law of the public-first source), stage 2's
+law (each arm computes what the abstract simulator computes, from the memory stage 1 leaves), and the
+sampler cutoff (`2^-128`). The cost bound `size + 1 + firstFuel + secondFuel ≤ 2^60` is proved from
+per-block bounds (every block's size and cost is at most `2^55`); the proofs about the machine keep the
+sizes and costs of stage 1 and of the replay as variables, so no kernel check evaluates those programs.
+
+---
+
+## 13. Status
+
+Every obligation of `Kriterion.Solution` is proved:
 
 * computable garbling, with query programs at exact budgets and their equality proofs;
 * Lamport compatibility;
 * perfect correctness;
 * function correctness;
 * the fixed byte count;
-* adaptive privacy.
+* adaptive privacy, with the closed simulator machine and its `2^60` cost bound.
 
-`#print axioms Submission.solution` reports exactly `propext`, `Classical.choice` and
-`Quot.sound`.
+`#print axioms Submission.solution` reports exactly `propext`, `Classical.choice` and `Quot.sound`.
 
-`adaptivePrivacy` is the proved top-level assembly. It yields exactly the field's type from
-these inputs, all proved:
+---
 
-- the mask swaps;
-- the hidden hop;
-- the public-first hop `G1U → HW` of §6.3, on top of its exact joint-law core;
-- the opening;
-- the abort mass;
-- the machine law of the closed simulator machine, with its `2^60` cost bound.
+## 14. Credits
 
-Also proved are:
+* **Nakul Khambhati, Anwesh Bhattacharya and David Heath**, *Duty-Free Bits: Projectivizing Garbling
+  Schemes* (ePrint 2026/476): the CRT-residue projectivization (one-hot trees, casts and pins,
+  extraction, folds, the body), the switch systems, and the Embryo masking.
+* **David Heath**, *Efficient Arithmetic in Garbled Circuits* (ePrint 2024/139): arithmetic labels
+  and per-modulus truth tables.
+* **Nakul Khambhati, Aaron Feickert, Christian Lewe and Mukesh Tiwari**, *Garbling Groth16 with
+  Native Group Operations* (ePrint 2026/2100): the delivery of Argo MAC field encodings through the
+  Duty-Free Bits CRT residues, with a fixed conversion per input and a cost per encoding, which this
+  entry's delivery layer follows.
+* **The challenge's ArgoMAC baseline** (`Kriterion-cc/argomac-lean`, Runchao Han): the first ArgoMAC
+  garbling of the challenge in Lean, the starting point of the ArgoMAC entries.
+* **xinshu** (`xinshudong/bn254-entry`, `bf53ea4`): the Plan B framework this tree descends from, a
+  switch-system entry with a complete proof, whose architecture this entry extends: the obligation's
+  reduction, the lazy oracle, the chain of games and the structure of the privacy proof, the
+  public-first hop, the opening, the simulator machine and its assembly language, the curve check,
+  the exception gadget and the decoder.
+* **Lazar** (`Lazar955/argomac-lean`): the Jacobian rows in the contest, the coefficient cut, the
+  four-encoding `Y` row (published first), and the proof that 3 is a quadratic non-residue modulo
+  `p`, so that no point of BN254 has `x = 0`.
+* **liucheng** (`liuchengxu/kriterion-scalar-multiplication-honest`): the 91-digit decomposition.
+* **Liam Eagen and Ying Tong Lai**, *Argo MAC: Garbling with Elliptic Curve MACs* (ePrint 2026/049).
+* **Sanjam Garg, Dimitris Kolonelos, Mikhail Sergeevitch, Srivatsan Sridhar and David Tse**, *BABE:
+  Verifying Proofs on Bitcoin Made 1000x Cheaper* (ePrint 2026/065): the Jacobian rows.
 
-- the exact equality of the scored real game with the tape-sampled one;
-- the exact identification of the library's ideal game with the abstract simulator of §6.2;
-- the budget arithmetic.
+The contest tunings are this entry's own: the modulus set and the closed-form schedule, the
+block-aligned casts, the fraction reading with 120 bits of slack, the wrap hint and the per-encoding
+records, the labelled mask key, the hash digest for the exception gadget, the hash-only oracle, and
+the Lean construction and proofs, including the conversion core by solve inversion, the wrap-hint
+coupling, the route that programs only the collectors' masks, and the simulator machine.
 
 This entry was written with AI coding agents under human direction and review.

@@ -3,21 +3,21 @@ This file defines the Plan B byte layout and proves the ciphertext-size theorem.
 
 The plan source is `2026-09-17-planB.md`, section D.5 and Task 11.
 `Public` carries no `Option` tag, so every inhabitant encodes to exactly
-`ciphertextBytesConstant = 3363376` bytes and the theorem is independent of `garble`.
+`ciphertextBytesConstant = 2976089` bytes and the theorem is independent of `garble`.
 
 | Field       | Encoding                                | Formula        | Bytes   |
 |-------------|-----------------------------------------|----------------|---------|
 | `curve`     | `3 * field`                             | `3 * 32`       | 96      |
-| `rows`      | `Vector rowGamma 91`                    | `91 * 352`     | 32,032  |
+| `rows`      | `Vector rowGamma 91`                    | `91 * 128`     | 11,648  |
 | `exception` | `Vector entry 91`                       | `91 * 6`       | 546     |
 | `curveXHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `curveYHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `pointXHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `pointYHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
-| `scale`     | `Vector chunkWord 127`                  | `127 * 26162`  | 3,322,574 |
-| **total**   |                                         |                | **3,363,376** |
+| `scale`     | `Vector chunkWord 127`                  | `127 * 23273`  | 2,955,671 |
+| **total**   |                                         |                | **2,976,089** |
 
-Rule N: the only fact about the `209296`-bit word is `pow_width`, proved symbolically in
+Rule N: the only fact about the `186184`-bit word is `pow_width`, proved symbolically in
 `Construction/PGS/Packing.lean`; the numeral itself is never formed.
 -/
 
@@ -68,14 +68,11 @@ private def entry : Encoding Exception.Entry := gadgetByte.vector 6
 /-- The whole gadget, `91 * 6 = 546` bytes. -/
 private def gadget : Encoding (Vector Exception.Entry digitCount) := entry.vector digitCount
 
-/-- One digit's eleven published row constants, `11 * 32 = 352` bytes. -/
+/-- One digit's four published row constants, `4 * 32 = 128` bytes. -/
 private def rowGamma : Encoding RowGamma :=
-  (field.pair (field.pair (field.pair (field.pair (field.pair (field.pair (field.pair
-    (field.pair (field.pair (field.pair field)))))))))).map
-    (fun value => (value.xC0, value.xC1, value.xC2, value.xC4, value.yC0, value.yC2,
-      value.yC3, value.yC4, value.yC5, value.zC0, value.zC1))
-    (fun ⟨xC0, xC1, xC2, xC4, yC0, yC2, yC3, yC4, yC5, zC0, zC1⟩ =>
-      ⟨xC0, xC1, xC2, xC4, yC0, yC2, yC3, yC4, yC5, zC0, zC1⟩)
+  (field.pair (field.pair (field.pair field))).map
+    (fun value => (value.xC0, value.yC0, value.yC4, value.zC0))
+    (fun ⟨xC0, yC0, yC4, zC0⟩ => ⟨xC0, yC0, yC4, zC0⟩)
     (fun _ => rfl)
 
 /-- The curve-membership check, `3 * 32 = 96` bytes. -/
@@ -88,7 +85,7 @@ private def rowVector : Encoding (Vector RowGamma digitCount) := rowGamma.vector
 /-- One coordinate's `bin-to-hot` fold joins. -/
 private def hotVector : Encoding (Vector Block foldStepCount) := block.vector foldStepCount
 
-/-- The `19` chunk words. -/
+/-- The `127` chunk words. -/
 private def scaleVector : Encoding (Vector (BitVec chunkJoinBits) chunkCount) :=
   chunkWord.vector chunkCount
 
@@ -104,7 +101,7 @@ def encoding : Encoding Public :=
 
 /-! ### Sizes
 
-`Encoding.natural chunkJoinBytes` is a `26162`-fold structural recursion, so nothing may force
+`Encoding.natural chunkJoinBytes` is a `23273`-fold structural recursion, so nothing may force
 a concrete chunk-word encoding: any defeq check that reaches `List.length` of one exhausts the
 kernel's stack. `SizedBy` keeps every such check at the `Encoding` level, where the comparison
 is a single delta step, and the concrete byte counts only ever meet as `Nat` arithmetic. -/
@@ -148,25 +145,23 @@ private theorem entry_sized : SizedBy entry 6 := sizedBy_vector gadgetByte_sized
 
 private theorem gadget_sized : SizedBy gadget 546 := sizedBy_vector entry_sized digitCount
 
-private theorem rowGamma_sized : SizedBy rowGamma 352 :=
+private theorem rowGamma_sized : SizedBy rowGamma 128 :=
   sizedBy_map (sizedBy_pair field_sized (sizedBy_pair field_sized (sizedBy_pair field_sized
-    (sizedBy_pair field_sized (sizedBy_pair field_sized (sizedBy_pair field_sized
-      (sizedBy_pair field_sized (sizedBy_pair field_sized (sizedBy_pair field_sized
-        (sizedBy_pair field_sized field_sized)))))))))) _ _ _
+    field_sized))) _ _ _
 
 private theorem curveTriple_sized : SizedBy curveTriple 96 :=
   sizedBy_pair field_sized (sizedBy_pair field_sized field_sized)
 
-private theorem rowVector_sized : SizedBy rowVector 32032 :=
+private theorem rowVector_sized : SizedBy rowVector 11648 :=
   sizedBy_vector rowGamma_sized digitCount
 
 private theorem hotVector_sized : SizedBy hotVector 2032 :=
   sizedBy_vector block_sized foldStepCount
 
-private theorem scaleVector_sized : SizedBy scaleVector 3322574 :=
+private theorem scaleVector_sized : SizedBy scaleVector 2955671 :=
   sizedBy_vector chunkWord_sized chunkCount
 
-/-- The complete layout: `96 + 32032 + 546 + 4 * 2032 + 3322574`. -/
+/-- The complete layout: `96 + 11648 + 546 + 4 * 2032 + 2955671`. -/
 private theorem encoding_sized : SizedBy encoding ciphertextBytesConstant :=
   sizedBy_map (sizedBy_pair curveTriple_sized (sizedBy_pair rowVector_sized
     (sizedBy_pair gadget_sized (sizedBy_pair hotVector_sized
@@ -176,7 +171,7 @@ private theorem encoding_sized : SizedBy encoding ciphertextBytesConstant :=
 /-- The byte table of plan D.5 with Task 19a's four fold-join vectors, as an arithmetic
 identity. -/
 theorem byteArithmetic :
-    3 * 32 + 91 * (11 * 32) + 91 * 6 + 4 * (127 * 16) + 127 * 26162 = 3363376 := by
+    3 * 32 + 91 * (4 * 32) + 91 * 6 + 4 * (127 * 16) + 127 * 23273 = 2976089 := by
   norm_num
 
 /-- **Every** public value encodes to exactly `ciphertextBytesConstant` bytes.
@@ -185,10 +180,10 @@ theorem encoding_length (value : Public) :
     (encoding.encode value).length = ciphertextBytesConstant :=
   encoding_sized value
 
-/-- The construction-facing corollary: the Plan B ciphertext is `3363376` bytes for every
-garbling, whatever the tape, because it is `3363376` bytes for every inhabitant of `Public`. -/
+/-- The construction-facing corollary: the Plan B ciphertext is `2976089` bytes for every
+garbling, whatever the tape, because it is `2976089` bytes for every inhabitant of `Public`. -/
 theorem garble_length (value : Public) :
-    (encoding.encode value).length = 3363376 :=
+    (encoding.encode value).length = 2976089 :=
   encoding_length value
 
 end Kriterion.ArgoMAC.PlanB.Wire

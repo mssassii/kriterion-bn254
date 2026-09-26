@@ -33,7 +33,7 @@ namespace Design
 inductive Phase
   /-- Pop the two protocol tag bits. -/
   | dispatch
-  /-- Stage 1: `105,652` bounded-rejection field cells (curve, rows, scale joins). -/
+  /-- Stage 1: `93,458` bounded-rejection field cells (curve, rows, scale joins). -/
   | fields
   /-- Stage 1: `546` exception bytes. -/
   | bytes
@@ -41,13 +41,13 @@ inductive Phase
   | hotJoins
   /-- Stage 1: the `1016`-block Lamport key. -/
   | key
-  /-- Stage 1: emit the `26,907,008` wire bits of `Wire.encoding`. -/
+  /-- Stage 1: emit the `23,808,712` wire bits of `Wire.encoding`. -/
   | serialize
   /-- Stage 2: parse `u` and `f_k u`. -/
   | parse
   /-- Stage 2: select one key label per input bit. -/
   | selectLabels
-  /-- Stage 2 valid: zero the `824` accumulators. -/
+  /-- Stage 2 valid: zero the `733` accumulators. -/
   | initAcc
   /-- Stage 2 valid: system A (`curveX`, `curveY`), `6,223` fixed queries. -/
   | systemA
@@ -87,7 +87,7 @@ def phases : List Phase :=
 def laneQueries (count : Nat) : Nat := 127 * (2 + 3 * (3 * count))
 
 /-- Stage 2's forward queries: systems A and B, less the `819` designated blocks. -/
-def fixedQueries : Nat := laneQueries 3 + laneQueries 2 + laneQueries 455 - 819 + laneQueries 364
+def fixedQueries : Nat := laneQueries 3 + laneQueries 2 + laneQueries 455 - 819 + laneQueries 273
 
 /-- Stage 2's oracle queries: fixed, one hash, `508` EncPRF pads. -/
 def stage2Queries : Nat := fixedQueries + 1 + 508
@@ -95,20 +95,21 @@ def stage2Queries : Nat := fixedQueries + 1 + 508
 /-- Stage 2's programs. -/
 def stage2Programs : Nat := 91 * 3 * 3
 
-theorem fixedQueries_eq : fixedQueries = 942029 := rfl
-theorem stage2Queries_eq : stage2Queries = 942538 := rfl
+theorem fixedQueries_eq : fixedQueries = 838016 := rfl
+theorem stage2Queries_eq : stage2Queries = 838525 := rfl
 theorem stage2Programs_eq : stage2Programs = 819 := rfl
 
-/-- The honest evaluator's `990,093` queries are the machine's `942,538` plus the `508`
+/-- The honest evaluator's `886,080` queries are the machine's `838,525` plus the `508`
 bit-`true` pads it may ask and the `46,228` gadget hashes, which the opening does not need,
 plus the `819` designated blocks, which it programs instead. -/
-theorem evaluator_queries : stage2Queries + stage2Programs + 508 + 46228 = 990093 := rfl
+theorem evaluator_queries : stage2Queries + stage2Programs + 508 + 46228 = 886080 := rfl
 
 /-! ### Instruction counts -/
 
-/-- The serializer: `2 + 3 · width` per cell. -/
+/-- The serializer: `2 + 3 · width` per cell, and `1 + 3 · 2` for the two zero bits of each
+chunk word. -/
 def serializeCount : Nat :=
-  scaleCellCount * (2 + 3 * 254) + hotBlockCount * (2 + 3 * 128) +
+  127 * ((1 + 3 * 2) + 733 * (2 + 3 * 254)) + hotBlockCount * (2 + 3 * 128) +
     exceptionByteCount * (2 + 3 * 8) + (curveCellCount + rowCellCount) * (2 + 3 * 256)
 
 /-- Stage 1: code slots and fuel. -/
@@ -128,18 +129,18 @@ def invalidSize : Nat := labelCount * (2 + 3 * 128)
 
 /-- The replay. -/
 def replaySize : Nat :=
-  (1 + 824 * 2) + 127 * (141 + 176 * 3) + 127 * (141 + 176 * 2) + 40 + (4 + 508 * 8) +
-    (83 + 4 * 28411 + 8 * 455 + 126 * (141 + 176 * 455)) + 127 * (141 + 176 * 364)
+  (1 + 733 * 2) + 127 * (141 + 176 * 3) + 127 * (141 + 176 * 2) + 40 + (4 + 508 * 8) +
+    (83 + 4 * 28411 + 8 * 455 + 126 * (141 + 176 * 455)) + 127 * (141 + 176 * 273)
 def replayCost : Nat :=
-  (1 + 824 * 2) + 127 * (89 + 92 * 3) + 127 * (89 + 92 * 2) + 40 + (4 + 508 * 8) +
-    (59 + 4 * 11205 + 8 * 455 + 126 * (89 + 92 * 455)) + 127 * (89 + 92 * 364)
+  (1 + 733 * 2) + 127 * (89 + 92 * 3) + 127 * (89 + 92 * 2) + 40 + (4 + 508 * 8) +
+    (59 + 4 * 11205 + 8 * 455 + 126 * (89 + 92 * 455)) + 127 * (89 + 92 * 273)
 
 /-- The opening. -/
 def openingSize : Nat :=
-  90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34 + 91 * 105 + 91 * (3 * 236623) +
+  90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34 + 91 * 76 + 91 * (3 * 236623) +
     91 * (3 * (3 * 34)) + 16
 def openingCost : Nat :=
-  90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34 + 91 * 105 + 91 * (3 * 169548) +
+  90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34 + 91 * 76 + 91 * (3 * 169548) +
     91 * (3 * (3 * 30)) + 16
 
 /-- The valid arm. -/
@@ -170,21 +171,21 @@ def secondFuel : Nat := 2 + prefixCost + 1 + validCost + 1
 /-- **The simulator's charge**, `size + 1 + firstFuel + secondFuel`. -/
 def totalCost : Nat := size + 1 + firstFuel + secondFuel
 
-theorem stage1Size_eq : stage1Size = 48389712564 := rfl
-theorem stage1Cost_eq : stage1Cost = 34649165432 := rfl
-theorem validSize_eq : validSize = 178145892 := rfl
-theorem validCost_eq : validCost = 127397302 := rfl
-theorem size_eq : size = 48568069839 := rfl
-theorem firstFuel_eq : firstFuel = 34649165435 := rfl
-theorem secondFuel_eq : secondFuel = 127408012 := rfl
+theorem stage1Size_eq : stage1Size = 42804918601 := rfl
+theorem stage1Cost_eq : stage1Cost = 30650213363 := rfl
+theorem validSize_eq : validSize = 176109039 := rfl
+theorem validCost_eq : validCost = 126331237 := rfl
+theorem size_eq : size = 42981239023 := rfl
+theorem firstFuel_eq : firstFuel = 30650213366 := rfl
+theorem secondFuel_eq : secondFuel = 126341947 := rfl
 
-theorem totalCost_eq : totalCost = 83344643287 := rfl
+theorem totalCost_eq : totalCost = 73757794337 := rfl
 
 /-- **The cost bound**: `size + 1 + firstFuel + secondFuel ≤ 2 ^ 60`. -/
 theorem totalCost_le : totalCost ≤ 2 ^ 60 := by
   rw [totalCost_eq]; decide
 
-/-- The charge is below `2 ^ 37` (about `2 ^ 36.28`): `23` bits of margin. -/
+/-- The charge is below `2 ^ 37` (about `2 ^ 36.10`): `23` bits of margin. -/
 theorem totalCost_lt_two_pow_37 : totalCost < 2 ^ 37 := by
   rw [totalCost_eq]; decide
 

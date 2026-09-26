@@ -47,12 +47,12 @@ theorem agree_desChunkBody [DecidableEq PlanB.FixedIndex] (bits : BitInput)
     (offJ : OffScratch (word (hotBase + 127 * Replay.pointXSpec.hotRow + chunk.val)))
     (cells : ∀ e, e < pointElementCountX → memory.ram (accCell Replay.pointXSpec e) = fieldWord (acc0 e))
     (joins : ∀ e : Fin pointElementCountX,
-      memory.ram (word (scaleCellBase + 824 * chunk.val + Replay.pointXSpec.slot + e.val)) =
+      memory.ram (word (scaleCellBase + 733 * chunk.val + Replay.pointXSpec.slot + e.val)) =
         fieldWord (scaleJ e))
     (joinAway : ∀ e first, e < pointElementCountX → first < pointElementCountX →
-      word (scaleCellBase + 824 * chunk.val + Replay.pointXSpec.slot + e) ≠ accCell Replay.pointXSpec first)
+      word (scaleCellBase + 733 * chunk.val + Replay.pointXSpec.slot + e) ≠ accCell Replay.pointXSpec first)
     (joinOff : ∀ e, e < pointElementCountX →
-      OffScratch (word (scaleCellBase + 824 * chunk.val + Replay.pointXSpec.slot + e))) :
+      OffScratch (word (scaleCellBase + 733 * chunk.val + Replay.pointXSpec.slot + e))) :
     Agree (fun (result : (Fin pointElementCountX → BaseField) × Record) after =>
         ∃ star : Block, DesChunkPost bits acc0 memory (designatedSwitch bits).val star
           (kappa bits) result after)
@@ -70,7 +70,7 @@ theorem agree_desChunkBody [DecidableEq PlanB.FixedIndex] (bits : BitInput)
   unfold Replay.chunkBody
   rw [rtree_seq]
   have alphaSmall : alpha.val < 4 := alpha.isLt
-  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 824 := by decide
+  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 733 := by decide
   refine Agree.bindOpt (fun result afterFold foldPost => ?_)
     ((agree_chunkPrefix Replay.pointXSpec chunkZero memory coord coordSmall L0 L1 J coordCell label0
       label1 joinCell off0 off1 offJ).map (Post' := fun result after =>

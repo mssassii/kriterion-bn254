@@ -11,7 +11,8 @@ This module supplies
   fixed-key permutation unchanged;
 * `maskSwapBound_real : Glue.HopBound Glue.realHybrid maskSwappedHybrid (fun _ _ => Glue.maskSwapError)`
   — P3's field `MaskSwapBound.real`, verbatim, with P3's constant `maskSwapError = 824 · 508 ·
-  (2^384 mod p) / 2^384` matched **exactly** (`maskSwapError_eq`).
+  (2^384 mod p) / 2^384`, an upper bound on `N · δ₃` for the `N = 733 · 508` masks
+  (`maskSwapError_ge`).
 
 The proof: `G0` is `realGame` on `(realTape uniform).map reassemble` (`uniform_eq_realTape`, a
 bijection of the tape; the instance mismatch of `Fintype.ofFinite` against the derived instances is
@@ -148,14 +149,15 @@ theorem realGame_etvDist_le [FieldCertificate] [GroupCertificate]
   unfold realGame
   exact PMF.etvDist_bind_right_le _ first second
 
-/-- P3's constant is exactly `N · δ₃`. -/
-theorem maskSwapError_eq :
-    Kriterion.ArgoMAC.Phase3.Glue.maskSwapError
-      = ((Fintype.card MaskSite : ℝ≥0∞) * delta3).toReal := by
+/-- P3's constant `N'·δ₃` bounds `N · δ₃` (`N = 733 · 508 ≤ N' = 824 · 508`). -/
+theorem maskSwapError_ge :
+    ((Fintype.card MaskSite : ℝ≥0∞) * delta3).toReal
+      ≤ Kriterion.ArgoMAC.Phase3.Glue.maskSwapError := by
   rw [Kriterion.ArgoMAC.Phase3.Glue.maskSwapError, Kriterion.ArgoMAC.Phase3.Glue.scaleMaskCount,
     card_maskSite, delta3, reductionResidue, ENNReal.toReal_mul, ENNReal.toReal_div]
   norm_num
-  ring
+  rw [mul_div_assoc]
+  exact mul_le_mul_of_nonneg_right (by norm_num) (by positivity)
 
 /-- **`G0 → G0U` in the challenge's currency, at any instances.** -/
 theorem advantage_real_swapped_le [FieldCertificate] [GroupCertificate] [Fintype FixedIndex]
@@ -166,11 +168,12 @@ theorem advantage_real_swapped_le [FieldCertificate] [GroupCertificate] [Fintype
         (realGame Scheme.scheme (fun _ => swappedChallengeTape) (publicHandler Prod.snd) adversary
           parameter scalar ())
       ≤ Kriterion.ArgoMAC.Phase3.Glue.maskSwapError := by
-  rw [tapeRealGame_eq_realTape, advantage_eq_etvDist, maskSwapError_eq]
+  rw [tapeRealGame_eq_realTape, advantage_eq_etvDist]
   have finite : (Fintype.card MaskSite : ℝ≥0∞) * delta3 ≠ ⊤ :=
     ENNReal.mul_ne_top (ENNReal.natCast_ne_top _)
       (ENNReal.div_ne_top (ENNReal.natCast_ne_top _) (by simp))
-  refine ENNReal.toReal_mono finite (le_trans (realGame_etvDist_le adversary parameter scalar _ _) ?_)
+  refine le_trans (ENNReal.toReal_mono finite
+    (le_trans (realGame_etvDist_le adversary parameter scalar _ _) ?_)) maskSwapError_ge
   exact maskSwap_etvDist_le restUniform (planBPoint garblerKeys) reassembleEquiv
 
 /-- **`MaskSwapBound.real`** (P3's field, verbatim): `G0 → G0U` costs `maskSwapError = N · δ₃`, at the

@@ -18,8 +18,8 @@ programs below ask every *distinct* question once and keep the answer in a table
 
 Each table has a *real* counterpart built from the oracle (`laneTables`, `realPads`, ...), the
 table-driven assembly on the real tables is the pure definition by `rfl`, and each program's
-`eval` is its real table. The query bounds are exact: garbling `1,305,053`, evaluation
-`990,093` (`garbleBudget_eq`, `evaluateBudget_eq`).
+`eval` is its real table. The query bounds are exact: garbling `1,166,369`, evaluation
+`886,080` (`garbleBudget_eq`, `evaluateBudget_eq`).
 -/
 
 import Construction.QueryMonad
@@ -500,10 +500,10 @@ def assemble (outputKeys : FieldMacToECMac.OutputKeys)
   let curveSlopes := CurveMembership.slopes curveR1 curveR2 curveK
   let digitK : FieldMacToECMac.DigitValues :=
     fun digit => Pipeline.digitValues pointX.offsets pointY.offsets digit
-  let pointSlopes : Fin digitCount → Biquadratic.Values := fun digit =>
-    Biquadratic.slopes (pointRandomness.get digit).x (pointRandomness.get digit).y
-      (pointRandomness.get digit).z (digitK digit)
   let rows := FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness
+  let pointSlopes : Fin digitCount → Biquadratic.Values := fun digit =>
+    Biquadratic.slopes (rows.get digit) (pointRandomness.get digit).x (pointRandomness.get digit).y
+      (pointRandomness.get digit).z (digitK digit)
   { curve := CurveMembership.garble bridgeKey curveMask.value curveR1 curveR2 curveK
     rows := Vector.ofFn fun index =>
       FieldMacToECMac.garbleRow (rows.get index) (pointRandomness.get index) (digitK index)
@@ -949,18 +949,18 @@ theorem laneEvalBudget_eq (count : Nat) :
   rw [laneEvalBudget,
     sum_chunkWidth (fun width => hotEvalBudget width + (2 ^ width - 1) * (count * 3))]
 
-/-- **Garbling asks `1,305,053` questions**: `1` hash, `1,016` EncPRF pads, `2,032` fold hashes,
-`1,255,776` switch-mask blocks and `46,228` gadget hashes. -/
-theorem garbleBudget_eq : garbleBudget = 1305053 := by
+/-- **Garbling asks `1,166,369` questions**: `1` hash, `1,016` EncPRF pads, `2,032` fold hashes,
+`1,117,092` switch-mask blocks and `46,228` gadget hashes. -/
+theorem garbleBudget_eq : garbleBudget = 1166369 := by
   unfold garbleBudget
   rw [laneGarbleBudget_eq, laneGarbleBudget_eq, laneGarbleBudget_eq, laneGarbleBudget_eq]
   simp only [chunkCount, chunkBits, lastChunkBits, hotGarbleBudget_two, curveElementCountX,
     curveElementCountY, pointElementCountX, pointElementCountY]
   norm_num
 
-/-- **Evaluation asks `990,093` questions**: `1,016` fold hashes, `941,832` switch-mask blocks,
+/-- **Evaluation asks `886,080` questions**: `1,016` fold hashes, `837,819` switch-mask blocks,
 `1` hash, `≤ 1,016` EncPRF pads and `46,228` gadget hashes. -/
-theorem evaluateBudget_eq : evaluateBudget = 990093 := by
+theorem evaluateBudget_eq : evaluateBudget = 886080 := by
   unfold evaluateBudget
   rw [laneEvalBudget_eq, laneEvalBudget_eq, laneEvalBudget_eq, laneEvalBudget_eq]
   simp only [chunkCount, chunkBits, lastChunkBits, hotEvalBudget_two, curveElementCountX,
@@ -972,10 +972,10 @@ theorem evaluateBudget_eq : evaluateBudget = 990093 := by
 variable [FieldCertificate] [GroupCertificate]
 
 /-- The garbling query bound, which the program's type carries. -/
-def garbleQueries : Nat := 1305053
+def garbleQueries : Nat := 1166369
 
 /-- The evaluation query bound, which the program's type carries. -/
-def evaluateQueries : Nat := 990093
+def evaluateQueries : Nat := 886080
 
 /-- **The garbling program**, at its exact budget. -/
 def garbleProgram (_parameter : Nat) (scalar : NonZeroScalar) (coins : Coins) :

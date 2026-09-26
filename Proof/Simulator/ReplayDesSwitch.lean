@@ -42,7 +42,7 @@ theorem agree_desSwitchStep [DecidableEq PlanB.FixedIndex] (bits : BitInput)
           elemProg (desIdx switch.val e) (hot switch)) fun values => .pure values.get) record) := by
   have alphaSmall : alpha.val < 2 ^ 256 := lt_trans alpha.isLt (by norm_num)
   have switchSmall : switch.val < 2 ^ 256 := lt_trans switch.isLt (by norm_num)
-  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 824 := by decide
+  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 733 := by decide
   unfold Replay.switchStep
   rw [rtree_loadAt_seq, rtree_cst_seq, rtree_ar_val _ _ _ _ _ _ (word alpha.val) (word switch.val)
     (by rw [reg_ne _ _ _ _ (by decide), reg_same, alphaCell]) (reg_same _ _ _), rtree_ite, reg_same,
@@ -120,7 +120,7 @@ theorem agree_desSwitches [DecidableEq PlanB.FixedIndex] (bits : BitInput) (alph
         if switch = alpha then FreeQuery.pure (fun _ => 0) else
           FreeQuery.bind (FreeQuery.vector pointElementCountX fun e =>
             elemProg (desIdx switch.val e) (hot switch)) fun values => .pure values.get) record0) := by
-  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 824 := by decide
+  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 733 := by decide
   refine agree_rep_vector bits _ (DesSwInv bits jstar hot acc0 alpha.val start record0) (2 ^ 2) _ ?_
     record0 start ⟨fun e => (by
       simp only [Finset.univ_eq_empty, Finset.sum_empty, add_zero]

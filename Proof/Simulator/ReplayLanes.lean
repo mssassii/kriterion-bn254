@@ -99,7 +99,7 @@ theorem agree_laneG [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec : Rep
 
 /-- An address outside the accumulators, the one-hot labels and `E*`, and the temporaries. -/
 def OffWork (address : Word) : Prop :=
-  (∀ e, e < 824 → address ≠ word (accBase + e)) ∧ (∀ j, j < 5 → address ≠ word (hotLabelBase + j)) ∧
+  (∀ e, e < 733 → address ≠ word (accBase + e)) ∧ (∀ j, j < 5 → address ≠ word (hotLabelBase + j)) ∧
     ∀ k, k < 16 → address ≠ word (tmpBase + k)
 
 /-- Every address below `accBase` is outside the work cells. -/
@@ -113,7 +113,7 @@ omit [FieldCertificate] in
 theorem OffWork.offScratch {address : Word} (off : OffWork address) : OffScratch address :=
   ⟨off.2.1, off.2.2⟩
 
-theorem OffWork.offChunk {spec : Replay.LaneSpec} (fits : spec.slot + spec.count ≤ 824)
+theorem OffWork.offChunk {spec : Replay.LaneSpec} (fits : spec.slot + spec.count ≤ 733)
     {address : Word} (off : OffWork address) : OffChunk spec address := by
   refine ⟨fun e bound => ?_, fun j bound => off.2.1 j (by omega), ?_, ?_⟩
   · have := off.1 (spec.slot + e) (by omega)
@@ -137,7 +137,7 @@ theorem OffWork.kappa {address : Word} (off : OffWork address) : address ≠ wor
 
 /-- The static facts of a lane description. -/
 structure SpecOK (spec : Replay.LaneSpec) : Prop where
-  fits : spec.slot + spec.count ≤ 824
+  fits : spec.slot + spec.count ≤ 733
   small : spec.count ≤ elementCountX
   labelsLow : spec.labels + 254 < 2 ^ 46
   hotLow : spec.hotRow < 4
@@ -154,12 +154,12 @@ structure LaneCells (spec : Replay.LaneSpec) (coord : Nat) (labels : Fin coordin
   hotCells : ∀ c : Fin chunkCount,
     memory.ram (word (hotBase + 127 * spec.hotRow + c.val)) = blockWord (joins.get ⟨c.val, c.isLt⟩)
   scaleCells : ∀ (c : Fin chunkCount) (e : Fin spec.count),
-    memory.ram (word (scaleCellBase + 824 * c.val + spec.slot + e.val)) = fieldWord (scale c e)
+    memory.ram (word (scaleCellBase + 733 * c.val + spec.slot + e.val)) = fieldWord (scale c e)
 
 omit [FieldCertificate] in
-theorem scaleAddress_small (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 824)
+theorem scaleAddress_small (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 733)
     (c : Fin chunkCount) (e : Nat) (bound : e < spec.count) :
-    scaleCellBase + 824 * c.val + spec.slot + e < 2 ^ 46 := by
+    scaleCellBase + 733 * c.val + spec.slot + e < 2 ^ 46 := by
   have chunkBound := c.isLt
   unfold chunkCount at chunkBound
   unfold scaleCellBase fieldBase curveCellCount rowCellCount
@@ -364,7 +364,7 @@ theorem specOK_pointX : SpecOK Replay.pointXSpec where
 theorem offChunk_three (address : Word) (off : address = word tmpJStar ∨
     address = word (hotLabelBase + 4) ∨ address = word tmpKappa) :
     OffChunk Replay.pointXSpec address := by
-  have fits : Replay.pointXSpec.slot + Replay.pointXSpec.count ≤ 824 := by decide
+  have fits : Replay.pointXSpec.slot + Replay.pointXSpec.count ≤ 733 := by decide
   rcases off with rfl | rfl | rfl
   · exact ⟨fun e bound => tmp_ne_acc Replay.pointXSpec fits 6 (by omega) e bound,
       fun j small => (hotLabel_ne_tmp j 6 (by omega) (by omega)).symm,

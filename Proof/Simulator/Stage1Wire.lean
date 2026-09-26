@@ -2,9 +2,9 @@
 **The bits of the Plan B wire encoding.**
 
 `wire_bits`: the flattened byte bits of `Wire.encoding.encode value` are, in order, the curve
-triple and the `91 × 11` row constants (`256` bits each), the `91 × 6` gadget bytes (`8`), the
+triple and the `91 × 4` row constants (`256` bits each), the `91 × 6` gadget bytes (`8`), the
 four fold-join vectors (`128`), and the `127` chunk words; `pack_bits` reads a chunk word as its
-`824` slots of `254` bits. Every statement is symbolic in the counts; no encoding of a concrete
+`733` slots of `254` bits and two zero bits. Every statement is symbolic in the counts; no encoding of a concrete
 width is ever unfolded.
 -/
 
@@ -81,16 +81,12 @@ theorem entry_bits (value : Exception.Entry) :
 
 theorem rowGamma_bits (value : RowGamma) :
     byteBits (encodeOf rowGamma value) =
-      (List.ofFn fun index : Fin 11 => lsbs 256 (rowField value index.val).val).flatten := by
-  rw [show rowGamma = (field.pair (field.pair (field.pair (field.pair (field.pair (field.pair
-    (field.pair (field.pair (field.pair (field.pair field)))))))))).map
-      (fun value : RowGamma => (value.xC0, value.xC1, value.xC2, value.xC4, value.yC0, value.yC2,
-        value.yC3, value.yC4, value.yC5, value.zC0, value.zC1))
-      (fun ⟨xC0, xC1, xC2, xC4, yC0, yC2, yC3, yC4, yC5, zC0, zC1⟩ =>
-        ⟨xC0, xC1, xC2, xC4, yC0, yC2, yC3, yC4, yC5, zC0, zC1⟩)
+      (List.ofFn fun index : Fin 4 => lsbs 256 (rowField value index.val).val).flatten := by
+  rw [show rowGamma = (field.pair (field.pair (field.pair field))).map
+      (fun value : RowGamma => (value.xC0, value.yC0, value.yC4, value.zC0))
+      (fun ⟨xC0, yC0, yC4, zC0⟩ => ⟨xC0, yC0, yC4, zC0⟩)
       (fun _ => rfl) from rfl, encodeOf_map]
-  rw [encodeOf_pair, encodeOf_pair, encodeOf_pair, encodeOf_pair, encodeOf_pair, encodeOf_pair,
-    encodeOf_pair, encodeOf_pair, encodeOf_pair, encodeOf_pair]
+  rw [encodeOf_pair, encodeOf_pair, encodeOf_pair]
   simp only [byteBits_append, field_bits]
   simp [List.ofFn_succ, rowField]
 
@@ -99,7 +95,7 @@ theorem wire_bits (value : Public) :
     byteBits (encoding.encode value) =
       lsbs 256 value.curve.1.val ++ lsbs 256 value.curve.2.1.val ++ lsbs 256 value.curve.2.2.val ++
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 11 =>
+          (List.ofFn fun index : Fin 4 =>
             lsbs 256 (rowField value.rows[digit.val] index.val).val).flatten).flatten ++
       (List.ofFn fun digit : Fin digitCount =>
           (List.ofFn fun index : Fin 6 =>
@@ -179,20 +175,21 @@ theorem digitSum_bits (width : Nat) : ∀ (count : Nat) (digit : Fin count → N
           Nat.zero_add]
         exact digitSum_bits width count (fun slot => digit slot.succ) (fun slot => small _)
 
-/-- **A chunk word reads as its `824` slots.** -/
+/-- **A chunk word reads as its `733` slots and its two zero bits.** -/
 theorem pack_bits (values : Fin elementCount → BaseField) :
     lsbs (8 * chunkJoinBytes) (pack values).toNat =
-      (List.ofFn fun slot : Fin elementCount => lsbs coordinateBits (values slot).val).flatten := by
+      (List.ofFn fun slot : Fin elementCount => lsbs coordinateBits (values slot).val).flatten ++
+        lsbs chunkPadBits 0 := by
   have small : ∀ slot, (values slot).val < 2 ^ coordinateBits := fun slot => val_lt_slot _
-  have width : 8 * chunkJoinBytes = coordinateBits * elementCount := by
+  have width : 8 * chunkJoinBytes = coordinateBits * elementCount + chunkPadBits := by
     rw [← chunkJoinBits_eq, chunkJoinBits_eq_product]
+  have below := digitSum_lt coordinateBits elementCount (fun slot => (values slot).val) small
   have sum : (pack values).toNat = digitSum coordinateBits elementCount fun slot => (values slot).val := by
     unfold pack
     rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt]
     · rfl
-    · rw [chunkJoinBits_eq_product]
-      exact digitSum_lt coordinateBits elementCount _ small
-  rw [width, sum]
-  exact digitSum_bits coordinateBits elementCount _ small
+    · exact lt_of_lt_of_le below (Nat.pow_le_pow_right (by norm_num) slotBits_le_chunkJoinBits)
+  rw [width, sum, lsbs_add, Nat.div_eq_of_lt below,
+    digitSum_bits coordinateBits elementCount _ small]
 
 end Kriterion.ArgoMAC.PlanB.SimMachine

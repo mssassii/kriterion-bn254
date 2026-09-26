@@ -8,9 +8,9 @@ y coordinate's `elementCountY` values slots `elementCountX .. elementCount - 1`;
 `coordinateBits` wide, and no slot carries into the next because the modulus is below
 `2 ^ coordinateBits`.
 
-Interleaving the two coordinates per chunk is what makes the published unit byte-aligned:
-`elementCountX * coordinateBits` and `elementCountY * coordinateBits` are not multiples of
-eight, but `elementCount * coordinateBits = 8 * chunkJoinBytes` is.
+The chunk word is the published unit: its `elementCount * coordinateBits = 186182` slot bits
+are followed by `chunkPadBits = 2` zero bits, so that the word is `8 * chunkJoinBytes` bits
+wide.
 
 Rule N: `256 ^ chunkJoinBytes = 2 ^ chunkJoinBits` is proved symbolically; no numeral of that
 size is ever evaluated.
@@ -77,16 +77,21 @@ private theorem packNat_digit (width : Nat) (digit : Nat → Nat)
 
 /-! ### The chunk word -/
 
-/-- `chunkJoinBits = coordinateBits * elementCount`, a structural product of two small
-numerals. -/
-theorem chunkJoinBits_eq_product : chunkJoinBits = coordinateBits * elementCount := by
-  unfold chunkJoinBits coordinateBits elementCount
+/-- `chunkJoinBits = coordinateBits * elementCount + chunkPadBits`: the slots and the two
+padding bits, a structural identity of small numerals. -/
+theorem chunkJoinBits_eq_product : chunkJoinBits = coordinateBits * elementCount + chunkPadBits := by
+  unfold chunkJoinBits coordinateBits elementCount chunkPadBits
   norm_num
+
+/-- The slots fit inside the chunk word. -/
+theorem slotBits_le_chunkJoinBits : coordinateBits * elementCount ≤ chunkJoinBits := by
+  rw [chunkJoinBits_eq_product]
+  exact Nat.le_add_right _ _
 
 /-- `256 ^ chunkJoinBytes = 2 ^ chunkJoinBits`.
 
 Rule N: `256 = 2 ^ 8` and `chunkJoinBits = 8 * chunkJoinBytes`, so this is `pow_mul`; the
-`209296`-bit numeral is never formed. -/
+`186184`-bit numeral is never formed. -/
 theorem pow_width : (256 : Nat) ^ chunkJoinBytes = 2 ^ chunkJoinBits := by
   rw [chunkJoinBits_eq, pow_mul]
   norm_num
@@ -129,9 +134,9 @@ theorem unpack_pack (values : Fin elementCount → BaseField) (element : Fin ele
     intro slot _
     rw [hdigit]
     simp [slot.isLt]
-  have small : packNat coordinateBits digit elementCount < 2 ^ chunkJoinBits := by
-    rw [chunkJoinBits_eq_product]
-    exact packNat_lt coordinateBits digit bound elementCount
+  have small : packNat coordinateBits digit elementCount < 2 ^ chunkJoinBits :=
+    lt_of_lt_of_le (packNat_lt coordinateBits digit bound elementCount)
+      (Nat.pow_le_pow_right (by norm_num) slotBits_le_chunkJoinBits)
   have toNatEq : (pack values).toNat = packNat coordinateBits digit elementCount := by
     rw [pack, sumEq, BitVec.toNat_ofNat, Nat.mod_eq_of_lt small]
   rw [unpack, BitVec.toNat_setWidth, BitVec.toNat_ushiftRight, toNatEq,

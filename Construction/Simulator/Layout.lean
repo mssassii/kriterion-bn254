@@ -55,8 +55,8 @@ abbrev rSecond : Register := 15
 
 /-! ### RAM regions -/
 
-/-- The `105,652` public field cells, in `Wire.encoding` order: curve (3), rows (`91 · 11`),
-scale (`127 · 824`). -/
+/-- The `93,458` public field cells, in `Wire.encoding` order: curve (3), rows (`91 · 4`),
+scale (`127 · 733`). -/
 def fieldBase : Nat := 2 ^ 40
 /-- The `546` exception bytes. -/
 def exceptionBase : Nat := 2 ^ 41
@@ -68,7 +68,7 @@ def requestBase : Nat := 2 ^ 43
 def labelBase : Nat := 2 ^ 44
 /-- The `508` EncPRF-whitened labels. -/
 def whiteBase : Nat := 2 ^ 45
-/-- The `824` delivered-value accumulators, in chunk-word slot order. -/
+/-- The `733` delivered-value accumulators, in chunk-word slot order. -/
 def accBase : Nat := 2 ^ 46
 /-- The current chunk's four one-hot labels, then the designated label `E*` at offset `4`. -/
 def hotLabelBase : Nat := 2 ^ 47
@@ -82,8 +82,8 @@ def keyBase : Nat := 2 ^ 50
 
 /-- Field-cell counts. -/
 def curveCellCount : Nat := 3
-def rowCellCount : Nat := 91 * 11
-def scaleCellCount : Nat := 127 * 824
+def rowCellCount : Nat := 91 * 4
+def scaleCellCount : Nat := 127 * 733
 def fieldCellCount : Nat := curveCellCount + rowCellCount + scaleCellCount
 /-- The first scale cell. -/
 def scaleCellBase : Nat := fieldBase + curveCellCount + rowCellCount
@@ -92,7 +92,7 @@ def hotBlockCount : Nat := 4 * 127
 def labelCount : Nat := 508
 def keyBlockCount : Nat := 2 * 508
 
-theorem fieldCellCount_eq : fieldCellCount = 105652 := by
+theorem fieldCellCount_eq : fieldCellCount = 93458 := by
   norm_num [fieldCellCount, curveCellCount, rowCellCount, scaleCellCount]
 
 /-! ### Request cells -/

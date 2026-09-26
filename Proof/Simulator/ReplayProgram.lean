@@ -22,7 +22,7 @@ variable [FieldCertificate]
 
 /-- An accumulator cell outside a lane's slots is outside that lane's chunk cells. -/
 theorem acc_offChunk (spec : Replay.LaneSpec) (e lo count : Nat) (slotIs : spec.slot = lo)
-    (countIs : spec.count = count) (fits : lo + count ≤ 824) (small : e < 824)
+    (countIs : spec.count = count) (fits : lo + count ≤ 733) (small : e < 733)
     (outside : e < lo ∨ lo + count ≤ e) : OffChunk spec (word (accBase + e)) := by
   refine ⟨fun e' bound => ?_, fun j bound => ?_, ?_, ?_⟩
   · rw [countIs] at bound
@@ -37,7 +37,7 @@ theorem acc_offChunk (spec : Replay.LaneSpec) (e lo count : Nat) (slotIs : spec.
       (by unfold accBase tmpBit0 tmpBase; omega)
 
 /-- `j*`, `E*`, `κ` are outside every lane's chunk cells. -/
-theorem special_offChunk (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 824) :
+theorem special_offChunk (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 733) :
     OffChunk spec (word tmpJStar) ∧ OffChunk spec (word (hotLabelBase + 4)) ∧
       OffChunk spec (word tmpKappa) := by
   refine ⟨⟨fun e bound => tmp_ne_acc spec fits 6 (by omega) e bound,
@@ -50,11 +50,11 @@ theorem special_offChunk (spec : Replay.LaneSpec) (fits : spec.slot + spec.count
       fun j small => (hotLabel_ne_tmp j 5 (by omega) (by omega)).symm,
       tmp_ne 5 0 (by omega) (by omega) (by omega), tmp_ne 5 1 (by omega) (by omega) (by omega)⟩⟩
 
-theorem acc_ne_tmp (e k : Nat) (small : e < 824) (kSmall : k < 16) :
+theorem acc_ne_tmp (e k : Nat) (small : e < 733) (kSmall : k < 16) :
     word (accBase + e) ≠ word (tmpBase + k) :=
   word_ne (by unfold accBase; omega) (by unfold tmpBase; omega) (by unfold accBase tmpBase; omega)
 
-theorem acc_ne_white (e i : Nat) (small : e < 824) (iSmall : i < 508) :
+theorem acc_ne_white (e i : Nat) (small : e < 733) (iSmall : i < 508) :
     word (accBase + e) ≠ word (whiteBase + i) :=
   word_ne (by unfold accBase; omega) (by unfold whiteBase; omega) (by unfold accBase whiteBase; omega)
 
@@ -114,7 +114,7 @@ theorem agree_replay [DecidableEq PlanB.FixedIndex] (source : Stage1Source) (inp
   obtain ⟨accs2, frame2', bits2, record2⟩ := post1
   have frame2 : ∀ address, OffReplay address → m2.ram address = memory.ram address :=
     fun address off => (frame2' address (off.1.offChunk specOK_curveX.fits)).trans (frame1 address off)
-  have zeros2 : ∀ e, e < 824 → (e < 455 ∨ 458 ≤ e) → m2.ram (word (accBase + e)) = fieldWord 0 :=
+  have zeros2 : ∀ e, e < 733 → (e < 455 ∨ 458 ≤ e) → m2.ram (word (accBase + e)) = fieldWord 0 :=
     fun e small outside => (frame2' _ (acc_offChunk _ e 455 3 rfl rfl (by omega) small
       (by omega))).trans (zeros e small)
   -- lane `curveY`
@@ -123,26 +123,26 @@ theorem agree_replay [DecidableEq PlanB.FixedIndex] (source : Stage1Source) (inp
     Replay.curveYSpec specOK_curveY _ _ _ _ m2 r1.2 (fun _ => 0)
     (laneCells_curveY start frame2) (fun e bound => by
       have small : e < 2 := bound
-      have cell := zeros2 (822 + e) (by omega) (by omega)
+      have cell := zeros2 (731 + e) (by omega) (by omega)
       rw [← Nat.add_assoc] at cell
       exact cell) (fun chunk switch e block => not_designated_of _ _ _ _ _ _ (Or.inl (by decide))))
   obtain ⟨accs3, frame3', bits3, record3⟩ := post2
   have frame3 : ∀ address, OffReplay address → m3.ram address = memory.ram address :=
     fun address off => (frame3' address (off.1.offChunk specOK_curveY.fits)).trans (frame2 address off)
-  have zeros3 : ∀ e, e < 822 → (e < 455 ∨ 458 ≤ e) → m3.ram (word (accBase + e)) = fieldWord 0 :=
-    fun e small outside => (frame3' _ (acc_offChunk _ e 822 2 rfl rfl (by omega) (by omega)
+  have zeros3 : ∀ e, e < 731 → (e < 455 ∨ 458 ≤ e) → m3.ram (word (accBase + e)) = fieldWord 0 :=
+    fun e small outside => (frame3' _ (acc_offChunk _ e 731 2 rfl rfl (by omega) (by omega)
       (by omega))).trans (zeros2 e (by omega) outside)
   have curveXCells : ∀ e : Fin curveElementCountX,
       m3.ram (word (accBase + 455 + e.val)) = fieldWord (r1.1 e) := by
     intro e
     have small : e.val < 3 := e.isLt
-    rw [Nat.add_assoc, frame3' _ (acc_offChunk _ (455 + e.val) 822 2 rfl rfl (by omega) (by omega)
+    rw [Nat.add_assoc, frame3' _ (acc_offChunk _ (455 + e.val) 731 2 rfl rfl (by omega) (by omega)
       (by omega)), ← Nat.add_assoc]
     have cell := accs2 e
     simp only [zero_add] at cell
     exact cell
   have curveYCells : ∀ e : Fin curveElementCountY,
-      m3.ram (word (accBase + 822 + e.val)) = fieldWord (r2.1 e) := by
+      m3.ram (word (accBase + 731 + e.val)) = fieldWord (r2.1 e) := by
     intro e
     have cell := accs3 e
     simp only [zero_add] at cell
@@ -172,7 +172,7 @@ theorem agree_replay [DecidableEq PlanB.FixedIndex] (source : Stage1Source) (inp
     rw [ram4, Function.update_of_ne tmpK1_ne_tmpK2, Function.update_self]
   have k2Cell : m4.ram (word tmpK2) = blockWord r3.1.2 := by
     rw [ram4, Function.update_self]
-  have zeros4 : ∀ e, e < 822 → (e < 455 ∨ 458 ≤ e) → m4.ram (word (accBase + e)) = fieldWord 0 := by
+  have zeros4 : ∀ e, e < 731 → (e < 455 ∨ 458 ≤ e) → m4.ram (word (accBase + e)) = fieldWord 0 := by
     intro e small outside
     rw [ram4, Function.update_of_ne (show word (accBase + e) ≠ word tmpK2 from
         acc_ne_tmp e 4 (by omega) (by omega)),
@@ -195,7 +195,7 @@ theorem agree_replay [DecidableEq PlanB.FixedIndex] (source : Stage1Source) (inp
   obtain ⟨whitesX, whitesY, frame5', bits5, record5⟩ := post4
   have frame5 : ∀ address, OffReplay address → m5.ram address = memory.ram address :=
     fun address off => (frame5' address off.2).trans (frame4 address off)
-  have zeros5 : ∀ e, e < 822 → (e < 455 ∨ 458 ≤ e) → m5.ram (word (accBase + e)) = fieldWord 0 :=
+  have zeros5 : ∀ e, e < 731 → (e < 455 ∨ 458 ≤ e) → m5.ram (word (accBase + e)) = fieldWord 0 :=
     fun e small outside => (frame5' _ fun i bound => acc_ne_white e i (by omega) bound).trans
       (zeros4 e small outside)
   -- lane `pointX`, chunk `0` designated
@@ -218,7 +218,7 @@ theorem agree_replay [DecidableEq PlanB.FixedIndex] (source : Stage1Source) (inp
     have small : i.val < 254 := i.isLt
     rw [frame6' (word (whiteBase + 254 + i.val))
       (desOfWork _ (offWork_of_lt (by unfold whiteBase; omega))), whitesY i]
-  have zeros6 : ∀ e, e < 364 → m6.ram (word (accBase + 458 + e)) = fieldWord 0 := by
+  have zeros6 : ∀ e, e < 273 → m6.ram (word (accBase + 458 + e)) = fieldWord 0 := by
     intro e small
     rw [Nat.add_assoc, frame6' (word (accBase + (458 + e)))
       ⟨acc_offChunk _ (458 + e) 0 455 rfl rfl (by omega) (by omega) (by omega),
@@ -236,7 +236,7 @@ theorem agree_replay [DecidableEq PlanB.FixedIndex] (source : Stage1Source) (inp
   have three := special_offChunk Replay.pointYSpec (by decide)
   refine ⟨fun e => ?_, fun e => ?_, ?_, ?_, ⟨star, ?_, ?_⟩, fun address off => ?_, ?_⟩
   · have small : e.val < 455 := e.isLt
-    rw [frame7' _ (acc_offChunk _ e.val 458 364 rfl rfl (by omega) (by omega) (by omega))]
+    rw [frame7' _ (acc_offChunk _ e.val 458 273 rfl rfl (by omega) (by omega) (by omega))]
     have cell := accs6 e
     simp only [zero_add] at cell
     exact cell

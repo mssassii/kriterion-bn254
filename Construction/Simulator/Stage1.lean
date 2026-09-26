@@ -2,12 +2,13 @@
 Stage 1 of the Plan B simulator: sample the complete public value with every scale mask
 uniform, keep it in RAM, and emit its canonical `Wire.encoding` bytes.
 
-* `105,652` field cells (curve, rows, scale joins), each by constant-time bounded rejection over
+* `93,458` field cells (curve, rows, scale joins), each by constant-time bounded rejection over
   254 coins with `attempts = 256` tries, aborting on exhaustion;
 * `546` exception bytes, `508` fold-join blocks and the `1016`-block Lamport key, each from fair
   coins (the key is retained for stage 2, which selects one label per input bit);
-* the serializer pushes the `26,907,008` wire bits in reverse, most significant bit of each cell
-  first, so the response stack reads the encoding least significant bit first;
+* the serializer pushes the `23,808,712` wire bits in reverse, most significant bit of each cell
+  first, so the response stack reads the encoding least significant bit first; every chunk word
+  is its `733` cells followed by `2` zero bits;
 * every register is zeroed at the end, so the retained state is a function of RAM and stacks.
 
 Stage 1 contains no oracle instruction at all.
@@ -41,11 +42,16 @@ def blocks : Prog := Prog.rep hotBlockCount fun index => wordCell 128 (hotBase +
 /-- The Lamport key: `1016` uniform blocks (P3's `Stage1Source.key`). -/
 def key : Prog := Prog.rep keyBlockCount fun index => wordCell 128 (keyBase + index)
 
-/-- The serializer, in reverse wire order: scale cells (254 bits), fold joins (128), exception
-bytes (8), then rows and curve (256 bits each). -/
+/-- One chunk word, in reverse wire order: its two zero bits on top, then its `733` cells
+(254 bits each), the last first. -/
+def serializeChunk (chunk : Nat) : Prog :=
+  .seq (emitZero 2)
+    (Prog.rep 733 fun index => emitWord (scaleCellBase + 733 * chunk + 733 - 1 - index) 254)
+
+/-- The serializer, in reverse wire order: the `127` chunk words (the last first), fold joins
+(128), exception bytes (8), then rows and curve (256 bits each). -/
 def serialize : Prog :=
-  .seq (Prog.rep scaleCellCount fun index =>
-      emitWord (fieldBase + fieldCellCount - 1 - index) 254)
+  .seq (Prog.rep 127 fun index => serializeChunk (127 - 1 - index))
     (.seq (Prog.rep hotBlockCount fun index => emitWord (hotBase + hotBlockCount - 1 - index) 128)
       (.seq (Prog.rep exceptionByteCount fun index =>
           emitWord (exceptionBase + exceptionByteCount - 1 - index) 8)
@@ -104,13 +110,23 @@ theorem cost_key : key.cost = keyBlockCount * 646 :=
 
 /-- The serializer's size equals its cost: it is straight-line code. -/
 def serializeCount : Nat :=
-  scaleCellCount * (2 + 3 * 254) + hotBlockCount * (2 + 3 * 128) +
+  127 * ((1 + 3 * 2) + 733 * (2 + 3 * 254)) + hotBlockCount * (2 + 3 * 128) +
     exceptionByteCount * (2 + 3 * 8) + (curveCellCount + rowCellCount) * (2 + 3 * 256)
+
+theorem size_serializeChunk (chunk : Nat) :
+    (serializeChunk chunk).size = (1 + 3 * 2) + 733 * (2 + 3 * 254) := by
+  unfold serializeChunk
+  rw [Prog.size_seq, size_emitZero, Prog.size_rep _ _ _ fun _ _ => size_emitWord _ _]
+
+theorem cost_serializeChunk (chunk : Nat) :
+    (serializeChunk chunk).cost = (1 + 3 * 2) + 733 * (2 + 3 * 254) := by
+  unfold serializeChunk
+  rw [Prog.cost_seq, cost_emitZero, Prog.cost_rep _ _ _ fun _ _ => cost_emitWord _ _]
 
 theorem size_serialize : serialize.size = serializeCount := by
   unfold serialize serializeCount
   rw [Prog.size_seq, Prog.size_seq, Prog.size_seq,
-    Prog.size_rep _ _ _ fun _ _ => size_emitWord _ _,
+    Prog.size_rep _ _ _ fun _ _ => size_serializeChunk _,
     Prog.size_rep _ _ _ fun _ _ => size_emitWord _ _,
     Prog.size_rep _ _ _ fun _ _ => size_emitWord _ _,
     Prog.size_rep _ _ _ fun _ _ => size_emitWord _ _]
@@ -119,7 +135,7 @@ theorem size_serialize : serialize.size = serializeCount := by
 theorem cost_serialize : serialize.cost = serializeCount := by
   unfold serialize serializeCount
   rw [Prog.cost_seq, Prog.cost_seq, Prog.cost_seq,
-    Prog.cost_rep _ _ _ fun _ _ => cost_emitWord _ _,
+    Prog.cost_rep _ _ _ fun _ _ => cost_serializeChunk _,
     Prog.cost_rep _ _ _ fun _ _ => cost_emitWord _ _,
     Prog.cost_rep _ _ _ fun _ _ => cost_emitWord _ _,
     Prog.cost_rep _ _ _ fun _ _ => cost_emitWord _ _]
@@ -143,10 +159,10 @@ theorem cost_program : program.cost =
     List.length_finRange]
   omega
 
-/-- The serializer emits exactly the `8 · 3,363,376` wire bits. -/
+/-- The serializer emits exactly the `8 · 2,976,089` wire bits. -/
 theorem wire_bits :
-    scaleCellCount * 254 + hotBlockCount * 128 + exceptionByteCount * 8 +
-      (curveCellCount + rowCellCount) * 256 = 8 * 3363376 := by
+    scaleCellCount * 254 + 127 * 2 + hotBlockCount * 128 + exceptionByteCount * 8 +
+      (curveCellCount + rowCellCount) * 256 = 8 * 2976089 := by
   norm_num [scaleCellCount, hotBlockCount, exceptionByteCount, curveCellCount, rowCellCount]
 
 end Stage1

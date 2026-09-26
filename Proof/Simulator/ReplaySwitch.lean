@@ -27,12 +27,12 @@ variable [FieldCertificate]
 abbrev accCell (spec : Replay.LaneSpec) (index : Nat) : Word := word (accBase + spec.slot + index)
 
 omit [FieldCertificate] in
-theorem accCell_lt (spec : Replay.LaneSpec) (index : Nat) (fits : spec.slot + index < 824) :
+theorem accCell_lt (spec : Replay.LaneSpec) (index : Nat) (fits : spec.slot + index < 733) :
     accBase + spec.slot + index < 2 ^ 256 := by
   unfold accBase; omega
 
-theorem accCell_ne (spec : Replay.LaneSpec) {first second : Nat} (firstFits : spec.slot + first < 824)
-    (secondFits : spec.slot + second < 824) (different : first ≠ second) :
+theorem accCell_ne (spec : Replay.LaneSpec) {first second : Nat} (firstFits : spec.slot + first < 733)
+    (secondFits : spec.slot + second < 733) (different : first ≠ second) :
     accCell spec first ≠ accCell spec second :=
   word_ne (accCell_lt spec first firstFits) (accCell_lt spec second secondFits) (by omega)
 
@@ -71,7 +71,7 @@ def ElemsInv (spec : Replay.LaneSpec) (acc0 : Nat → BaseField) (coef : BaseFie
 
 /-- **The element loop of one switch.** -/
 theorem agree_elements [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec : Replay.LaneSpec)
-    (chunk switch count : Nat) (fits : spec.slot + count ≤ 824) (start : Memory) (record0 : Record)
+    (chunk switch count : Nat) (fits : spec.slot + count ≤ 733) (start : Memory) (record0 : Record)
     (label : Block) (coef : BaseField) (acc0 : Nat → BaseField)
     (index : Fin count → Fin 3 → PlanB.FixedIndex)
     (named : ∀ (e : Fin count) (block : Fin 3),
@@ -151,7 +151,7 @@ def SwitchPost (spec : Replay.LaneSpec) (acc1 : Nat → BaseField) (coef : BaseF
 
 /-- **One switch step** (not the designated chunk). -/
 theorem agree_switchStep [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec : Replay.LaneSpec)
-    (fits : spec.slot + spec.count ≤ 824) (small : spec.count ≤ elementCountX)
+    (fits : spec.slot + spec.count ≤ 733) (small : spec.count ≤ elementCountX)
     (chunk : Fin chunkCount) (alpha switch : Fin (2 ^ 2)) (hot : Fin (2 ^ 2) → Block)
     (memory : Memory) (record : Record) (acc1 : Nat → BaseField)
     (clean : ∀ (e : Fin spec.count) block,
@@ -220,13 +220,13 @@ def SwInv (spec : Replay.LaneSpec) (acc0 : Nat → BaseField) (alpha : Nat) (sta
     (∀ address, (∀ e, e < spec.count → address ≠ accCell spec e) →
       memory.ram address = start.ram address) ∧ memory.bits = start.bits ∧ state.2 = record0
 
-theorem hotLabel_ne_acc (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 824)
+theorem hotLabel_ne_acc (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 733)
     (offset : Nat) (small : offset < 5) (e : Nat) (bound : e < spec.count) :
     word (hotLabelBase + offset) ≠ accCell spec e :=
   word_ne (by unfold hotLabelBase; omega) (accCell_lt spec e (by omega))
     (by unfold hotLabelBase accBase; omega)
 
-theorem tmp_ne_acc (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 824)
+theorem tmp_ne_acc (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 733)
     (offset : Nat) (small : offset < 16) (e : Nat) (bound : e < spec.count) :
     word (tmpBase + offset) ≠ accCell spec e :=
   word_ne (by unfold tmpBase; omega) (accCell_lt spec e (by omega))
@@ -234,7 +234,7 @@ theorem tmp_ne_acc (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 8
 
 /-- **The switch loop of a chunk** (not the designated chunk). -/
 theorem agree_switches [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec : Replay.LaneSpec)
-    (fits : spec.slot + spec.count ≤ 824) (small : spec.count ≤ elementCountX)
+    (fits : spec.slot + spec.count ≤ 733) (small : spec.count ≤ elementCountX)
     (chunk : Fin chunkCount) (alpha : Fin (2 ^ 2)) (hot : Fin (2 ^ 2) → Block)
     (start : Memory) (record0 : Record) (acc0 : Nat → BaseField)
     (clean : ∀ (switch : Fin (2 ^ 2)) (e : Fin spec.count) block,
@@ -282,13 +282,13 @@ theorem agree_switches [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec : 
 /-! ### The published-join terms -/
 
 /-- `rep n joinTerm` adds `α · J[e]` to the first `n` accumulator cells. -/
-theorem rtree_joinTerms (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 824)
+theorem rtree_joinTerms (spec : Replay.LaneSpec) (fits : spec.slot + spec.count ≤ 733)
     (chunk : Nat) (alpha : BaseField) (join : Nat → BaseField) (start : Memory)
     (factor : start.registers rF = fieldWord alpha)
     (joins : ∀ e, e < spec.count →
-      start.ram (word (scaleCellBase + 824 * chunk + spec.slot + e)) = fieldWord (join e))
+      start.ram (word (scaleCellBase + 733 * chunk + spec.slot + e)) = fieldWord (join e))
     (joinAway : ∀ e first, e < spec.count → first < spec.count →
-      word (scaleCellBase + 824 * chunk + spec.slot + e) ≠ accCell spec first)
+      word (scaleCellBase + 733 * chunk + spec.slot + e) ≠ accCell spec first)
     (acc0 : Nat → BaseField) (cells : ∀ e, e < spec.count → start.ram (accCell spec e) = fieldWord (acc0 e)) :
     ∀ count, count ≤ spec.count → ∃ after, rtree (Prog.rep count fun index => Replay.joinTerm spec chunk index) start =
         .pure (some after) ∧
@@ -301,14 +301,14 @@ theorem rtree_joinTerms (spec : Replay.LaneSpec) (fits : spec.slot + spec.count 
       obtain ⟨middle, run, accs, frame, bitsSame, factorSame⟩ :=
         rtree_joinTerms spec fits chunk alpha join start factor joins joinAway acc0 cells count
           (by omega)
-      have joinCell : middle.ram (word (scaleCellBase + 824 * chunk + spec.slot + count)) =
+      have joinCell : middle.ram (word (scaleCellBase + 733 * chunk + spec.slot + count)) =
           fieldWord (join count) := by
         rw [frame _ fun e small => joinAway count e (by omega) (by omega), joins count (by omega)]
       have accCellValue : middle.ram (accCell spec count) = fieldWord (acc0 count) := by
         rw [frame _ fun e small => accCell_ne spec (by omega) (by omega) (by omega),
           cells count (by omega)]
       refine ⟨storeRam (setReg (setReg (setReg (setReg (setReg (setReg (setReg middle rAddr
-          (word (scaleCellBase + 824 * chunk + spec.slot + count))) rC (fieldWord (join count)))
+          (word (scaleCellBase + 733 * chunk + spec.slot + count))) rC (fieldWord (join count)))
           rC (fieldWord (join count * alpha))) rAddr (accCell spec count)) rD
           (fieldWord (acc0 count))) rD (fieldWord (acc0 count + join count * alpha))) rAddr
           (accCell spec count))

@@ -17,7 +17,15 @@ Every statement takes its `Fintype` instances as arguments, so it applies at the
 cardinality (the permutation families have `(2^128)!`-sized factors).
 -/
 
-import Construction
+-- The seven modules of release-r1's construction root, named explicitly so that this file does not
+-- change meaning when `Construction.lean` is the CRT root.
+import Construction.Garbling
+import Construction.PGS
+import Construction.ArgoMAC.Seed
+import Construction.QueryMonad
+import Construction.Scheme
+import Construction.OraclePrograms
+import Construction.Simulator
 import Solution
 import Proof.Privacy.Phase3.Glue.Uniform
 

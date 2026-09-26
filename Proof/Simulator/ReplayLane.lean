@@ -28,7 +28,7 @@ def ChunkPost (spec : Replay.LaneSpec) (acc0 : Nat → BaseField) (start : Memor
 
 /-- **One plain chunk.** The abstract side is the body of `evalChunkM`, at a width `w = 2`. -/
 theorem agree_chunkBody [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec : Replay.LaneSpec)
-    (fits : spec.slot + spec.count ≤ 824) (small : spec.count ≤ elementCountX)
+    (fits : spec.slot + spec.count ≤ 733) (small : spec.count ≤ elementCountX)
     (chunk : Fin chunkCount) (width : Nat) (twoWide : width = 2) (alpha : Fin (2 ^ width))
     (bitLabel join : Nat → Block) (scaleJ : Fin spec.count → BaseField)
     (memory : Memory) (record : Record) (acc0 : Nat → BaseField)
@@ -44,11 +44,11 @@ theorem agree_chunkBody [DecidableEq PlanB.FixedIndex] (bits : BitInput) (spec :
     (offJ : OffScratch (word (hotBase + 127 * spec.hotRow + chunk.val)))
     (cells : ∀ e, e < spec.count → memory.ram (accCell spec e) = fieldWord (acc0 e))
     (joins : ∀ e : Fin spec.count,
-      memory.ram (word (scaleCellBase + 824 * chunk.val + spec.slot + e.val)) = fieldWord (scaleJ e))
+      memory.ram (word (scaleCellBase + 733 * chunk.val + spec.slot + e.val)) = fieldWord (scaleJ e))
     (joinAway : ∀ e first, e < spec.count → first < spec.count →
-      word (scaleCellBase + 824 * chunk.val + spec.slot + e) ≠ accCell spec first)
+      word (scaleCellBase + 733 * chunk.val + spec.slot + e) ≠ accCell spec first)
     (joinOff : ∀ e, e < spec.count →
-      OffScratch (word (scaleCellBase + 824 * chunk.val + spec.slot + e)))
+      OffScratch (word (scaleCellBase + 733 * chunk.val + spec.slot + e)))
     (clean : ∀ (switch : Fin (2 ^ 2)) (e : Fin spec.count) block,
       ¬ IsDesignated bits (scaleIndexOf spec.lane chunk switch.val e block)) :
     Agree (ChunkPost spec acc0 memory record) (rtree (Replay.chunkBody ordF0 spec false chunk.val) memory)

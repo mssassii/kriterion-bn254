@@ -5,7 +5,7 @@ its abstract half (`LazyIdeal.lean`: a pair of kernels over the shared lazy orac
 
 **Stage 1** makes no oracle call. It draws a `Stage1Source` -- every published field in source
 form (the curve triple, the 91 row-constant records, the gadget bytes, the four fold-join vectors,
-and the `127 × 824` scale joins as *canonical* field elements) together with the Lamport key
+and the `127 × 733` scale joins as *canonical* field elements) together with the Lamport key
 (508 label pairs) -- and publishes `publicValue` of it: the scale joins packed by the construction's
 own `pack`, never a uniform `BitVec` word (design note B, F7). With every scale mask swapped to
 uniform before the game starts (P1's `G0 → G0U`), this is the construction's published law.
@@ -52,7 +52,7 @@ noncomputable section
 structure Stage1Source where
   /-- The curve-membership constants. -/
   curve : BaseField × BaseField × BaseField
-  /-- The eleven row constants of each digit. -/
+  /-- The four row constants of each digit. -/
   rows : Vector RowGamma digitCount
   /-- The gadget bytes. -/
   exception : Vector Exception.Entry digitCount
@@ -92,8 +92,7 @@ local instance vectorFinite {α : Type} [Finite α] {count : Nat} : Finite (Vect
       exact congrFun equal ⟨index, bound⟩)
 
 instance rowGammaFinite : Finite RowGamma :=
-  Finite.of_injective (fun row : RowGamma => (row.xC0, row.xC1, row.xC2, row.xC4, row.yC0,
-      row.yC2, row.yC3, row.yC4, row.yC5, row.zC0, row.zC1)) (by
+  Finite.of_injective (fun row : RowGamma => (row.xC0, row.yC0, row.yC4, row.zC0)) (by
     intro first second equal
     cases first
     cases second
@@ -137,7 +136,7 @@ noncomputable instance nonZeroBaseFintype : Fintype NonZeroBase := Fintype.ofFin
 
 instance stage1SourceNonempty : Nonempty Stage1Source :=
   ⟨{ curve := (0, 0, 0)
-     rows := Vector.replicate _ ⟨0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0⟩
+     rows := Vector.replicate _ ⟨0, 0, 0, 0⟩
      exception := Vector.replicate _ (Vector.replicate _ 0)
      curveXHot := Vector.replicate _ 0
      curveYHot := Vector.replicate _ 0
@@ -226,12 +225,18 @@ def designatedSwitch (bits : BitInput) : Fin (2 ^ chunkWidth chunkZero) :=
 def kappa (bits : BitInput) : BaseField :=
   iota _ (designatedSwitch bits) - iota _ (activeSwitch bits)
 
-/-- The three unit collectors of a digit, one per row: `rowX_x9`, `rowY_x9`, `rowZ_x9`. -/
+/-- The three collectors of a digit, one per row: `rowX_x9`, the `Y` row's mixed element
+`rowY_x9` and `rowZ_x9`. -/
 def collectorElement : Fin 3 → XElement := ![.rowX_x9, .rowY_x9, .rowZ_x9]
 
 /-- The row coordinate each collector controls. -/
 def collectorComponent : Fin 3 → FieldMacToECMac.HomogeneousValue → BaseField :=
   ![fun value => value.x, fun value => value.y, fun value => value.z]
+
+/-- Each collector's clear multiplier in its row: `1` for `X` and `Z`, `y` for the `Y` row's mixed
+element. -/
+def collectorMultiplier : Fin 3 → AffineInput → BaseField :=
+  ![fun _ => 1, fun input => input.y, fun _ => 1]
 
 /-- The designated fixed index of (digit, collector, block). -/
 def designatedIndex (bits : BitInput) (digit : Fin digitCount) (collector block : Fin 3) :
@@ -392,13 +397,14 @@ def targetRows [FieldCertificate] [GroupCertificate] (target : Point)
     (digit : Fin digitCount) : FieldMacToECMac.HomogeneousValue :=
   liftRow (digitPoints target tail digit) (lift digit).value
 
-/-- The designated mask each collector needs: `y* = κ · (W_d.c − R_d.c)`, where `R_d`
-is the evaluator's row with every designated mask at `0`. -/
+/-- The designated mask each collector needs: `y* = κ · μ_c⁻¹ · (W_d.c − R_d.c)`, where `R_d`
+is the evaluator's row with every designated mask at `0` and `μ_c` the collector's multiplier
+(`y` for the `Y` row, `1` otherwise). -/
 def collectorTargets (bits : BitInput)
     (evalRows : Vector FieldMacToECMac.HomogeneousValue FieldMacToECMac.outputMacCount)
     (targets : Fin digitCount → FieldMacToECMac.HomogeneousValue) :
     Fin digitCount × Fin 3 → BaseField :=
-  fun site => kappa bits *
+  fun site => kappa bits * (collectorMultiplier site.2 bits.toAffine)⁻¹ *
     (collectorComponent site.2 (targets site.1) - collectorComponent site.2 (evalRows.get site.1))
 
 /-- A `sampleFp`-preimage of every collector target, drawn independently. -/
@@ -500,7 +506,7 @@ def idealHybrid : HybridGame := fun adversary parameter scalar =>
 /-- `M`: the library's ideal game with a closed machine, as a chain game. -/
 def machineHybrid (simulator : BoundedMachine.Simulator) : HybridGame :=
   fun adversary parameter scalar =>
-    LazySimulatorProtocol.idealGame Scheme.scheme Wire.encoding 3363376 simulator adversary
+    LazySimulatorProtocol.idealGame Scheme.scheme Wire.encoding 2976089 simulator adversary
       parameter scalar ()
 
 /-! ### The interface P2's machine must match -/

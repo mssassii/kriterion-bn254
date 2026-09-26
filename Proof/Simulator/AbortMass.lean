@@ -134,26 +134,26 @@ theorem lambdaAbort_le :
     (Or.inl (by positivity)) (Or.inl (ENNReal.pow_ne_top (by norm_num)))]
   exact_mod_cast lambdaAbort_nat
 
-theorem cutoffFirst_nat : 105743 * 2 ^ 129 ≤ 2 ^ 500 := Nat.le_of_ble_eq_true rfl
+theorem cutoffFirst_nat : 93549 * 2 ^ 129 ≤ 2 ^ 500 := Nat.le_of_ble_eq_true rfl
 
 theorem cutoffSecond_nat : 273 * 2 ^ 129 ≤ 2 ^ 399 := Nat.le_of_ble_eq_true rfl
 
 /-- The field, randomiser and preimage cutoffs together: `105,652 + 91` draws at `2^-500` and
 `273` at `2^-399` stay far below `2^-128`. -/
 theorem cutoffTotal_le :
-    (105652 + 91 : ENNReal) * (2 ^ 500)⁻¹ + 273 * (2 ^ 399)⁻¹ ≤ (2 ^ 128)⁻¹ := by
-  have first : (105652 + 91 : ENNReal) * (2 ^ 500)⁻¹ ≤ (2 ^ 129)⁻¹ := by
+    (93458 + 91 : ENNReal) * (2 ^ 500)⁻¹ + 273 * (2 ^ 399)⁻¹ ≤ (2 ^ 128)⁻¹ := by
+  have first : (93458 + 91 : ENNReal) * (2 ^ 500)⁻¹ ≤ (2 ^ 129)⁻¹ := by
     rw [← div_eq_mul_inv, ENNReal.div_le_iff (by positivity) (ENNReal.pow_ne_top (by norm_num)),
       ← ENNReal.div_eq_inv_mul, ENNReal.le_div_iff_mul_le (Or.inl (by positivity))
       (Or.inl (ENNReal.pow_ne_top (by norm_num)))]
-    rw [show (105652 + 91 : ENNReal) = 105743 by norm_num]
+    rw [show (93458 + 91 : ENNReal) = 93549 by norm_num]
     exact_mod_cast cutoffFirst_nat
   have second : (273 : ENNReal) * (2 ^ 399)⁻¹ ≤ (2 ^ 129)⁻¹ := by
     rw [← div_eq_mul_inv, ENNReal.div_le_iff (by positivity) (ENNReal.pow_ne_top (by norm_num)),
       ← ENNReal.div_eq_inv_mul, ENNReal.le_div_iff_mul_le (Or.inl (by positivity))
       (Or.inl (ENNReal.pow_ne_top (by norm_num)))]
     exact_mod_cast cutoffSecond_nat
-  calc (105652 + 91 : ENNReal) * (2 ^ 500)⁻¹ + 273 * (2 ^ 399)⁻¹
+  calc (93458 + 91 : ENNReal) * (2 ^ 500)⁻¹ + 273 * (2 ^ 399)⁻¹
       ≤ (2 ^ 129)⁻¹ + (2 ^ 129)⁻¹ := add_le_add first second
     _ = (2 ^ 128)⁻¹ := by
         rw [← two_mul, pow_succ, ENNReal.mul_inv (Or.inl (by positivity)) (Or.inl (by norm_num)),

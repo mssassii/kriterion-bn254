@@ -236,7 +236,7 @@ theorem agree_designatedElements [DecidableEq PlanB.FixedIndex] (bits : BitInput
       (rtree (Prog.rep pointElementCountX (Replay.guardedElement ordF0 Replay.pointXSpec 0 switch)) start)
       (interceptT bits (FreeQuery.vector pointElementCountX fun e => elemProg (desIdx switch e) label)
         record0) := by
-  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 824 := by decide
+  have fits : Replay.pointXSpec.slot + pointElementCountX ≤ 733 := by decide
   refine agree_rep_vector bits _ (DesElemsInv bits switch label acc0 coef start record0)
     pointElementCountX _ ?_ record0 start
     ⟨fun e bound => absurd bound (Nat.not_lt_zero _), fun _ _ => rfl, rfl, rfl, rfl, fun _ => rfl,

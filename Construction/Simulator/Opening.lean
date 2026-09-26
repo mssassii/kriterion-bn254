@@ -12,7 +12,8 @@ order of P3's `AbstractSimulator.opening`):
 3. `lambdas`: `91` randomisers `λ_d ∈ [1, p)`;
 4. `lifts`: `W_d = (λ² x', λ³ y', tag · λ)` with `x' = 1 + tag · (x − 1)`, i.e. `liftRow`;
 5. `solve`: the running rows `X, Y, Z` of every digit on the accumulated (designated-free)
-   values and `y*_{d,c} = κ · (W_d.c − row_c)`;
+   values and `y*_{d,c} = κ · μ_c⁻¹ · (W_d.c − row_c)`, `μ = (1, y, 1)` (the `Y` collector is the
+   mixed element, which rides on `y`);
 6. `preimages`: for every `(d, c)`, `m < q + [y* < ρ]` by bounded rejection over `131` coins and
    the limbs of `y* + p · m`;
 7. `programs`: the `819` programs `fixedForward (scale pointX 0 j* (5d + slot c) b) E* ↦ o_b ⊕ E*`,
@@ -125,8 +126,8 @@ def liftOne (digit : Nat) : Prog :=
 
 def lifts : Prog := rep 91 liftOne
 
-/-- The row-constant cell `k` of digit `d`. -/
-def rowCell (digit slot : Nat) : Nat := fieldBase + curveCellCount + 11 * digit + slot
+/-- The row-constant cell `k` of digit `d` (`xC0, yC0, yC4, zC0`). -/
+def rowCell (digit slot : Nat) : Nat := fieldBase + curveCellCount + 4 * digit + slot
 
 /-- `rAcc += RAM[cell] · R[factor]`. -/
 def addScaled (cell : Nat) (factor : Register) : Prog :=
@@ -140,6 +141,12 @@ def finishTarget (row target : Nat) : Prog :=
   seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, ar .fieldMul rSel rSel rF,
     storeAt target rSel]
 
+/-- `RAM[target] = κ · (RAM[row] − rAcc) · y⁻¹` with `y` in `rB` (the `Y` collector rides on `y`);
+`rAcc` is free once the difference is formed and receives `y⁻¹`. -/
+def finishTargetOverY (row target : Nat) : Prog :=
+  seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, ar .fieldMul rSel rSel rF,
+    ar .fieldInv rAcc rB rB, ar .fieldMul rSel rSel rAcc, storeAt target rSel]
+
 /-- The accumulator cell of x-slot `s` and y-slot `s` of the point lanes. -/
 def xCell (slot : Nat) : Nat := accBase + slot
 def yCell (slot : Nat) : Nat := accBase + 458 + slot
@@ -148,20 +155,18 @@ def yCell (slot : Nat) : Nat := accBase + 458 + slot
 def solveDigit (digit : Nat) : Prog :=
   seqList [loadAt rA reqX, loadAt rB reqY, ar .fieldMul rC rA rA, ar .fieldMul rD rB rB,
     ar .fieldMul rE rA rB, loadAt rF tmpKappa,
-    -- X row: c0 + c1 x + c2 y + c4 x² + v[x7] x + v[x9] + v[y10]
-    loadAt rAcc (rowCell digit 0), addScaled (rowCell digit 1) rA, addScaled (rowCell digit 2) rB,
-    addScaled (rowCell digit 3) rC, addScaled (xCell (5 * digit)) rA,
-    addCell (xCell (5 * digit + 1)), addCell (yCell (4 * digit)),
+    -- X row: c0 + v[x7] x + v[x9] + v[y10] (the other coefficients ride in the slopes)
+    loadAt rAcc (rowCell digit 0), addScaled (xCell (5 * digit)) rA,
+    addCell (xCell (5 * digit + 1)), addCell (yCell (3 * digit)),
     finishTarget (openRow digit) (openTarget digit 0),
-    -- Y row: c0 + c2 y + c3 x y + c4 x² + c5 y² + v[y6] x + v[x7] x + v[y8] y + v[x9] + v[y10]
-    loadAt rAcc (rowCell digit 4), addScaled (rowCell digit 5) rB, addScaled (rowCell digit 6) rE,
-    addScaled (rowCell digit 7) rC, addScaled (rowCell digit 8) rD,
-    addScaled (yCell (4 * digit + 1)) rA, addScaled (xCell (5 * digit + 2)) rA,
-    addScaled (yCell (4 * digit + 2)) rB, addCell (xCell (5 * digit + 3)),
-    addCell (yCell (4 * digit + 3)),
-    finishTarget (openRow digit + 1) (openTarget digit 1),
-    -- Z row: c0 + c1 x + v[x9]
-    loadAt rAcc (rowCell digit 9), addScaled (rowCell digit 10) rA, addCell (xCell (5 * digit + 4)),
+    -- Y row: c0 + c4 x² + v[x7] x² + v[x9] y + v[y8] y + v[y10];
+    -- the collector `x9` rides on `y`, so the target is scaled by `y⁻¹`
+    loadAt rAcc (rowCell digit 1), addScaled (rowCell digit 2) rC,
+    addScaled (xCell (5 * digit + 2)) rC, addScaled (xCell (5 * digit + 3)) rB,
+    addScaled (yCell (3 * digit + 1)) rB, addCell (yCell (3 * digit + 2)),
+    finishTargetOverY (openRow digit + 1) (openTarget digit 1),
+    -- Z row: c0 + v[x9]
+    loadAt rAcc (rowCell digit 3), addCell (xCell (5 * digit + 4)),
     finishTarget (openRow digit + 2) (openTarget digit 2),
     zeroRegs [rAcc, rAddr, rSel, rA, rB, rC, rD, rE, rF]]
 
@@ -324,13 +329,13 @@ theorem cost_liftOne (digit : Nat) : (liftOne digit).cost = 34 := by
 theorem size_lifts : lifts.size = 91 * 34 := size_rep _ _ _ fun _ _ => size_liftOne _
 theorem cost_lifts : lifts.cost = 91 * 34 := cost_rep _ _ _ fun _ _ => cost_liftOne _
 
-theorem size_solveDigit (digit : Nat) : (solveDigit digit).size = 105 := by
-  unfold solveDigit addScaled addCell finishTarget; prog_size
-theorem cost_solveDigit (digit : Nat) : (solveDigit digit).cost = 105 := by
-  unfold solveDigit addScaled addCell finishTarget; prog_size
+theorem size_solveDigit (digit : Nat) : (solveDigit digit).size = 76 := by
+  unfold solveDigit addScaled addCell finishTarget finishTargetOverY; prog_size
+theorem cost_solveDigit (digit : Nat) : (solveDigit digit).cost = 76 := by
+  unfold solveDigit addScaled addCell finishTarget finishTargetOverY; prog_size
 
-theorem size_solve : solve.size = 91 * 105 := size_rep _ _ _ fun _ _ => size_solveDigit _
-theorem cost_solve : solve.cost = 91 * 105 := cost_rep _ _ _ fun _ _ => cost_solveDigit _
+theorem size_solve : solve.size = 91 * 76 := size_rep _ _ _ fun _ _ => size_solveDigit _
+theorem cost_solve : solve.cost = 91 * 76 := cost_rep _ _ _ fun _ _ => cost_solveDigit _
 
 theorem size_limbsOf (digit collector : Nat) : (limbsOf digit collector).size = 58 := by
   unfold limbsOf shr128; prog_size
@@ -386,12 +391,12 @@ theorem cost_programs : (programs ordF).cost = 91 * (3 * (3 * 30)) :=
 
 /-- The opening's code size. -/
 def programSize : Nat :=
-  90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34 + 91 * 105 + 91 * (3 * 236623) +
+  90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34 + 91 * 76 + 91 * (3 * 236623) +
     91 * (3 * (3 * 34)) + 16
 
 /-- The opening's cost. -/
 def programCost : Nat :=
-  90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34 + 91 * 105 + 91 * (3 * 169548) +
+  90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34 + 91 * 76 + 91 * (3 * 169548) +
     91 * (3 * (3 * 30)) + 16
 
 theorem size_program : (program ordF).size = programSize := by

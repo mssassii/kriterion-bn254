@@ -28,12 +28,12 @@ observation of the tape (the garbled output together with the entire oracle, or 
 game run on it),
 
 ```
-d( realTape.map observe , swappedTape.map observe )  ≤  N · δ₃ ,   N = 418,592
+d( realTape.map observe , swappedTape.map observe )  ≤  N · δ₃ ,   N = 372,364
 ```
 
 with `δ₃ = (2 ^ 384 mod p) / 2 ^ 384` the bias of one three-block Rule S draw
 (`Basic.sampleFp_etvDist_le`) and `N = #MaskSite` (`card_maskSite`), which evaluates to
-`824 · 508 = 418,592` from `Params` (`card_maskSite_eq_design`) and `N · δ₃ ≤ 2 ^ -111`
+`733 · 508 = 372,364` from `Params` (`card_maskSite_eq_design`) and `N · δ₃ ≤ 2 ^ -111`
 (`maskCount_mul_delta3_le`).
 
 **The proof is data processing over the whole tape.** For a fixed point set the uniform
@@ -274,7 +274,7 @@ theorem laneCount_le (lane : Lane) : laneCount lane ≤ elementCountX := by
   cases lane <;> simp only [laneCount, curveElementCountX, curveElementCountY,
     pointElementCountX, pointElementCountY, elementCountX] <;> omega
 
-/-- The four lanes together deliver all `824` elements. -/
+/-- The four lanes together deliver all `733` elements. -/
 theorem sum_laneCount : ∑ lane : Lane, laneCount lane = elementCount := by
   decide
 
@@ -297,8 +297,8 @@ theorem sum_twoPow_chunkWidth : ∑ chunk : Fin chunkCount, 2 ^ chunkWidth chunk
   rw [sum_chunkWidth (fun width => 2 ^ width)]
   rfl
 
-/-- **`N = 418,592`**: every garbler scale mask of every lane. -/
-theorem card_maskSite : Fintype.card MaskSite = 418592 := by
+/-- **`N = 372,364`**: every garbler scale mask of every lane. -/
+theorem card_maskSite : Fintype.card MaskSite = 372364 := by
   rw [card_maskSite_eq_design, sum_twoPow_chunkWidth]
   rfl
 
@@ -482,12 +482,12 @@ theorem maskSwap_bind_etvDist_le {X : Type} (coinsLaw : PMF Coins)
   have identity := maskSwap_etvDist_le coinsLaw point id
   rwa [PMF.map_id, PMF.map_id] at identity
 
-/-- **Theorem 1 with the numbers in**: `≤ 418,592 · δ₃ ≤ 2 ^ -111`. -/
+/-- **Theorem 1 with the numbers in**: `≤ 372,364 · δ₃ ≤ 2 ^ -111`. -/
 theorem maskSwap_etvDist_le_numeral {X : Type} (coinsLaw : PMF Coins)
     (point : RestTape Coins → MaskSite × Fin 3 → Block)
     (observe : Coins × PermutationOracle FixedIndex Block → X) :
     ((realTape coinsLaw).map observe).etvDist ((swappedTape coinsLaw point).map observe)
-      ≤ (418592 : ℝ≥0∞) * delta3 ∧
+      ≤ (372364 : ℝ≥0∞) * delta3 ∧
     ((realTape coinsLaw).map observe).etvDist ((swappedTape coinsLaw point).map observe)
       ≤ (2 ^ 111 : ℝ≥0∞)⁻¹ := by
   have bound := maskSwap_etvDist_le coinsLaw point observe
@@ -587,7 +587,7 @@ theorem garblerMask_oracleOf {Coins : Type}
     garblerPoint, limb]
 
 /-- **Every garbler scale mask, swapped.** Under `G0U` with the garbler's own points, the
-construction's `N = 418,592` masks — every lane, chunk, switch and element — are iid uniform on
+construction's `N = 372,364` masks — every lane, chunk, switch and element — are iid uniform on
 `F_p` and independent of the coins and of every non-scale permutation. -/
 theorem swappedTape_garblerMasks {Coins : Type} (coinsLaw : PMF Coins)
     (keys : Coins → (Lane → Block) × (Lane → Fin PlanB.coordinateBits → Block × Block)) :

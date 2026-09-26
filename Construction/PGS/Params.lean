@@ -3,11 +3,15 @@ This file defines the frozen Plan B parameters of the projectivized garbling sch
 The plan source is `2026-09-17-planB.md`, section D.1 and D.5.
 
 **The query-gated profile.** The pinned challenge bounds the oracle queries of garbling
-(`≤ 1,759,967`) and evaluation (`≤ 1,055,879`). The `scale-hot` layer costs `3 · 824` queries per
+(`≤ 1,759,967`) and evaluation (`≤ 1,055,879`). The `scale-hot` layer costs `3 · 733` queries per
 switch and `Σ_c 2 ^ b_c ≥ 508` for any chunking of 254 bits, so the chunks must be narrow: at
-`chunkBits = 2` garbling makes `1,305,053` queries and evaluation `990,093`, both at least 5%
-below their gates (`Programs.garbleBudget_eq` and `Programs.evaluateBudget_eq` in
+`chunkBits = 2` garbling makes `1,166,369` queries and evaluation `886,080`
+(`Programs.garbleBudget_eq` and `Programs.evaluateBudget_eq` in
 `Construction/OraclePrograms.lean` count every term).
+
+**The Y4 rows.** A digit consumes eight elements: five x-type (`X` two, `Y` two, `Z` one) and
+three y-type (`X` one, `Y` two). The `Y` row is the four-element row that uses the curve equation
+`y² = x³ + 3` (`Construction/ArgoMAC/Biquadratic.lean`).
 -/
 
 import Mathlib.Algebra.BigOperators.Fin
@@ -32,14 +36,14 @@ def foldStepCount : Nat := 127
 /-- The number of x-type elements: `91 * 5 + 3`. -/
 def elementCountX : Nat := 458
 
-/-- The number of y-type elements: `91 * 4 + 2`. -/
-def elementCountY : Nat := 366
+/-- The number of y-type elements: `91 * 3 + 2`. -/
+def elementCountY : Nat := 275
 
 /-- The x-type elements of the point rows, delivered by switch system B: `91 * 5`. -/
 def pointElementCountX : Nat := 455
 
-/-- The y-type elements of the point rows, delivered by switch system B: `91 * 4`. -/
-def pointElementCountY : Nat := 364
+/-- The y-type elements of the point rows, delivered by switch system B: `91 * 3`. -/
+def pointElementCountY : Nat := 273
 
 /-- The x-type elements of the curve check, delivered by switch system A. -/
 def curveElementCountX : Nat := 3
@@ -47,17 +51,21 @@ def curveElementCountX : Nat := 3
 /-- The y-type elements of the curve check, delivered by switch system A. -/
 def curveElementCountY : Nat := 2
 
-/-- The `819` point-row elements are `91 * 9`. -/
-def pointElementCount : Nat := 819
+/-- The `728` point-row elements are `91 * 8`. -/
+def pointElementCount : Nat := 728
 
 /-- The total number of IT-GS elements `S`. -/
-def elementCount : Nat := 824
+def elementCount : Nat := 733
 
-/-- The width in bits of one chunk's published `scale-hot` join word: `824 * 254`. -/
-def chunkJoinBits : Nat := 209296
+/-- The width in bits of one chunk's published `scale-hot` join word: the `733 * 254 = 186182`
+slot bits and `chunkPadBits = 2` zero bits that round the word up to whole bytes. -/
+def chunkJoinBits : Nat := 186184
+
+/-- The zero bits above the last slot of a chunk word. -/
+def chunkPadBits : Nat := 2
 
 /-- The width in bytes of one chunk's published `scale-hot` join word. -/
-def chunkJoinBytes : Nat := 26162
+def chunkJoinBytes : Nat := 23273
 
 /-- The number of bits of one coordinate. -/
 def coordinateBits : Nat := 254

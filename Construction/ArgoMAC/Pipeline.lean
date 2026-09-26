@@ -2,14 +2,14 @@
 This file connects `C_1`, `C_23` and `C_45` over the projectivized garbling scheme.
 The active paper shows this pipeline at `fig:garbled_c_with_cm_opt`.
 
-Plan B replaces the 824 `DigitAdaptor` tables by chunked switch systems, and Task 19a runs
+Plan B replaces the per-element `DigitAdaptor` tables (733 elements) by chunked switch systems, and Task 19a runs
 **two** of them per coordinate:
 
 * **system A** (lanes `curveX`, `curveY`) is keyed on the *raw* 508 Lamport labels and delivers
   the five curve-check elements. Its output is the bridge key `t`, which the check publishes
   as `t + mask * (x^3 + 3 - y^2)`: exactly `t` on the curve, uniform off it.
 * **system B** (lanes `pointX`, `pointY`) is keyed on the *EncPRF-whitened* labels, whose
-  one-time pads come from `t` through `EncPRF.whiteningKeys`. It delivers the `819 = 91 * 9`
+  one-time pads come from `t` through `EncPRF.whiteningKeys`. It delivers the `728 = 91 * 8`
   point-row elements. An evaluator who cannot produce `t` holds garbage labels for system B
   and can compute none of the point rows -- that is the gating the curve check is for.
 
@@ -25,11 +25,12 @@ bit-dependent `EncPRF.transformMac` labels, unchanged from the baseline.
    **not** mention the slopes,
 3. derive the slopes from the offsets (`curveSlopes`, `pointSlopes`),
 4. weight them per chunk (`chunkScalar`, inside `garbleCoord`),
-5. publish the joins (`garbleCoord`), the eleven row constants and the three curve constants,
+5. publish the joins (`garbleCoord`), the four row constants and the three curve constants,
    each with its element offsets absorbed.
 
-The four lanes' `824` joins of one chunk are still interleaved into a single
-`chunkJoinBits`-wide word, so the chunk stays the byte-aligned publication unit.
+The four lanes' `733` joins of one chunk are still interleaved into a single
+`chunkJoinBits`-wide word (with two zero bits on top), so the chunk stays the byte-aligned
+publication unit.
 The plan source is `2026-09-17-planB.md`, sections D.3--D.6 and
 Tasks 19 and 19a.
 -/
@@ -134,8 +135,7 @@ def xElementOfSlot : Nat → XElement
 /-- The y-type element slot inside a digit. -/
 def yElementOfSlot : Nat → YElement
   | 0 => .rowX_y10
-  | 1 => .rowY_y6
-  | 2 => .rowY_y8
+  | 1 => .rowY_y8
   | _ => .rowY_y10
 
 /-- The x-type curve element slot. -/
@@ -240,8 +240,8 @@ def curveValues (xValues : Fin curveElementCountX → BaseField)
 
 One chunk publishes a single `chunkJoinBits`-wide word carrying all four lanes' joins: the
 `pointX` lane's `455` values in slots `0 .. 454`, the `curveX` lane's `3` in slots
-`455 .. 457`, the `pointY` lane's `364` in slots `458 .. 821` and the `curveY` lane's `2` in
-slots `822, 823`. Interleaving the lanes per chunk is what makes the *chunk* the byte-aligned
+`455 .. 457`, the `pointY` lane's `273` in slots `458 .. 730` and the `curveY` lane's `2` in
+slots `731, 732`. Interleaving the lanes per chunk is what makes the *chunk* the byte-aligned
 unit. -/
 
 /-- Interleave the two coordinates' joins of one chunk. -/
@@ -479,29 +479,30 @@ def digitK (oracle : PermutationOracle FixedIndex Block) (delta : Coord → Bloc
     (whitened : InputMacKey) : FieldMacToECMac.DigitValues :=
   fun digit => digitValues (pointXK oracle delta whitened) (pointYK oracle delta whitened) digit
 
-/-- **Step 3.** The nine slopes of each digit, derived from the element offsets. -/
-def pointSlopes (oracle : PermutationOracle FixedIndex Block) (delta : Coord → Block)
-    (whitened : InputMacKey) (randomness : FieldMacToECMac.Randomness) :
+/-- **Step 3.** The eight slopes of each digit, derived from the element offsets and carrying the
+row coefficients. -/
+def pointSlopes (rows : FieldMacToECMac.Rows) (oracle : PermutationOracle FixedIndex Block)
+    (delta : Coord → Block) (whitened : InputMacKey) (randomness : FieldMacToECMac.Randomness) :
     Fin digitCount → Biquadratic.Values :=
   fun digit =>
-    Biquadratic.slopes (randomness.get digit).x (randomness.get digit).y (randomness.get digit).z
-      (digitK oracle delta whitened digit)
+    Biquadratic.slopes (rows.get digit) (randomness.get digit).x (randomness.get digit).y
+      (randomness.get digit).z (digitK oracle delta whitened digit)
 
 /-- **Steps 4 and 5.** The `pointX` lane's published fold joins and chunk joins. -/
-def pointXGarbled (oracle : PermutationOracle FixedIndex Block) (delta : Coord → Block)
-    (whitened : InputMacKey) (randomness : FieldMacToECMac.Randomness) :
+def pointXGarbled (rows : FieldMacToECMac.Rows) (oracle : PermutationOracle FixedIndex Block)
+    (delta : Coord → Block) (whitened : InputMacKey) (randomness : FieldMacToECMac.Randomness) :
     Vector Block foldStepCount × (Fin chunkCount → Fin pointElementCountX → BaseField) :=
   garbleCoord oracle .pointX (delta .x) (bitKeyOf whitened .x)
-    (pointXAssemble (pointSlopes oracle delta whitened randomness))
+    (pointXAssemble (pointSlopes rows oracle delta whitened randomness))
 
 /-- **Steps 4 and 5.** The `pointY` lane's published fold joins and chunk joins. -/
-def pointYGarbled (oracle : PermutationOracle FixedIndex Block) (delta : Coord → Block)
-    (whitened : InputMacKey) (randomness : FieldMacToECMac.Randomness) :
+def pointYGarbled (rows : FieldMacToECMac.Rows) (oracle : PermutationOracle FixedIndex Block)
+    (delta : Coord → Block) (whitened : InputMacKey) (randomness : FieldMacToECMac.Randomness) :
     Vector Block foldStepCount × (Fin chunkCount → Fin pointElementCountY → BaseField) :=
   garbleCoord oracle .pointY (delta .y) (bitKeyOf whitened .y)
-    (pointYAssemble (pointSlopes oracle delta whitened randomness))
+    (pointYAssemble (pointSlopes rows oracle delta whitened randomness))
 
-/-- The point layer's published table: the eleven row constants of each digit and the gadget
+/-- The point layer's published table: the four row constants of each digit and the gadget
 entries. The gadget keeps reading the bit-dependent `EncPRF.transformKey` labels. -/
 def pointGarble (outputKeys : FieldMacToECMac.OutputKeys)
     (pointRandomness : FieldMacToECMac.Randomness)
@@ -537,15 +538,15 @@ def garble (outputKeys : FieldMacToECMac.OutputKeys)
       encPRFOracle hashOracle delta inputKey).2
     curveXHot := (curveXGarbled fixedKeyOracle delta inputKey curveR1 curveR2).1
     curveYHot := (curveYGarbled fixedKeyOracle delta inputKey curveR1 curveR2).1
-    pointXHot := (pointXGarbled fixedKeyOracle delta
+    pointXHot := (pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
       (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).1
-    pointYHot := (pointYGarbled fixedKeyOracle delta
+    pointYHot := (pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
       (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).1
     scale := Vector.ofFn fun chunk => pack (assembleWord
-      ((pointXGarbled fixedKeyOracle delta
+      ((pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
         (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
       ((curveXGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)
-      ((pointYGarbled fixedKeyOracle delta
+      ((pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
         (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
       ((curveYGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)) }
 
@@ -758,16 +759,16 @@ theorem scale_pointX :
     (fun chunk => readPointX (unpack ((garble outputKeys pointRandomness exceptionPad bridgeKey
         curveMask curveR1 curveR2 fixedKeyOracle encPRFOracle hashOracle delta inputKey).scale.get
         chunk)))
-      = (pointXGarbled fixedKeyOracle delta
+      = (pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
           (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 := by
   funext chunk
   have word : (garble outputKeys pointRandomness exceptionPad bridgeKey curveMask curveR1 curveR2
         fixedKeyOracle encPRFOracle hashOracle delta inputKey).scale.get chunk
       = pack (assembleWord
-          ((pointXGarbled fixedKeyOracle delta
+          ((pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveXGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)
-          ((pointYGarbled fixedKeyOracle delta
+          ((pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveYGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)) := by
     simp only [garble, Vector.get_ofFn]
@@ -783,10 +784,10 @@ theorem scale_curveX :
   have word : (garble outputKeys pointRandomness exceptionPad bridgeKey curveMask curveR1 curveR2
         fixedKeyOracle encPRFOracle hashOracle delta inputKey).scale.get chunk
       = pack (assembleWord
-          ((pointXGarbled fixedKeyOracle delta
+          ((pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveXGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)
-          ((pointYGarbled fixedKeyOracle delta
+          ((pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveYGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)) := by
     simp only [garble, Vector.get_ofFn]
@@ -797,16 +798,16 @@ theorem scale_pointY :
     (fun chunk => readPointY (unpack ((garble outputKeys pointRandomness exceptionPad bridgeKey
         curveMask curveR1 curveR2 fixedKeyOracle encPRFOracle hashOracle delta inputKey).scale.get
         chunk)))
-      = (pointYGarbled fixedKeyOracle delta
+      = (pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
           (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 := by
   funext chunk
   have word : (garble outputKeys pointRandomness exceptionPad bridgeKey curveMask curveR1 curveR2
         fixedKeyOracle encPRFOracle hashOracle delta inputKey).scale.get chunk
       = pack (assembleWord
-          ((pointXGarbled fixedKeyOracle delta
+          ((pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveXGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)
-          ((pointYGarbled fixedKeyOracle delta
+          ((pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveYGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)) := by
     simp only [garble, Vector.get_ofFn]
@@ -822,10 +823,10 @@ theorem scale_curveY :
   have word : (garble outputKeys pointRandomness exceptionPad bridgeKey curveMask curveR1 curveR2
         fixedKeyOracle encPRFOracle hashOracle delta inputKey).scale.get chunk
       = pack (assembleWord
-          ((pointXGarbled fixedKeyOracle delta
+          ((pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveXGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)
-          ((pointYGarbled fixedKeyOracle delta
+          ((pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).2 chunk)
           ((curveYGarbled fixedKeyOracle delta inputKey curveR1 curveR2).2 chunk)) := by
     simp only [garble, Vector.get_ofFn]
@@ -905,7 +906,7 @@ theorem pointXValues_garble (correlated : CorrelatedKey inputKey delta)
         (BitInput.ofAffine input)
         ((whitenedKey encPRFOracle hashOracle bridgeKey inputKey).encode
           (BitInput.ofAffine input)) element
-      = pointXAssemble (pointSlopes fixedKeyOracle delta
+      = pointXAssemble (pointSlopes (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness) element
           * input.x
         + pointXK fixedKeyOracle delta
@@ -914,14 +915,14 @@ theorem pointXValues_garble (correlated : CorrelatedKey inputKey delta)
     curveR1 curveR2 fixedKeyOracle encPRFOracle hashOracle delta inputKey, macLabels_encode]
   have hot : (garble outputKeys pointRandomness exceptionPad bridgeKey curveMask curveR1 curveR2
       fixedKeyOracle encPRFOracle hashOracle delta inputKey).pointXHot
-      = (pointXGarbled fixedKeyOracle delta
+      = (pointXGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
           (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).1 := rfl
   rw [hot, pointXGarbled, coordBits_ofAffine]
   exact delivers .pointX (delta .x)
     (bitKeyOf (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) .x)
     (fun position => whitenedKey_correlated encPRFOracle hashOracle bridgeKey inputKey delta
       correlated .x position)
-    (pointXAssemble (pointSlopes fixedKeyOracle delta
+    (pointXAssemble (pointSlopes (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
       (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness)) input.x element
 
 /-- **System B, y lane.** -/
@@ -933,7 +934,7 @@ theorem pointYValues_garble (correlated : CorrelatedKey inputKey delta)
         (BitInput.ofAffine input)
         ((whitenedKey encPRFOracle hashOracle bridgeKey inputKey).encode
           (BitInput.ofAffine input)) element
-      = pointYAssemble (pointSlopes fixedKeyOracle delta
+      = pointYAssemble (pointSlopes (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness) element
           * input.y
         + pointYK fixedKeyOracle delta
@@ -942,17 +943,17 @@ theorem pointYValues_garble (correlated : CorrelatedKey inputKey delta)
     curveR1 curveR2 fixedKeyOracle encPRFOracle hashOracle delta inputKey, macLabels_encode]
   have hot : (garble outputKeys pointRandomness exceptionPad bridgeKey curveMask curveR1 curveR2
       fixedKeyOracle encPRFOracle hashOracle delta inputKey).pointYHot
-      = (pointYGarbled fixedKeyOracle delta
+      = (pointYGarbled (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
           (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness).1 := rfl
   rw [hot, pointYGarbled, coordBits_ofAffine]
   exact delivers .pointY (delta .y)
     (bitKeyOf (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) .y)
     (fun position => whitenedKey_correlated encPRFOracle hashOracle bridgeKey inputKey delta
       correlated .y position)
-    (pointYAssemble (pointSlopes fixedKeyOracle delta
+    (pointYAssemble (pointSlopes (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness) fixedKeyOracle delta
       (whitenedKey encPRFOracle hashOracle bridgeKey inputKey) pointRandomness)) input.y element
 
-/-- Each digit's row sees exactly the nine values its algebra expects. -/
+/-- Each digit's row sees exactly the eight values its algebra expects. -/
 theorem digitValues_garble (correlated : CorrelatedKey inputKey delta)
     (delivers : Delivers fixedKeyOracle) (input : AffineInput) :
     digitValues
@@ -966,8 +967,8 @@ theorem digitValues_garble (correlated : CorrelatedKey inputKey delta)
           (BitInput.ofAffine input)
           ((whitenedKey encPRFOracle hashOracle bridgeKey inputKey).encode
             (BitInput.ofAffine input)))
-      = FieldMacToECMac.delivered pointRandomness
-          (digitK fixedKeyOracle delta
+      = FieldMacToECMac.delivered (FieldMacToECMac.rowsForOutputKeys outputKeys pointRandomness)
+          pointRandomness (digitK fixedKeyOracle delta
             (whitenedKey encPRFOracle hashOracle bridgeKey inputKey)) input := by
   funext digit element
   cases element with
@@ -1020,7 +1021,8 @@ theorem evaluateEncoded [FieldCertificate] (correlated : CorrelatedKey inputKey 
       curveR1 curveR2 fixedKeyOracle encPRFOracle hashOracle delta inputKey)
       = pointGarble outputKeys pointRandomness exceptionPad bridgeKey fixedKeyOracle
         encPRFOracle hashOracle delta inputKey from rfl,
-    pointGarble, InputMacKey.encodeOfAffine, FieldMacToECMac.evaluateEncoded]
+    pointGarble, InputMacKey.encodeOfAffine,
+    FieldMacToECMac.evaluateEncoded _ _ _ _ _ _ _ _ inputOnCurve]
   exact FieldMacToECMac.rowsForOutputKeysSparse outputKeys pointRandomness
 
 end Encoded

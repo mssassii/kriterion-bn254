@@ -82,6 +82,9 @@ def emitBits (width : Nat) : Prog :=
 /-- Emit the low `width` bits of `RAM[address]`. -/
 def emitWord (address width : Nat) : Prog := .seq (loadAt rAcc address) (emitBits width)
 
+/-- Emit `width` zero bits (the padding on top of a chunk word). -/
+def emitZero (width : Nat) : Prog := .seq (cst rAcc 0) (emitBits width)
+
 /-! ### Sizes and costs -/
 
 theorem size_cst (target : Register) (value : Nat) : (cst target value).size = 1 := rfl
@@ -162,6 +165,12 @@ theorem size_emitWord (address width : Nat) : (emitWord address width).size = 2 
 
 theorem cost_emitWord (address width : Nat) : (emitWord address width).cost = 2 + 3 * width := by
   simp only [emitWord, Prog.cost, cost_loadAt, cost_emitBits]
+
+theorem size_emitZero (width : Nat) : (emitZero width).size = 1 + 3 * width := by
+  simp only [emitZero, Prog.size, size_cst, size_emitBits]
+
+theorem cost_emitZero (width : Nat) : (emitZero width).cost = 1 + 3 * width := by
+  simp only [emitZero, Prog.cost, cost_cst, cost_emitBits]
 
 end Blocks
 

@@ -434,18 +434,9 @@ theorem openingFree_noOracle : openingFree.NoOracle := by
         noOracle_zeroRegs _, trivial⟩
   · exact noOracle_rep _ _ fun _ _ => by
       unfold Opening.solveDigit Opening.addScaled Opening.addCell Opening.finishTarget
-      simp only [Prog.seqList]
-      exact ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, rfl, rfl, rfl, ⟨rfl, rfl⟩,
-        ⟨rfl, rfl⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, trivial⟩,
-        ⟨rfl, rfl⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, trivial⟩,
-        ⟨rfl, rfl⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, trivial⟩, noOracle_zeroRegs _, trivial⟩
+        Opening.finishTargetOverY
+      simp only [Prog.seqList, Prog.NoOracle, loadAt, storeAt, cst, ar, Op.isOracle, and_true,
+        true_and, noOracle_zeroRegs]
   · exact noOracle_rep _ _ fun _ _ => noOracle_rep _ _ fun _ _ => by
       unfold Opening.preimageOne Opening.limbsOf Opening.shr128
       simp only [Prog.seqList]

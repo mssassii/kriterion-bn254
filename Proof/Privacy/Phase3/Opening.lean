@@ -6,16 +6,18 @@
 ### (a) The row solve
 
 With the published constants `γ = rows[d]` and the input `u` fixed, each of a digit's three rows is
-affine in the nine delivered element values (`evaluateGamma_eq_affine`: a `γ`-and-`u` constant
+affine in the eight delivered element values (`evaluateGamma_eq_affine`: a `γ`-and-`u` constant
 plus the linear form `rowLinear u`, which does not mention `γ`), and each row has a
-coefficient-one **collector** that no other row reads: `rowX_x9` for `X`, `rowY_x9` for `Y`,
-`rowZ_x9` for `Z` (`rowLinear_collectorX/Y/Z`). All three are x-type elements of lane `pointX`.
+**collector** that no other row reads: `rowX_x9` for `X` (coefficient one), the mixed element
+`rowY_x9` for `Y` (coefficient `y`), `rowZ_x9` for `Z` (coefficient one)
+(`rowLinear_collectorX/Y/Z`). All three are x-type elements of lane `pointX`.
 
-`collectorEquiv γ u v : F_p³ ≃ HomogeneousValue` is the solve: its forward map writes the collector
-triple into `v` and evaluates the three rows, its inverse is the closed form `collectorSolve`
-(note §1.3, E3). It depends on `v` only through the six non-collector values
-(`collectorEquiv_congr`), so for every fixed value of the six free elements and the eleven
-published constants the collector triple and the row triple determine each other.
+`collectorEquiv γ u v : F_p³ ≃ HomogeneousValue` is the solve, for an input with `y ≠ 0` (every
+curve point): its forward map writes the collector triple into `v` and evaluates the three rows,
+its inverse is the closed form `collectorSolve` (note §1.3, E3), which divides the `Y` residual by
+`y`. It depends on `v` only through the five non-collector values (`collectorEquiv_congr`), so
+for every fixed value of the five free elements and the four published constants the collector
+triple and the row triple determine each other.
 
 ### (b) The digit-point law
 
@@ -71,7 +73,7 @@ noncomputable section
 /-- The `X` row's collector: x-type element `rowX_x9`. -/
 abbrev collectorX : Biquadratic.Element := .inl .rowX_x9
 
-/-- The `Y` row's collector: x-type element `rowY_x9`. -/
+/-- The `Y` row's collector: the mixed x-type element `rowY_x9` (clear multiplier `y`). -/
 abbrev collectorY : Biquadratic.Element := .inl .rowY_x9
 
 /-- The `Z` row's collector: x-type element `rowZ_x9`. -/
@@ -87,16 +89,15 @@ instance (element : Biquadratic.Element) : Decidable (IsCollector element) := by
 /-- The row triple's linear part in the delivered values. It does not mention `γ`. -/
 def rowLinear (input : AffineInput) (values : Biquadratic.Values) : HomogeneousValue where
   x := values (.inl .rowX_x7) * input.x + values (.inl .rowX_x9) + values (.inr .rowX_y10)
-  y := values (.inr .rowY_y6) * input.x + values (.inl .rowY_x7) * input.x
-    + values (.inr .rowY_y8) * input.y + values (.inl .rowY_x9) + values (.inr .rowY_y10)
+  y := values (.inl .rowY_x7) * input.x ^ 2 + values (.inl .rowY_x9) * input.y
+    + values (.inr .rowY_y8) * input.y + values (.inr .rowY_y10)
   z := values (.inl .rowZ_x9)
 
 /-- The row triple's constant part: the published constants on the input's monomials. -/
 def rowConstant (gamma : RowGamma) (input : AffineInput) : HomogeneousValue where
-  x := gamma.xC0 + gamma.xC1 * input.x + gamma.xC2 * input.y + gamma.xC4 * input.x ^ 2
-  y := gamma.yC0 + gamma.yC2 * input.y + gamma.yC3 * input.x * input.y + gamma.yC4 * input.x ^ 2
-    + gamma.yC5 * input.y ^ 2
-  z := gamma.zC0 + gamma.zC1 * input.x
+  x := gamma.xC0
+  y := gamma.yC0 + gamma.yC4 * input.x ^ 2
+  z := gamma.zC0
 
 /-- **The rows are affine in the delivered values, with `γ` fixed.** -/
 theorem evaluateGamma_eq_affine (gamma : RowGamma) (input : AffineInput)
@@ -123,9 +124,9 @@ theorem rowLinear_collectorX (input : AffineInput) (value : BaseField) :
     rowLinear input (Pi.single collectorX value) = ⟨value, 0, 0⟩ := by
   simp [rowLinear, Pi.single_apply]
 
-/-- The `Y` collector has coefficient one in `Y` and appears in no other row. -/
+/-- The `Y` collector has coefficient `y` in `Y` and appears in no other row. -/
 theorem rowLinear_collectorY (input : AffineInput) (value : BaseField) :
-    rowLinear input (Pi.single collectorY value) = ⟨0, value, 0⟩ := by
+    rowLinear input (Pi.single collectorY value) = ⟨0, value * input.y, 0⟩ := by
   simp [rowLinear, Pi.single_apply]
 
 /-- The `Z` collector has coefficient one in `Z` and appears in no other row. -/
@@ -157,20 +158,19 @@ theorem collectorsOf_setCollectors (values : Biquadratic.Values)
   simp [collectorsOf, setCollectors]
 
 /-- **The collector solve** (note §1.3, E3): the collector triple that makes the three rows equal a
-target, given the published constants and the six other delivered values. -/
+target, given the published constants and the five other delivered values. The `Y` collector
+rides on `y`, so its residual is divided by `y`. -/
 def collectorSolve (gamma : RowGamma) (input : AffineInput) (values : Biquadratic.Values)
     (target : HomogeneousValue) : BaseField × BaseField × BaseField :=
-  (target.x - (gamma.xC0 + gamma.xC1 * input.x + gamma.xC2 * input.y + gamma.xC4 * input.x ^ 2
-      + values (.inl .rowX_x7) * input.x + values (.inr .rowX_y10)),
-   target.y - (gamma.yC0 + gamma.yC2 * input.y + gamma.yC3 * input.x * input.y
-      + gamma.yC4 * input.x ^ 2 + gamma.yC5 * input.y ^ 2 + values (.inr .rowY_y6) * input.x
-      + values (.inl .rowY_x7) * input.x + values (.inr .rowY_y8) * input.y
-      + values (.inr .rowY_y10)),
-   target.z - (gamma.zC0 + gamma.zC1 * input.x))
+  (target.x - (gamma.xC0 + values (.inl .rowX_x7) * input.x + values (.inr .rowX_y10)),
+   (target.y - (gamma.yC0 + gamma.yC4 * input.x ^ 2 + values (.inl .rowY_x7) * input.x ^ 2
+      + values (.inr .rowY_y8) * input.y + values (.inr .rowY_y10))) * input.y⁻¹,
+   target.z - gamma.zC0)
 
 /-- **The collector triple and the row triple determine each other**, for every fixed value of the
-six free elements and the published constants. -/
-def collectorEquiv (gamma : RowGamma) (input : AffineInput) (values : Biquadratic.Values) :
+five free elements and the published constants, at an input with `y ≠ 0`. -/
+def collectorEquiv [FieldCertificate] (gamma : RowGamma) (input : AffineInput) (yNe : input.y ≠ 0)
+    (values : Biquadratic.Values) :
     (BaseField × BaseField × BaseField) ≃ HomogeneousValue where
   toFun triple := evaluateGamma gamma input (setCollectors values triple)
   invFun target := collectorSolve gamma input values target
@@ -179,19 +179,19 @@ def collectorEquiv (gamma : RowGamma) (input : AffineInput) (values : Biquadrati
     simp only [collectorSolve, evaluateGamma, Biquadratic.evaluateX, Biquadratic.evaluateY,
       Biquadratic.evaluateZ, xGammaOf, yGammaOf, zGammaOf, setCollectors]
     simp only [reduceCtorEq, if_false, if_true, Sum.inl.injEq]
-    refine Prod.ext ?_ (Prod.ext ?_ ?_) <;> simp <;> ring
+    refine Prod.ext ?_ (Prod.ext ?_ ?_) <;> dsimp only <;> first | ring1 | (field_simp; ring1) | field_simp
   right_inv target := by
     obtain ⟨tx, ty, tz⟩ := target
     simp only [collectorSolve, evaluateGamma, Biquadratic.evaluateX, Biquadratic.evaluateY,
       Biquadratic.evaluateZ, xGammaOf, yGammaOf, zGammaOf, setCollectors]
     simp only [reduceCtorEq, if_false, if_true, Sum.inl.injEq]
-    congr 1 <;> ring
+    congr 1 <;> first | ring1 | (field_simp; ring1) | field_simp
 
-/-- The solve reads only the six non-collector elements. -/
-theorem collectorEquiv_congr (gamma : RowGamma) (input : AffineInput)
+/-- The solve reads only the five non-collector elements. -/
+theorem collectorEquiv_congr [FieldCertificate] (gamma : RowGamma) (input : AffineInput) (yNe : input.y ≠ 0)
     (first second : Biquadratic.Values)
     (agree : ∀ element, ¬ IsCollector element → first element = second element) :
-    collectorEquiv gamma input first = collectorEquiv gamma input second := by
+    collectorEquiv gamma input yNe first = collectorEquiv gamma input yNe second := by
   have same : ∀ triple, setCollectors first triple = setCollectors second triple := by
     intro triple
     funext element
@@ -207,22 +207,22 @@ theorem collectorEquiv_congr (gamma : RowGamma) (input : AffineInput)
     rw [same]
 
 /-- The rows at the solved collectors hit the target. -/
-theorem evaluateGamma_collectorSolve (gamma : RowGamma) (input : AffineInput)
+theorem evaluateGamma_collectorSolve [FieldCertificate] (gamma : RowGamma) (input : AffineInput) (yNe : input.y ≠ 0)
     (values : Biquadratic.Values) (target : HomogeneousValue) :
     evaluateGamma gamma input (setCollectors values (collectorSolve gamma input values target))
       = target :=
-  (collectorEquiv gamma input values).right_inv target
+  (collectorEquiv gamma input yNe values).right_inv target
 
 /-- Conversely, any family whose rows hit the target carries the solved collectors. -/
-theorem collectorsOf_eq_solve (gamma : RowGamma) (input : AffineInput)
+theorem collectorsOf_eq_solve [FieldCertificate] (gamma : RowGamma) (input : AffineInput) (yNe : input.y ≠ 0)
     (values : Biquadratic.Values) (target : HomogeneousValue)
     (hits : evaluateGamma gamma input values = target) :
     collectorsOf values = collectorSolve gamma input values target := by
-  have forward : collectorEquiv gamma input values (collectorsOf values) = target := by
+  have forward : collectorEquiv gamma input yNe values (collectorsOf values) = target := by
     show evaluateGamma gamma input (setCollectors values (collectorsOf values)) = target
     rw [setCollectors_collectorsOf, hits]
   rw [← forward]
-  exact ((collectorEquiv gamma input values).left_inv (collectorsOf values)).symm
+  exact ((collectorEquiv gamma input yNe values).left_inv (collectorsOf values)).symm
 
 /-! ## (b) The digit-point law -/
 

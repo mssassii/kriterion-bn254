@@ -10,7 +10,11 @@ import Construction.PGS.Params
 namespace Kriterion.ArgoMAC.PlanB
 
 /-- The x-type element slots of one digit: two on the `X` row, two on the `Y` row,
-one on the `Z` row. -/
+one on the `Z` row.
+
+On the four-element `Y` row, `rowY_x7` is the *cubic* element (x bits, clear multiplier `x²`) and
+`rowY_x9` the *mixed* element (x bits, clear multiplier `y`); they keep the `x7`/`x9` family names
+of the adaptor families that serve them. -/
 inductive XElement
   | rowX_x7
   | rowX_x9
@@ -22,16 +26,15 @@ deriving DecidableEq
 instance : Fintype XElement :=
   ⟨{.rowX_x7, .rowX_x9, .rowY_x7, .rowY_x9, .rowZ_x9}, fun value => by cases value <;> simp⟩
 
-/-- The y-type element slots of one digit: one on the `X` row and three on the `Y` row. -/
+/-- The y-type element slots of one digit: one on the `X` row and two on the `Y` row. -/
 inductive YElement
   | rowX_y10
-  | rowY_y6
   | rowY_y8
   | rowY_y10
 deriving DecidableEq
 
 instance : Fintype YElement :=
-  ⟨{.rowX_y10, .rowY_y6, .rowY_y8, .rowY_y10}, fun value => by cases value <;> simp⟩
+  ⟨{.rowX_y10, .rowY_y8, .rowY_y10}, fun value => by cases value <;> simp⟩
 
 /-- The x-type element slots of the curve-membership check. -/
 inductive CurveXElement
@@ -56,7 +59,7 @@ instance : Fintype CurveYElement :=
 abbrev xSlotsPerDigit : Nat := 5
 
 /-- The number of y-type element slots one digit consumes. -/
-abbrev ySlotsPerDigit : Nat := 4
+abbrev ySlotsPerDigit : Nat := 3
 
 /-- The slot of an x-type element inside its digit. -/
 def XElement.slot : XElement → Fin xSlotsPerDigit
@@ -69,9 +72,8 @@ def XElement.slot : XElement → Fin xSlotsPerDigit
 /-- The slot of a y-type element inside its digit. -/
 def YElement.slot : YElement → Fin ySlotsPerDigit
   | .rowX_y10 => 0
-  | .rowY_y6 => 1
-  | .rowY_y8 => 2
-  | .rowY_y10 => 3
+  | .rowY_y8 => 1
+  | .rowY_y10 => 2
 
 /-- The slot of a curve x-type element after the `91 * 5` digit slots. -/
 def CurveXElement.slot : CurveXElement → Fin 3
@@ -79,7 +81,7 @@ def CurveXElement.slot : CurveXElement → Fin 3
   | .x5 => 1
   | .x7 => 2
 
-/-- The slot of a curve y-type element after the `91 * 4` digit slots. -/
+/-- The slot of a curve y-type element after the `91 * 3` digit slots. -/
 def CurveYElement.slot : CurveYElement → Fin 2
   | .y4 => 0
   | .y6 => 1
@@ -112,7 +114,7 @@ def curveXElementIndex (element : CurveXElement) : Fin curveElementCountX :=
     unfold curveElementCountX
     omega⟩
 
-/-- The `pointY` lane's element index: `91 * 4` digit slots. -/
+/-- The `pointY` lane's element index: `91 * 3` digit slots. -/
 def yElementIndex (digit : Fin digitCount) (element : YElement) : Fin pointElementCountY :=
   ⟨ySlotsPerDigit * digit.val + element.slot.val, by
     have hd := digit.isLt

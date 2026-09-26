@@ -131,6 +131,12 @@ theorem noOracle_bounded (width : Nat) (test use : Prog) (count : Nat)
 theorem noOracle_emitWord (address width : Nat) : (emitWord address width).NoOracle :=
   ⟨⟨rfl, rfl⟩, noOracle_rep _ _ fun _ _ => ⟨rfl, rfl, rfl⟩⟩
 
+theorem noOracle_emitZero (width : Nat) : (emitZero width).NoOracle :=
+  ⟨rfl, noOracle_rep _ _ fun _ _ => ⟨rfl, rfl, rfl⟩⟩
+
+theorem noOracle_serializeChunk (chunk : Nat) : (Stage1.serializeChunk chunk).NoOracle :=
+  ⟨noOracle_emitZero 2, noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _⟩
+
 /-- **Stage 1 has no oracle instruction.** -/
 theorem stage1_noOracle : Stage1.program.NoOracle := by
   refine ⟨noOracle_rep _ _ fun _ _ => ?_, noOracle_rep _ _ fun _ _ => ?_,
@@ -139,7 +145,7 @@ theorem stage1_noOracle : Stage1.program.NoOracle := by
   · exact ⟨noOracle_sampleWord _, ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
   · exact ⟨noOracle_sampleWord _, ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
   · exact ⟨noOracle_sampleWord _, ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
-  · exact ⟨noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _,
+  · exact ⟨noOracle_rep _ _ fun _ _ => noOracle_serializeChunk _,
       noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _,
       noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _,
       noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _⟩
@@ -331,18 +337,9 @@ theorem opening_ops : (Opening.program ordF).OpsSatisfy ValidOracle := by
   · -- the collector targets
     exact plainOps (noOracle_rep _ _ fun _ _ => by
       unfold Opening.solveDigit Opening.addScaled Opening.addCell Opening.finishTarget
-      simp only [Prog.seqList]
-      exact ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, rfl, rfl, rfl, ⟨rfl, rfl⟩,
-        ⟨rfl, rfl⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, trivial⟩,
-        ⟨rfl, rfl⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, trivial⟩,
-        ⟨rfl, rfl⟩, ⟨⟨rfl, rfl⟩, rfl, rfl, trivial⟩, ⟨⟨rfl, rfl⟩, rfl, trivial⟩,
-        ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, trivial⟩, noOracle_zeroRegs _, trivial⟩)
+        Opening.finishTargetOverY
+      simp only [Prog.seqList, Prog.NoOracle, loadAt, storeAt, cst, ar, Op.isOracle, and_true,
+        true_and, noOracle_zeroRegs])
   · -- the preimages
     exact plainOps (noOracle_rep _ _ fun _ _ => noOracle_rep _ _ fun _ _ => by
       unfold Opening.preimageOne Opening.limbsOf Opening.shr128

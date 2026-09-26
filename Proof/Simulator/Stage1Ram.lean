@@ -184,12 +184,8 @@ theorem sourceOfDraws_congr (cells cells' : Nat → BaseField) (bytes bytes' hot
     intro digit bound
     have small : digit < 91 := bound
     simp only [sourceOfDraws, Vector.getElem_ofFn]
-    rw [sameCells _ (by omega), sameCells (3 + 11 * digit + 1) (by omega),
-      sameCells (3 + 11 * digit + 2) (by omega), sameCells (3 + 11 * digit + 3) (by omega),
-      sameCells (3 + 11 * digit + 4) (by omega), sameCells (3 + 11 * digit + 5) (by omega),
-      sameCells (3 + 11 * digit + 6) (by omega), sameCells (3 + 11 * digit + 7) (by omega),
-      sameCells (3 + 11 * digit + 8) (by omega), sameCells (3 + 11 * digit + 9) (by omega),
-      sameCells (3 + 11 * digit + 10) (by omega)]
+    rw [sameCells _ (by omega), sameCells (3 + 4 * digit + 1) (by omega),
+      sameCells (3 + 4 * digit + 2) (by omega), sameCells (3 + 4 * digit + 3) (by omega)]
   · apply Vector.ext
     intro digit bound
     apply Vector.ext
@@ -219,7 +215,7 @@ theorem sourceOfDraws_congr (cells cells' : Nat → BaseField) (bytes bytes' hot
     exact sameHot _ (by unfold hotBlockCount; omega)
   · funext chunk slot
     have chunkSmall : chunk.val < 127 := chunk.isLt
-    have slotSmall : slot.val < 824 := slot.isLt
+    have slotSmall : slot.val < 733 := slot.isLt
     exact sameCells _ (by omega)
   · apply inputMacKey_ext
     · apply Vector.ext

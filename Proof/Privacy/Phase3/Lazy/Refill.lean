@@ -4,7 +4,7 @@
 `I` (`Glue.idealHybrid`) answers the simulator's honest evaluation from the shared lazy oracle
 (`Glue.runIntercept`): a fresh forward query at a scale index is uniform on the outputs still
 unused at that index. `I^U` differs in exactly one place. At the start of the opening it draws a
-**mask tape** -- one block per (mask site, limb), the `N = 418,592` masks iid uniform on `F_p` and
+**mask tape** -- one block per (mask site, limb), the `N = 372,364` masks iid uniform on `F_p` and
 the tape uniform on the fibre of `masksOf` (`uniformMaskTape`; the same fibre kernel as P1's
 `G0 → G0U` swap) -- and a non-designated forward query at a mask-site index is answered from the
 tape when it is the **first stage-2 touch of that index at a fresh input** (`consumeCell`): the

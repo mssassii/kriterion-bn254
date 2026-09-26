@@ -60,9 +60,9 @@ structure LaneSpec where
   hotRow : Nat
 
 def curveXSpec : LaneSpec := ⟨.curveX, reqX, labelBase, 3, 455, 0⟩
-def curveYSpec : LaneSpec := ⟨.curveY, reqY, labelBase + 254, 2, 822, 1⟩
+def curveYSpec : LaneSpec := ⟨.curveY, reqY, labelBase + 254, 2, 731, 1⟩
 def pointXSpec : LaneSpec := ⟨.pointX, reqX, whiteBase, 455, 0, 2⟩
-def pointYSpec : LaneSpec := ⟨.pointY, reqY, whiteBase + 254, 364, 458, 3⟩
+def pointYSpec : LaneSpec := ⟨.pointY, reqY, whiteBase + 254, 273, 458, 3⟩
 
 /-- Is x-slot `element` of lane `pointX` a collector (`x9` of rows X, Y, Z)? -/
 def isCollector (element : Nat) : Bool :=
@@ -184,7 +184,7 @@ def switchStep (spec : LaneSpec) (designated : Bool) (chunk switch : Nat) : Prog
 
 /-- The published-join term `acc[e] += ι(α) · J_c[e]`. -/
 def joinTerm (spec : LaneSpec) (chunk index : Nat) : Prog :=
-  .seq (loadAt rC (scaleCellBase + 824 * chunk + spec.slot + index))
+  .seq (loadAt rC (scaleCellBase + 733 * chunk + spec.slot + index))
     (.seq (ar .fieldMul rC rC rF)
     (.seq (loadAt rD (accBase + spec.slot + index))
     (.seq (ar .fieldAdd rD rD rC) (storeAt (accBase + spec.slot + index) rD))))
@@ -204,9 +204,9 @@ def designatedLane (spec : LaneSpec) : Prog :=
   .seq (chunkBody ordF spec true 0) (Prog.rep (chunkCount - 1) fun chunk =>
     chunkBody ordF spec false (chunk + 1))
 
-/-- Zero the `824` accumulators. -/
+/-- Zero the `733` accumulators. -/
 def initAcc : Prog :=
-  .seq (cst rA 0) (Prog.rep 824 fun index => storeAt (accBase + index) rA)
+  .seq (cst rA 0) (Prog.rep 733 fun index => storeAt (accBase + index) rA)
 
 /-- The bridge value `t` of `CurveMembership.evaluate`, then the hash query; `k1`, `k2` are
 stored. -/
@@ -223,11 +223,11 @@ def bridge : Prog :=
       (.seq (ar .fieldAdd rInput rInput rAcc)
     (.seq (loadAt rAcc (accBase + 455)) (.seq (ar .fieldMul rAcc rAcc rC)
       (.seq (ar .fieldAdd rInput rInput rAcc)
-    (.seq (loadAt rAcc (accBase + 822)) (.seq (ar .fieldMul rAcc rAcc rB)
+    (.seq (loadAt rAcc (accBase + 731)) (.seq (ar .fieldMul rAcc rAcc rB)
       (.seq (ar .fieldAdd rInput rInput rAcc)
     (.seq (loadAt rAcc (accBase + 456)) (.seq (ar .fieldMul rAcc rAcc rA)
       (.seq (ar .fieldAdd rInput rInput rAcc)
-    (.seq (loadAt rAcc (accBase + 823)) (.seq (ar .fieldAdd rInput rInput rAcc)
+    (.seq (loadAt rAcc (accBase + 732)) (.seq (ar .fieldAdd rInput rInput rAcc)
     (.seq (loadAt rAcc (accBase + 457)) (.seq (ar .fieldAdd rInput rInput rAcc)
     (.seq (.op (.query 4 rIndex rInput rFirst rSecond))
     (.seq (storeAt tmpK1 rFirst) (storeAt tmpK2 rSecond)))))))))))))))))))))))))))
@@ -416,11 +416,11 @@ theorem cost_designatedLane (spec : LaneSpec) : (designatedLane ordF spec).cost 
   rw [Prog.cost_rep _ _ _ fun _ _ => cost_chunkBody_plain ordF spec _]
   rfl
 
-theorem size_initAcc : initAcc.size = 1 + 824 * 2 := by
+theorem size_initAcc : initAcc.size = 1 + 733 * 2 := by
   simp only [initAcc, Prog.size_seq, size_cst]
   rw [Prog.size_rep _ _ _ fun _ _ => size_storeAt _ _]
 
-theorem cost_initAcc : initAcc.cost = 1 + 824 * 2 := by
+theorem cost_initAcc : initAcc.cost = 1 + 733 * 2 := by
   simp only [initAcc, Prog.cost_seq, cost_cst]
   rw [Prog.cost_rep _ _ _ fun _ _ => cost_storeAt _ _]
 
@@ -443,13 +443,13 @@ theorem cost_whiten : (whiten ordE).cost = 4 + labelCount * 8 := by
 
 /-- The replay's code size. -/
 def programSize : Nat :=
-  (1 + 824 * 2) + 127 * (141 + 176 * 3) + 127 * (141 + 176 * 2) + 40 + (4 + 508 * 8) +
-    (83 + 4 * 28411 + 8 * 455 + 126 * (141 + 176 * 455)) + 127 * (141 + 176 * 364)
+  (1 + 733 * 2) + 127 * (141 + 176 * 3) + 127 * (141 + 176 * 2) + 40 + (4 + 508 * 8) +
+    (83 + 4 * 28411 + 8 * 455 + 126 * (141 + 176 * 455)) + 127 * (141 + 176 * 273)
 
 /-- The replay's cost. -/
 def programCost : Nat :=
-  (1 + 824 * 2) + 127 * (89 + 92 * 3) + 127 * (89 + 92 * 2) + 40 + (4 + 508 * 8) +
-    (59 + 4 * 11205 + 8 * 455 + 126 * (89 + 92 * 455)) + 127 * (89 + 92 * 364)
+  (1 + 733 * 2) + 127 * (89 + 92 * 3) + 127 * (89 + 92 * 2) + 40 + (4 + 508 * 8) +
+    (59 + 4 * 11205 + 8 * 455 + 126 * (89 + 92 * 455)) + 127 * (89 + 92 * 273)
 
 theorem size_program : (program ordF ordE).size = programSize := by
   simp only [program, Prog.size_seq, size_initAcc, size_lane, size_bridge, size_whiten,
@@ -461,8 +461,8 @@ theorem cost_program : (program ordF ordE).cost = programCost := by
     cost_designatedLane]
   rfl
 
-theorem programSize_eq : programSize = 18532579 := by norm_num [programSize]
-theorem programCost_eq : programCost = 9685155 := by norm_num [programCost]
+theorem programSize_eq : programSize = 16498365 := by norm_num [programSize]
+theorem programCost_eq : programCost = 8621729 := by norm_num [programCost]
 
 end Sizes
 

@@ -1,13 +1,13 @@
 /-
-This file exports the computable ArgoMAC construction.
-The paper source is the ArgoMAC/BaBe paper at commit `e2dcf4d`, as cited by the challenge's
-baseline `argomac-lean`.
+The construction root of the CRT entry: the CRT layer and the entry (`Construction/CRT/`: the
+residue lanes, the conversion blocks, the records, the entry's scheme and query programs, the
+stage-1 source layout and the budget numerals) and the CRT simulator machine
+(`Construction/Simulator/CRT/`). The switch-system entry's modules that these import (the scheme,
+the garbling, the Lamport encoding, the simulator blocks the CRT machine reuses) are built through
+them.
 -/
 
-import Construction.Garbling
-import Construction.PGS
-import Construction.ArgoMAC.Seed
-import Construction.QueryMonad
-import Construction.Scheme
-import Construction.OraclePrograms
-import Construction.Simulator
+import Construction.CRT.Entry
+import Construction.CRT.Layout
+import Construction.CRT.BudgetFacts
+import Construction.Simulator.CRT.Simulator

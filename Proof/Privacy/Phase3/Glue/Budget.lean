@@ -5,7 +5,7 @@ Each term is the formula of design note B §5, with the corrections of the revie
 
 | hop | term | value |
 |---|---|---|
-| `G0 → G0U` | `maskSwapError = N·δ₃`, `N = 824·508`, `δ₃ = (2^384 mod p)/2^384` | `2^-111.86` |
+| `G0 → G0U` | `maskSwapError = N'·δ₃`, `N' = 824·508 ≥ 733·508`, `δ₃ = (2^384 mod p)/2^384` | `2^-111.86` |
 | `G0U → G1U` | `hiddenPointError q = 3q/2^128 + q/(p−1)` (`L1`) | linear |
 | `G1U → HW` | `stageOneHitError q₁ + exceptionalError + maskSwapError`: `L2 = 4q₁/2^128`, plus the doubling-exception mass `182/(r−1)` (the gadget goes from real to lazy in this hop; P1d, `PublicFirst.gadget_counterShape_refutes`), plus one more `N·δ₃`. The last term is needed because off the curve `G1U` installs the system-A masks with `G0U`'s uniform values while `HW` makes no call, so the adversary's own masks are `sampleFp` of fresh blocks (P1g, `not_publicFirst`). | linear + `2^-111.86` |
 | `HW → H` | `outputKernelError = 364/(r−1)` (`ε_pt`; P1's lemmas give `≤ 363/#Point`) | `2^-245.1` |
@@ -27,7 +27,11 @@ open BN254
 
 noncomputable section
 
-/-- `N`: the garbler's scale masks, `S · Σ_c 2^{b_c} = 824 · 508 = 418,592`. -/
+/-- `N'`: the charged count of garbler scale masks, `824 · 508 = 418,592`. It is an upper bound on
+the garbler's `S · Σ_c 2^{b_c} = 733 · 508 = 372,364` scale masks (`MaskSwap.card_maskSite`), and
+the margin `N' − 733 · 508 ≥ 2540 + 2^272 / (2^384 mod p) − 733 · 508` lets one charge `N'·δ₃` also
+absorb the public-first hop's coincidence mass and off-curve reading distance
+(`PublicFirst.LiftHop.coincidence_slack`, which needs `N' ≥ 382,809`). -/
 def scaleMaskCount : ℕ := 824 * 508
 
 /-- One copy of the global mask swap, `N·δ₃` with `δ₃ = (2^384 mod p)/2^384`. -/

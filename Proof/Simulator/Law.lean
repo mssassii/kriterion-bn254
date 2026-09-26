@@ -63,17 +63,15 @@ def stage1Draws : PMF (Option ((Fin fieldCellCount → BaseField) × (Fin except
 /-- The source a draw publishes and retains. -/
 def sourceOfDraws (cells : Nat → BaseField) (bytes hot key : Nat → Nat) : Stage1Source where
   curve := (cells 0, cells 1, cells 2)
-  rows := Vector.ofFn fun digit => ⟨cells (3 + 11 * digit), cells (3 + 11 * digit + 1),
-    cells (3 + 11 * digit + 2), cells (3 + 11 * digit + 3), cells (3 + 11 * digit + 4),
-    cells (3 + 11 * digit + 5), cells (3 + 11 * digit + 6), cells (3 + 11 * digit + 7),
-    cells (3 + 11 * digit + 8), cells (3 + 11 * digit + 9), cells (3 + 11 * digit + 10)⟩
+  rows := Vector.ofFn fun digit => ⟨cells (3 + 4 * digit), cells (3 + 4 * digit + 1),
+    cells (3 + 4 * digit + 2), cells (3 + 4 * digit + 3)⟩
   exception := Vector.ofFn fun digit => Vector.ofFn fun slot =>
     BitVec.ofNat 8 (bytes (6 * digit + slot))
   curveXHot := Vector.ofFn fun chunk => BitVec.ofNat 128 (hot chunk)
   curveYHot := Vector.ofFn fun chunk => BitVec.ofNat 128 (hot (127 + chunk))
   pointXHot := Vector.ofFn fun chunk => BitVec.ofNat 128 (hot (254 + chunk))
   pointYHot := Vector.ofFn fun chunk => BitVec.ofNat 128 (hot (381 + chunk))
-  joins := fun chunk slot => cells (1004 + 824 * chunk + slot)
+  joins := fun chunk slot => cells (367 + 733 * chunk + slot)
   key := ⟨Vector.ofFn fun bit => ⟨BitVec.ofNat 128 (key (2 * bit)),
       BitVec.ofNat 128 (key (2 * bit + 1))⟩,
     Vector.ofFn fun bit => ⟨BitVec.ofNat 128 (key (2 * (254 + bit))),
@@ -159,7 +157,7 @@ installs. -/
 def machineKernels [FieldCertificate] :=
   @machineAbstract _ PlanB.FixedIndex EncPRF.PermutationIndex PlanB.Public
     (Fintype.ofFinite _) (Fintype.ofFinite _) (Classical.decEq _) (Classical.decEq _)
-    Wire.encoding 3363376 planBSimulator
+    Wire.encoding 2976089 planBSimulator
 
 /-- The abstract simulator of the machine's samplers, at the same instances. -/
 def boundedKernels [FieldCertificate] [GroupCertificate] :=

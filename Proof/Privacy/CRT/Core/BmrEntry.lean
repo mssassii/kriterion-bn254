@@ -1,0 +1,531 @@
+/-
+**P45 at the entry** (H8's `CrtBmrSplit`, parts (a) to (d); `Core/H8.lean` section 5).
+
+* `rowsDoubling_of_doubling`: the doubling event of the real coins shows in the true rows (a target row with `Z = 0`),
+  so route M's reveal `rowsDoubling` covers it when the rows kernel's coins are coupled with the garbler's.
+* The real reading, part (a): the garbler's body on a tag table reads P45's pads (`bmrPadsOf`), and its CRT offsets
+  are P45's (`gxOf_offset`, `gyOf_offset`).
+-/
+
+import Proof.Privacy.CRT.Core.H8
+import Proof.Privacy.CRT.Core.BmrFlags
+import Proof.Privacy.CRT.Swap.PadBridge
+import Proof.Privacy.CRT.Core.ExtractStageHash
+import Proof.Correctness.CRT.EntryCorrect
+
+namespace Kriterion.CRT.Privacy.BmrEntry
+
+open BN254 Cryptography GarbledCircuit Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB Kriterion.CRT
+
+noncomputable section
+
+/-- **Doubling shows in the true rows**: at `u = exc_o` the incomplete addition's `Z` of digit `o` vanishes
+(`Coordinates.exceptionalZ`). -/
+theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
+    (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
+    (doubling : ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u) :
+    H8.rowsDoubling (Security.Phase3.trueRows scalar coins u) := by
+  obtain ⟨o, hexc⟩ := doubling
+  unfold Kriterion.CRT.Entry.exceptional at hexc
+  split_ifs at hexc with inRange
+  generalize hkey : (Kriterion.CRT.Entry.outputKeysOf scalar coins).get ⟨o, inRange⟩ = key at hexc
+  dsimp only at hexc
+  cases hphi : digitEndomorphismBase key.digit with
+  | none => rw [hphi] at hexc; cases hexc
+  | some phi =>
+    rw [hphi] at hexc
+    simp only [Option.some.injEq] at hexc
+    refine ⟨⟨o, inRange⟩, ?_⟩
+    have six := digitEndomorphismBasePowSix key.digit phi hphi
+    unfold Security.Phase3.trueRows FieldMacToECMac.evaluateRow
+    simp only [FieldMacToECMac.rowsForOutputKeys, Vector.get_ofFn]
+    unfold Kriterion.CRT.Entry.outputKeysOf at hkey
+    rw [hkey, hphi]
+    rw [(Coordinates.evaluateRowsSome _ _ _ _).2.2, ← hexc, Exception.exceptionalInput_transform phi six]
+    rw [Coordinates.exceptionalZ _ _ rfl, mul_zero]
+
+/-! ### The real reading: pads and offsets -/
+
+/-- A tag table answers a labelled input by its tag. -/
+theorem tagHash_hashInput (table : TagTable) (G : Block) (tag : ℕ) :
+    H8.tagHash table (Kriterion.CRT.hashInput G tag) =
+      table ⟨tag % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩ := by
+  unfold H8.tagHash
+  simp only [ExtractStage.hashInput_div]
+
+/-- The pad digits of a body site on a tag table do not depend on the label. -/
+theorem padVectorM_tagHash (table : TagTable) (m S q : ℕ) [NeZero m] (label : Block) (κ i ρ : ℕ) :
+    (fun e => (((padVectorM m S q label (bodyTag κ i ρ)).eval (H8.tagHash table) e : ℕ) : ZMod m)) =
+      padVector m S q (fun j => table ⟨bodyTag κ i ρ j.val % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩) := by
+  rw [padVectorM_eq_padVector]
+  simp only [tagHash_hashInput]
+
+/-- Summing over `Fin m` through the cast is summing over `ZMod m`. -/
+theorem sum_fin_cast {m : ℕ} [NeZero m] {M : Type*} [AddCommMonoid M] (f : ZMod m → M) :
+    ∑ ρ : Fin m, f (ρ.val : ZMod m) = ∑ ρ : ZMod m, f ρ := by
+  let e : Fin m ≃ ZMod m :=
+    { toFun := fun ρ => (ρ.val : ZMod m)
+      invFun := fun z => ⟨z.val, ZMod.val_lt z⟩
+      left_inv := fun ρ => Fin.ext (ZMod.val_cast_of_lt ρ.isLt)
+      right_inv := fun z => ZMod.natCast_zmod_val z }
+  exact Fintype.sum_equiv e _ _ fun _ => rfl
+
+/-- **The garbler's body on a tag table does not depend on the final labels.** -/
+theorem bodyGarbleM_tagHash (table : TagTable) (m S q coord i : ℕ) (final : Fin m → Block) :
+    (bodyGarbleM m S q coord i final).eval (H8.tagHash table) =
+      (bodyGarbleM m S q coord i fun _ => 0).eval (H8.tagHash table) := by
+  simp only [bodyGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, SliceC.eval_padVectorM, hlong,
+    tagHash_hashInput]
+
+/-- The body of a modulus on a tag table is the body at zero labels (either kind of modulus). -/
+theorem modGarbleM_body (table : TagTable) (S coord : ℕ) (delta : Block) (chunks : ℕ → ChunkGarbled Entry.table.castWidth)
+    (i : Fin Entry.table.count) :
+    ((modGarbleM Entry.table S coord delta chunks i).eval (H8.tagHash table)).body =
+      (bodyGarbleM (Entry.table.modulus i) S (Entry.table.padAnswers S i) coord i.val fun _ => 0).eval
+        (H8.tagHash table) := by
+  unfold modGarbleM
+  split
+  · simp only [FreeQuery.eval_bind, FreeQuery.eval_pure]
+    exact bodyGarbleM_tagHash _ _ _ _ _ _ _
+  · simp only [FreeQuery.eval_bind, FreeQuery.eval_pure]
+    exact bodyGarbleM_tagHash _ _ _ _ _ _ _
+
+/-- On the real table the layout's pad count is the garbler's. -/
+theorem padCount_eq (κ : ℕ) (i : Fin Entry.table.count) :
+    Layout.padCount κ i.val = Entry.table.padAnswers (Layout.padS κ) i := by
+  unfold Layout.padCount
+  rw [dif_pos i.isLt]
+
+theorem packAnswers_congr {q q' : ℕ} (same : q = q') (g : ℕ → Block × Block) :
+    packAnswers q (fun j => g j.val) = packAnswers q' (fun j => g j.val) := by
+  subst same
+  rfl
+
+/-- `H8.padValues` at the garbler's pad count. -/
+theorem padValues_eq (table : TagTable) (κ : ℕ) (i : Fin Entry.table.count) (ρ : ℕ) (e : Fin (Layout.padS κ)) :
+    H8.padValues table κ i ρ e =
+      ((digit (Entry.table.modulus i) (fractionValue (Entry.table.modulus i) (Layout.padS κ)
+        (Entry.table.padAnswers (Layout.padS κ) i)
+        (packAnswers (Entry.table.padAnswers (Layout.padS κ) i) fun j =>
+          table ⟨bodyTag κ i ρ j.val % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩)) e.val : ℕ) :
+        ZMod (Entry.table.modulus i)) := by
+  unfold H8.padValues padVector
+  rw [packAnswers_congr (padCount_eq κ i)
+    (fun j => table ⟨tagCode Family.body κ i 0 0 ρ j % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩), padCount_eq]
+  rfl
+
+/-- **The garbler's CRT offsets on a tag table** are the CRT of its body residues. -/
+theorem coordGarbleM_offset (table : TagTable) (S coord : ℕ) (delta : Block) (zero : ℕ → Block) (e : Fin S) :
+    ((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).offset e =
+      Entry.table.crt fun i => ((bodyGarbleM (Entry.table.modulus i) S (Entry.table.padAnswers S i) coord i.val
+        fun _ => 0).eval (H8.tagHash table)).residue e := by
+  simp only [coordGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, stored_eq, modGarbleM_body]
+  rfl
+
+/-- P45's pads of a tag table (encoding `e` of coordinate `κ` is entry `flat e` of the body site's pad vector). -/
+def bmrPadsOf (table : TagTable) : BMR.Pads Entry.table := fun i ρ e =>
+  match e with
+  | .inl x => H8.padValues table 0 i ρ.val ⟨(BMR.xFlat x).val, by simp [Layout.padS]⟩
+  | .inr y => H8.padValues table 1 i ρ.val ⟨(BMR.yFlat y).val, by simp [Layout.padS]⟩
+
+/-- The body residue on a tag table, as a sum over slots. -/
+theorem bodyGarbleM_residue (table : TagTable) (m S q coord i : ℕ) (e : Fin S) :
+    ((bodyGarbleM m S q coord i fun _ => 0).eval (H8.tagHash table)).residue e =
+      (∑ ρ : Fin m, (ρ.val : ZMod m) * ((digit m (fractionValue m S q (packAnswers q fun j =>
+        table ⟨bodyTag coord i ρ.val j.val % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩)) e.val : ℕ) : ZMod m)).val := by
+  simp only [bodyGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, SliceC.eval_padVectorM, hlong,
+    tagHash_hashInput, stored_eq]
+
+/-- **The garbler's `x` offsets on a tag table are P45's.** -/
+theorem gx_offset (table : TagTable) (delta : Block) (zero : ℕ → Block) (x : BMR.XEnc) (c : BMR.Coins Entry.table)
+    (pads : c.pads = bmrPadsOf table) :
+    ((coordGarbleM Entry.table Entry.xCount 0 delta zero).eval (H8.tagHash table)).offset (BMR.xFlat x) =
+      BMR.offset c (.inl x) := by
+  rw [coordGarbleM_offset]
+  unfold BMR.offset
+  congr 1
+  funext i
+  rw [bodyGarbleM_residue]
+  unfold BMR.readout
+  rw [pads, ← sum_fin_cast]
+  congr 2
+  funext ρ
+  simp only [bmrPadsOf, padValues_eq, ZMod.val_cast_of_lt ρ.isLt]
+  rfl
+
+/-- **The garbler's `y` offsets on a tag table are P45's.** -/
+theorem gy_offset (table : TagTable) (delta : Block) (zero : ℕ → Block) (y : BMR.YEnc) (c : BMR.Coins Entry.table)
+    (pads : c.pads = bmrPadsOf table) :
+    ((coordGarbleM Entry.table Entry.yCount 1 delta zero).eval (H8.tagHash table)).offset (BMR.yFlat y) =
+      BMR.offset c (.inr y) := by
+  rw [coordGarbleM_offset]
+  unfold BMR.offset
+  congr 1
+  funext i
+  rw [bodyGarbleM_residue]
+  unfold BMR.readout
+  rw [pads, ← sum_fin_cast]
+  congr 2
+  funext ρ
+  simp only [bmrPadsOf, padValues_eq, ZMod.val_cast_of_lt ρ.isLt]
+  rfl
+
+/-! ### The real reading: masks and element offsets -/
+
+/-- On a tag table the masks do not depend on the key. -/
+theorem maskValues_tagHash (table : TagTable) (K : Block) :
+    maskValues (H8.tagHash table) K digitCount = maskValues (H8.tagHash table) 0 digitCount := by
+  unfold maskValues siteAnswers
+  simp only [tagHash_hashInput]
+
+/-- P45's masks of a tag table, by row encoding. -/
+def bmrMasksOf (table : TagTable) : BMR.RowEnc → BaseField
+  | (d, .inl x) => maskOf (maskValues (H8.tagHash table) 0 digitCount) 0 (xElementIndex d x).val
+  | (d, .inr y) => maskOf (maskValues (H8.tagHash table) 0 digitCount) 1 (yElementIndex d y).val
+
+/-- The P45 coin reading of a table: pads and masks from the table, the rest from given coins. -/
+structure Reads (table : TagTable) (c : BMR.Coins Entry.table) : Prop where
+  pads : c.pads = bmrPadsOf table
+  mask : c.mask = bmrMasksOf table
+
+/-- **The garbler's `x` element offsets are P45's** (row encodings: `(O : F_p) − π`; curve encodings: `(O : F_p)`). -/
+theorem offsetsX_eq (table : TagTable) (delta : Block) (zero : ℕ → Block) (K : Block) (c : BMR.Coins Entry.table)
+    (reads : Reads table c) (x : BMR.XEnc) :
+    Entry.offsetsX ((coordGarbleM Entry.table Entry.xCount 0 delta zero).eval (H8.tagHash table)).offset
+        (maskValues (H8.tagHash table) K digitCount) (BMR.xFlat x) =
+      match x with
+      | .inl (d, element) => BMR.rowOffset c (d, .inl element)
+      | .inr element => BMR.offsetF c (BMR.curveEnc (.inl element)) := by
+  unfold Entry.offsetsX
+  rw [gx_offset table delta zero x c reads.pads, maskValues_tagHash]
+  rcases x with ⟨d, element⟩ | element
+  · simp only [BMR.rowOffset, BMR.rowEnc, reads.mask, bmrMasksOf, BMR.offsetF, Entry.toField, BMR.xFlat]
+  · have past : ¬ 455 + element.slot.val < 5 * digitCount := by
+      have := element.slot.isLt; simp only [digitCount]; omega
+    simp only [BMR.offsetF, BMR.curveEnc, Entry.toField, BMR.xFlat, maskOf, if_pos, past, if_false, sub_zero]
+
+/-- **The garbler's `y` element offsets are P45's.** -/
+theorem offsetsY_eq (table : TagTable) (delta : Block) (zero : ℕ → Block) (K : Block) (c : BMR.Coins Entry.table)
+    (reads : Reads table c) (y : BMR.YEnc) :
+    Entry.offsetsY ((coordGarbleM Entry.table Entry.yCount 1 delta zero).eval (H8.tagHash table)).offset
+        (maskValues (H8.tagHash table) K digitCount) (BMR.yFlat y) =
+      match y with
+      | .inl (d, element) => BMR.rowOffset c (d, .inr element)
+      | .inr element => BMR.offsetF c (BMR.curveEnc (.inr element)) := by
+  unfold Entry.offsetsY
+  rw [gy_offset table delta zero y c reads.pads, maskValues_tagHash]
+  rcases y with ⟨d, element⟩ | element
+  · simp only [BMR.rowOffset, BMR.rowEnc, reads.mask, bmrMasksOf, BMR.offsetF, Entry.toField, BMR.yFlat]
+  · have past : ¬ 273 + element.slot.val < 3 * digitCount := by
+      have := element.slot.isLt; simp only [digitCount]; omega
+    simp only [BMR.offsetF, BMR.curveEnc, Entry.toField, BMR.yFlat, maskOf, past, if_false, sub_zero,
+      one_ne_zero]
+
+/-! ### The real reading: the coins, the element values, the curve and the rows -/
+
+/-- P45's context of the scheme's coins: the row coefficients and `ρ` of each digit. -/
+def bmrContextOf (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) : BMR.Context where
+  rows d := (FieldMacToECMac.rowsForOutputKeys (Entry.outputKeysOf scalar coins) coins.pointRandomness).get d
+  rho d := (coins.pointRandomness.get d).rho
+
+/-- **P45's coins of a table tape**: pads and masks from the table; `r4`, the unused randomizers and the curve coins
+from the scheme's coins. -/
+def bmrCoinsOf (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) : BMR.Coins Entry.table :=
+  (bmrPadsOf table, bmrMasksOf table, fun d => (coins.pointRandomness.get d).y.r4,
+    fun d => ![(coins.pointRandomness.get d).x.r1, (coins.pointRandomness.get d).x.r2,
+      (coins.pointRandomness.get d).x.r4, (coins.pointRandomness.get d).y.r2, (coins.pointRandomness.get d).y.r3,
+      (coins.pointRandomness.get d).y.r5, (coins.pointRandomness.get d).z.r1],
+    (coins.bridgeKey, ⟨coins.curveMask.value, coins.curveMask.nonzero⟩, coins.curveR1, coins.curveR2))
+
+theorem bmrCoinsOf_reads (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
+    Reads table (bmrCoinsOf coins table) := ⟨rfl, rfl⟩
+
+/-- The garbler's `x` element offsets through the names. -/
+theorem offXOf_eq (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
+    EntryCorrect.offXOf (H8.tagHash table) coins (BMR.xFlat x) =
+      match x with
+      | .inl (d, element) => BMR.rowOffset (bmrCoinsOf coins table) (d, .inl element)
+      | .inr element => BMR.offsetF (bmrCoinsOf coins table) (BMR.curveEnc (.inl element)) := by
+  unfold EntryCorrect.offXOf EntryCorrect.gxOf EntryCorrect.masksOf
+  exact offsetsX_eq table _ _ _ _ (bmrCoinsOf_reads coins table) x
+
+/-- The garbler's `y` element offsets through the names. -/
+theorem offYOf_eq (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
+    EntryCorrect.offYOf (H8.tagHash table) coins (BMR.yFlat y) =
+      match y with
+      | .inl (d, element) => BMR.rowOffset (bmrCoinsOf coins table) (d, .inr element)
+      | .inr element => BMR.offsetF (bmrCoinsOf coins table) (BMR.curveEnc (.inr element)) := by
+  unfold EntryCorrect.offYOf EntryCorrect.gyOf EntryCorrect.masksOf
+  exact offsetsY_eq table _ _ _ _ (bmrCoinsOf_reads coins table) y
+
+/-- **The garbler's row values are P45's row offsets.** -/
+theorem KOf_eq (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (d : Fin 91)
+    (element : Biquadratic.Element) :
+    EntryCorrect.KOf (H8.tagHash table) coins d element = BMR.rowOffset (bmrCoinsOf coins table) (d, element) := by
+  unfold EntryCorrect.KOf
+  rcases element with x | y
+  · show Entry.pointPartX (EntryCorrect.offXOf (H8.tagHash table) coins) (xElementIndex d x) = _
+    unfold Entry.pointPartX
+    rw [show (⟨(xElementIndex d x).val, _⟩ : Fin Entry.xCount) = BMR.xFlat (.inl (d, x)) from rfl, offXOf_eq]
+  · show Entry.pointPartY (EntryCorrect.offYOf (H8.tagHash table) coins) (yElementIndex d y) = _
+    unfold Entry.pointPartY
+    rw [show (⟨(yElementIndex d y).val, _⟩ : Fin Entry.yCount) = BMR.yFlat (.inl (d, y)) from rfl, offYOf_eq]
+
+/-- **The garbler's curve values are P45's curve offsets.** -/
+theorem curveKOf_eq (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
+    EntryCorrect.curveKOf (H8.tagHash table) coins = BMR.curveK (bmrCoinsOf coins table) := by
+  funext element
+  unfold EntryCorrect.curveKOf
+  rcases element with x | y
+  · show Entry.curvePartX (EntryCorrect.offXOf (H8.tagHash table) coins) (curveXElementIndex x) = _
+    unfold Entry.curvePartX
+    rw [show (⟨pointElementCountX + (curveXElementIndex x).val, _⟩ : Fin Entry.xCount) = BMR.xFlat (.inr x)
+      from rfl, offXOf_eq]
+    rfl
+  · show Entry.curvePartY (EntryCorrect.offYOf (H8.tagHash table) coins) (curveYElementIndex y) = _
+    unfold Entry.curvePartY
+    rw [show (⟨pointElementCountY + (curveYElementIndex y).val, _⟩ : Fin Entry.yCount) = BMR.yFlat (.inr y)
+      from rfl, offYOf_eq]
+    rfl
+
+/-- **The published curve constants are P45's.** -/
+theorem curve_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
+    (EntryCorrect.pubOf (H8.tagHash table) scalar coins).curve = BMR.curveTable (bmrCoinsOf coins table) := by
+  rw [EntryCorrect.pubOf_curve, curveKOf_eq]
+  rfl
+
+/-- **The published row constants are P45's.** -/
+theorem rows_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (d : Fin 91) :
+    (EntryCorrect.pubOf (H8.tagHash table) scalar coins).rows.get d =
+      BMR.gamma (bmrContextOf scalar coins) (bmrCoinsOf coins table) d := by
+  rw [EntryCorrect.pubOf_rows]
+  erw [Vector.get_ofFn]
+  have values : EntryCorrect.KOf (H8.tagHash table) coins d =
+      fun element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) := funext (KOf_eq coins table d)
+  rw [values]
+  rfl
+
+/-! ### The real reading: the slopes -/
+
+/-- **The garbler's `x` slopes are P45's.** -/
+theorem slXOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable)
+    (x : BMR.XEnc) :
+    EntryCorrect.slXOf (H8.tagHash table) scalar coins (BMR.xFlat x) =
+      BMR.slope (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inl x) := by
+  unfold EntryCorrect.slXOf Entry.slopesX Entry.joinX
+  rcases x with ⟨d, element⟩ | element
+  · have low : (BMR.xFlat (.inl (d, element))).val < pointElementCountX := (xElementIndex d element).isLt
+    rw [dif_pos low]
+    rw [show (⟨(BMR.xFlat (.inl (d, element))).val, low⟩ : Fin pointElementCountX) = xElementIndex d element
+      from rfl]
+    erw [Pipeline.pointXAssemble_digit]
+    unfold EntryCorrect.pointOf Entry.pointSlopes
+    have values : EntryCorrect.KOf (H8.tagHash table) coins d =
+        fun element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) := funext (KOf_eq coins table d)
+    rw [values]
+    rfl
+  · have high : ¬ (BMR.xFlat (.inr element)).val < pointElementCountX := by
+      show ¬ 455 + element.slot.val < pointElementCountX
+      unfold pointElementCountX
+      omega
+    rw [dif_neg high]
+    unfold Pipeline.curveXAssemble EntryCorrect.curveSlopesOf
+    rw [curveKOf_eq]
+    have idx : Pipeline.curveXElementOfSlot ((BMR.xFlat (.inr element)).val - pointElementCountX) = element := by
+      cases element <;> simp [BMR.xFlat, pointElementCountX, Pipeline.curveXElementOfSlot, CurveXElement.slot]
+    rw [idx]
+    rfl
+
+/-- **The garbler's `y` slopes are P45's.** -/
+theorem slYOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable)
+    (y : BMR.YEnc) :
+    EntryCorrect.slYOf (H8.tagHash table) scalar coins (BMR.yFlat y) =
+      BMR.slope (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inr y) := by
+  unfold EntryCorrect.slYOf Entry.slopesY Entry.joinY
+  rcases y with ⟨d, element⟩ | element
+  · have low : (BMR.yFlat (.inl (d, element))).val < pointElementCountY := (yElementIndex d element).isLt
+    rw [dif_pos low]
+    rw [show (⟨(BMR.yFlat (.inl (d, element))).val, low⟩ : Fin pointElementCountY) = yElementIndex d element
+      from rfl]
+    erw [Pipeline.pointYAssemble_digit]
+    unfold EntryCorrect.pointOf Entry.pointSlopes
+    have values : EntryCorrect.KOf (H8.tagHash table) coins d =
+        fun element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) := funext (KOf_eq coins table d)
+    rw [values]
+    rfl
+  · have high : ¬ (BMR.yFlat (.inr element)).val < pointElementCountY := by
+      show ¬ 273 + element.slot.val < pointElementCountY
+      unfold pointElementCountY
+      omega
+    rw [dif_neg high]
+    unfold Pipeline.curveYAssemble EntryCorrect.curveSlopesOf
+    rw [curveKOf_eq]
+    have idx : Pipeline.curveYElementOfSlot ((BMR.yFlat (.inr element)).val - pointElementCountY) = element := by
+      cases element <;> simp [BMR.yFlat, pointElementCountY, Pipeline.curveYElementOfSlot, CurveYElement.slot]
+    rw [idx]
+    rfl
+
+/-! ### The real reading: pad sums, joins, hints and records -/
+
+/-- The body pad sum on a tag table, as a sum over slots. -/
+theorem bodyGarbleM_padSum (table : TagTable) (m S q coord i : ℕ) (e : Fin S) :
+    ((bodyGarbleM m S q coord i fun _ => 0).eval (H8.tagHash table)).padSum e =
+      (∑ ρ : Fin m, ((digit m (fractionValue m S q (packAnswers q fun j =>
+        table ⟨bodyTag coord i ρ.val j.val % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩)) e.val : ℕ) : ZMod m)).val := by
+  simp only [bodyGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, SliceC.eval_padVectorM, hlong,
+    tagHash_hashInput, stored_eq]
+
+/-- The garbler's pad sums on a tag table are its bodies' at zero labels. -/
+theorem coordGarbleM_padSum (table : TagTable) (S coord : ℕ) (delta : Block) (zero : ℕ → Block)
+    (i : Fin Entry.table.count) (e : Fin S) :
+    ((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).padSum i e =
+      ((bodyGarbleM (Entry.table.modulus i) S (Entry.table.padAnswers S i) coord i.val
+        fun _ => 0).eval (H8.tagHash table)).padSum e := by
+  simp only [coordGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, stored_eq, modGarbleM_body]
+
+/-- The garbler's hints on a tag table are the wrap hints of its offsets. -/
+theorem coordGarbleM_hint (table : TagTable) (S coord : ℕ) (delta : Block) (zero : ℕ → Block) (e : Fin S) :
+    ((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).hint e =
+      wrapHint Entry.table.product Entry.table.wrapBound
+        (((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).offset e) := by
+  simp only [coordGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, stored_eq]
+
+/-- **The garbler's `x` pad sums are P45's.** -/
+theorem gx_padSum (table : TagTable) (delta : Block) (zero : ℕ → Block) (x : BMR.XEnc) (c : BMR.Coins Entry.table)
+    (pads : c.pads = bmrPadsOf table) (i : Fin Entry.table.count) :
+    ((coordGarbleM Entry.table Entry.xCount 0 delta zero).eval (H8.tagHash table)).padSum i (BMR.xFlat x) =
+      (∑ ρ : ZMod (Entry.table.modulus i), c.pads i ρ (.inl x)).val := by
+  rw [coordGarbleM_padSum, bodyGarbleM_padSum, pads, ← sum_fin_cast]
+  congr 2
+  funext ρ
+  simp only [bmrPadsOf, padValues_eq, ZMod.val_cast_of_lt ρ.isLt]
+  rfl
+
+/-- **The garbler's `y` pad sums are P45's.** -/
+theorem gy_padSum (table : TagTable) (delta : Block) (zero : ℕ → Block) (y : BMR.YEnc) (c : BMR.Coins Entry.table)
+    (pads : c.pads = bmrPadsOf table) (i : Fin Entry.table.count) :
+    ((coordGarbleM Entry.table Entry.yCount 1 delta zero).eval (H8.tagHash table)).padSum i (BMR.yFlat y) =
+      (∑ ρ : ZMod (Entry.table.modulus i), c.pads i ρ (.inr y)).val := by
+  rw [coordGarbleM_padSum, bodyGarbleM_padSum, pads, ← sum_fin_cast]
+  congr 2
+  funext ρ
+  simp only [bmrPadsOf, padValues_eq, ZMod.val_cast_of_lt ρ.isLt]
+  rfl
+
+/-- A residue join, read as a natural. -/
+theorem join_val (a : ZMod m) (slope : BaseField) [NeZero m] :
+    (a + ((slope.val : ℕ) : ZMod m)).val = (a.val + slope.val) % m := by
+  rw [ZMod.val_add, ZMod.val_natCast, Nat.add_mod_mod]
+
+theorem gxOf_unfold_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
+    (EntryCorrect.gxOf (H8.tagHash table) coins).offset (BMR.xFlat x) =
+      ((coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval
+        (H8.tagHash table)).offset (BMR.xFlat x) := by
+  rw [EntryCorrect.gxOf]
+
+/-- The `x` offsets through the names. -/
+theorem gxOf_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
+    (EntryCorrect.gxOf (H8.tagHash table) coins).offset (BMR.xFlat x) = BMR.offset (bmrCoinsOf coins table) (.inl x) := by
+  rw [gxOf_unfold_offset]
+  exact gx_offset table _ _ x (bmrCoinsOf coins table) rfl
+
+theorem gxOf_unfold_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
+    (EntryCorrect.gxOf (H8.tagHash table) coins).hint (BMR.xFlat x) =
+      ((coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval
+        (H8.tagHash table)).hint (BMR.xFlat x) := by
+  rw [EntryCorrect.gxOf]
+
+/-- The `x` hints through the names. -/
+theorem gxOf_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
+    (EntryCorrect.gxOf (H8.tagHash table) coins).hint (BMR.xFlat x) = BMR.hint (bmrCoinsOf coins table) (.inl x) := by
+  have step := coordGarbleM_hint table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0) (BMR.xFlat x)
+  rw [gx_offset table _ _ x (bmrCoinsOf coins table) rfl] at step
+  rw [gxOf_unfold_hint, step]
+  rfl
+
+theorem gxOf_unfold_padSum (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc)
+    (i : Fin Entry.table.count) :
+    (EntryCorrect.gxOf (H8.tagHash table) coins).padSum i (BMR.xFlat x) =
+      ((coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval
+        (H8.tagHash table)).padSum i (BMR.xFlat x) := by
+  rw [EntryCorrect.gxOf]
+
+/-- The `x` pad sums through the names. -/
+theorem gxOf_padSum (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc)
+    (i : Fin Entry.table.count) :
+    (EntryCorrect.gxOf (H8.tagHash table) coins).padSum i (BMR.xFlat x) =
+      (∑ ρ : ZMod (Entry.table.modulus i), (bmrCoinsOf coins table).pads i ρ (.inl x)).val := by
+  rw [gxOf_unfold_padSum]
+  exact gx_padSum table _ _ x (bmrCoinsOf coins table) rfl i
+
+/-- The records of any coordinate garbling, spelled out. -/
+theorem records_formula {S : ℕ} (g : CoordGarbled Entry.table S) (slopes : Fin S → ℕ) (e : Fin S) :
+    g.records slopes e = (if g.hint e then Entry.table.product else 0) +
+      ∑ i : Fin Entry.table.count, ((g.padSum i e + slopes e) % Entry.table.modulus i) * Entry.table.radix i := by
+  unfold CoordGarbled.records CoordGarbled.join
+  simp only [stored_eq]
+
+/-- **The published `x` records are P45's** (hint and joins). -/
+theorem recX_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
+    ((EntryCorrect.pubOf (H8.tagHash table) scalar coins).recX.get (BMR.xFlat x)).val =
+      (if BMR.hint (bmrCoinsOf coins table) (.inl x) then Entry.table.product else 0) +
+        ∑ i : Fin Entry.table.count,
+          (BMR.join (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inl x) i).val * Entry.table.radix i := by
+  rw [EntryCorrect.pubOf_recX, records_formula, gxOf_hint]
+  refine congrArg (HAdd.hAdd _) (Finset.sum_congr rfl fun i _ => ?_)
+  rw [gxOf_padSum, slXOf_eq, BMR.join, join_val]
+
+theorem gyOf_unfold_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
+    (EntryCorrect.gyOf (H8.tagHash table) coins).offset (BMR.yFlat y) =
+      ((coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval
+        (H8.tagHash table)).offset (BMR.yFlat y) := by
+  rw [EntryCorrect.gyOf]
+
+theorem gyOf_unfold_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
+    (EntryCorrect.gyOf (H8.tagHash table) coins).hint (BMR.yFlat y) =
+      ((coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval
+        (H8.tagHash table)).hint (BMR.yFlat y) := by
+  rw [EntryCorrect.gyOf]
+
+theorem gyOf_unfold_padSum (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc)
+    (i : Fin Entry.table.count) :
+    (EntryCorrect.gyOf (H8.tagHash table) coins).padSum i (BMR.yFlat y) =
+      ((coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval
+        (H8.tagHash table)).padSum i (BMR.yFlat y) := by
+  rw [EntryCorrect.gyOf]
+
+/-- The `y` offsets through the names. -/
+theorem gyOf_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
+    (EntryCorrect.gyOf (H8.tagHash table) coins).offset (BMR.yFlat y) = BMR.offset (bmrCoinsOf coins table) (.inr y) := by
+  rw [gyOf_unfold_offset]
+  exact gy_offset table _ _ y (bmrCoinsOf coins table) rfl
+
+/-- The `y` hints through the names. -/
+theorem gyOf_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
+    (EntryCorrect.gyOf (H8.tagHash table) coins).hint (BMR.yFlat y) = BMR.hint (bmrCoinsOf coins table) (.inr y) := by
+  have step := coordGarbleM_hint table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0) (BMR.yFlat y)
+  rw [gy_offset table _ _ y (bmrCoinsOf coins table) rfl] at step
+  rw [gyOf_unfold_hint, step]
+  rfl
+
+/-- The `y` pad sums through the names. -/
+theorem gyOf_padSum (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc)
+    (i : Fin Entry.table.count) :
+    (EntryCorrect.gyOf (H8.tagHash table) coins).padSum i (BMR.yFlat y) =
+      (∑ ρ : ZMod (Entry.table.modulus i), (bmrCoinsOf coins table).pads i ρ (.inr y)).val := by
+  rw [gyOf_unfold_padSum]
+  exact gy_padSum table _ _ y (bmrCoinsOf coins table) rfl i
+
+/-- **The published `y` records are P45's** (hint and joins). -/
+theorem recY_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
+    ((EntryCorrect.pubOf (H8.tagHash table) scalar coins).recY.get (BMR.yFlat y)).val =
+      (if BMR.hint (bmrCoinsOf coins table) (.inr y) then Entry.table.product else 0) +
+        ∑ i : Fin Entry.table.count,
+          (BMR.join (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inr y) i).val * Entry.table.radix i := by
+  rw [EntryCorrect.pubOf_recY, records_formula, gyOf_hint]
+  refine congrArg (HAdd.hAdd _) (Finset.sum_congr rfl fun i _ => ?_)
+  rw [gyOf_padSum, slYOf_eq, BMR.join, join_val]
+
+end
+
+end Kriterion.CRT.Privacy.BmrEntry

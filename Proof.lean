@@ -1,9 +1,9 @@
 /-
-The proof root: correctness, Lamport compatibility, the ciphertext size, and adaptive privacy
-(`Proof.Privacy`, the Plan B hybrid chain and the closed simulator machine).
+The proof root of the CRT entry: perfect correctness, Lamport compatibility, and adaptive privacy
+(the CRT hybrid chain at `crtEntry` with the CRT simulator machine). The switch-system entry's proof
+modules that these import are built through them.
 -/
 
-import Proof.Correctness
-import Proof.LamportCompatibility
-import Proof.CiphertextSize
-import Proof.Privacy
+import Proof.Correctness.CRT.EntryCorrect
+import Proof.LamportCompatibility.Labels
+import Proof.Privacy.CRT.Final

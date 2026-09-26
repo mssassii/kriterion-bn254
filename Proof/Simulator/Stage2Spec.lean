@@ -55,12 +55,12 @@ structure OpeningPre (source : Stage1Source) (input : AffineInput) (target : Poi
     outputWords target
   /-- The row constants of every digit, in wire (cell) order (`rowField`: `xC0, xC1, xC2, xC4,
   yC0, yC2, yC3, yC4, yC5, zC0, zC1`). -/
-  rowCells : ∀ (digit : Fin digitCount) (slot : Nat), slot < 11 →
+  rowCells : ∀ (digit : Fin digitCount) (slot : Nat), slot < 4 →
     memory.ram (word (Opening.rowCell digit.val slot)) = fieldWord (rowField (source.rows.get digit) slot)
   /-- The `pointX` lane's (designated-free) values, slots `0 .. 454`. -/
   accXCells : ∀ element : Fin pointElementCountX,
     memory.ram (word (accBase + element.val)) = fieldWord (pointX element)
-  /-- The `pointY` lane's values, slots `458 .. 821`. -/
+  /-- The `pointY` lane's values, slots `458 .. 730`. -/
   accYCells : ∀ element : Fin pointElementCountY,
     memory.ram (word (accBase + 458 + element.val)) = fieldWord (pointY element)
   /-- `κ = ι(j*) − ι(α₀)`. -/

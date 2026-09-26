@@ -36,15 +36,7 @@ theorem gammaConst_eq_rowField (row : RowGamma) : ∀ slot, gammaConst row slot 
   | 0 => rfl
   | 1 => rfl
   | 2 => rfl
-  | 3 => rfl
-  | 4 => rfl
-  | 5 => rfl
-  | 6 => rfl
-  | 7 => rfl
-  | 8 => rfl
-  | 9 => rfl
-  | 10 => rfl
-  | _ + 11 => rfl
+  | _ + 3 => rfl
 
 theorem readWords_outputWords (target : Point) : readWords (outputWords target) = some target := by
   cases target with
@@ -126,11 +118,13 @@ theorem optionProduct_values {α : Type} :
               · simpa using optionProduct_values count (fun index => sample index.succ) tail
                   tailMember later
 
-theorem solveWords_component (kappaValue : BaseField) (target row : FieldMacToECMac.HomogeneousValue)
-    (collector : Fin 3) :
-    wordAt (solveWords kappaValue target row) collector.val =
-      fieldWord (kappaValue * (collectorComponent collector target - collectorComponent collector row)) := by
-  fin_cases collector <;> rfl
+theorem solveWords_component (kappaValue : BaseField) (point : AffineInput)
+    (target row : FieldMacToECMac.HomogeneousValue) (collector : Fin 3) :
+    wordAt (solveWords kappaValue point.y target row) collector.val =
+      fieldWord (kappaValue * (collectorMultiplier collector point)⁻¹ *
+        (collectorComponent collector target - collectorComponent collector row)) := by
+  fin_cases collector <;>
+    simp [solveWords, wordAt, collectorMultiplier, collectorComponent]
 
 /-! ### From the lifts to the view -/
 
@@ -221,10 +215,10 @@ theorem rest_law (source : Stage1Source) (input : AffineInput) (target : Point)
       rfl)
     (fun digit element => by
       have digitSmall := digit.isLt
-      have slotSmall : element.slot.val < 4 := element.slot.isLt
+      have slotSmall : element.slot.val < 3 := element.slot.isLt
       rw [sameToLifted _ (not_openCell _ (by addr_arith) (by addr_arith))]
       have := pre.accYCells (yElementIndex digit element)
-      rw [show Opening.yCell (4 * digit.val + element.slot.val) =
+      rw [show Opening.yCell (3 * digit.val + element.slot.val) =
         accBase + 458 + (yElementIndex digit element).val from rfl, this, wordField_fieldWord]
       rfl)
     (fun digit position inside => by
@@ -238,7 +232,7 @@ theorem rest_law (source : Stage1Source) (input : AffineInput) (target : Point)
       solved.ram (word (openTarget digit collector)) = fieldWord (ys (digit, collector)) := by
     intro digit collector
     rw [← openTarget_shift, targetsSolved digit digit.isLt collector collector.isLt,
-      solveWords_component, ysDef]
+      solveWords_component _ (BitInput.ofAffine input).toAffine, ysDef]
     have getIs : (FieldMacToECMac.evaluateHomogeneous (Pipeline.pointTable source.publicValue)
         (Pipeline.digitValues pointX pointY) (BitInput.ofAffine input).toAffine).get digit =
         FieldMacToECMac.evaluateGamma (source.rows.get digit) (BitInput.ofAffine input).toAffine

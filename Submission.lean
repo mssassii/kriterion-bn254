@@ -1,24 +1,20 @@
 /-
-The Plan B entry at the query-gated challenge library (`aaf2789`).
+The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, 182,936 bytes).
+Every field is proved.
 
-* `FixedIndex` is the chunked one-hot / scale-hot index of `Construction/PGS/Index.lean`, at the
-  query-gated profile (`chunkBits = 2`, `chunkCount = 127`);
-* `Randomness` is `Scheme.Coins`: a Plan B tape without its three public tables, which the
-  library now supplies as a separate oracle;
-* `Public` is the eight-field, tag-free public value of design D.5, `3,363,376` bytes;
-* `scheme` is `Scheme.scheme`, the Plan B garbler and evaluator on `coins.withOracle oracle`;
-* `garbleProgram`/`evaluateProgram` are the query programs of `Construction/OraclePrograms.lean`
-  at their exact budgets, `1,305,053` and `990,093` queries.
+* `FixedIndex` and `EncIndex` are `Empty` (the entry is hash-only);
+* `Randomness` is the switch-system entry's `Scheme.Coins` (the CRT layer draws no coins of its own);
+* `Public` is `Kriterion.CRT.Entry.Public`, 182,936 bytes (`Wire.encoding_length`);
+* `garbleProgram` / `evaluateProgram` are `Entry.garbleProgram` / `Entry.evaluateProgram` at the
+  term-by-term budgets `garbleBudget` (995,088) and `evaluateBudget` (987,209);
+* `perfectCorrectness` is `Kriterion.CRT.EntryCorrect.perfectCorrectness`
+  (`Proof/Correctness/CRT/EntryCorrect.lean`);
+* `adaptivePrivacy` is `Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy`
+  (`Proof/Privacy/CRT/Final.lean`), the closed CRT hybrid chain with the CRT simulator machine, whose
+  statement `CrtPrivacy crtEntry` is the type of this field once `crtEntry`'s projections are reduced.
 
-Every field is proved outright. `adaptivePrivacy` is `Phase3.Glue.planB_oracleAdaptivePrivacy_of`
-applied to `planB_publicFirst` and `MachineBound.of_law machineLaw_planB`. The hybrid chain
-(with the public-first hop `G1U → HW`), the lazy oracle, the abort bound and the closed
-simulator machine are all proved.
-
-Elaboration note: each non-trivial field is proved as a standalone theorem below and then
-*named* in the structure instance, and the `scheme` field is the constant `@Scheme.scheme`, not
-the eta-expanded `fun field group => ...`: the beta-redex that the expansion leaves in the field
-types makes the kernel unfold `PlanB.Wire.encoding` when it checks the constructor application.
+As in the switch-system entry's `Submission.lean`, each non-trivial field is a standalone theorem named
+in the instance, and `scheme` is the constant `@Entry.scheme`.
 -/
 
 import Solution
@@ -28,73 +24,79 @@ import Proof
 set_option maxRecDepth 8000
 
 namespace Submission
-open Kriterion Kriterion.BN254 Kriterion.ArgoMAC
+
+open Kriterion Kriterion.BN254 Kriterion.ArgoMAC Kriterion.CRT Kriterion.CRT.Entry
 
 /-- `Solution.lamportCompatible`: `Encode` selects one label of each of the 508 pairs. -/
 def lamportCompatible (field : FieldCertificate) (group : @GroupCertificate field) :
-    GarbledCircuit.LamportCompatibility (@Scheme.scheme field group) affineLamportBits where
+    GarbledCircuit.LamportCompatibility (@Entry.scheme field group) affineLamportBits where
   keyPairs key := Lamport.keyPairs key
   encodeSelectsLabels key input := Lamport.selectedLabels_eq key input
 
-/-- `Solution.perfectCorrectness`: the evaluator rebuilds its labels from the 508 selected
-blocks (`Lamport.restore_selected`), and Plan B is exact for every coins, oracle and input. -/
-theorem perfectCorrectness (field : FieldCertificate) (group : @GroupCertificate field) :
-    GarbledCircuit.PerfectCorrectness (@Scheme.scheme field group) Prod.snd := by
-  letI := field
-  letI := group
-  intro parameter scalar tape input
-  change some (Garbling.evaluate tape.2
-      (Garbling.garble construction scalar (tape.1.withOracle tape.2)).1
-      (Lamport.restore input
-        (Lamport.selectedLabels (tape.1.inputMacKey.encode (BitInput.ofAffine input))))) = _
-  rw [Lamport.restore_selected]
-  exact congrArg some (JacobianMixed.evaluateCorrect scalar (tape.1.withOracle tape.2) input)
-
-/-- `Solution.garbleProgramCorrect`. -/
+/-- `Solution.garbleProgramCorrect`: the program is the lifted `garbleCM`, and the scheme's garbler
+is `garbleCM` evaluated at the scheme's hash. -/
 theorem garbleProgramCorrect (field : FieldCertificate) (group : @GroupCertificate field)
-    (parameter : Nat) (scalar : NonZeroScalar) (coins : Scheme.Coins) (oracle : Scheme.Oracle) :
-    (Programs.garbleProgram parameter scalar coins).eval (Cryptography.publicAnswer oracle) =
-      (@Scheme.scheme field group).garble parameter scalar (coins, oracle) :=
-  @Programs.garbleProgram_correct field group parameter scalar coins oracle
+    (parameter : Nat) (scalar : NonZeroScalar) (coins : Entry.Coins) (oracle : Entry.Oracle) :
+    (Entry.garbleProgram scalar coins).eval (Cryptography.publicAnswer oracle) =
+      (@Entry.scheme field group).garble parameter scalar (coins, oracle) := by
+  rw [Entry.garbleProgram, FreeQuery.eval_toProgram, Entry.garbleM, eval_liftHash]
+  simp only [Entry.scheme]
 
 /-- `Solution.evaluateProgramCorrect`. -/
 theorem evaluateProgramCorrect (field : FieldCertificate) (group : @GroupCertificate field)
-    (table : PlanB.Public) (input : AffineInput) (labels : GarbledCircuit.LamportSignature)
-    (oracle : Scheme.Oracle) :
-    (@Programs.evaluateProgram field group table input labels).eval
-        (Cryptography.publicAnswer oracle) =
-      (@Scheme.scheme field group).evaluate oracle table input labels :=
-  @Programs.evaluateProgram_correct field group table input labels oracle
+    (pub : Entry.Public) (input : AffineInput) (labels : GarbledCircuit.LamportSignature)
+    (oracle : Entry.Oracle) :
+    (@Entry.evaluateProgram field group pub input labels).eval (Cryptography.publicAnswer oracle) =
+      (@Entry.scheme field group).evaluate oracle pub input labels := by
+  rw [Entry.evaluateProgram, FreeQuery.eval_toProgram, Entry.evaluateM, eval_liftHash]
+  simp only [Entry.scheme]
 
-/-- The Plan B submission at `3,363,376` bytes. -/
+/-- `Solution.ciphertextSize`: every public value is 182,936 bytes. -/
+theorem ciphertextSize (field : FieldCertificate) (group : @GroupCertificate field) (parameter : Nat)
+    (scalar : NonZeroScalar) (tape : Entry.Coins × Entry.Oracle) :
+    (Wire.encoding.encode ((@Entry.scheme field group).garble parameter scalar tape).1).length =
+      ciphertextBytes :=
+  Wire.encoding_length _
+
+/-- `Solution.perfectCorrectness` (`Proof/Correctness/CRT/EntryCorrect.lean`): the replay delivers
+through the published material (`coord_delivery` on the real table), the curve check
+releases `t`, the rows are the switch-system entry's delivered values, the digest unlocks every exceptional digit,
+and the switch-system entry's decode chain gives the scalar multiple. -/
+theorem perfectCorrectness (field : FieldCertificate) (group : @GroupCertificate field) :
+    GarbledCircuit.PerfectCorrectness (@Entry.scheme field group) Prod.snd :=
+  Kriterion.CRT.EntryCorrect.perfectCorrectness field group
+
+/-- The configuration-E submission at 182,936 bytes. -/
 def solution : Kriterion.Solution := {
-  FixedIndex := PlanB.FixedIndex
-  EncIndex := EncPRF.PermutationIndex
+  FixedIndex := Empty
+  EncIndex := Empty
   fixedFinite := inferInstance
   encFinite := inferInstance
-  Randomness := Scheme.Coins
+  Randomness := Entry.Coins
   randomnessFinite := inferInstance
-  randomness := Scheme.witness
-  Public := PlanB.Public
-  EncodingKey := InputMacKey
-  encoding := PlanB.Wire.encoding
-  ciphertextBytes := 3363376
-  garbleQueries := Programs.garbleQueries
-  evaluateQueries := Programs.evaluateQueries
-  scheme := @Scheme.scheme
-  garbleProgram := fun _ _ => Programs.garbleProgram
-  evaluateProgram := @Programs.evaluateProgram
+  randomness := Entry.witness
+  Public := Entry.Public
+  EncodingKey := Entry.Key
+  encoding := Wire.encoding
+  ciphertextBytes := ciphertextBytes
+  garbleQueries := garbleBudget
+  evaluateQueries := evaluateBudget
+  scheme := @Entry.scheme
+  garbleProgram := fun _ _ _ => Entry.garbleProgram
+  evaluateProgram := @Entry.evaluateProgram
   garbleProgramCorrect := garbleProgramCorrect
   evaluateProgramCorrect := evaluateProgramCorrect
   ciphertextSize := by
     intro field group parameter scalar tape
-    exact PlanB.Wire.ciphertextSize _
+    exact Wire.encoding_length _
   lamportCompatible := lamportCompatible
   functionCorrect := fun _ _ _ _ => rfl
   perfectCorrectness := perfectCorrectness
-  adaptivePrivacy := Phase3.Glue.planB_oracleAdaptivePrivacy_of
-    Security.Phase3.PublicFirst.planB_publicFirst
-    (Phase3.Glue.MachineBound.of_law PlanB.SimMachine.machineLaw_planB)
+  adaptivePrivacy := by
+    intro field group
+    have h := Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy field group
+    simp only [Kriterion.CRT.Privacy.Instance.crtEntry] at h
+    exact h
 }
 
 end Submission
