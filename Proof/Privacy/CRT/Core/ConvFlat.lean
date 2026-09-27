@@ -11,7 +11,7 @@ from its joins and pins (`Construction/CRT/Layout.lean`). This file connects the
 * **B2** (`phi_bijective`, `phi_uniform`): the source's joins and pins of one coordinate are read back by `readPub` as
   a bijection `phi` onto `ConvVals table`. The join and pin positions of `ConvVals` are enumerated by sums and sigmas
   whose `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_chunk`, `jIdx_mod`, `pIdx_mod`), so `phi` is
-  injective; the two sides have `2 ^ (128 · 3546)` elements.
+  injective; the two sides have `2 ^ (128 · 3412)` elements.
 * `source_joins_pins_uniform`, `source_crt_law`: under a uniform source the joins and pins of coordinate `κ` are
   uniform, so the source's flat vector is `flatOf` of uniform conversion values.
 -/

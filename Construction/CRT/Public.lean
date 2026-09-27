@@ -6,11 +6,11 @@ The public value of configuration E and its byte codec.
 | `curve`     | `3 * field`                      | `3 * 32`         | 96      |
 | `rows`      | `Vector rowGamma 91`             | `91 * 96`        | 8,736   |
 | `exception` | `Vector entry 91`                | `91 * 12`        | 1,092   |
-| `crtX`      | `Vector block 3546`              | `3546 * 16`      | 56,736  |
-| `crtY`      | `Vector block 3546`              | `3546 * 16`      | 56,736  |
+| `crtX`      | `Vector block 3412`              | `3412 * 16`      | 54,592  |
+| `crtY`      | `Vector block 3412`              | `3412 * 16`      | 54,592  |
 | `recX`      | `Vector (natural 78) 367`        | `367 * 78`       | 28,626  |
 | `recY`      | `Vector (natural 78) 275`        | `275 * 78`       | 21,450  |
-| **total**   |                                  |                  | **173,472** |
+| **total**   |                                  |                  | **169,184** |
 
 Every field has a fixed width and there is no tag, so every inhabitant encodes to exactly
 `ciphertextBytes` bytes and the size theorem does not mention the garbler (xinshu's `SizedBy`
@@ -31,7 +31,7 @@ open Kriterion Kriterion.BN254 Kriterion.Cryptography Kriterion.ArgoMAC Kriterio
 
 /-! ### Sizes and indices -/
 
-/-- The real table (85 moduli, T9, slack 120). -/
+/-- The real table (85 moduli, fallback 7/8-bit schedule, slack 120). -/
 abbrev table : CrtTable := bn254Table
 
 /-- Encodings of `x`: 364 point encodings digit-major with slot `e mod 4` =
@@ -43,7 +43,7 @@ abbrev xCount : Nat := 367
 abbrev yCount : Nat := 275
 
 /-- Published conversion blocks per coordinate. -/
-abbrev convCount : Nat := 3546
+abbrev convCount : Nat := 3412
 
 /-- Record width in bytes. -/
 abbrev recordBytes : Nat := 78
@@ -73,8 +73,8 @@ structure Public where
   /-- The records of `y`. -/
   recY : Vector Record yCount
 
-/-- The ciphertext size: `96 + 91 * 96 + 91 * 12 + 2 * 3546 * 16 + 642 * 78`. -/
-def ciphertextBytes : Nat := 173472
+/-- The ciphertext size: `96 + 91 * 96 + 91 * 12 + 2 * 3412 * 16 + 642 * 78`. -/
+def ciphertextBytes : Nat := 169184
 
 /-- The flat blocks of one coordinate read back as the evaluator's conversion material. -/
 def convOf (blocks : Vector Block convCount) : ConvPublic := ConvPublic.unflatten table blocks.toArray
@@ -201,7 +201,7 @@ theorem byteArithmetic :
       (convCount * 16 + (xCount * 78 + yCount * 78))))) = ciphertextBytes := by
   simp only [digitCount, convCount, xCount, yCount, ciphertextBytes]
 
-/-- **Every** public value encodes to exactly `ciphertextBytes = 173,472` bytes. -/
+/-- **Every** public value encodes to exactly `ciphertextBytes = 169,184` bytes. -/
 theorem encoding_length (value : Public) : (encoding.encode value).length = ciphertextBytes := by
   rw [encoding_sized value, byteArithmetic]
 

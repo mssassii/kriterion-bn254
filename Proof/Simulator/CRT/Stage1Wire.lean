@@ -4,7 +4,7 @@
 `Wire.encoding`'s field, block, byte, entry, row, curve and record encoders are private to
 `Construction/CRT/Public.lean`; `encoding_eq` restates the encoding with public copies (`rfl`). `wire_bits`: the
 byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × 3 × 256`), the exception
-bytes (`91 × 12 × 8`), the two conversion vectors (`3546 × 128` bits each) and the records (`624` bits each), least
+bytes (`91 × 12 × 8`), the two conversion vectors (`3412 × 128` bits each) and the records (`624` bits each), least
 significant first.
 -/
 

@@ -56,8 +56,10 @@ theorem size_pieceProg (p : Piece) (safe : CrtSerial.PieceSafe p) : (pieceProg p
       omega
   | record κ e => exact size_recordProg κ e
 
+-- CHECK: Recheck this closed list-length certificate under the fallback selector;
+-- the inherited kernel recursion limit has not been tested with the new table.
 set_option maxRecDepth 200000 in
-theorem pieces_length : pieces.length = 56278 := by decide +kernel
+theorem pieces_length : pieces.length = 56144 := by decide +kernel
 
 theorem size_serializeList (list : List Piece) (safeAll : ∀ p ∈ list, CrtSerial.PieceSafe p) :
     (Prog.rep list.length fun n => pieceProg (list.getD (list.length - 1 - n) default)).size ≤
@@ -121,7 +123,7 @@ theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 : Nat)
     (eq : total = a0 + (a1 + (a2 + (a3 + (a4 + (a5 + (a6 + (a7 + (a8 + (a9 + (a10 + a11)))))))))))
     (h0 : a0 ≤ fieldCount * 457231) (h1 : a1 ≤ exceptionByteCount * 62) (h2 : a2 ≤ 2 * Entry.joinCount * 902)
     (h3 : a3 ≤ 2 * (Entry.pinCount * 128) * 104) (h4 : a4 ≤ recordCount * moduliCount * 20000)
-    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h7 : a7 ≤ 56278 * 6000) (h8 : a8 ≤ labelCount * 7)
+    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h7 : a7 ≤ 56144 * 6000) (h8 : a8 ≤ labelCount * 7)
     (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) : total ≤ 2 ^ 55 := by
   rewrite [CrtStored.joinCount_eq] at h2
   rewrite [CrtConv.pinCount_eq] at h3
@@ -152,7 +154,7 @@ theorem size_program : CrtStage1.program.size ≤ 2 ^ 55 := by
       simp only [keyXor, Prog.seqList, Prog.size_seq, size_loadAt, size_storeAt, ar, Prog.size]; omega
   have clearSize : CrtStage1.clearLimbs.size = recordLimbCount * 3 :=
     Prog.size_rep _ _ _ fun _ _ => by simp only [Prog.size_seq, size_cst, size_storeAt]
-  have serialSize : CrtStage1.serialize.size ≤ 56278 * 6000 := by
+  have serialSize : CrtStage1.serialize.size ≤ 56144 * 6000 := by
     have bound := size_serialize
     rewrite [pieces_length] at bound
     exact bound

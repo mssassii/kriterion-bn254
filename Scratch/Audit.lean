@@ -50,12 +50,12 @@ run_cmd do
 #eval Entry.garbleBudget
 #eval Entry.evaluateBudget
 
-/-- The expected numbers of this entry (85 moduli, table T9, pad slack 120, block-aligned cast
+/-- The expected numbers of this entry (85 moduli, fallback 7/8-bit table, pad slack 120, block-aligned cast
 lanes, per-encoding 78-byte records with the wrap hint, sign rows with three published constants
 per digit, the hash digest with two exceptional kinds). -/
-def expectedBytes : Nat := 173472
-def expectedGarble : Nat := 945076
-def expectedEvaluate : Nat := 937418
+def expectedBytes : Nat := 169184
+def expectedGarble : Nat := 1062038
+def expectedEvaluate : Nat := 1054570
 
 #guard Kriterion.Benchmark.ciphertextBytes Submission.solution == expectedBytes
 #guard Kriterion.Benchmark.garbleQueries Submission.solution == expectedGarble

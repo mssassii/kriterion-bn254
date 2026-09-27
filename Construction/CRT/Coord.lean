@@ -285,7 +285,7 @@ def modBlocks : Kind → Nat
 /-- Published blocks of chunk `c`: its joins and its pin. -/
 def CrtTable.chunkBlocks (T : CrtTable) (c : Nat) : Nat := (T.chunkWidth c - 1) + T.castWidth
 
-/-- Published conversion blocks of one coordinate (3,546 for the real table). -/
+/-- Published conversion blocks of one coordinate (3,412 for the real table). -/
 def CrtTable.convBlocks (T : CrtTable) : Nat :=
   (∑ c : Fin T.chunkCount, T.chunkBlocks c.val) + ∑ i : Fin T.count, modBlocks (T.kind i)
 
