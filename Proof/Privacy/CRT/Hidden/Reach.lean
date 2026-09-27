@@ -515,7 +515,7 @@ theorem word_target (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table
   · rename_i B ran
     have enough : need (Entry.table.modulus i) (t9Row 32 (Entry.table.modulus i)).ell ≤ B := of_decide_eq_true ok
     -- The certificate depends only on ell, which the schedule selector preserves.
-    have ellEq : row.ell = (t9Row 32 (Entry.table.modulus i)).ell := congrArg OddRow.ell rowEq
+    have ellEq : row.ell = (t9Row 32 (Entry.table.modulus i)).ell := by rw [rowEq]; rfl
     rw [← ellEq] at enough
     have reach := reach_run (Entry.table.modulus i) _ 1 _ B (reach_one _ pos) ran
     rw [unpack_length] at reach
