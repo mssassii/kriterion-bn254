@@ -1,8 +1,13 @@
 # The sign row on psivesely's CRT-residue delivery of ArgoMAC
 
 This is an entry for the Kriterion `scalar-multiplication` challenge: garbled BN254 scalar
-multiplication `f_k(u) = k·u`, checked in Lean against the challenge library
+multiplication `f_k(u) = k·u`, targeting the challenge library
 `Kriterion-cc/kriterion-challenge` at commit `aaf2789` (Lean `v4.33.1`).
+
+**Draft status:** the fallback schedule changes in this branch have not been built or checked by
+Lean yet. The numbers below are independently computed targets; the updated Lean certificates and
+audit expectations must pass on the build VM before this branch is considered verified.
+The schedule uses width 8 for 67 odd moduli and width 7 for the other 17, retaining 128-bit labels.
 
 It is psivesely's CRT entry (`psivesely/kriterion-bn254-crt`, commit `de8f397`, 182,936 bytes) with Lazar's
 sign row (`Lazar955/bn254-planb`) in the `Y` slot of every digit:
@@ -18,7 +23,7 @@ delivery of the affine encodings replaced:
 
 * **the delivery layer**: the switch systems are replaced by the CRT-residue projectivization of Duty-Free
   Bits (Khambhati, Bhattacharya and Heath), applied to Argo MAC encodings as in ePrint 2026/2100: per coordinate, one conversion of the 254 input bits into
-  one-hot labels of the residues modulo 85 small moduli (3,546 published blocks), then one 78-byte record
+  one-hot labels of the residues modulo 85 small moduli (3,412 published blocks), then one 78-byte record
   per encoding;
 * **the gating**: the rows are masked by hash outputs keyed by the curve check's value, in place of the
   second switch system on labels whitened by EncPRF pads;
@@ -32,14 +37,14 @@ are xinshu's.
 
 | metric | value | rule |
 |---|---|---|
-| `ciphertextBytes` | **173,472** `= 96 + 91·96 + 91·12 + 2·56,736 + 642·78` | ranked, lower is better |
-| `garbleQueries` | **945,076** `≤ 1,759,967` | acceptance gate |
-| `evaluateQueries` | **937,418** `≤ 1,055,879` (118,461 below) | acceptance gate |
+| `ciphertextBytes` | **169,184** `= 96 + 91·96 + 91·12 + 2·54,592 + 642·78` | ranked, lower is better |
+| `garbleQueries` | **1,062,038** `≤ 1,759,967` | acceptance gate |
+| `evaluateQueries` | **1,054,570** `≤ 1,055,879` (1,309 below) | acceptance gate |
 
-Every field of `Kriterion.Solution` is proved, and there is no `sorry` in the tree.
-`#print axioms Submission.solution` reports exactly `propext`, `Classical.choice` and `Quot.sound`,
-and so does every declaration under `Construction/`, `Proof/` and `Submission.lean`
-(`Scratch/Audit.lean`, `Scratch/ProofAudit.lean`).
+The baseline supplied proofs for every field of `Kriterion.Solution`, with no `sorry`, and its
+axiom audits reported only `propext`, `Classical.choice` and `Quot.sound`. This branch preserves the
+proof structure and introduces no admitted proofs; its updated certificates and audits remain to be
+checked (`Scratch/Audit.lean`, `Scratch/ProofAudit.lean`).
 
 `Intuition.md` explains the construction and the proof.
 
@@ -177,28 +182,30 @@ no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side th
 | `curve` | 3 curve-check constants | 96 |
 | `rows` | 91 digits × 3 constants × 32 B | 8,736 |
 | `exception` | 91 digits × 12-byte entry | 1,092 |
-| `crtX`, `crtY` | 3,546 blocks × 16 B per coordinate | 113,472 |
+| `crtX`, `crtY` | 3,412 blocks × 16 B per coordinate | 109,184 |
 | `recX`, `recY` | 642 records × 78 B (367 of `x`, 275 of `y`) | 50,076 |
-| **total** | | **173,472** |
+| **total** | | **169,184** |
 
 A record is `h_e·M + Σ_i J_{e,i}·Π_{i'<i} m_{i'}`, below `2M < 2^624`. Every field has a fixed width, so
 every public value encodes to the same length (`Entry.Wire.encoding_length`). Against `de8f397`, the sign
 row saves 91 records (7,098 B) and 91 row constants (2,912 B), and the second exceptional case adds 6
-bytes per digit (546 B): 9,464 B less.
+bytes per digit (546 B): 9,464 B less. The fallback schedule saves another 4,288 B,
+for 13,752 B less in total.
 
 ## 3. Query accounting
 
 | part | garbling | evaluation |
 |---|---:|---:|
-| coordinate `x` (chunks 71,936 / 71,458; conversions 207,160 / 204,924; body 217,950 / 216,976) | 497,046 | 493,358 |
-| coordinate `y` (chunks and conversions as `x`; body 166,643 / 165,895) | 445,739 | 442,277 |
+| coordinate `x` (chunks 71,936 / 71,458; conversions 265,641 / 263,500; body 217,950 / 216,976) | 555,527 | 551,934 |
+| coordinate `y` (chunks and conversions as `x`; body 166,643 / 165,895) | 504,220 | 500,853 |
 | mask key | 1 | 1 |
 | masks | 1,092 | 1,092 |
 | exception digest | 1,198 | 690 |
-| **total** | **945,076** | **937,418** |
+| **total** | **1,062,038** | **1,054,570** |
 
 The budgets are term-by-term sums over the 85 moduli (`Entry.garbleBudgetOf`, `Entry.evaluateBudgetOf`),
-evaluated by `decide +kernel` in `Construction/CRT/BudgetFacts.lean`. The evaluator's count is the same for
+with certificates using `decide +kernel` in `Construction/CRT/BudgetFacts.lean` (not yet rerun for
+this draft). The evaluator's count is the same for
 every input. Against `de8f397`, the body of `x` (367 encodings instead of 458) asks 49,966 garbling and
 49,745 evaluation queries fewer, the masks 137 fewer on each side, and the digest 91 more on each side.
 
@@ -238,14 +245,21 @@ and its opening draws 91 lift pairs `(λ, t)`.
 
 | `Solution` field | where | status |
 |---|---|---|
-| `garbleProgram`, `evaluateProgram`, `garbleQueries`, `evaluateQueries`, `garbleProgramCorrect`, `evaluateProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` | proved |
-| `ciphertextSize` | `Construction/CRT/Public.lean` (`Entry.Wire.encoding_length`) | proved |
-| `lamportCompatible` | `Proof/LamportCompatibility/Labels.lean` | proved |
-| `functionCorrect` | `rfl` | proved |
-| `perfectCorrectness` | `Proof/Correctness/CRT/EntryCorrect.lean` (`EntryCorrect.perfectCorrectness`) | proved |
-| `adaptivePrivacy` | `Proof/Privacy/CRT/Final.lean` (`Final.crtEntry_adaptivePrivacy`, from `Assembly.crtPrivacy`), `Proof/Privacy/CRT/Glue/Instance.lean` (`crtEntry_privacy_of_table`), `Proof/Privacy/CRT/Glue/MachineCrt.lean` (`crtEntry_machineHop_of`) | proved |
+| `garbleProgram`, `evaluateProgram`, `garbleQueries`, `evaluateQueries`, `garbleProgramCorrect`, `evaluateProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` | proof supplied; draft unbuilt |
+| `ciphertextSize` | `Construction/CRT/Public.lean` (`Entry.Wire.encoding_length`) | proof supplied; draft unbuilt |
+| `lamportCompatible` | `Proof/LamportCompatibility/Labels.lean` | proof supplied; draft unbuilt |
+| `functionCorrect` | `rfl` | proof supplied; draft unbuilt |
+| `perfectCorrectness` | `Proof/Correctness/CRT/EntryCorrect.lean` (`EntryCorrect.perfectCorrectness`) | proof supplied; draft unbuilt |
+| `adaptivePrivacy` | `Proof/Privacy/CRT/Final.lean` (`Final.crtEntry_adaptivePrivacy`, from `Assembly.crtPrivacy`), `Proof/Privacy/CRT/Glue/Instance.lean` (`crtEntry_privacy_of_table`), `Proof/Privacy/CRT/Glue/MachineCrt.lean` (`crtEntry_machineHop_of`) | proof supplied; draft unbuilt |
 
 ## 6. Build and audit
+
+The static fallback audit runs without Lean and checks the frozen schedule, cost numerals,
+and the existing reachability certificates. It does not check proof elaboration:
+
+```sh
+python3 Scratch/check_fallback.py
+```
 
 ```sh
 lake exe cache get                      # Mathlib build cache
@@ -255,10 +269,10 @@ lake env lean Scratch/ProofAudit.lean   # the three axioms over every declaratio
 ```
 
 `Scratch/` is not a Lean library and the verifier ignores it. `Scratch/Audit.lean` fails if the bytes
-(173,472, from the metric and from encoding an all-zero public value), the garbling budget (945,076) or
-the evaluation budget (937,418) differ, or if a budget comes within 500 queries of its gate, and it checks
-the axioms of the solution and of the privacy field. A clean build of the entry's 397 modules (with
-Mathlib and the challenge library prebuilt) takes a few minutes.
+(169,184, from the metric and from encoding an all-zero public value), the garbling budget (1,062,038) or
+the evaluation budget (1,054,570) differ, or if a budget comes within 500 queries of its gate, and it checks
+the axioms of the solution and of the privacy field. Build time depends strongly on available
+memory; this fallback draft has not been built, and no build-time estimate is claimed here.
 
 ## 7. Provenance
 

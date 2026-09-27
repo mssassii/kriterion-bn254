@@ -1,8 +1,13 @@
 # Intuition: the sign row on psivesely's CRT-residue delivery of ArgoMAC
 
-This entry garbles BN254 scalar multiplication at **173,472 bytes** of public ciphertext.
-Garbling makes at most **945,076** oracle queries (gate 1,759,967) and evaluation at most
-**937,418** (gate 1,055,879). Both figures are the exact bounds carried in the types of
+**Draft status:** the fallback schedule has not been built in Lean. Its independently computed
+target is **169,184 bytes** of public ciphertext; updated proof terms and audit expectations remain
+to be checked on the build VM. This document describes the intended construction and existing proof
+architecture, not a completed verification of this branch.
+
+This entry garbles BN254 scalar multiplication at that target size.
+Garbling makes at most **1,062,038** oracle queries (gate 1,759,967) and evaluation at most
+**1,054,570** (gate 1,055,879). Both figures are the expected exact bounds to be checked against the types of
 `garbleProgram` and `evaluateProgram`.
 
 It is psivesely's CRT entry (`psivesely/kriterion-bn254-crt`, commit `de8f397`, 182,936 bytes)
@@ -10,8 +15,8 @@ with Lazar's sign row in the `Y` slot of every digit. The sign row reads three a
 instead of four and, with the coefficient cut, publishes one constant instead of two, so a digit
 reads 7 encodings and publishes 3 constants (section 1.1). It also vanishes at a second exceptional
 input, which the exception gadget covers with a 12-byte entry per digit (sections 1.2 and 6).
-Sections 1.1, 1.2, 6 and 11.6 describe the change; everything else is psivesely's construction and
-proof, with this entry's numbers.
+Sections 1.1, 1.2, 6 and 11.6 describe the sign-row change. This branch additionally retunes the
+first extraction width to 8 for 67 odd moduli, retaining width 7 for the other 17 (section 3.6).
 
 psivesely's entry keeps the ArgoMAC structure of xinshu's entry (`xinshudong/bn254-entry`, commit
 `bf53ea4`, 3,363,376 bytes): 91 digit MACs whose rows read affine encodings of the input
@@ -21,13 +26,14 @@ chunks. psivesely's entry delivers them through the CRT-residue projectivization
 (Khambhati, Bhattacharya and Heath), as ePrint 2026/2100 (Khambhati, Feickert, Lewe and Tiwari) does
 for the field encodings of Argo MAC: each input coordinate is turned once into one-hot labels of its
 residues modulo 85 small moduli, and each encoding then costs one 78-byte record. The conversion of
-a coordinate is 56,736 bytes whatever the number of encodings. The rows are gated by masks keyed by
+a coordinate is 54,592 bytes whatever the number of encodings. The rows are gated by masks keyed by
 the curve check, the exception gadget is a hash digest, and the oracle is the field hash alone. The
 proof architecture (the obligation, the lazy oracle, the chain of games, the public-first hop, the
 opening and the closed simulator machine) is xinshu's, adapted to the CRT layer.
 
-Every field of the challenge's `Solution` record is proved in Lean, with no `sorry`, and the entry
-depends only on the axioms `propext`, `Classical.choice` and `Quot.sound`.
+The baseline had proofs for every field of the challenge's `Solution` record, with no `sorry`, and
+only `propext`, `Classical.choice` and `Quot.sound` in its axiom audits. The modified branch still
+needing build and audit validation supplies proof terms without new admissions.
 
 ---
 
@@ -122,7 +128,7 @@ The construction obtains those residues in two layers.
    modulus, one residue join. The evaluator can hash every slot except the hot one, and the join
    supplies what it misses. Section 4.
 
-The conversion of a coordinate publishes 3,546 blocks (56,736 bytes). The body publishes, per
+The conversion of a coordinate publishes 3,412 blocks (54,592 bytes). The body publishes, per
 encoding, the 85 residue joins and one hint bit, packed into a 78-byte record.
 
 ---
@@ -178,8 +184,9 @@ They cost nothing.
 ### 3.4 Extraction
 
 The word `W_m` must become boolean labels of the bits of `σ_m`. Extraction does this in three
-*stages*, as in the Duty-Free Bits reference code: stage 0 extracts bits `0..6` (width 7, casts of
-width `ℓ`); stage 1 extracts bits `7..ℓ − 2` (width `ℓ − 8`, casts of width `ℓ − 7`); stage 2 takes
+*stages*, as in the Duty-Free Bits reference code: stage 0 extracts bits `0..w0 − 1` (width
+`w0 ∈ {7,8}`, casts of width `ℓ`); stage 1 extracts bits `w0..ℓ − 2` (width `ℓ − w0 − 1`, casts
+of width `ℓ − w0`); stage 2 takes
 the top bit for free. A stage over `w` bits reduces the remaining word to `w` bits, takes its low
 lane bit as the first bit label, builds a tree over `w` bits, casts every leaf, and publishes the
 tree's `w − 1` joins and a pin. The evaluator's order is forced by data dependencies: at level `n` it
@@ -189,9 +196,9 @@ extracted part is subtracted first).
 
 ### 3.5 From bits to a one-hot vector over `Z_m`
 
-- **Kept one-hot.** Stage 0's leaf vector is a one-hot vector of `σ_m mod 2^7`.
-- **Growth.** For `ℓ = 13` and `ℓ = 14` it grows by one or two more bits (bits 7 and 8, from stage 1)
-  with the tree step and one join per bit, to `k0 = max(7, ℓ − 5)` bits.
+- **Kept one-hot.** Stage 0's leaf vector is a one-hot vector of `σ_m mod 2^w0`.
+- **Growth.** It grows by `k0 − w0` bits from stage 1, with the tree step and one join per bit,
+  to `k0 = max(w0, ℓ − 5)` bits. The fallback needs at most one growth bit.
 - **Reindex.** Slot `ρ < m` of the new vector is the XOR of the kept slots `α ≡ ρ (mod m)`. Since
   `2^{k0} ≥ m` for every modulus, no class is empty, and the hot slot is `(σ_m mod 2^{k0}) mod m`.
   Free.
@@ -208,9 +215,13 @@ throughout (a reference evaluator that read the second grown level from the low 
 
 The moduli are every prime from 17 to 439 (79 primes), the prime powers 49, 81, 121, 125, 169, and
 256: 85 pairwise coprime moduli whose product `M` has 623 bits (`log2 M = 622.26`). Every odd modulus
-follows one closed-form schedule: `ℓ = bitlen(32·(m − 1))`, stage widths `(7, ℓ − 8, 1)`,
-`k0 = max(7, ℓ − 5)`, growth `k0 − 7` bits, folds `ℓ − k0` bits. A modulus publishes `4ℓ − 17`
-blocks (23 to 39). With the chunks' 670 blocks this gives the 3,546 blocks of one coordinate.
+uses `ℓ = bitlen(32·(m − 1))`, stage widths `(w0, ℓ − w0 − 1, 1)`, and
+`k0 = max(w0, ℓ − 5)`, with `k0 − w0` growth bits and `ℓ − k0` folds. The real table chooses
+`w0 = 8` for 67 odd moduli and `w0 = 7` for 17; the generic T9 definition remains unchanged.
+A modulus publishes `4ℓ − 2w0 − 3` blocks (21 to 37 in the selected table). The odd rows
+publish 2,742 blocks and the chunks 670, giving 3,412 blocks per coordinate. Compared with all
+width-7 rows, this saves `2 × 67 = 134` blocks per coordinate while retaining 1,309 queries of
+evaluator headroom. Using width 8 for all odd rows would exceed the evaluator gate at 128 bits.
 
 ---
 
@@ -297,24 +308,25 @@ Correctness does not use this; privacy does (section 11).
 
 ---
 
-## 8. Why the ciphertext is 173,472 bytes
+## 8. Why the ciphertext is 169,184 bytes
 
 | Field | Contents | Bytes |
 |---|---|---:|
 | `curve` | 3 curve-check constants × 32 | 96 |
 | `rows` | 91 digits × 3 constants × 32 | 8,736 |
 | `exception` | 91 digits × 12-byte entry | 1,092 |
-| `crtX` | conversion of `x`: 3,546 blocks × 16 | 56,736 |
-| `crtY` | conversion of `y`: 3,546 blocks × 16 | 56,736 |
+| `crtX` | conversion of `x`: 3,412 blocks × 16 | 54,592 |
+| `crtY` | conversion of `y`: 3,412 blocks × 16 | 54,592 |
 | `recX` | 367 records × 78 | 28,626 |
 | `recY` | 275 records × 78 | 21,450 |
-| **total** | | **173,472** |
+| **total** | | **169,184** |
 
 Every field has a fixed width and there is no tag, so every public value encodes to the same
 length (`Wire.encoding_length`). The conversion blocks are 65 percent of the total and do not depend
 on the number of encodings; each further encoding would cost 78 bytes. Against psivesely's entry,
 the sign row saves 91 records (7,098 bytes) and one row constant per digit (2,912 bytes), and the
-second exceptional case adds 6 bytes per digit (546 bytes).
+second exceptional case adds 6 bytes per digit (546 bytes). The fallback schedule then saves
+another 4,288 bytes across the two coordinates.
 
 ---
 
@@ -326,9 +338,9 @@ the hot one:
 | Part | Garbling `x` | Garbling `y` | Evaluation `x` | Evaluation `y` |
 |---|---:|---:|---:|---:|
 | chunk trees and casts | 71,936 | 71,936 | 71,458 | 71,458 |
-| extraction, growth, folds (84 odd moduli) | 207,160 | 207,160 | 204,924 | 204,924 |
+| extraction, growth, folds (84 odd moduli) | 265,641 | 265,641 | 263,500 | 263,500 |
 | body pads (85 moduli) | 217,950 | 166,643 | 216,976 | 165,895 |
-| **coordinate** | **497,046** | **445,739** | **493,358** | **442,277** |
+| **coordinate** | **555,527** | **504,220** | **551,934** | **500,853** |
 
 | Fixed part | Garbling | Evaluation |
 |---|---:|---:|
@@ -336,9 +348,10 @@ the hot one:
 | masks | 1,092 | 1,092 |
 | exception digest | 1,198 | 690 |
 
-Totals: 945,076 garbling and 937,418 evaluation queries. The evaluation count is the same for every
+Totals: 1,062,038 garbling and 1,054,570 evaluation queries. The evaluation count is the same for every
 input, since every one-hot vector has exactly one hot slot. The budgets are sums over the 85 moduli
-in `Construction/CRT/Entry.lean`, evaluated by the kernel in `Construction/CRT/BudgetFacts.lean`.
+in `Construction/CRT/Entry.lean`; their `decide +kernel` certificates in
+`Construction/CRT/BudgetFacts.lean` await a build for this draft.
 
 ---
 
@@ -375,7 +388,9 @@ G0 → G0T → G0U → G1U → HW → H → I → M
 ```
 
 - `G0 → G0T`: the mask key's input is a labelled query, so the real game is the game on an answer
-  table indexed by tags, except when `t` equals one of the garbler's 945,076 inputs.
+  table indexed by tags. The budget conservatively retains `1,759,967/p`, using the fixed
+  garbler-query gate instead of the smaller actual count 1,062,038; the current table-hop proof
+  in fact establishes zero cost.
 - `G0T → G0U`: every pad vector and every mask, read from a uniform integer by a slightly biased
   reading, is swapped for an exactly uniform value (the pad-slack and `sampleFp` biases).
 - `G0U → G1U`: the garbler's hidden entries (the hot slot of every one-hot structure, the other
@@ -470,7 +485,7 @@ The error terms, as stated in `Proof/Privacy/CRT/Glue/Budget.lean`:
 
 | Hop | Term | Value |
 |---|---|---:|
-| `G0 → G0T` | `945,076/p` | `2^-233.75` |
+| `G0 → G0T` | `1,759,967/p` | `2^-232.85` |
 | `G0T → G0U`, `G1U → HW`, `H → I` | pad and mask swap, three times | `2^-113.51` each |
 | `G0U → G1U` | per query `4/2^128 + 1/(p − 1)` | `2^-126` per query |
 | `G0U → G1U` | the curve encodings' wrap window (section 11.1) | `2^-104.74` |
@@ -520,7 +535,8 @@ does not use are removed from the tree.
 
 ## 13. Status
 
-Every obligation of `Kriterion.Solution` is proved:
+The following obligations have supplied proof terms, adapted from the verified baseline and
+awaiting a build and audit for the fallback schedule:
 
 * computable garbling, with query programs at exact budgets and their equality proofs;
 * Lamport compatibility;
@@ -529,7 +545,8 @@ Every obligation of `Kriterion.Solution` is proved:
 * the fixed byte count;
 * adaptive privacy, with the closed simulator machine and its `2^60` cost bound.
 
-`#print axioms Submission.solution` reports exactly `propext`, `Classical.choice` and `Quot.sound`.
+The baseline `#print axioms Submission.solution` reported exactly `propext`, `Classical.choice`
+and `Quot.sound`; rerun this audit for the fallback branch after it builds.
 
 ---
 

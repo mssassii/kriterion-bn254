@@ -2,21 +2,23 @@
 
 This map covers the CRT entry with the sign row against the challenge library `aaf2789`. The top-level
 `README.md` explains the construction and the argument, and `Intuition.md` the ideas. This file says which
-module proves which obligation.
+module supplies which proof obligation. **Draft status:** the fallback 7/8-bit schedule has not
+been built; the updated proof terms, metrics, and axiom audits require validation on the build VM.
 
 `Proof.lean` imports `Proof.Correctness.CRT.EntryCorrect`, `Proof.LamportCompatibility.Labels` and
 `Proof.Privacy.CRT.Final`, and `Construction.lean` imports the entry and the simulator machine, so a bare
 `lake build` compiles every module named here and every module they import. `Submission.lean` names the
-fields. Every field is proved; there is no `sorry` in the tree, and every declaration uses only `propext`,
-`Classical.choice` and `Quot.sound` (`Scratch/ProofAudit.lean`).
+fields. The baseline proved every field without admissions and passed the three-axiom audit.
+This branch introduces no admitted proof, but the updated tree must be rebuilt and audited
+(`Scratch/ProofAudit.lean`).
 
 ## 1. The fields of `Kriterion.Solution`
 
 | field | proved by | where |
 |---|---|---|
-| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (945,076); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
-| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (937,418); `Submission.evaluateProgramCorrect` | the same |
-| `ciphertextSize` | `Entry.Wire.encoding_length` (173,472) | `Construction/CRT/Public.lean` |
+| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (1,062,038); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
+| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (1,054,570); `Submission.evaluateProgramCorrect` | the same |
+| `ciphertextSize` | `Entry.Wire.encoding_length` (169,184) | `Construction/CRT/Public.lean` |
 | `lamportCompatible` | `Lamport.selectedLabels_eq` | `Proof/LamportCompatibility/Labels.lean` |
 | `functionCorrect` | `rfl` | `Submission.lean` |
 | `perfectCorrectness` | `EntryCorrect.perfectCorrectness` | `Proof/Correctness/CRT/EntryCorrect.lean` |
@@ -62,7 +64,7 @@ from their leaves (`Assembly.privacy_of_leaves`, `Assembly.crtPrivacy`) and give
 | row | statement | where |
 |---|---|---|
 | H1 | `G0` is the challenge's lazy real game | `Laws/Table.lean`, `Paths/TableFacts.lean`, `Glue/Instance.lean` |
-| H2 | `G0 → G0T`, the table-planted game, `945,076/p` | `Laws/Table.lean` |
+| H2 | `G0 → G0T`, the table-planted game, `1,759,967/p` | `Laws/Table.lean` |
 | H3 | `G0T → G0U`, the pad and mask swap | `Swap/` (`Hop`, `Layout`, `Reading`), `EntryInstance.lean` (`crtEntry_swap`) |
 | H5 | `G0U → G1U`, the reach: the honest evaluator reaches every designed-visible entry (`crtEntry_designedReached`) | `Designed.lean`, `Hidden/Reached.lean`, `Hidden/Align*.lean`, `Glue/Containment.lean` |
 | H6 | the stage-one guess: a stage-1 query touches a hidden garbler entry with probability at most the per-query charge (`crtEntry_stageOneGuess_of`: the never-hot casts, the bridge key, the reachability of the conversion and body tags) | `Hidden/StageOne*.lean`, `Hidden/Reach.lean` |
