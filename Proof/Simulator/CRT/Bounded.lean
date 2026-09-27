@@ -4,7 +4,7 @@
 | knob | the machine's sampler | the exact sampler it replaces (`Instance.view`) |
 |---|---|---|
 | `source` | `CrtDraws.drawLaw` mapped by `CrtSource.sourceOf` (stage 1: bounded field cells, bounded digits, coin words) | the uniform `Entry.Source` |
-| `rows` | `rows`: release-r1's `tailLaw` and `liftLaw` through `targetRows` | `simRows` = release-r1's `simulatedRows` (`idealSamplers.tail`, `.lift`) |
+| `rows` | `rows`: release-r1's `tailLaw` and `liftLaw` (`91` randomiser pairs `(λ, t)`) through `targetRows` | `simRows` = `simulatedRows` (`idealSamplers.tail`, `.lift`) |
 | `preimage` | release-r1's `preimageLaw` (bounded multiplier) | `idealPreimage` |
 | `fourth` | the view's own (a 128-coin word is exactly uniform, `Preimages.fourth_eq`) | the same |
 -/

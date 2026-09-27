@@ -1,12 +1,8 @@
 /-
-**The law of stage 1's serializer.**
-
-`serialize` pushes the wire bits in reverse wire order; each `emitWord address width` pushes the
-low `width` bits of `RAM[address]`, least significant on top, and `emitZero width` pushes `width`
-zero bits. `memSem_serialize`: the serializer is deterministic, leaves the RAM and the other stacks
-unchanged, and leaves stack `3` holding `serialBits RAM` (curve and rows, bytes, fold joins, and the
-chunk words, each its `733` scale cells then two zero bits, each least significant bit first) on
-top of the old stack.
+**The laws of the emission blocks** that stage 1's serializer is built from: `emitWord address width` pushes the
+low `width` bits of `RAM[address]`, least significant on top (`memSem_emitWord`), `emitZero width` pushes `width`
+zero bits, and `Emits` composes them. The CRT serializer (`Proof/Simulator/CRT/Stage1Serial.lean`,
+`Stage1Record.lean`) is proved with these.
 -/
 
 import Proof.Simulator.Stage1Cells
@@ -156,94 +152,6 @@ theorem memSem_emitBlock (width : Nat) (small : width ≤ 256) (top : Nat) :
           congr 3
           simp only [Fin.val_succ]
           omega
-
-/-- The bits of chunk word `chunk` in a RAM: its `733` scale cells (`254` bits each), then two zero
-bits. -/
-def chunkWordBits (ram : Word → Word) (chunk : Nat) : List Bool :=
-  (List.ofFn fun index : Fin 733 =>
-      bitRun (ram (word (fieldBase + (curveCellCount + rowCellCount) + 733 * chunk + index.val)))
-        0 254).flatten ++ bitRun (word 0) 0 2
-
-/-- **The serialized bits of a RAM**: curve and rows (`256` bits each), the exception bytes
-(`8`), the fold joins (`128`), the `127` chunk words, each least significant bit first. -/
-def serialBits (ram : Word → Word) : List Bool :=
-  (List.ofFn fun index : Fin (curveCellCount + rowCellCount) =>
-      bitRun (ram (word (fieldBase + index.val))) 0 256).flatten ++
-    ((List.ofFn fun index : Fin exceptionByteCount =>
-      bitRun (ram (word (exceptionBase + index.val))) 0 8).flatten ++
-    ((List.ofFn fun index : Fin hotBlockCount =>
-      bitRun (ram (word (hotBase + index.val))) 0 128).flatten ++
-    (List.ofFn fun chunk : Fin 127 => chunkWordBits ram chunk.val).flatten))
-
-/-- **One chunk word's law.** -/
-theorem memSem_serializeChunk (chunk : Nat) (memory : Memory) :
-    ∃ after, (Stage1.serializeChunk chunk).memSem memory = PMF.pure (some after) ∧
-      Emits memory after (chunkWordBits memory.ram chunk) := by
-  obtain ⟨afterZero, runZero, emitsZero⟩ := memSem_emitZero 2 (by norm_num) memory
-  obtain ⟨afterCells, runCells, emitsCells⟩ := memSem_emitBlock 254 (by norm_num)
-    (scaleCellBase + 733 * chunk + 733 - 1) 733 (by omega) afterZero
-  refine ⟨afterCells, ?_, ?_⟩
-  · unfold Stage1.serializeChunk
-    rw [memSem_seq, runZero, PMF.pure_bind]
-    simp only [kleisli]
-    exact runCells
-  · have all := emitsZero.trans emitsCells
-    rw [emitsZero.1] at all
-    have address : ∀ index : Nat, scaleCellBase + 733 * chunk + 733 - 1 + 1 - 733 + index =
-        fieldBase + (curveCellCount + rowCellCount) + 733 * chunk + index := by
-      intro index
-      unfold scaleCellBase
-      omega
-    simp only [address] at all
-    exact all
-
-theorem block_le (base total count : Nat) (le : count ≤ total) (pos : 0 < total) :
-    count ≤ base + total - 1 + 1 := by omega
-
-theorem top_sub (base count : Nat) (pos : 0 < count) : base + count - 1 + 1 - count = base := by
-  omega
-
-theorem top_sub' (base first second : Nat) (pos : 0 < second) :
-    base + (first + second) - 1 + 1 - second = base + first := by omega
-
-/-- **The serializer's law.** -/
-theorem memSem_serialize (memory : Memory) :
-    ∃ after, Stage1.serialize.memSem memory = PMF.pure (some after) ∧
-      Emits memory after (serialBits memory.ram) := by
-  have hotTop : hotBase + hotBlockCount - 1 + 1 - hotBlockCount = hotBase :=
-    top_sub _ _ (by decide)
-  have byteTop : exceptionBase + exceptionByteCount - 1 + 1 - exceptionByteCount =
-      exceptionBase := top_sub _ _ (by decide)
-  have fieldTop : fieldBase + curveCellCount + rowCellCount - 1 + 1 -
-      (curveCellCount + rowCellCount) = fieldBase := by
-    rw [Nat.add_assoc]
-    exact top_sub _ _ (by decide)
-  obtain ⟨afterScale, runScale, emitsScale⟩ := memSem_emitRep Stage1.serializeChunk chunkWordBits
-    memSem_serializeChunk (127 - 1) 127 (by omega) memory
-  obtain ⟨afterHot, runHot, emitsHot⟩ := memSem_emitBlock 128 (by norm_num)
-    (hotBase + hotBlockCount - 1) hotBlockCount
-    (block_le _ _ _ le_rfl (by unfold hotBlockCount; decide)) afterScale
-  obtain ⟨afterBytes, runBytes, emitsBytes⟩ := memSem_emitBlock 8 (by norm_num)
-    (exceptionBase + exceptionByteCount - 1) exceptionByteCount
-    (block_le _ _ _ le_rfl (by unfold exceptionByteCount; decide)) afterHot
-  obtain ⟨afterFields, runFields, emitsFields⟩ := memSem_emitBlock 256 (by norm_num)
-    (fieldBase + curveCellCount + rowCellCount - 1) (curveCellCount + rowCellCount)
-    (by rw [Nat.add_assoc]; exact block_le _ _ _ le_rfl (by decide))
-    afterBytes
-  refine ⟨afterFields, ?_, ?_⟩
-  · unfold Stage1.serialize
-    rw [memSem_seq, runScale, PMF.pure_bind]
-    simp only [kleisli]
-    rw [memSem_seq, runHot, PMF.pure_bind]
-    simp only [kleisli]
-    rw [memSem_seq, runBytes, PMF.pure_bind]
-    simp only [kleisli]
-    exact runFields
-  · have all := ((emitsScale.trans emitsHot).trans emitsBytes).trans emitsFields
-    rw [emitsBytes.1, emitsHot.1, emitsScale.1, hotTop, byteTop, fieldTop] at all
-    convert all using 1
-    unfold serialBits
-    simp only [List.append_assoc, show 127 - 1 + 1 - 127 = 0 from rfl, Nat.zero_add]
 
 end Serializer
 

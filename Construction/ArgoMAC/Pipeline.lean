@@ -128,8 +128,7 @@ lane. -/
 def xElementOfSlot : Nat → XElement
   | 0 => .rowX_x7
   | 1 => .rowX_x9
-  | 2 => .rowY_x7
-  | 3 => .rowY_x9
+  | 2 => .rowY_cubic
   | _ => .rowZ_x9
 
 /-- The y-type element slot inside a digit. -/

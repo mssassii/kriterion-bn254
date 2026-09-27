@@ -5,9 +5,9 @@ Off the doubling event the exception entries of the real garbling are distribute
 independent of every `g` that reads the table off the hidden digest tags (every final, the other bit's label) and the
 coins up to the exception pads.
 
-* On the table oracle a digit's final is answered by its tag alone (`finalMask_table`: the input is a labelled input
-  below `2^168`, so the key does not matter). So entry `o` is `entryOf`: the pad for a zero digit, the pad with the byte
-  at the exceptional input's slot replaced by `lowByte (A (final o)).1 ⊕ digitCode` otherwise
+* On the table oracle a final is answered by its tag alone (`finalMask_table`: the input is a labelled input
+  below `2^168`, so the key does not matter). So entry `o` is `entryOf`: the pad for a zero digit, the pad with the
+  bytes at the two exceptional inputs' slots replaced by `lowByte (A (final (2 o + k))).1 ⊕ digitCode` otherwise
   (`realGarbled_exception`).
 * `entryOf` pushes a uniform pad and a uniform answer to a uniform entry (`lowByte_uniform`, `update_uniform`,
   `entryOf_uniform`), digit by digit (`pi_map_uniform`).
@@ -59,8 +59,8 @@ theorem lowByte_uniform : (PMF.uniformOfFintype Block).map Exception.lowByte = P
       show b.1 ^^^ (x ^^^ y).setWidth 128 ^^^ (x ^^^ y).setWidth 128 = b.1
       rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]) }
 
-/-- An entry as a function of its six slots. -/
-abbrev EntryF : Type := Fin 6 → BitVec 8
+/-- An entry as a function of its twelve slots. -/
+abbrev EntryF : Type := Fin 12 → BitVec 8
 
 def entryEquiv : Exception.Entry ≃ EntryF where
   toFun v := fun i => v[i]
@@ -74,7 +74,7 @@ def entryEquiv : Exception.Entry ≃ EntryF where
     simp
 
 /-- **Overwriting one slot with a uniform byte keeps a uniform entry uniform.** -/
-theorem update_uniform (idx : Fin 6) :
+theorem update_uniform (idx : Fin 12) :
     (PMF.uniformOfFintype (EntryF × BitVec 8)).map (fun p => Function.update p.1 idx p.2) =
       PMF.uniformOfFintype EntryF := by
   classical
@@ -95,25 +95,29 @@ theorem update_uniform (idx : Fin 6) :
       subst h
       simp }
 
-theorem writeEntry_eq (pad : Exception.Entry) (idx : Fin 6) (v : BitVec 8) :
+theorem writeEntry_eq (pad : Exception.Entry) (idx : Fin 12) (v : BitVec 8) :
     Exception.writeEntry pad idx v = entryEquiv.symm (Function.update (entryEquiv pad) idx v) := by
   apply Vector.ext
   intro j hj
   simp only [Exception.writeEntry, entryEquiv, Equiv.coe_fn_symm_mk, Equiv.coe_fn_mk, Vector.getElem_ofFn,
     Vector.getElem_set, Function.update_apply]
-  by_cases h : (⟨j, hj⟩ : Fin 6) = idx
+  by_cases h : (⟨j, hj⟩ : Fin 12) = idx
   · subst h
     simp
   · rw [if_neg h, if_neg (fun e => h (Fin.ext e.symm))]
     rfl
 
-/-- **A digit's entry from its pad and its final's answer**: the pad for a zero digit; otherwise the pad with the
-masked code at the exceptional input's slot. -/
-def entryOf (digit : Digit) (offset : AffineInput) : Exception.Entry × (Block × Block) → Exception.Entry :=
+/-- **A digit's entry from its pad and its two finals' answers**: the pad for a zero digit; otherwise the pad with the
+masked code at both exceptional inputs' slots. -/
+def entryOf (digit : Digit) (offset : AffineInput) :
+    Exception.Entry × ((Block × Block) × (Block × Block)) → Exception.Entry :=
   match digitEndomorphismBase digit with
   | none => fun p => p.1
-  | some phi => fun p => Exception.writeEntry p.1 (Exception.exceptionIndex (Exception.exceptionalInput phi offset))
-      (Exception.lowByte p.2.1 ^^^ Exception.digitCode digit)
+  | some phi => fun p => Exception.writeEntry
+      (Exception.writeEntry p.1 (Exception.slotOf false (Exception.exceptionalInput phi offset))
+        (Exception.lowByte p.2.1.1 ^^^ Exception.digitCode digit))
+      (Exception.slotOf true (Exception.tripleInput phi offset))
+      (Exception.lowByte p.2.2.1 ^^^ Exception.digitCode digit)
 
 theorem masked_uniform (code : BitVec 8) :
     (PMF.uniformOfFintype (Block × Block)).map (fun a => Exception.lowByte a.1 ^^^ code) =
@@ -126,30 +130,59 @@ theorem masked_uniform (code : BitVec 8) :
     simpa [BitVec.xor_assoc] using this
   · simp [BitVec.xor_assoc]
 
-/-- **A digit's entry is uniform** under a uniform pad and a uniform answer. -/
+/-- **One slot written with a masked uniform byte keeps a uniform entry uniform.** -/
+theorem writeEntry_uniform (i : Fin 12) (code : BitVec 8) :
+    (PMF.uniformOfFintype (Exception.Entry × (Block × Block))).map
+      (fun p => Exception.writeEntry p.1 i (Exception.lowByte p.2.1 ^^^ code)) =
+      PMF.uniformOfFintype Exception.Entry := by
+  classical
+  have factor : (fun p : Exception.Entry × (Block × Block) => Exception.writeEntry p.1 i
+      (Exception.lowByte p.2.1 ^^^ code)) =
+      entryEquiv.symm ∘ (fun q : EntryF × BitVec 8 => Function.update q.1 i q.2) ∘
+        (fun p : Exception.Entry × (Block × Block) => (entryEquiv p.1, Exception.lowByte p.2.1 ^^^ code)) := by
+    funext p
+    exact writeEntry_eq _ _ _
+  rw [factor, ← PMF.map_comp, ← PMF.map_comp,
+    prod_map_uniform entryEquiv _ (Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv entryEquiv)
+      (masked_uniform _), update_uniform, Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv]
+
+/-- **Two slots written with masked uniform bytes keep a uniform entry uniform.** -/
+theorem writeEntry2_uniform (i0 i1 : Fin 12) (code : BitVec 8) :
+    (PMF.uniformOfFintype (Exception.Entry × ((Block × Block) × (Block × Block)))).map
+      (fun p => Exception.writeEntry (Exception.writeEntry p.1 i0 (Exception.lowByte p.2.1.1 ^^^ code)) i1
+        (Exception.lowByte p.2.2.1 ^^^ code)) = PMF.uniformOfFintype Exception.Entry := by
+  classical
+  let first : Exception.Entry × (Block × Block) → Exception.Entry := fun q =>
+    Exception.writeEntry q.1 i0 (Exception.lowByte q.2.1 ^^^ code)
+  let second : Exception.Entry × (Block × Block) → Exception.Entry := fun q =>
+    Exception.writeEntry q.1 i1 (Exception.lowByte q.2.1 ^^^ code)
+  have inner : (PMF.uniformOfFintype ((Exception.Entry × (Block × Block)) × (Block × Block))).map
+      (fun q => (first q.1, id q.2)) = PMF.uniformOfFintype (Exception.Entry × (Block × Block)) :=
+    prod_map_uniform first id (writeEntry_uniform i0 code) (PMF.map_id _)
+  have factor : (fun p : Exception.Entry × ((Block × Block) × (Block × Block)) =>
+      Exception.writeEntry (Exception.writeEntry p.1 i0 (Exception.lowByte p.2.1.1 ^^^ code)) i1
+        (Exception.lowByte p.2.2.1 ^^^ code)) =
+      second ∘ (fun q : (Exception.Entry × (Block × Block)) × (Block × Block) => (first q.1, id q.2)) ∘
+        (Equiv.prodAssoc _ _ _).symm := by
+    funext p
+    rfl
+  rw [factor, ← PMF.map_comp, ← PMF.map_comp,
+    Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv (Equiv.prodAssoc _ _ _).symm, inner]
+  exact writeEntry_uniform i1 code
+
+/-- **A digit's entry is uniform** under a uniform pad and two uniform answers. -/
 theorem entryOf_uniform (digit : Digit) (offset : AffineInput) :
-    (PMF.uniformOfFintype (Exception.Entry × (Block × Block))).map (entryOf digit offset) =
+    (PMF.uniformOfFintype (Exception.Entry × ((Block × Block) × (Block × Block)))).map (entryOf digit offset) =
       PMF.uniformOfFintype Exception.Entry := by
   classical
   unfold entryOf
   split
   · exact Laws.uniform_map_fst
-  · rename_i phi _
-    set idx := Exception.exceptionIndex (Exception.exceptionalInput phi offset)
-    have factor : (fun p : Exception.Entry × (Block × Block) => Exception.writeEntry p.1 idx
-        (Exception.lowByte p.2.1 ^^^ Exception.digitCode digit)) =
-        entryEquiv.symm ∘ (fun q : EntryF × BitVec 8 => Function.update q.1 idx q.2) ∘
-          (fun p : Exception.Entry × (Block × Block) =>
-            (entryEquiv p.1, Exception.lowByte p.2.1 ^^^ Exception.digitCode digit)) := by
-      funext p
-      exact writeEntry_eq _ _ _
-    rw [factor, ← PMF.map_comp, ← PMF.map_comp,
-      prod_map_uniform entryEquiv _ (Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv entryEquiv)
-        (masked_uniform _), update_uniform, Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv]
+  · exact writeEntry2_uniform _ _ _
 
 /-! ### The finals on the table oracle -/
 
-/-- The position of digit `o`'s final. -/
+/-- The position of final site `o` (`2 d + k` for digit `d`, kind `k`). -/
 def finalPos (o : ℕ) : Fin (2 ^ 40) := tag40 (digestFinalTag o)
 
 theorem digestFinalTag_lt (o : ℕ) (ho : o < 65536) : digestFinalTag o < 2 ^ 40 :=
@@ -170,27 +203,56 @@ theorem finalMask_table (A : TagTable) (key : Block) (o : ℕ) (ho : o < 65536) 
 
 theorem digitCount_lt : digitCount < 65536 := by decide
 
-theorem finalPos_injective : Function.Injective fun o : Fin digitCount => finalPos o.val := by
+/-- The final sites: two per digit. -/
+abbrev FinalSite := Fin (2 * digitCount)
+
+theorem finalSite_lt (o : FinalSite) : o.val < 65536 := lt_trans o.isLt (by decide)
+
+theorem finalPos_injective : Function.Injective fun o : FinalSite => finalPos o.val := by
   intro o o' h
   have e := congrArg Fin.val h
   simp only at e
-  rw [finalPos_val _ (lt_trans o.isLt digitCount_lt), finalPos_val _ (lt_trans o'.isLt digitCount_lt)] at e
+  rw [finalPos_val _ (finalSite_lt o), finalPos_val _ (finalSite_lt o')] at e
   have hs := congrArg tagSlot e
   unfold digestFinalTag at hs
-  rw [tagSlot_tagCode ⟨by decide, by decide, by decide, by decide, lt_trans o.isLt digitCount_lt, by decide⟩,
-    tagSlot_tagCode ⟨by decide, by decide, by decide, by decide, lt_trans o'.isLt digitCount_lt, by decide⟩] at hs
+  rw [tagSlot_tagCode ⟨by decide, by decide, by decide, by decide, finalSite_lt o, by decide⟩,
+    tagSlot_tagCode ⟨by decide, by decide, by decide, by decide, finalSite_lt o', by decide⟩] at hs
   exact Fin.ext hs
+
+/-- A digit's two final sites. -/
+def siteOf (o : Fin digitCount) (k : Fin 2) : FinalSite := ⟨2 * o.val + k.val, by have := o.isLt; omega⟩
+
+/-- A function on the final sites is a pair of functions on the digits. -/
+def sitesEquiv (X : Type) : (FinalSite → X) ≃ (Fin digitCount → X × X) where
+  toFun F := fun o => (F (siteOf o 0), F (siteOf o 1))
+  invFun G := fun s => if s.val % 2 = 0 then (G ⟨s.val / 2, by have := s.isLt; omega⟩).1
+    else (G ⟨s.val / 2, by have := s.isLt; omega⟩).2
+  left_inv F := by
+    funext s
+    show (if s.val % 2 = 0 then F (siteOf _ 0) else F (siteOf _ 1)) = F s
+    split_ifs with h
+    · exact congrArg F (Fin.ext (by show 2 * (s.val / 2) + 0 = s.val; omega))
+    · exact congrArg F (Fin.ext (by show 2 * (s.val / 2) + 1 = s.val; omega))
+  right_inv G := by
+    funext o
+    have e0 : (⟨(siteOf o 0).val / 2, by have := (siteOf o 0).isLt; omega⟩ : Fin digitCount) = o :=
+      Fin.ext (by show (2 * o.val + 0) / 2 = o.val; omega)
+    have e1 : (⟨(siteOf o 1).val / 2, by have := (siteOf o 1).isLt; omega⟩ : Fin digitCount) = o :=
+      Fin.ext (by show (2 * o.val + 1) / 2 = o.val; omega)
+    have k0 : (siteOf o 0).val % 2 = 0 := by show (2 * o.val + 0) % 2 = 0; omega
+    have k1 : ¬ (siteOf o 1).val % 2 = 0 := by show ¬ (2 * o.val + 1) % 2 = 0; omega
+    simp only [if_pos k0, if_neg k1, e0, e1]
 
 theorem family_final (o : ℕ) (ho : o < 65536) : tagFamily (finalPos o).val = 9 := by
   rw [finalPos_val o ho]
   exact tagFamily_tagCode ⟨by decide, by decide, by decide, by decide, ho, by decide⟩
 
 /-- **The finals lie away from every pad and mask site.** -/
-theorem final_away : ∀ site ∈ crtLayout.sites, ∀ o : Fin digitCount,
+theorem final_away : ∀ site ∈ crtLayout.sites, ∀ o : FinalSite,
     finalPos o.val ∉ (siteTags crtLayout site).map tagPos := by
   intro site mem o hmem
   obtain ⟨t, ht, heq⟩ := List.mem_map.mp hmem
-  have ho := lt_trans o.isLt digitCount_lt
+  have ho := finalSite_lt o
   have fam := family_final o.val ho
   rw [← heq] at fam
   have ne : ∀ {fam' coord idx stage level slot part : ℕ}, 5 < fam' → fam' < 9 →
@@ -214,9 +276,7 @@ theorem final_away : ∀ site ∈ crtLayout.sites, ∀ o : Fin digitCount,
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ fam
     · simp only [siteTags, List.mem_map, List.mem_range] at ht
       obtain ⟨j, hj, rfl⟩ := ht
-      have hj' : j < 3 := by
-        have : j < (if k = 227 then 2 else 3) := hj
-        split at this <;> omega
+      have hj' : j < 3 := hj
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ fam
 
 /-! ### The real entries -/
@@ -226,7 +286,8 @@ theorem realGarbled_exception [FieldCertificate] [GroupCertificate] (parameter :
     (tape : TableTape crtEntry) :
     (H8.realGarbled crtEntry parameter scalar tape).1.exception =
       Vector.ofFn fun o : Fin digitCount => entryOf ((outputKeysOf scalar tape.1).get o).digit
-        ((outputKeysOf scalar tape.1).get o).offset.coordinates (tape.1.exceptionPad.get o, tape.2 (finalPos o.val)) := by
+        ((outputKeysOf scalar tape.1).get o).offset.coordinates
+        (tape.1.exceptionPad.get o, (tape.2 (finalPos (2 * o.val)), tape.2 (finalPos (2 * o.val + 1)))) := by
   rw [ConvSplit.realGarbled_eq]
   simp only [garbleCM, FreeQuery.eval_bind, FreeQuery.eval_pure, assemble]
   rw [eval_digestGarbleM]
@@ -236,7 +297,8 @@ theorem realGarbled_exception [FieldCertificate] [GroupCertificate] (parameter :
   | none => rfl
   | some phi =>
       simp only
-      rw [finalMask_table _ _ _ (lt_trans o.isLt digitCount_lt)]
+      rw [finalMask_table _ _ _ (by have := o.isLt; simp only [digitCount] at this; omega),
+        finalMask_table _ _ _ (by have := o.isLt; simp only [digitCount] at this; omega)]
 
 
 /-! ### Refilling the pads -/
@@ -330,13 +392,13 @@ theorem coins_refill :
 /-! ### The law -/
 
 /-- The digits' entries from their pads and finals' answers, at the coins' output keys. -/
-def entriesOf (scalar : NonZeroScalar) (c : crtEntry.Coins) (q : Fin digitCount → Exception.Entry × (Block × Block)) :
-    Fin digitCount → Exception.Entry :=
+def entriesOf (scalar : NonZeroScalar) (c : crtEntry.Coins)
+    (q : Fin digitCount → Exception.Entry × ((Block × Block) × (Block × Block))) : Fin digitCount → Exception.Entry :=
   fun o => entryOf ((outputKeysOf scalar c).get o).digit ((outputKeysOf scalar c).get o).offset.coordinates (q o)
 
 theorem entriesOf_uniform (scalar : NonZeroScalar) (c : crtEntry.Coins) :
-    (PMF.uniformOfFintype (Fin digitCount → Exception.Entry × (Block × Block))).map (entriesOf scalar c) =
-      PMF.uniformOfFintype (Fin digitCount → Exception.Entry) := by
+    (PMF.uniformOfFintype (Fin digitCount → Exception.Entry × ((Block × Block) × (Block × Block)))).map
+      (entriesOf scalar c) = PMF.uniformOfFintype (Fin digitCount → Exception.Entry) := by
   classical
   exact pi_map_uniform (fun o => entryOf ((outputKeysOf scalar c).get o).digit
     ((outputKeysOf scalar c).get o).offset.coordinates) fun o => entryOf_uniform _ _
@@ -351,12 +413,12 @@ theorem digest_core {α : Type} [FieldCertificate] [GroupCertificate] (parameter
       ((PMF.uniformOfFintype (Fin digitCount → Exception.Entry)).map Vector.ofFn) b *
         ((swappedTableTape crtEntry).map fun tape => some (G tape)) (some a) := by
   classical
-  let pos : Fin digitCount → Fin (2 ^ 40) := fun o => finalPos o.val
+  let pos : FinalSite → Fin (2 ^ 40) := fun o => finalPos o.val
   have inj : Function.Injective pos := finalPos_injective
   let μ := swappedTableTape crtEntry
   letI : Fintype crtEntry.Coins := @Fintype.ofFinite _ crtEntry.coinsFinite
   haveI : Nonempty crtEntry.Coins := ⟨crtEntry.coinWitness⟩
-  let uF := PMF.uniformOfFintype (Fin digitCount → Block × Block)
+  let uF := PMF.uniformOfFintype (FinalSite → Block × Block)
   let uP := PMF.uniformOfFintype (Fin digitCount → Exception.Entry)
   -- the finals are refilled
   have hfillT : μ = μ.bind fun ρ => uF.map fun F => ((ρ.1, HiddenGuess.fillAt pos F ρ.2) : TableTape crtEntry) := by
@@ -401,17 +463,21 @@ theorem digest_core {α : Type} [FieldCertificate] [GroupCertificate] (parameter
     dsimp only
     rw [HiddenGuess.fillAt_apply_of_not_mem pos F ρ.2 tag ?_]
     rintro ⟨o, rfl⟩
-    exact htag (Or.inl (family_final o.val (lt_trans o.isLt digitCount_lt)))
+    exact htag (Or.inl (family_final o.val (finalSite_lt o)))
   have partFill : ∀ ρ : TableTape crtEntry, ∀ F P,
       (H8.realGarbled crtEntry parameter scalar (withPad ρ.1 P, HiddenGuess.fillAt pos F ρ.2)).1.exception =
-        Vector.ofFn (entriesOf scalar ρ.1 fun o => (P o, F o)) := by
+        Vector.ofFn (entriesOf scalar ρ.1 fun o => (P o, sitesEquiv _ F o)) := by
     intro ρ F P
     rw [realGarbled_exception]
     refine congrArg Vector.ofFn (funext fun o => ?_)
     unfold entriesOf
     dsimp only
-    rw [withPad_pad, outputKeysOf_withPad, show HiddenGuess.fillAt pos F ρ.2 (finalPos o.val) = F o from
-      congrFun (HiddenGuess.fillAt_comp pos inj F ρ.2) o]
+    rw [withPad_pad, outputKeysOf_withPad,
+      show HiddenGuess.fillAt pos F ρ.2 (finalPos (2 * o.val)) = F (siteOf o 0) from
+        congrFun (HiddenGuess.fillAt_comp pos inj F ρ.2) (siteOf o 0),
+      show HiddenGuess.fillAt pos F ρ.2 (finalPos (2 * o.val + 1)) = F (siteOf o 1) from
+        congrFun (HiddenGuess.fillAt_comp pos inj F ρ.2) (siteOf o 1)]
+    rfl
   have joint : (μ.map fun tape => some ((H8.realGarbled crtEntry parameter scalar tape).1.exception, G tape)) =
       μ.bind fun ρ => ((PMF.uniformOfFintype (Fin digitCount → Exception.Entry)).map Vector.ofFn).map
         fun e => some (e, G ρ) := by
@@ -421,27 +487,29 @@ theorem digest_core {α : Type} [FieldCertificate] [GroupCertificate] (parameter
     rw [PMF.map_bind]
     have inner : ∀ F, (uP.map fun P => ((withPad ρ.1 P, HiddenGuess.fillAt pos F ρ.2) : TableTape crtEntry)).map
         (fun tape => some ((H8.realGarbled crtEntry parameter scalar tape).1.exception, G tape)) =
-        uP.map fun P => some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (P o, F o)), G ρ) := by
+        uP.map fun P => some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (P o, sitesEquiv _ F o)), G ρ) := by
       intro F
       rw [PMF.map_comp]
       refine congrArg (fun h => PMF.map h uP) (funext fun P => ?_)
       simp only [Function.comp]
       rw [partFill ρ F P, gfill ρ F P]
     simp_rw [inner]
-    have prodLaw : (uF.bind fun F => uP.map fun P => some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (P o, F o)),
-        G ρ)) = (PMF.uniformOfFintype ((Fin digitCount → Block × Block) × (Fin digitCount → Exception.Entry))).map
-          (fun q => some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (q.2 o, q.1 o)), G ρ)) := by
+    have prodLaw : (uF.bind fun F => uP.map fun P => some (Vector.ofFn (entriesOf scalar ρ.1 fun o =>
+        (P o, sitesEquiv _ F o)), G ρ)) =
+        (PMF.uniformOfFintype ((FinalSite → Block × Block) × (Fin digitCount → Exception.Entry))).map
+          (fun q => some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (q.2 o, sitesEquiv _ q.1 o)), G ρ)) := by
       rw [← Kriterion.ArgoMAC.Phase3.Glue.uniform_product, PMF.map_bind]
       refine congrArg (PMF.bind _) (funext fun F => ?_)
       rw [PMF.map_comp]
       rfl
     rw [prodLaw]
-    let zip : ((Fin digitCount → Block × Block) × (Fin digitCount → Exception.Entry)) ≃
-        (Fin digitCount → Exception.Entry × (Block × Block)) :=
-      (Equiv.prodComm _ _).trans (Equiv.arrowProdEquivProdArrow _ _ _).symm
-    have hzip : ∀ q, zip q = fun o => (q.2 o, q.1 o) := fun q => rfl
-    have factor : (fun q : (Fin digitCount → Block × Block) × (Fin digitCount → Exception.Entry) =>
-        some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (q.2 o, q.1 o)), G ρ)) =
+    let zip : ((FinalSite → Block × Block) × (Fin digitCount → Exception.Entry)) ≃
+        (Fin digitCount → Exception.Entry × ((Block × Block) × (Block × Block))) :=
+      ((sitesEquiv (Block × Block)).prodCongr (Equiv.refl _)).trans
+        ((Equiv.prodComm _ _).trans (Equiv.arrowProdEquivProdArrow _ _ _).symm)
+    have hzip : ∀ q, zip q = fun o => (q.2 o, sitesEquiv _ q.1 o) := fun q => rfl
+    have factor : (fun q : (FinalSite → Block × Block) × (Fin digitCount → Exception.Entry) =>
+        some (Vector.ofFn (entriesOf scalar ρ.1 fun o => (q.2 o, sitesEquiv _ q.1 o)), G ρ)) =
         (fun e => some (e, G ρ)) ∘ Vector.ofFn ∘ entriesOf scalar ρ.1 ∘ zip := by
       funext q
       simp only [Function.comp_apply, hzip]

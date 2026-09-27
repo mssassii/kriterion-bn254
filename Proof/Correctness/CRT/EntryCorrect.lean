@@ -72,8 +72,7 @@ theorem pubOf_curve : (pubOf H scalar coins).curve =
       (curveKOf H coins) := rfl
 
 theorem pubOf_rows : (pubOf H scalar coins).rows = Vector.ofFn fun digit =>
-    FieldMacToECMac.garbleRow ((rowsOf scalar coins).get digit) (coins.pointRandomness.get digit)
-      (KOf H coins digit) := rfl
+    FieldMacToECMac.garbleRow ((rowsOf scalar coins).get digit) (KOf H coins digit) := rfl
 
 theorem pubOf_exception : (pubOf H scalar coins).exception = Vector.ofFn (entriesOf H scalar coins) := rfl
 
@@ -149,7 +148,7 @@ theorem maskOf_x_curve (m : MaskValues digitCount) (e : Nat) (large : pointEleme
     maskOf m 0 e = 0 := by
   unfold maskOf
   simp only [pointElementCountX, digitCount] at large
-  simp only [↓reduceIte, show ¬ e < 5 * digitCount by simp only [digitCount]; omega]
+  simp only [↓reduceIte, show ¬ e < 4 * digitCount by simp only [digitCount]; omega]
 
 theorem maskOf_y_curve (m : MaskValues digitCount) (e : Nat) (large : pointElementCountY ≤ e) :
     maskOf m 1 e = 0 := by
@@ -351,15 +350,28 @@ theorem evaluate_onCurve [FieldCertificate] [GroupCertificate] (H : HashN) (scal
   rw [homog]
   refine EntryDecode.decodeResult_eq scalar.value coins.offsets coins.offsetsClamped coins.pointRandomness
     input point decoded _ ?_
-  intro index zeroRow
-  obtain ⟨phi, selected, exceptional⟩ := EntryDecode.zeroRow_exceptional (outputKeysOf scalar coins)
-    coins.pointRandomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve zeroRow
-  rw [pubOf_exception]
-  simp only [vector_get_ofFn]
-  exact DigestUnlock.digestUnlock_exceptional H coordinateBitCount digitCount (zeroOf coins) (deltaOf coins)
-    (fun o => ((outputKeysOf scalar coins).get o).digit)
-    (fun o => ((outputKeysOf scalar coins).get o).offset.coordinates)
-    (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest coins input) index phi selected exceptional
+  intro index
+  refine ⟨fun zZero xZero => ?_, fun zNe sZero => ?_⟩
+  · obtain ⟨phi, selected, exceptional⟩ := EntryDecode.zeroRow_exceptional (outputKeysOf scalar coins)
+      coins.pointRandomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
+      zZero xZero
+    rw [pubOf_exception]
+    simp only [vector_get_ofFn]
+    exact DigestUnlock.digestUnlock_exceptional H coordinateBitCount digitCount (zeroOf coins)
+      (deltaOf coins) (fun o => ((outputKeysOf scalar coins).get o).digit)
+      (fun o => ((outputKeysOf scalar coins).get o).offset.coordinates)
+      (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest coins input) index phi selected
+      exceptional
+  · obtain ⟨phi, selected, triple⟩ := EntryDecode.signZero_triple (outputKeysOf scalar coins)
+      coins.pointRandomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
+      zNe sZero
+    rw [pubOf_exception]
+    simp only [vector_get_ofFn]
+    exact DigestUnlock.digestUnlock_triple H coordinateBitCount digitCount (zeroOf coins)
+      (deltaOf coins) (fun o => ((outputKeysOf scalar coins).get o).digit)
+      (fun o => ((outputKeysOf scalar coins).get o).offset.coordinates)
+      (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest coins input) index phi selected
+      triple
 
 /-- **Perfect correctness at every hash, coins and input.** -/
 theorem entry_correct [FieldCertificate] [GroupCertificate] (H : HashN) (scalar : NonZeroScalar)

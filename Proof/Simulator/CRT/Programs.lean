@@ -247,7 +247,7 @@ theorem sem_programSite (cells : ProgramCells) (k : Nat) (kSmall : k < 2 ^ 16) (
 /-- Collector `c` of digit `d`, in `collectorList`'s order. -/
 def collectorAt (d : Fin 91) : Fin 3 → Privacy.BMR.Collector
   | 0 => ⟨(d, .inl .rowX_x9), Or.inl rfl⟩
-  | 1 => ⟨(d, .inl .rowY_x9), Or.inr (Or.inl rfl)⟩
+  | 1 => ⟨(d, .inl .rowY_cubic), Or.inr (Or.inl rfl)⟩
   | 2 => ⟨(d, .inl .rowZ_x9), Or.inr (Or.inr rfl)⟩
 
 omit [FieldCertificate] [Fintype FI] [Fintype EI] [DecidableEq FI] [DecidableEq EI] in

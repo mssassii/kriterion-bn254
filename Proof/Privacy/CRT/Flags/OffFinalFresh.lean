@@ -91,9 +91,7 @@ theorem lpos_away (c : Fin 2) (p : Fin coordinateBitCount) {b : ℕ} (hb : b < 2
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ fam
     · simp only [siteTags, List.mem_map, List.mem_range] at ht
       obtain ⟨j, hj, rfl⟩ := ht
-      have hj' : j < 3 := by
-        have : j < (if k = 227 then 2 else 3) := hj
-        split at this <;> omega
+      have hj' : j < 3 := hj
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ fam
 
 /-- **The table key of an input**: the XOR of the table's first blocks at the input's digest-label positions. -/
@@ -252,8 +250,7 @@ theorem mem_xsOf [FieldCertificate] [GroupCertificate] (source : (PublicFirst.vi
   obtain ⟨n, hn, rfl⟩ := List.mem_map.mp member
   obtain ⟨small, -⟩ := OffDecomp.final_small _ n hn
   unfold OffDecomp.finalsAt at hn
-  simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at hn
-  obtain ⟨o, rfl⟩ := hn
+  obtain ⟨o, -, rfl⟩ := Align.mem_finals hn
   rw [← keyOf_eq source u t]
   unfold lowKey
   rw [small.1]

@@ -5,10 +5,10 @@
 
 * forward: the residue joins, the row constants, the curve constants, the cold pad entries, and for every
   non-collector the **ideal shear** `π'_e = v⁰_e − u_e` (the evaluator's hint-free value minus the row value), with
-  the unused randomizers and the curve mask as the residual;
+  the unused randomizers (`r4` among them) and the curve mask as the residual;
 * inverse: `v⁰` from the joins and the cold entries; the non-collector row values `u = v⁰ − π'`; per digit the row
-  offsets and `r4` by `rowEquiv.symm`; the curve randomizers from the curve constants; the slopes (row encodings
-  from the offsets and `r4`, curve encodings in the chain `x3 → x5 → x7`, `y4 → y6`); every hot pad entry from its
+  offsets by `rowEquiv.symm`; the curve randomizers from the curve constants; the slopes (row encodings
+  from the offsets, curve encodings in the chain `x3 → x5 → x7`, `y4 → y6`); every hot pad entry from its
   join, its cold entries and its slope; the masks `π_e = (O_e : F_p) − b_e`; and `t` from the first curve constant.
 
 The forward map uses `π'`, not the real mask: on the wrap event the real mask is `v⁰ − u + M` and the real map is
@@ -96,7 +96,7 @@ residual. -/
 def forward (ctx : Context) (u : AffineInput) (c : Coins T) : (Source T × Visible T u) × Residual :=
   (((join ctx c, gamma ctx c, curveTable c),
       (coldOf u c, fun r => deliveredIdeal u (join ctx c) (coldOf u c) (rowEnc r.1) - rowValue ctx u c r.1)),
-    (c.unused, c.2.2.2.2.2.1))
+    (c.r4, c.unused, c.2.2.2.2.2.1))
 
 /-! ### The inverse -/
 
@@ -109,13 +109,13 @@ variable [FieldCertificate] (ctx : Context) (u : AffineInput) (good : u.x ≠ 0 
 def ncValues (d : Fin 91) : NonCollectorElem → BaseField := fun element =>
   deliveredIdeal u out.1.1.1 out.1.2.1 (rowEnc (d, element.1)) - out.1.2.2 ⟨(d, element.1), element.2⟩
 
-/-- A digit's row offsets and `r4`, by the cut-row bijection. -/
-def recovered (d : Fin 91) : Biquadratic.Values × BaseField :=
-  (rowEquiv (ctx.rows d) (ctx.rho d) u good).symm (out.1.1.2.1 d, ncValues u out d)
+/-- A digit's row offsets, by the cut-row bijection. -/
+def recovered (d : Fin 91) : Biquadratic.Values :=
+  (rowEquiv (ctx.rows d) u good).symm (out.1.1.2.1 d, ncValues u out d)
 
 /-- The curve randomizers `r1 = c1 − mask`, `r2 = c2 + mask`. -/
-def r1Inv : BaseField := out.1.1.2.2.2.1 - out.2.2.1
-def r2Inv : BaseField := out.1.1.2.2.2.2 + out.2.2.1
+def r1Inv : BaseField := out.1.1.2.2.2.1 - out.2.2.2.1
+def r2Inv : BaseField := out.1.1.2.2.2.2 + out.2.2.2.1
 
 /-- The curve offsets in the chain order. -/
 def kx3 : BaseField := padOffset (fullPad u out.1.1.1 out.1.2.1 (-r1Inv u out) (curveEnc (.inl .x3)))
@@ -127,13 +127,11 @@ def ky6 : BaseField := padOffset (fullPad u out.1.1.1 out.1.2.1 (-ky4 u out) (cu
 /-- The slope of every encoding, recovered. -/
 def slopeInv : Enc → BaseField
   | .inl (.inl (d, x)) =>
-    let br := recovered ctx u good out d
-    let rand := rowRand br.2 (out.2.1 d)
-    Biquadratic.slopes (ctx.rows d) rand.1 rand.2.1 rand.2.2 br.1 (.inl x)
+    let rand := rowRand (out.2.1 d) (out.2.2.1 d)
+    Biquadratic.slopes (ctx.rows d) rand.1 rand.2.1 rand.2.2 (recovered ctx u good out d) (.inl x)
   | .inr (.inl (d, y)) =>
-    let br := recovered ctx u good out d
-    let rand := rowRand br.2 (out.2.1 d)
-    Biquadratic.slopes (ctx.rows d) rand.1 rand.2.1 rand.2.2 br.1 (.inr y)
+    let rand := rowRand (out.2.1 d) (out.2.2.1 d)
+    Biquadratic.slopes (ctx.rows d) rand.1 rand.2.1 rand.2.2 (recovered ctx u good out d) (.inr y)
   | .inl (.inr .x3) => -r1Inv u out
   | .inl (.inr .x5) => -kx3 u out
   | .inl (.inr .x7) => -kx5 u out
@@ -145,15 +143,15 @@ def padsInv : Pads T := fun i ρ e => fullPad u out.1.1.1 out.1.2.1 (slopeInv ct
 
 /-- The recovered masks `π_e = (O_e : F_p) − b_e`. -/
 def masksInv : RowEnc → BaseField := fun r =>
-  padOffset (fun i ρ => padsInv ctx u good out i ρ (rowEnc r)) - (recovered ctx u good out r.1).1 r.2
+  padOffset (fun i ρ => padsInv ctx u good out i ρ (rowEnc r)) - recovered ctx u good out r.1 r.2
 
 /-- The recovered `t` from the first curve constant. -/
-def bridgeInv : BaseField := out.1.1.2.2.1 - 3 * out.2.2.1 + ky6 u out + kx7 u out
+def bridgeInv : BaseField := out.1.1.2.2.1 - 3 * out.2.2.2.1 + ky6 u out + kx7 u out
 
 /-- **The inverse.** -/
 def backward : Coins T :=
-  (padsInv ctx u good out, masksInv ctx u good out, fun d => (recovered ctx u good out d).2, out.2.1,
-    (bridgeInv u out, out.2.2, r1Inv u out, r2Inv u out))
+  (padsInv ctx u good out, masksInv ctx u good out, out.2.1, out.2.2.1,
+    (bridgeInv u out, out.2.2.2, r1Inv u out, r2Inv u out))
 
 /-! ### The left inverse -/
 
@@ -167,8 +165,8 @@ theorem ncValues_forward (d : Fin 91) :
   simp only [ncValues, forward, sub_sub_cancel]
 
 theorem recovered_forward (d : Fin 91) :
-    recovered ctx u good (forward ctx u c) d = (fun element => rowOffset c (d, element), c.r4 d) := by
-  have apply := rowEquiv_apply (ctx.rows d) (ctx.rho d) u good (fun element => rowOffset c (d, element))
+    recovered ctx u good (forward ctx u c) d = fun element => rowOffset c (d, element) := by
+  have apply := rowEquiv_apply (ctx.rows d) u good (fun element => rowOffset c (d, element))
     (c.r4 d) (c.unused d)
   unfold recovered
   rw [ncValues_forward]
@@ -240,14 +238,9 @@ theorem bridgeInv_forward : bridgeInv u (forward ctx u c) = c.bridge := by
 
 theorem backward_forward : backward ctx u good (forward ctx u c) = c := by
   obtain ⟨pads, masks, r4, unused, t, mask, r1, r2⟩ := c
-  show (padsInv ctx u good _, masksInv ctx u good _, fun d => (recovered ctx u good _ d).2, unused,
+  show (padsInv ctx u good _, masksInv ctx u good _, r4, unused,
     (bridgeInv u _, mask, r1Inv u _, r2Inv u _)) = (pads, masks, r4, unused, t, mask, r1, r2)
   rw [padsInv_forward, masksInv_forward, bridgeInv_forward, r1Inv_forward, r2Inv_forward]
-  have r4Eq : (fun d => (recovered ctx u good (forward ctx u (pads, masks, r4, unused, t, mask, r1, r2)) d).2) = r4 := by
-    funext d
-    rw [recovered_forward]
-    rfl
-  rw [r4Eq]
   rfl
 
 end Left
@@ -258,7 +251,7 @@ section Right
 
 /-- The recovered coins' row offsets are the recovered offsets. -/
 theorem rowOffset_backward (d : Fin 91) (element : Biquadratic.Element) :
-    rowOffset (backward ctx u good out) (d, element) = (recovered ctx u good out d).1 element := by
+    rowOffset (backward ctx u good out) (d, element) = recovered ctx u good out d element := by
   simp only [rowOffset, backward, masksInv, Coins.mask, offsetF, offset, readout, Coins.pads]
   show padOffset _ - (padOffset _ - _) = _
   rw [sub_sub_cancel]
@@ -293,13 +286,13 @@ theorem coldOf_backward : coldOf u (backward ctx u good out) = out.1.2.1 := by
 
 theorem rowEquiv_recovered (d : Fin 91) :
     let br := recovered ctx u good out d
-    let rand := rowRand br.2 (out.2.1 d)
-    (FieldMacToECMac.garbleRow (ctx.rows d) ⟨ctx.rho d, rand.1, rand.2.1, rand.2.2⟩ br.1,
+    let rand := rowRand (out.2.1 d) (out.2.2.1 d)
+    (FieldMacToECMac.garbleRow (ctx.rows d) br,
       fun element : NonCollectorElem =>
-        Biquadratic.delivered (ctx.rows d) rand.1 rand.2.1 rand.2.2 br.1 u element.1) =
+        Biquadratic.delivered (ctx.rows d) rand.1 rand.2.1 rand.2.2 br u element.1) =
       (out.1.1.2.1 d, ncValues u out d) := by
   intro br rand
-  rw [← rowEquiv_apply (ctx.rows d) (ctx.rho d) u good br.1 br.2 (out.2.1 d)]
+  rw [← rowEquiv_apply (ctx.rows d) u good br (out.2.1 d) (out.2.2.1 d)]
   exact Equiv.apply_symm_apply _ _
 
 theorem gamma_backward (d : Fin 91) : gamma ctx (backward ctx u good out) d = out.1.1.2.1 d := by
@@ -308,13 +301,12 @@ theorem gamma_backward (d : Fin 91) : gamma ctx (backward ctx u good out) d = ou
   rw [← this]
   unfold gamma
   simp only [rowOffset_backward]
-  rfl
 
 theorem curveTable_backward : curveTable (backward ctx u good out) = out.1.1.2.2 := by
   unfold curveTable CurveMembership.garble
   rw [curveK_backward_y6, curveK_backward_x7]
-  show (3 * out.2.2.1 + bridgeInv u out - ky6 u out - kx7 u out, out.2.2.1 + r1Inv u out,
-    -out.2.2.1 + r2Inv u out) = out.1.1.2.2
+  show (3 * out.2.2.2.1 + bridgeInv u out - ky6 u out - kx7 u out, out.2.2.2.1 + r1Inv u out,
+    -out.2.2.2.1 + r2Inv u out) = out.1.1.2.2
   unfold bridgeInv r1Inv r2Inv
   obtain ⟨c0, c1, c2⟩ := out.1.1.2.2
   simp only [Prod.mk.injEq]
@@ -344,7 +336,8 @@ theorem forward_backward : forward ctx u (backward ctx u good out) = out := by
       (coldOf u (backward ctx u good out)) (rowEnc r.1) - rowValue ctx u (backward ctx u good out) r.1) =
       out.1.2.2 := funext (shear_backward ctx u good out)
   show (((join ctx _, gamma ctx _, curveTable _), (coldOf u _, fun r : NonCollector =>
-      deliveredIdeal u (join ctx _) (coldOf u _) (rowEnc r.1) - rowValue ctx u _ r.1)), (out.2.1, out.2.2)) = out
+      deliveredIdeal u (join ctx _) (coldOf u _) (rowEnc r.1) - rowValue ctx u _ r.1)),
+      (out.2.1, out.2.2.1, out.2.2.2)) = out
   rw [shearEq, joinEq, gammaEq, tableEq, coldEq]
 
 end Right
@@ -415,12 +408,11 @@ theorem bmr_real_eq_ideal (facts : TableFacts T) (ctx : Context) (u : AffineInpu
     obtain ⟨⟨d, element⟩, collector⟩ := r
     simp only
     rw [rowValues d]
-    have solve := collector_eq_solve (ctx.rows d) (ctx.rho d) (c.r4 d) (c.unused d)
+    have solve := collector_eq_solve (ctx.rows d) (c.r4 d) (c.unused d)
       (fun element => rowOffset c (d, element)) u onCurve element collector
     simp only at solve
     have gammaEq : gamma ctx c d = FieldMacToECMac.garbleRow (ctx.rows d)
-        ⟨ctx.rho d, (rowRand (c.r4 d) (c.unused d)).1, (rowRand (c.r4 d) (c.unused d)).2.1,
-          (rowRand (c.r4 d) (c.unused d)).2.2⟩ (fun element => rowOffset c (d, element)) := rfl
+        (fun element => rowOffset c (d, element)) := rfl
     rw [gammaEq, ← solve]
     exact (rowMask (d, element)).symm
   · have curveValues : (fun element => deliveredIdeal u (join ctx c) (coldOf u c) (curveEnc element)) =

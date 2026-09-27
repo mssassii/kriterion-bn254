@@ -19,14 +19,16 @@ noncomputable section
 
 variable [FieldCertificate] [GroupCertificate]
 
-/-- The scheme's coins other than the layer: the clamped offsets, `ρ`, the exception pad and the input labels. -/
+/-- The scheme's coins other than the layer: the clamped offsets, `(ρ, τ)`, the exception pad and the input labels. -/
 abbrev Rest := {o : FieldMacToECMac.SuccessfulOffsets // ∀ [FieldCertificate] [GroupCertificate], o.IsClamped} ×
-  (Fin 91 → NonZeroBase) × FieldMacToECMac.ExceptionPad × (PlanB.Coord → Fin coordinateBitCount → Block) ×
-  (PlanB.Coord → Block)
+  (Fin 91 → NonZeroBase × NonZeroBase) × FieldMacToECMac.ExceptionPad ×
+  (PlanB.Coord → Fin coordinateBitCount → Block) × (PlanB.Coord → Block)
 
-/-- The row randomness of one digit from its `ρ`, its `r4` and its seven unused randomizers. -/
-def rowOf (rho : NonZeroBase) (r4 : BaseField) (unused : Fin 7 → BaseField) : FieldMacToECMac.RowRandomness where
-  rho := rho
+/-- The row randomness of one digit from its `(ρ, τ)`, its `r4` and its seven unused randomizers. -/
+def rowOf (scales : NonZeroBase × NonZeroBase) (r4 : BaseField) (unused : Fin 7 → BaseField) :
+    FieldMacToECMac.RowRandomness where
+  rho := scales.1
+  tau := scales.2
   x := ⟨unused 0, unused 1, unused 2⟩
   y := ⟨unused 3, unused 4, r4, unused 5⟩
   z := ⟨unused 6⟩
@@ -35,16 +37,18 @@ def rowOf (rho : NonZeroBase) (r4 : BaseField) (unused : Fin 7 → BaseField) : 
 def unusedOf (row : FieldMacToECMac.RowRandomness) : Fin 7 → BaseField :=
   ![row.x.r1, row.x.r2, row.x.r4, row.y.r2, row.y.r3, row.y.r5, row.z.r1]
 
-theorem unusedOf_rowOf (rho : NonZeroBase) (r4 : BaseField) (unused : Fin 7 → BaseField) :
-    unusedOf (rowOf rho r4 unused) = unused := by
+theorem unusedOf_rowOf (scales : NonZeroBase × NonZeroBase) (r4 : BaseField) (unused : Fin 7 → BaseField) :
+    unusedOf (rowOf scales r4 unused) = unused := by
   funext k
   fin_cases k <;> rfl
 
-theorem rowOf_parts (row : FieldMacToECMac.RowRandomness) : rowOf row.rho row.y.r4 (unusedOf row) = row := rfl
+theorem rowOf_parts (row : FieldMacToECMac.RowRandomness) :
+    rowOf (row.rho, row.tau) row.y.r4 (unusedOf row) = row := rfl
 
 /-- The rest and the layer of the scheme's coins. -/
 def splitFun (c : Kriterion.ArgoMAC.Scheme.Coins) : Rest × Layer :=
-  ((⟨c.offsets, c.offsetsClamped⟩, fun d => (c.pointRandomness.get d).rho, c.exceptionPad, c.inputZero, c.inputDelta),
+  ((⟨c.offsets, c.offsetsClamped⟩, fun d => ((c.pointRandomness.get d).rho, (c.pointRandomness.get d).tau),
+      c.exceptionPad, c.inputZero, c.inputDelta),
     layerOf c)
 
 /-- The scheme's coins from the rest and the layer. -/
@@ -71,7 +75,8 @@ theorem layerOf_eq (c : Kriterion.ArgoMAC.Scheme.Coins) :
 
 theorem join_split (c : Kriterion.ArgoMAC.Scheme.Coins) : joinFun (splitFun c) = c := by
   obtain ⟨offsets, clamped, pr, pad, bridge, mask, r1, r2, zero, delta⟩ := c
-  have rows : (Vector.ofFn fun d => rowOf ((pr.get d).rho) ((pr.get d).y.r4) (unusedOf (pr.get d))) = pr := by
+  have rows : (Vector.ofFn fun d => rowOf ((pr.get d).rho, (pr.get d).tau) ((pr.get d).y.r4)
+      (unusedOf (pr.get d))) = pr := by
     ext i hi
     simp only [Vector.getElem_ofFn, rowOf_parts]
     rfl

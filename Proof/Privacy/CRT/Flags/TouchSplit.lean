@@ -3,8 +3,8 @@
 
 The unflagged final state of `M'`'s stage 2 at the empty stage-1 state stores:
 * on the curve: the private state after the collector programs, whose lookups are the view's entries off `u`'s digest
-  labels (`OnDecomp`'s containment), then the digest's lazy reads: `u`'s digest labels (family 8) and the 91 finals at
-  the key `key(u)` (family 9);
+  labels (`OnDecomp`'s containment), then the digest's lazy reads: `u`'s digest labels (family 8) and the 182 finals
+  (two per digit) at the key `key(u)` (family 9);
 * off the curve: the view's entries and the finals at `key(t)` (`crtOffDecomp`, `xs = xsOf`).
 
 A family-9 tag is never visible, so the view's entries have no family-9 input. The touch of a point `x` therefore

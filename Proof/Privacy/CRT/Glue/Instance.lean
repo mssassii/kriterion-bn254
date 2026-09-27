@@ -114,7 +114,7 @@ theorem crtEntry_opening : CrtOpeningHop crtEntry := by
   change (decodePoint u).map (scalarMultiplication scalar.value) = some target at output
   obtain ⟨point, decoded, rfl⟩ := Option.map_eq_some_iff.mp output
   have rows := Security.Phase3.rows_etvDist_le scalar u point decoded
-  have finite : (364 * (Fintype.card Point : ℝ≥0∞)⁻¹) ≠ ⊤ :=
+  have finite : (455 * (Fintype.card Point : ℝ≥0∞)⁻¹) ≠ ⊤ :=
     ENNReal.mul_ne_top (by norm_num) (ENNReal.inv_ne_top.mpr (Nat.cast_ne_zero.mpr Fintype.card_ne_zero))
   refine le_trans rows ?_
   rw [ENNReal.le_ofReal_iff_toReal_le finite (show 0 ≤ outputKernelError from frac_nonneg _ _),

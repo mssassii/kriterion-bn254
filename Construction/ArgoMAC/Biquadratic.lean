@@ -3,8 +3,8 @@ This file defines the three sparse biquadratic rows of one recoded digit.
 
 Plan B removes the 254-row `DigitAdaptor` tables: a row no longer garbles its own adaptors, it
 consumes the affine element values the projectivized garbling scheme delivers. A digit consumes
-eight element slots -- five against the `x` coordinate and three against the `y` coordinate -- and
-publishes four field elements: `X` and `Z` their constants, `Y` its constant and its `x²`
+seven element slots -- four against the `x` coordinate and three against the `y` coordinate --
+and publishes three field elements: the `X` and `Z` constants and the sign row's `x²`
 coefficient. Every other row coefficient is **carried in the slopes** (Lazar's coefficient cut,
 entry `d9a8327`): an element's slope is the coefficient of the monomial it rides on, so the row
 needs no published constant for it.
@@ -12,14 +12,17 @@ needs no published constant for it.
 * `X = c0 + c1 x + c2 y + c4 x²`: `x7` (x bits, multiplier `x`, slope `c4`), `x9` (x bits,
   multiplier `1`, slope `c1 - K7`), `y10` (y bits, multiplier `1`, slope `c2`); publishes
   `c0 - K9 - K10`.
-* `Y = c0 + c2 y + c3 x y + c4 x² + c5 y²`, the four-element row that uses the curve equation:
-  the *cubic* element `x7` (x bits, multiplier `x²`, slope `-r4`), the *mixed* element `x9` (x bits,
-  multiplier `y`, slope `c3`), `y8` (y bits, multiplier `y`, slope `r4 + c5`), `y10` (y bits,
-  multiplier `1`, slope `c2 - K8 - K9`); publishes `c0 - 3 r4 - K10` and `c4 - K7`. Its value is the
-  `Y` polynomial plus `r4 (y² - x³ - 3)`, so it is exact on the curve `y² = x³ + 3`.
+* The sign row `S = s0 + s2 y + s4 x² + s5 y²` in the `Y` slot (`Coordinates.signCoefficients`):
+  the *cubic* element (x bits, multiplier `x²`, slope `-t`), `y8` (y bits, multiplier `y`, slope
+  `t + s5`), `y10` (y bits, multiplier `1`, slope `s2 - K8`), with `t = (s0 - K10) / 3`
+  (`signShift`); publishes only `s4 - Kc`. Its value is the sign row plus `t (y² - x³ - 3)`, so it
+  is exact on the curve `y² = x³ + 3`: the cubic element's `-t x³` becomes `t (3 - y²)`, whose
+  `y²` part the `y8` slope absorbs and whose constant `3 t = s0 - K10` replaces the published
+  constant.
 * `Z = c0 + c1 x`: `x9` (x bits, multiplier `1`, slope `c1`); publishes `c0 - K9`.
 
-The randomness structures keep all eight randomisers; only the `Y` row's `r4` is read.
+The randomness structures keep the eight row randomisers of the earlier rows as coins; none is
+read.
 The plan source is `2026-09-17-planB.md`, sections D.1 and D.4.
 -/
 
@@ -31,7 +34,7 @@ namespace Kriterion.ArgoMAC.Biquadratic
 
 open BN254 Kriterion.ArgoMAC.PlanB
 
-/-- The eight element slots one digit consumes: five x-type and three y-type. -/
+/-- The seven element slots one digit consumes: four x-type and three y-type. -/
 abbrev Element := XElement ⊕ YElement
 
 /-- One value per element slot of a digit. The garbler uses this for the element offsets
@@ -49,7 +52,7 @@ def coordValue (input : AffineInput) : Element → BaseField
 @[simp] theorem coordValue_inr (input : AffineInput) (element : YElement) :
     coordValue input (.inr element) = input.y := rfl
 
-/-- The `X` row randomizers: monomials `1, x, y, x²`. -/
+/-- The `X` row randomizers: monomials `1, x, y, x²` (unused coins). -/
 structure XRandomness where
   /-- The randomizer of the `x` monomial. -/
   r1 : BaseField
@@ -58,7 +61,7 @@ structure XRandomness where
   /-- The randomizer of the `x²` monomial. -/
   r4 : BaseField
 
-/-- The `Y` row randomizers: monomials `1, y, x y, x², y²`. -/
+/-- The `Y` row randomizers (unused coins). -/
 structure YRandomness where
   /-- The randomizer of the `y` monomial. -/
   r2 : BaseField
@@ -69,7 +72,7 @@ structure YRandomness where
   /-- The randomizer of the `y²` monomial. -/
   r5 : BaseField
 
-/-- The `Z` row randomizer: monomials `1, x`. -/
+/-- The `Z` row randomizer: monomials `1, x` (unused coin). -/
 structure ZRandomness where
   /-- The randomizer of the `x` monomial. -/
   r1 : BaseField
@@ -79,11 +82,9 @@ structure XGamma where
   /-- The constant monomial. -/
   c0 : BaseField
 
-/-- The two published constants of the `Y` row: the constant and the `x²` coefficient (the
-cubic element's offset is absorbed there). -/
+/-- The published constant of the sign row: its `x²` coefficient (the cubic element's offset is
+absorbed there). -/
 structure YGamma where
-  /-- The constant monomial. -/
-  c0 : BaseField
   /-- The `x²` monomial. -/
   c4 : BaseField
 
@@ -96,8 +97,24 @@ structure ZGamma where
 
 `K e` is the element offset the projectivized garbling scheme delivers -- the PGS output mask
 `O[e]`, which the garbler can compute from the tape alone before any slope exists. That is what
-keeps the chains `x7 → x9` (`X` row) and `y8, x9 → y10` (`Y` row) resolvable in one pass. The
-slopes carry the row coefficients. -/
+keeps the chains `x7 → x9` (`X` row) and `y10 → cubic, y8`, `y8 → y10` (sign row) resolvable in
+one pass. The slopes carry the row coefficients. -/
+
+/-- `3⁻¹` in `F_p`: `p ≡ 1 (mod 3)`, so `3 · (2 p + 1) / 3 = 2 p + 1 ≡ 1`. -/
+def inverseThree : BaseField := ((2 * baseFieldModulus + 1) / 3 : Nat)
+
+theorem three_mul_inverseThree : (3 : BaseField) * inverseThree = 1 := by decide
+
+/-- The sign row's shift `t = (s0 - K10) / 3`: the cubic element's slope is `-t`, and `3 t`
+replaces the sign row's published constant. -/
+def signShift (rows : Coordinates.Rows) (K : Values) : BaseField :=
+  (rows.y.constant - K (.inr .rowY_y10)) * inverseThree
+
+/-- `3 t = s0 - K10`. -/
+theorem three_mul_signShift (rows : Coordinates.Rows) (K : Values) :
+    3 * signShift rows K = rows.y.constant - K (.inr .rowY_y10) := by
+  unfold signShift
+  linear_combination (rows.y.constant - K (.inr .rowY_y10)) * three_mul_inverseThree
 
 /-- The slope of every element slot of one digit. -/
 def slopes (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness) (z : ZRandomness)
@@ -105,10 +122,9 @@ def slopes (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness) (z : ZR
   | .inl .rowX_x7 => rows.x.xSquared
   | .inl .rowX_x9 => rows.x.x - K (.inl .rowX_x7)
   | .inr .rowX_y10 => rows.x.y
-  | .inl .rowY_x7 => -y.r4
-  | .inl .rowY_x9 => rows.y.xy
-  | .inr .rowY_y8 => y.r4 + rows.y.ySquared
-  | .inr .rowY_y10 => rows.y.y - K (.inr .rowY_y8) - K (.inl .rowY_x9)
+  | .inl .rowY_cubic => -signShift rows K
+  | .inr .rowY_y8 => signShift rows K + rows.y.ySquared
+  | .inr .rowY_y10 => rows.y.y - K (.inr .rowY_y8)
   | .inl .rowZ_x9 => rows.z.x
 
 /-- The value the evaluator obtains for every element slot of one digit. -/
@@ -122,11 +138,10 @@ def delivered (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness) (z :
 def garbleX (c0 : BaseField) (K : Values) : XGamma := {
   c0 := c0 - K (.inl .rowX_x9) - K (.inr .rowX_y10) }
 
-/-- The four-element `Y` row: the consumed elements are the cubic `x7`, the mixed `x9`, `y8`
-and `y10`. -/
-def garbleY (c0 c4 : BaseField) (randomness : YRandomness) (K : Values) : YGamma := {
-  c0 := c0 - 3 * randomness.r4 - K (.inr .rowY_y10)
-  c4 := c4 - K (.inl .rowY_x7) }
+/-- The sign row: the consumed elements are `cubic`, `y8` and `y10`; only the `x²` coefficient is
+published, absorbing the cubic element's offset. -/
+def garbleY (c4 : BaseField) (K : Values) : YGamma := {
+  c4 := c4 - K (.inl .rowY_cubic) }
 
 /-- The `Z` row: the single consumed element is `x9`. -/
 def garbleZ (c0 : BaseField) (K : Values) : ZGamma := {
@@ -136,11 +151,10 @@ def garbleZ (c0 : BaseField) (K : Values) : ZGamma := {
 def evaluateX (gamma : XGamma) (input : AffineInput) (values : Values) : BaseField :=
   gamma.c0 + values (.inl .rowX_x7) * input.x + values (.inl .rowX_x9) + values (.inr .rowX_y10)
 
-/-- The `Y` row value: `c0 + c4 x² + x7 · x² + x9 · y + y8 · y + y10`. -/
+/-- The sign row value: `c4 x² + cubic · x² + y8 · y + y10`. -/
 def evaluateY (gamma : YGamma) (input : AffineInput) (values : Values) : BaseField :=
-  gamma.c0 + gamma.c4 * input.x ^ 2 + values (.inl .rowY_x7) * input.x ^ 2 +
-    values (.inl .rowY_x9) * input.y + values (.inr .rowY_y8) * input.y +
-    values (.inr .rowY_y10)
+  gamma.c4 * input.x ^ 2 + values (.inl .rowY_cubic) * input.x ^ 2 +
+    values (.inr .rowY_y8) * input.y + values (.inr .rowY_y10)
 
 /-- The `Z` row value: `c0 + x9`. -/
 def evaluateZ (gamma : ZGamma) (input : AffineInput) (values : Values) : BaseField :=
@@ -160,25 +174,26 @@ theorem evaluateEncodedX (rows : Coordinates.Rows) (x : XRandomness) (y : YRando
   simp only [evaluateX, garbleX, delivered, slopes, coordValue]
   ring
 
-/-- The `Y` row evaluates to its five-monomial value plus `r4 (y² - x³ - 3)`, at every input. -/
-theorem evaluateEncodedYCubic (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness)
+/-- The sign row value at any input: its four-monomial value plus `t` times the curve
+equation. -/
+theorem evaluateEncodedY_raw (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness)
     (z : ZRandomness) (K : Values) (input : AffineInput) :
-    evaluateY (garbleY rows.y.constant rows.y.xSquared y K) input (delivered rows x y z K input) =
-      rows.y.constant + rows.y.y * input.y + rows.y.xy * input.x * input.y +
-        rows.y.xSquared * input.x ^ 2 + rows.y.ySquared * input.y ^ 2 +
-        y.r4 * (input.y ^ 2 - input.x ^ 3 - 3) := by
+    evaluateY (garbleY rows.y.xSquared K) input (delivered rows x y z K input) =
+      rows.y.constant + rows.y.y * input.y + rows.y.xSquared * input.x ^ 2 +
+        rows.y.ySquared * input.y ^ 2 + signShift rows K * (input.y ^ 2 - input.x ^ 3 - 3) := by
+  have three := three_mul_signShift rows K
   simp only [evaluateY, garbleY, delivered, slopes, coordValue]
-  ring
+  linear_combination three
 
-/-- On the curve the `Y` row evaluates to its five-monomial value. -/
+/-- On the curve the sign row evaluates to its four-monomial value. -/
 theorem evaluateEncodedY (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness)
     (z : ZRandomness) (K : Values) (input : AffineInput) (onCurve : OnCurve input) :
-    evaluateY (garbleY rows.y.constant rows.y.xSquared y K) input (delivered rows x y z K input) =
-      rows.y.constant + rows.y.y * input.y + rows.y.xy * input.x * input.y +
-        rows.y.xSquared * input.x ^ 2 + rows.y.ySquared * input.y ^ 2 := by
-  rw [evaluateEncodedYCubic]
+    evaluateY (garbleY rows.y.xSquared K) input (delivered rows x y z K input) =
+      rows.y.constant + rows.y.y * input.y + rows.y.xSquared * input.x ^ 2 +
+        rows.y.ySquared * input.y ^ 2 := by
+  rw [evaluateEncodedY_raw]
   unfold OnCurve at onCurve
-  linear_combination y.r4 * onCurve
+  linear_combination signShift rows K * onCurve
 
 /-- The `Z` row evaluates to its two-monomial value. -/
 theorem evaluateEncodedZ (rows : Coordinates.Rows) (x : XRandomness) (y : YRandomness)

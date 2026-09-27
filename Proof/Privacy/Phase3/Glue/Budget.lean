@@ -7,15 +7,15 @@ Each term is the formula of design note B §5, with the corrections of the revie
 |---|---|---|
 | `G0 → G0U` | `maskSwapError = N'·δ₃`, `N' = 824·508 ≥ 733·508`, `δ₃ = (2^384 mod p)/2^384` | `2^-111.86` |
 | `G0U → G1U` | `hiddenPointError q = 3q/2^128 + q/(p−1)` (`L1`) | linear |
-| `G1U → HW` | `stageOneHitError q₁ + exceptionalError + maskSwapError`: `L2 = 4q₁/2^128`, plus the doubling-exception mass `182/(r−1)` (the gadget goes from real to lazy in this hop; P1d, `PublicFirst.gadget_counterShape_refutes`), plus one more `N·δ₃`. The last term is needed because off the curve `G1U` installs the system-A masks with `G0U`'s uniform values while `HW` makes no call, so the adversary's own masks are `sampleFp` of fresh blocks (P1g, `not_publicFirst`). | linear + `2^-111.86` |
-| `HW → H` | `outputKernelError = 364/(r−1)` (`ε_pt`; P1's lemmas give `≤ 363/#Point`) | `2^-245.1` |
+| `G1U → HW` | `stageOneHitError q₁ + exceptionalError + maskSwapError`: `L2 = 4q₁/2^128`, plus the exceptional mass `364/(r−1)` (both kinds) (the gadget goes from real to lazy in this hop; P1d, `PublicFirst.gadget_counterShape_refutes`), plus one more `N·δ₃`. The last term is needed because off the curve `G1U` installs the system-A masks with `G0U`'s uniform values while `HW` makes no call, so the adversary's own masks are `sampleFp` of fresh blocks (P1g, `not_publicFirst`). | linear + `2^-111.86` |
+| `HW → H` | `outputKernelError = 455/(r−1)` (`ε_pt`; P1's lemmas give `≤ 455/#Point`) | `2^-244.8` |
 | `H → I^U` | `abortError q₁ = q₁·abortQueryCharge q₁`, `abortQueryCharge q₁ = 1/(2^128−q₁) + 1/(2^128−q₁)` (per stage-1 query at a candidate designated index: input and output freshness, both through `E*`'s min-entropy; see `AbortBound`) | linear |
 | `I^U → I` | `maskSwapError + idealRefillError q₁`: per derived mask `δ₃`, per stage-1 query at its indices `refillQueryCharge q₁ = 1/2^128 + 1/(2^128−q₁)` (`L3`) | `2^-111.86` + linear |
 | `I → M` | `machineCutoffError = 2^-128` (`ε_cut`, relaxed from the planned `2^-391.72`) | constant |
 
 `chainError_budget`: for `q₁ + q₂ < 2^100`, `chainError q₁ q₂ · 2^100 ≤ q₁ + q₂ + 1`. Every term
 is bounded by a thousandth of its unit, so the budget closes with the constant `≤ 6/1000` (six
-terms: three `N·δ₃`, `182/(r−1)`, `364/(r−1)` and the cutoff; the value is ≈ `2^-110.28`) and the
+terms: three `N·δ₃`, `364/(r−1)`, `455/(r−1)` and the cutoff; the value is ≈ `2^-110.28`) and the
 linear coefficient `≤ 4/1000` (per query, in units of `2^-100`).
 -/
 
@@ -57,15 +57,16 @@ def hiddenPointError (queries : ℕ) : ℝ :=
 /-- `L2`: stage-1 hits on a garbler point. -/
 def stageOneHitError (first : ℕ) : ℝ := 4 * (first : ℝ) / 2 ^ 128
 
-/-- `ε_exc`: the doubling-exception mass at the adversary's input, `≤ 182/#Point ≤ 182/(r−1)`.
-It is charged in `G1U → HW`, where the gadget switches from the garbler's entries (which unlock the
-true digit at the exceptional input) to uniform published bytes. The adversary's input doubles a
-digit with this mass under the construction's offset law, independently of its view. -/
-def exceptionalError : ℝ := 182 / ((scalarFieldModulus : ℝ) - 1)
+/-- `ε_exc`: the exceptional mass at the adversary's input, both exceptional kinds of every digit
+(the doubling input `Q = K` and the sign-zero input `Q = 2K`), `≤ 364/(r−1)`. It is charged in
+`G1U → HW`, where the gadget switches from the garbler's entries (which unlock the true digit at an
+exceptional input) to uniform published bytes. -/
+def exceptionalError : ℝ := 364 / ((scalarFieldModulus : ℝ) - 1)
 
-/-- `ε_pt`: the offset restriction, the doubling rows and the tail restriction of the output
-kernel. P1's opening lemmas give `≤ 363/#Point`, which is `≤ 364/(r−1)` since `#Point ≥ r`. -/
-def outputKernelError : ℝ := 364 / ((scalarFieldModulus : ℝ) - 1)
+/-- `ε_pt`: the offset restriction, the exceptional rows (both kinds) and the tail restriction of
+the output kernel. P1's opening lemmas give `≤ 455/#Point`, which is `≤ 455/(r−1)` since
+`#Point ≥ r`. -/
+def outputKernelError : ℝ := 455 / ((scalarFieldModulus : ℝ) - 1)
 
 /-- The smallest preimage count `M(p−1) = ⌊(2^384 − p)/p⌋ + 1` of `sampleFp`. It no longer enters
 the budget (the abort charge has no limb term); it is kept for P1's `LimbBound`. -/

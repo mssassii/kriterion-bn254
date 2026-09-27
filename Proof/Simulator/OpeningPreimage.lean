@@ -11,7 +11,7 @@ The cutoff mass of these draws (`preimageAbort_le`, `≤ 2^-399` each) is part o
 already proved (`samplerCutoff`); the machine law here is exact against `preimageLaw`.
 -/
 
-import Proof.Simulator.OpeningSolve
+import Proof.Simulator.OpeningLift
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 

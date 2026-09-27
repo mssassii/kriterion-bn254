@@ -1,12 +1,12 @@
 /-
-The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, 182,936 bytes).
+The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, sign rows, 173,472 bytes).
 Every field is proved.
 
 * `FixedIndex` and `EncIndex` are `Empty` (the entry is hash-only);
 * `Randomness` is the switch-system entry's `Scheme.Coins` (the CRT layer draws no coins of its own);
-* `Public` is `Kriterion.CRT.Entry.Public`, 182,936 bytes (`Wire.encoding_length`);
+* `Public` is `Kriterion.CRT.Entry.Public`, 173,472 bytes (`Wire.encoding_length`);
 * `garbleProgram` / `evaluateProgram` are `Entry.garbleProgram` / `Entry.evaluateProgram` at the
-  term-by-term budgets `garbleBudget` (995,088) and `evaluateBudget` (987,209);
+  term-by-term budgets `garbleBudget` (945,076) and `evaluateBudget` (937,418);
 * `perfectCorrectness` is `Kriterion.CRT.EntryCorrect.perfectCorrectness`
   (`Proof/Correctness/CRT/EntryCorrect.lean`);
 * `adaptivePrivacy` is `Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy`
@@ -51,7 +51,7 @@ theorem evaluateProgramCorrect (field : FieldCertificate) (group : @GroupCertifi
   rw [Entry.evaluateProgram, FreeQuery.eval_toProgram, Entry.evaluateM, eval_liftHash]
   simp only [Entry.scheme]
 
-/-- `Solution.ciphertextSize`: every public value is 182,936 bytes. -/
+/-- `Solution.ciphertextSize`: every public value is 173,472 bytes. -/
 theorem ciphertextSize (field : FieldCertificate) (group : @GroupCertificate field) (parameter : Nat)
     (scalar : NonZeroScalar) (tape : Entry.Coins × Entry.Oracle) :
     (Wire.encoding.encode ((@Entry.scheme field group).garble parameter scalar tape).1).length =
@@ -60,13 +60,13 @@ theorem ciphertextSize (field : FieldCertificate) (group : @GroupCertificate fie
 
 /-- `Solution.perfectCorrectness` (`Proof/Correctness/CRT/EntryCorrect.lean`): the replay delivers
 through the published material (`coord_delivery` on the real table), the curve check
-releases `t`, the rows are the switch-system entry's delivered values, the digest unlocks every exceptional digit,
-and the switch-system entry's decode chain gives the scalar multiple. -/
+releases `t`, the rows are the switch-system entry's delivered values, the digest unlocks every exceptional digit
+(both kinds, `Q = K` and `Q = 2K`), and the decode chain with the sign row gives the scalar multiple. -/
 theorem perfectCorrectness (field : FieldCertificate) (group : @GroupCertificate field) :
     GarbledCircuit.PerfectCorrectness (@Entry.scheme field group) Prod.snd :=
   Kriterion.CRT.EntryCorrect.perfectCorrectness field group
 
-/-- The configuration-E submission at 182,936 bytes. -/
+/-- The configuration-E submission with sign rows, at 173,472 bytes. -/
 def solution : Kriterion.Solution := {
   FixedIndex := Empty
   EncIndex := Empty

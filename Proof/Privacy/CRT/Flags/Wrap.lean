@@ -4,8 +4,8 @@
 The middle game reveals when some CRT value of the replay lies in the two-sided window `[0, B − 1) ∪ (M − B, M)`
 (`H8.replayWraps`). On a tag table the replay's CRT values are P45's `evalInt` at the published joins and the table's
 cold pads (`replayCrtValues_x`, `_y`). Under the swapped table the cold pads are uniform
-(`swapped_cold_uniform`, from `swapped_pads_split`), so each CRT value is uniform on `[0, M)` (`evalInt_uniform`) and lies in the window with probability at most `2 (B − 1) / M`. Over the 733 encodings this is
-`1466 (p − 1)^2 / M ≤ smudgeError`, for every source; the weighted sum over sources factors.
+(`swapped_cold_uniform`, from `swapped_pads_split`), so each CRT value is uniform on `[0, M)` (`evalInt_uniform`) and lies in the window with probability at most `2 (B − 1) / M`. Over the 642 encodings this is
+`1284 (p − 1)^2 / M ≤ smudgeError`, for every source; the weighted sum over sources factors.
 -/
 
 import Proof.Privacy.CRT.Swap.PadLaw
@@ -133,7 +133,7 @@ theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.vi
   refine (MeasureTheory.measure_iUnion_fintype_le _ _).trans ?_
   refine (Finset.sum_le_sum fun e _ => wrap_one u _ e).trans ?_
   rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
-  have card : Fintype.card BMR.Enc = 733 := by
+  have card : Fintype.card BMR.Enc = 642 := by
     rw [Fintype.card_sum, BMR.card_xEnc, BMR.card_yEnc]
   rw [card, wrapBound_eq, product_eq, Nat.add_sub_cancel]
   unfold smudgeError frac
@@ -142,7 +142,7 @@ theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.vi
     exact_mod_cast this
   rw [ENNReal.ofReal_div_of_pos Mpos, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast, ← mul_div_assoc]
   refine ENNReal.div_le_div_right ?_ _
-  have e : 733 * (2 * (BudgetData.p - 1) ^ 2) = 1466 * (BudgetData.p - 1) ^ 2 := by ring
+  have e : 642 * (2 * (BudgetData.p - 1) ^ 2) = 1284 * (BudgetData.p - 1) ^ 2 := by ring
   rw [← Nat.cast_mul, e]
   exact_mod_cast Nat.le_add_right _ _
 

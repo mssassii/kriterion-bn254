@@ -160,20 +160,34 @@ theorem asked_garbleEntryM {bits : ℕ} (table : Fin 2 → Fin bits → Block ×
     asked H (garbleEntryM table index digit offset pad) =
       match digitEndomorphismBase digit with
       | none => []
-      | some phi => [hashInput (garblerKey table (Exception.exceptionalInput phi offset)) (digestFinalTag index)] := by
+      | some phi => [hashInput (garblerKey table (Exception.exceptionalInput phi offset)) (digestFinalTag (2 * index)),
+          hashInput (garblerKey table (Exception.tripleInput phi offset)) (digestFinalTag (2 * index + 1))] := by
   unfold garbleEntryM
   cases digitEndomorphismBase digit with
   | none => rfl
   | some phi =>
-      simp only [finalMaskM, asked_bind, asked_h128M, asked_pure, List.append_nil, List.singleton_append]
+      simp only [finalMaskM, asked_bind, asked_h128M, asked_pure, List.append_nil, List.singleton_append,
+        List.cons_append, List.nil_append]
 
 theorem asked_digestEvalM (bits digits : ℕ) (labels : Fin 2 → Fin bits → Block) (u : BN254.AffineInput)
     (entries : Fin digits → Exception.Entry) :
     asked H (digestEvalM bits digits labels u entries) =
       asked H (digestKeyM bits labels u) ++
-        (List.finRange digits).flatMap fun o => [hashInput (digestKey H bits labels u) (digestFinalTag o.val)] := by
+        (List.finRange digits).flatMap fun o => [hashInput (digestKey H bits labels u) (digestFinalTag (2 * o.val)),
+          hashInput (digestKey H bits labels u) (digestFinalTag (2 * o.val + 1))] := by
   unfold digestEvalM
-  simp only [asked_bind, asked_tableM, asked_pure, List.append_nil, finalMaskM, asked_h128M, eval_digestKeyM]
+  simp only [asked_bind, asked_tableM, asked_pure, List.append_nil, finalMaskM, asked_h128M, eval_digestKeyM,
+    List.singleton_append, List.cons_append, List.nil_append]
+
+/-- **A final of the evaluator's list is at a site below `2 * digits`.** -/
+theorem mem_finals {digits : ℕ} {key : Block} {n : ℕ}
+    (h : n ∈ (List.finRange digits).flatMap fun o =>
+      [hashInput key (digestFinalTag (2 * o.val)), hashInput key (digestFinalTag (2 * o.val + 1))]) :
+    ∃ s, s < 2 * digits ∧ n = hashInput key (digestFinalTag s) := by
+  simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_cons, List.not_mem_nil, or_false] at h
+  obtain ⟨o, rfl | rfl⟩ := h
+  · exact ⟨_, by have := o.isLt; omega, rfl⟩
+  · exact ⟨_, by have := o.isLt; omega, rfl⟩
 
 end Digest
 
@@ -209,14 +223,31 @@ theorem maskKeyTag_family : tagFamily maskKeyTag = 10 := by
 
 theorem exceptional_some (scalar : BN254.NonZeroScalar) (coins : Coins) (o : Fin digitCount)
     (phi : BN254.BaseField) (selected : digitEndomorphismBase ((outputKeysOf scalar coins).get o).digit = some phi) :
-    exceptional scalar coins o.val =
+    exceptional scalar coins (2 * o.val) =
       some (Exception.exceptionalInput phi ((outputKeysOf scalar coins).get o).offset.coordinates) := by
-  have hget : ∀ h : o.val < digitCount, (outputKeysOf scalar coins).get ⟨o.val, h⟩ = (outputKeysOf scalar coins).get o :=
-    fun _ => rfl
+  have small : 2 * o.val / 2 < digitCount := by have := o.isLt; omega
+  have hget : (outputKeysOf scalar coins).get ⟨2 * o.val / 2, small⟩ = (outputKeysOf scalar coins).get o :=
+    congrArg _ (Fin.ext (by show 2 * o.val / 2 = o.val; omega))
   unfold exceptional
-  rw [dif_pos o.isLt]
+  rw [dif_pos small]
   dsimp only
-  rw [hget o.isLt, selected]
+  rw [hget, selected]
+  dsimp only
+  rw [if_pos (by omega)]
+
+theorem triple_some (scalar : BN254.NonZeroScalar) (coins : Coins) (o : Fin digitCount)
+    (phi : BN254.BaseField) (selected : digitEndomorphismBase ((outputKeysOf scalar coins).get o).digit = some phi) :
+    exceptional scalar coins (2 * o.val + 1) =
+      some (Exception.tripleInput phi ((outputKeysOf scalar coins).get o).offset.coordinates) := by
+  have small : (2 * o.val + 1) / 2 < digitCount := by have := o.isLt; omega
+  have hget : (outputKeysOf scalar coins).get ⟨(2 * o.val + 1) / 2, small⟩ = (outputKeysOf scalar coins).get o :=
+    congrArg _ (Fin.ext (by show (2 * o.val + 1) / 2 = o.val; omega))
+  unfold exceptional
+  rw [dif_pos small]
+  dsimp only
+  rw [hget, selected]
+  dsimp only
+  rw [if_neg (by omega)]
 
 /-! ### The containment on the program level -/
 
@@ -316,14 +347,26 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
       split at inEntry
       · exact absurd inEntry List.not_mem_nil
       · rename_i phi selected
-        rw [List.mem_singleton] at inEntry
-        subst inEntry
-        obtain ⟨hf, hslot⟩ := digestFinalTag_fields (o := o.val) (by have := o.isLt; simp [digitCount] at this; omega)
-        rw [hashInput_div, designTag_final _ _ _ hf, hslot, beq_iff_eq, exceptional_some scalar coins o phi selected,
-          Option.some.injEq] at designed
-        rw [List.mem_singleton, eval_digestTableM,
-          DigestUnlock.digestKey_honest H coordinateBitCount (zeroOf coins) (deltaOf coins) _ u
-            (labelsOf_honest coins u), designed]
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+        rcases inEntry with inEntry | inEntry
+        · subst inEntry
+          obtain ⟨hf, hslot⟩ := digestFinalTag_fields (o := 2 * o.val)
+            (by have := o.isLt; simp [digitCount] at this; omega)
+          rw [hashInput_div, designTag_final _ _ _ hf, hslot, beq_iff_eq,
+            exceptional_some scalar coins o phi selected, Option.some.injEq] at designed
+          rw [List.mem_cons, eval_digestTableM,
+            DigestUnlock.digestKey_honest H coordinateBitCount (zeroOf coins) (deltaOf coins) _ u
+              (labelsOf_honest coins u), designed]
+          exact Or.inl rfl
+        · subst inEntry
+          obtain ⟨hf, hslot⟩ := digestFinalTag_fields (o := 2 * o.val + 1)
+            (by have := o.isLt; simp [digitCount] at this; omega)
+          rw [hashInput_div, designTag_final _ _ _ hf, hslot, beq_iff_eq,
+            triple_some scalar coins o phi selected, Option.some.injEq] at designed
+          rw [List.mem_cons, List.mem_singleton, eval_digestTableM,
+            DigestUnlock.digestKey_honest H coordinateBitCount (zeroOf coins) (deltaOf coins) _ u
+              (labelsOf_honest coins u), designed]
+          exact Or.inr rfl
 
 /-- **Every designed garbler input is the reach's** (`Entry.reachCM`, the reach on the curve; for every hash). -/
 theorem garble_designed_reached (H : HashN) (scalar : BN254.NonZeroScalar) (coins : Coins) (u : BN254.AffineInput) :

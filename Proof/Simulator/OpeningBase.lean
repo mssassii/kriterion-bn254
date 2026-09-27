@@ -10,7 +10,7 @@
   `tmpM`) blanked; every store of the opening disappears under it (`openMask_update`).
 -/
 
-import Proof.Simulator.ReplayFold
+import Proof.Simulator.ReplayElement
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 
@@ -96,6 +96,13 @@ theorem memSem_rep_succ (count : Nat) (body : Nat → Prog) (memory : Memory) :
     (Prog.rep (count + 1) body).memSem memory =
       ((Prog.rep count body).memSem memory).bind (kleisli (body count).memSem) := by
   rw [Prog.rep, memSem_seq]
+
+/-- A sequence of two blocks is a `rep` of two. -/
+theorem memSem_seq_rep_two (first second : Prog) (memory : Memory) :
+    (Prog.seq first second).memSem memory =
+      (Prog.rep 2 fun index => if index = 0 then first else second).memSem memory := by
+  rw [memSem_rep_succ, memSem_rep_succ, Prog.rep, memSem_skip, PMF.pure_bind, memSem_seq]
+  rfl
 
 /-! ### Memories after a phase -/
 

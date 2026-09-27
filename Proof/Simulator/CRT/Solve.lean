@@ -106,18 +106,18 @@ theorem exec_finishMask (row dec out : Nat) (memory : Memory) (acc w v : BaseFie
     rw [rowCell, decCell, accReg, fieldSub_words, fieldSub_words]
   · simp only [storeRam, setReg, Function.update_apply, if_neg n1, if_neg n2, if_neg n3]
 
-/-- **`RAM[out] = v − (w − acc) · y⁻¹`**, `y` in `rB`. -/
-theorem exec_finishMaskOverY (row dec out : Nat) (memory : Memory) (acc w v y : BaseField)
+/-- **`RAM[out] = v − (w − acc) · z⁻¹`**, `z` in `rC`. -/
+theorem exec_finishMaskOver (row dec out : Nat) (memory : Memory) (acc w v z : BaseField)
     (rowCell : memory.ram (word row) = fieldWord w) (decCell : memory.ram (word dec) = fieldWord v)
-    (accReg : memory.registers rAcc = fieldWord acc) (yReg : memory.registers rB = fieldWord y) :
-    ∃ after, (finishMaskOverY row dec out).exec memory = some after ∧
-      after.ram = Function.update memory.ram (word out) (fieldWord (v - (w - acc) * y⁻¹)) ∧
+    (accReg : memory.registers rAcc = fieldWord acc) (zReg : memory.registers rC = fieldWord z) :
+    ∃ after, (finishMaskOver rC row dec out).exec memory = some after ∧
+      after.ram = Function.update memory.ram (word out) (fieldWord (v - (w - acc) * z⁻¹)) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rAddr → register ≠ rSel → register ≠ rD → register ≠ rAcc →
         after.registers register = memory.registers register := by
   refine ⟨_, rfl, ?_, rfl, fun register n1 n2 n3 n4 => ?_⟩
   · simp (config := {decide := true}) only [storeRam, setReg, Function.update_apply, if_true, if_false]
-    rw [rowCell, decCell, accReg, yReg, fieldSub_words, fieldInv_word, fieldMul_words, fieldSub_words]
+    rw [rowCell, decCell, accReg, zReg, fieldSub_words, fieldInv_word, fieldMul_words, fieldSub_words]
   · simp only [storeRam, setReg, Function.update_apply, if_neg n1, if_neg n2, if_neg n3, if_neg n4]
 
 /-! ### The rows -/
@@ -148,12 +148,12 @@ def Keeps4 (memory after : Memory) : Prop :=
 theorem exec_rowX (d : Nat) (memory : Memory) (x y c0 v7 p7 v10 p10 w v9 : BaseField)
     (regs : RowRegs memory x y)
     (hc : memory.ram (word (Opening.rowCell d 0)) = fieldWord c0)
-    (hv7 : memory.ram (word (decX (5 * d))) = fieldWord v7)
-    (hp7 : memory.ram (word (maskX (5 * d))) = fieldWord p7)
+    (hv7 : memory.ram (word (decX (4 * d))) = fieldWord v7)
+    (hp7 : memory.ram (word (maskX (4 * d))) = fieldWord p7)
     (hv10 : memory.ram (word (decY (3 * d))) = fieldWord v10)
     (hp10 : memory.ram (word (maskY (3 * d))) = fieldWord p10)
     (hw : memory.ram (word (openRow d)) = fieldWord w)
-    (hv9 : memory.ram (word (decX (5 * d + 1))) = fieldWord v9) :
+    (hv9 : memory.ram (word (decX (4 * d + 1))) = fieldWord v9) :
     ∃ after, (rowX d).exec memory = some after ∧
       after.ram = Function.update memory.ram (word (openTarget d 0))
         (fieldWord (v9 - (w - (c0 + (v7 - p7) * x + (v10 - p10))))) ∧
@@ -181,67 +181,65 @@ theorem exec_rowX (d : Nat) (memory : Memory) (x y c0 v7 p7 v10 p10 w v9 : BaseF
   · rw [keep4 register n2 n3 n4, keep3 register n1 n2 n3 n4, keep2 register n1 n2 n3 n4, m1Def]
     simp only [setReg, Function.update_apply, if_neg n1, if_neg n2]
 
-/-- **The `Y` row**: `π = v(x9') − (W.y − (yC0 + yC4·x² + r(x7')·x² + r(y8)·y + r(y10')))·y⁻¹`. -/
-theorem exec_rowY (d : Nat) (memory : Memory) (x y c0 c4 v7 p7 v8 p8 v10 p10 w v9 : BaseField)
+omit [FieldCertificate] in
+theorem exec_cst (target : Register) (value : Nat) (memory : Memory) :
+    (cst target value).exec memory = some (setReg memory target (word value)) := rfl
+
+theorem fieldWord_zero : fieldWord (0 : BaseField) = word 0 := rfl
+
+/-- **The sign row**: `π = v(cubic) − (W.y − (yC4·x² + r(y8)·y + r(y10')))·(x·x)⁻¹`. -/
+theorem exec_rowY (d : Nat) (memory : Memory) (x y c4 v8 p8 v10 p10 w vc : BaseField)
     (regs : RowRegs memory x y)
-    (hc0 : memory.ram (word (Opening.rowCell d 1)) = fieldWord c0)
-    (hc4 : memory.ram (word (Opening.rowCell d 2)) = fieldWord c4)
-    (hv7 : memory.ram (word (decX (5 * d + 2))) = fieldWord v7)
-    (hp7 : memory.ram (word (maskX (5 * d + 2))) = fieldWord p7)
+    (hc4 : memory.ram (word (Opening.rowCell d 1)) = fieldWord c4)
     (hv8 : memory.ram (word (decY (3 * d + 1))) = fieldWord v8)
     (hp8 : memory.ram (word (maskY (3 * d + 1))) = fieldWord p8)
     (hv10 : memory.ram (word (decY (3 * d + 2))) = fieldWord v10)
     (hp10 : memory.ram (word (maskY (3 * d + 2))) = fieldWord p10)
     (hw : memory.ram (word (openRow d + 1)) = fieldWord w)
-    (hv9 : memory.ram (word (decX (5 * d + 3))) = fieldWord v9) :
+    (hvc : memory.ram (word (decX (4 * d + 2))) = fieldWord vc) :
     ∃ after, (rowY d).exec memory = some after ∧
       after.ram = Function.update memory.ram (word (openTarget d 1))
-        (fieldWord (v9 - (w - (c0 + c4 * (x * x) + (v7 - p7) * (x * x) + (v8 - p8) * y + (v10 - p10))) *
-          y⁻¹)) ∧
+        (fieldWord (vc - (w - (0 + c4 * (x * x) + (v8 - p8) * y + (v10 - p10))) * (x * x)⁻¹)) ∧
       after.bits = memory.bits ∧ RowRegs after x y ∧ Keeps4 memory after := by
-  set m1 := setReg (setReg memory rAddr (word (Opening.rowCell d 1))) rAcc
-    (memory.ram (word (Opening.rowCell d 1))) with m1Def
-  have acc1 : m1.registers rAcc = fieldWord c0 := by
-    rw [m1Def]; simp only [setReg, Function.update_self]; exact hc0
-  have regs1 : RowRegs m1 x y := RowRegs.keep regs fun register n1 n2 _ _ => by
-    rw [m1Def]; simp only [setReg, Function.update_apply, if_neg n1, if_neg n2]
-  obtain ⟨m2, run2, ram2, bits2, acc2, keep2⟩ := exec_addConstScaled _ rC m1 c0 c4 (x * x) (by decide)
+  set m1 := setReg memory rAcc (word 0) with m1Def
+  have acc1 : m1.registers rAcc = fieldWord 0 := by
+    rw [m1Def, fieldWord_zero]; simp only [setReg, Function.update_self]
+  have regs1 : RowRegs m1 x y := RowRegs.keep regs fun register n1 _ _ _ => by
+    rw [m1Def]; simp only [setReg, Function.update_apply, if_neg n1]
+  obtain ⟨m2, run2, ram2, bits2, acc2, keep2⟩ := exec_addConstScaled _ rC m1 0 c4 (x * x) (by decide)
     (by decide) (by decide) hc4 regs1.2.2 acc1
   have regs2 : RowRegs m2 x y := RowRegs.keep regs1 fun register n1 n2 n3 _ => keep2 register n1 n2 n3
-  obtain ⟨m3, run3, ram3, bits3, acc3, keep3⟩ := exec_addRowScaled _ _ rC m2 _ v7 p7 (x * x) (by decide)
-    (by decide) (by decide) (by decide) (by rw [ram2]; exact hv7) (by rw [ram2]; exact hp7) regs2.2.2 acc2
+  obtain ⟨m3, run3, ram3, bits3, acc3, keep3⟩ := exec_addRowScaled _ _ rB m2 _ v8 p8 y (by decide)
+    (by decide) (by decide) (by decide) (by rw [ram2]; exact hv8) (by rw [ram2]; exact hp8)
+    regs2.2.1 acc2
   have regs3 : RowRegs m3 x y := RowRegs.keep regs2 keep3
-  obtain ⟨m4, run4, ram4, bits4, acc4, keep4⟩ := exec_addRowScaled _ _ rB m3 _ v8 p8 y (by decide)
-    (by decide) (by decide) (by decide) (by rw [ram3, ram2]; exact hv8) (by rw [ram3, ram2]; exact hp8)
-    regs3.2.1 acc3
+  obtain ⟨m4, run4, ram4, bits4, acc4, keep4⟩ := exec_addRow _ _ m3 _ v10 p10
+    (by rw [ram3, ram2]; exact hv10) (by rw [ram3, ram2]; exact hp10) acc3
   have regs4 : RowRegs m4 x y := RowRegs.keep regs3 keep4
-  obtain ⟨m5, run5, ram5, bits5, acc5, keep5⟩ := exec_addRow _ _ m4 _ v10 p10
-    (by rw [ram4, ram3, ram2]; exact hv10) (by rw [ram4, ram3, ram2]; exact hp10) acc4
-  have regs5 : RowRegs m5 x y := RowRegs.keep regs4 keep5
-  obtain ⟨m6, run6, ram6, bits6, keep6⟩ := exec_finishMaskOverY _ _ (openTarget d 1) m5 _ w v9 y
-    (by rw [ram5, ram4, ram3, ram2]; exact hw) (by rw [ram5, ram4, ram3, ram2]; exact hv9) acc5 regs5.2.1
-  refine ⟨m6, ?_, ?_, ?_, RowRegs.keep regs5 fun register n1 n2 n3 n4 => keep6 register n2 n3 n4 n1,
+  obtain ⟨m5, run5, ram5, bits5, keep5⟩ := exec_finishMaskOver _ _ (openTarget d 1) m4 _ w vc (x * x)
+    (by rw [ram4, ram3, ram2]; exact hw) (by rw [ram4, ram3, ram2]; exact hvc) acc4 regs4.2.2
+  refine ⟨m5, ?_, ?_, ?_, RowRegs.keep regs4 fun register n1 n2 n3 n4 => keep5 register n2 n3 n4 n1,
     fun register n1 n2 n3 n4 => ?_⟩
   · unfold rowY
-    rw [exec_seqList_cons _ _ _ m1 (exec_loadAt _ _ _), exec_seqList_cons _ _ _ m2 run2,
+    rw [exec_seqList_cons _ _ _ m1 (exec_cst _ _ _), exec_seqList_cons _ _ _ m2 run2,
       exec_seqList_cons _ _ _ m3 run3, exec_seqList_cons _ _ _ m4 run4, exec_seqList_cons _ _ _ m5 run5,
-      exec_seqList_cons _ _ _ m6 run6, exec_seqList_nil]
-  · rw [ram6, ram5, ram4, ram3, ram2]; rfl
-  · rw [bits6, bits5, bits4, bits3, bits2]; rfl
-  · rw [keep6 register n2 n3 n4 n1, keep5 register n1 n2 n3 n4, keep4 register n1 n2 n3 n4,
-      keep3 register n1 n2 n3 n4, keep2 register n1 n2 n3, m1Def]
-    simp only [setReg, Function.update_apply, if_neg n1, if_neg n2]
+      exec_seqList_nil]
+  · rw [ram5, ram4, ram3, ram2]; rfl
+  · rw [bits5, bits4, bits3, bits2]; rfl
+  · rw [keep5 register n2 n3 n4 n1, keep4 register n1 n2 n3 n4, keep3 register n1 n2 n3 n4,
+      keep2 register n1 n2 n3, m1Def]
+    simp only [setReg, Function.update_apply, if_neg n1]
 
 /-- **The `Z` row**: `π = v(x9'') − (W.z − zC0)`. -/
 theorem exec_rowZ (d : Nat) (memory : Memory) (x y c0 w v9 : BaseField) (regs : RowRegs memory x y)
-    (hc : memory.ram (word (Opening.rowCell d 3)) = fieldWord c0)
+    (hc : memory.ram (word (Opening.rowCell d 2)) = fieldWord c0)
     (hw : memory.ram (word (openRow d + 2)) = fieldWord w)
-    (hv9 : memory.ram (word (decX (5 * d + 4))) = fieldWord v9) :
+    (hv9 : memory.ram (word (decX (4 * d + 3))) = fieldWord v9) :
     ∃ after, (rowZ d).exec memory = some after ∧
       after.ram = Function.update memory.ram (word (openTarget d 2)) (fieldWord (v9 - (w - c0))) ∧
       after.bits = memory.bits ∧ RowRegs after x y ∧ Keeps4 memory after := by
-  set m1 := setReg (setReg memory rAddr (word (Opening.rowCell d 3))) rAcc
-    (memory.ram (word (Opening.rowCell d 3))) with m1Def
+  set m1 := setReg (setReg memory rAddr (word (Opening.rowCell d 2))) rAcc
+    (memory.ram (word (Opening.rowCell d 2))) with m1Def
   have acc1 : m1.registers rAcc = fieldWord c0 := by
     rw [m1Def]; simp only [setReg, Function.update_self]; exact hc
   have regs1 : RowRegs m1 x y := RowRegs.keep regs fun register n1 n2 _ _ => by
@@ -278,10 +276,10 @@ theorem exec_solvePrefix (memory : Memory) (x y : BaseField)
 contents `dx, px` (delivered values and masks of the `x` encodings), `dy, py` (of the `y` encodings). -/
 def maskFormula (x y : BaseField) (gamma : RowGamma) (w : FieldMacToECMac.HomogeneousValue)
     (dx px dy py : Nat → BaseField) (d : Nat) : Fin 3 → BaseField
-  | 0 => dx (5 * d + 1) - (w.x - (gamma.xC0 + (dx (5 * d) - px (5 * d)) * x + (dy (3 * d) - py (3 * d))))
-  | 1 => dx (5 * d + 3) - (w.y - (gamma.yC0 + gamma.yC4 * (x * x) + (dx (5 * d + 2) - px (5 * d + 2)) * (x * x) +
-      (dy (3 * d + 1) - py (3 * d + 1)) * y + (dy (3 * d + 2) - py (3 * d + 2)))) * y⁻¹
-  | 2 => dx (5 * d + 4) - (w.z - gamma.zC0)
+  | 0 => dx (4 * d + 1) - (w.x - (gamma.xC0 + (dx (4 * d) - px (4 * d)) * x + (dy (3 * d) - py (3 * d))))
+  | 1 => dx (4 * d + 2) - (w.y - (0 + gamma.yC4 * (x * x) + (dy (3 * d + 1) - py (3 * d + 1)) * y +
+      (dy (3 * d + 2) - py (3 * d + 2)))) * (x * x)⁻¹
+  | 2 => dx (4 * d + 3) - (w.z - gamma.zC0)
 
 omit [FieldCertificate] in
 theorem cellNe {first second : Nat} (firstSmall : first < 2 ^ 256) (secondSmall : second < 2 ^ 256)
@@ -297,12 +295,10 @@ structure DigitCells (memory : Memory) (x y : BaseField) (gamma : RowGamma)
   reqXCell : memory.ram (word reqX) = fieldWord x
   reqYCell : memory.ram (word reqY) = fieldWord y
   row0 : memory.ram (word (Opening.rowCell d 0)) = fieldWord gamma.xC0
-  row1 : memory.ram (word (Opening.rowCell d 1)) = fieldWord gamma.yC0
-  row2 : memory.ram (word (Opening.rowCell d 2)) = fieldWord gamma.yC4
-  row3 : memory.ram (word (Opening.rowCell d 3)) = fieldWord gamma.zC0
-  decXCell : ∀ k, k < 5 → memory.ram (word (decX (5 * d + k))) = fieldWord (dx (5 * d + k))
-  maskX0 : memory.ram (word (maskX (5 * d))) = fieldWord (px (5 * d))
-  maskX2 : memory.ram (word (maskX (5 * d + 2))) = fieldWord (px (5 * d + 2))
+  row1 : memory.ram (word (Opening.rowCell d 1)) = fieldWord gamma.yC4
+  row2 : memory.ram (word (Opening.rowCell d 2)) = fieldWord gamma.zC0
+  decXCell : ∀ k, k < 4 → memory.ram (word (decX (4 * d + k))) = fieldWord (dx (4 * d + k))
+  maskX0 : memory.ram (word (maskX (4 * d))) = fieldWord (px (4 * d))
   decYCell : ∀ k, k < 3 → memory.ram (word (decY (3 * d + k))) = fieldWord (dy (3 * d + k))
   maskYCell : ∀ k, k < 3 → memory.ram (word (maskY (3 * d + k))) = fieldWord (py (3 * d + k))
   targetX : memory.ram (word (openRow d)) = fieldWord w.x
@@ -332,7 +328,6 @@ theorem exec_solveDigit (d : Nat) (small : d < 91) (memory : Memory) (x y : Base
   have dx1 := cells.decXCell 1 (by omega)
   have dx2 := cells.decXCell 2 (by omega)
   have dx3 := cells.decXCell 3 (by omega)
-  have dx4 := cells.decXCell 4 (by omega)
   have dy0 := cells.decYCell 0 (by omega)
   have dy1 := cells.decYCell 1 (by omega)
   have dy2 := cells.decYCell 2 (by omega)
@@ -340,24 +335,17 @@ theorem exec_solveDigit (d : Nat) (small : d < 91) (memory : Memory) (x y : Base
   have py1 := cells.maskYCell 1 (by omega)
   have py2 := cells.maskYCell 2 (by omega)
   simp only [Nat.add_zero] at dx0 dy0 py0
-  obtain ⟨m2, run2, ram2, bits2, regs2, keep2⟩ := exec_rowX d m1 x y gamma.xC0 (dx (5 * d)) (px (5 * d))
-    (dy (3 * d)) (py (3 * d)) w.x (dx (5 * d + 1)) regs1 (by rw [ram1]; exact cells.row0)
+  obtain ⟨m2, run2, ram2, bits2, regs2, keep2⟩ := exec_rowX d m1 x y gamma.xC0 (dx (4 * d)) (px (4 * d))
+    (dy (3 * d)) (py (3 * d)) w.x (dx (4 * d + 1)) regs1 (by rw [ram1]; exact cells.row0)
     (by rw [ram1]; exact dx0) (by rw [ram1]; exact cells.maskX0) (by rw [ram1]; exact dy0)
     (by rw [ram1]; exact py0) (by rw [ram1]; exact cells.targetX) (by rw [ram1]; exact dx1)
   have read2 : ∀ address, address < openBase + 1000 ∨ openBase + 2000 ≤ address → address < 2 ^ 256 →
       m2.ram (word address) = memory.ram (word address) := fun address range fits => by
     rw [ram2, Function.update_of_ne (t0 address range fits), ram1]
-  obtain ⟨m3, run3, ram3, bits3, regs3, keep3⟩ := exec_rowY d m2 x y gamma.yC0 gamma.yC4 (dx (5 * d + 2))
-    (px (5 * d + 2)) (dy (3 * d + 1)) (py (3 * d + 1)) (dy (3 * d + 2)) (py (3 * d + 2)) w.y
-    (dx (5 * d + 3)) regs2
+  obtain ⟨m3, run3, ram3, bits3, regs3, keep3⟩ := exec_rowY d m2 x y gamma.yC4
+    (dy (3 * d + 1)) (py (3 * d + 1)) (dy (3 * d + 2)) (py (3 * d + 2)) w.y (dx (4 * d + 2)) regs2
     (by rw [read2 _ (by unfold Opening.rowCell fieldBase curveCellCount openBase; omega)
       (by unfold Opening.rowCell fieldBase curveCellCount; omega)]; exact cells.row1)
-    (by rw [read2 _ (by unfold Opening.rowCell fieldBase curveCellCount openBase; omega)
-      (by unfold Opening.rowCell fieldBase curveCellCount; omega)]; exact cells.row2)
-    (by rw [read2 _ (by unfold decX Layout.decodedCell openBase; omega)
-      (by unfold decX Layout.decodedCell; omega)]; exact dx2)
-    (by rw [read2 _ (by unfold maskX Layout.maskCell openBase; omega)
-      (by unfold maskX Layout.maskCell; omega)]; exact cells.maskX2)
     (by rw [read2 _ (by unfold decY Layout.decodedCell openBase; omega)
       (by unfold decY Layout.decodedCell; omega)]; exact dy1)
     (by rw [read2 _ (by unfold maskY Layout.maskCell openBase; omega)
@@ -368,16 +356,16 @@ theorem exec_solveDigit (d : Nat) (small : d < 91) (memory : Memory) (x y : Base
       (by unfold maskY Layout.maskCell; omega)]; exact py2)
     ((read2 _ (by unfold openRow openBase; omega) (by unfold openRow openBase; omega)).trans cells.targetY)
     (by rw [read2 _ (by unfold decX Layout.decodedCell openBase; omega)
-      (by unfold decX Layout.decodedCell; omega)]; exact dx3)
+      (by unfold decX Layout.decodedCell; omega)]; exact dx2)
   have read3 : ∀ address, address < openBase + 1000 ∨ openBase + 2000 ≤ address → address < 2 ^ 256 →
       m3.ram (word address) = memory.ram (word address) := fun address range fits => by
     rw [ram3, Function.update_of_ne (t1 address range fits), read2 address range fits]
-  obtain ⟨m4, run4, ram4, bits4, regs4, keep4⟩ := exec_rowZ d m3 x y gamma.zC0 w.z (dx (5 * d + 4)) regs3
+  obtain ⟨m4, run4, ram4, bits4, regs4, keep4⟩ := exec_rowZ d m3 x y gamma.zC0 w.z (dx (4 * d + 3)) regs3
     (by rw [read3 _ (by unfold Opening.rowCell fieldBase curveCellCount openBase; omega)
-      (by unfold Opening.rowCell fieldBase curveCellCount; omega)]; exact cells.row3)
+      (by unfold Opening.rowCell fieldBase curveCellCount; omega)]; exact cells.row2)
     ((read3 _ (by unfold openRow openBase; omega) (by unfold openRow openBase; omega)).trans cells.targetZ)
     (by rw [read3 _ (by unfold decX Layout.decodedCell openBase; omega)
-      (by unfold decX Layout.decodedCell; omega)]; exact dx4)
+      (by unfold decX Layout.decodedCell; omega)]; exact dx3)
   refine ⟨m4, ?_, ?_, ?_, ?_⟩
   · unfold solveDigit
     rw [exec_seqList_cons _ _ _ m1 run1, exec_seqList_cons _ _ _ m2 run2, exec_seqList_cons _ _ _ m3 run3,
@@ -414,14 +402,10 @@ theorem DigitCells.transfer {memory memory' : Memory} {x y : BaseField} {gamma :
     (by unfold Opening.rowCell fieldBase curveCellCount; omega)).trans cells.row1
   row2 := (same _ (by unfold OutsideTargets Opening.rowCell fieldBase curveCellCount openBase; omega)
     (by unfold Opening.rowCell fieldBase curveCellCount; omega)).trans cells.row2
-  row3 := (same _ (by unfold OutsideTargets Opening.rowCell fieldBase curveCellCount openBase; omega)
-    (by unfold Opening.rowCell fieldBase curveCellCount; omega)).trans cells.row3
   decXCell k bound := (same _ (by unfold OutsideTargets decX Layout.decodedCell openBase; omega)
     (by unfold decX Layout.decodedCell; omega)).trans (cells.decXCell k bound)
   maskX0 := (same _ (by unfold OutsideTargets maskX Layout.maskCell openBase; omega)
     (by unfold maskX Layout.maskCell; omega)).trans cells.maskX0
-  maskX2 := (same _ (by unfold OutsideTargets maskX Layout.maskCell openBase; omega)
-    (by unfold maskX Layout.maskCell; omega)).trans cells.maskX2
   decYCell k bound := (same _ (by unfold OutsideTargets decY Layout.decodedCell openBase; omega)
     (by unfold decY Layout.decodedCell; omega)).trans (cells.decYCell k bound)
   maskYCell k bound := (same _ (by unfold OutsideTargets maskY Layout.maskCell openBase; omega)

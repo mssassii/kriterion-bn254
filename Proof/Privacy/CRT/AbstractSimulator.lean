@@ -8,7 +8,7 @@ program (F5), and none replays the digest (F6):
 * **stage 2, output `none`** (an invalid or off-curve input): return the selected labels; no oracle call;
 * **stage 2, output `some Q`**: run route M's replay on the shared lazy oracle (`routeMReplay`):
   the conversion and body blocks through `reader`, the key query at `t'` asked of the lazy oracle directly (never
-  through a tag-decoding reader: `t'` is uniform on `F_p` and may decode as a site tag), then the 683 non-collector
+  through a tag-decoding reader: `t'` is uniform on `F_p` and may decode as a site tag), then the 546 non-collector
   mask answers through `reader` (the 546 collector-mask positions are never read); as one program of the layer this
   is `RouteMView.replayProgram`, `replayRouteM`; draw the target rows `W_d`;
   set each collector's mask `π_c = v_c − τ_c` with `τ_c` the route-M solve (`BMR.collectorSolve`); draw a `sampleFp`
@@ -81,7 +81,7 @@ structure RouteMView [FieldCertificate] (Public : Type) where
   delivered : ConvOut → BMR.Enc → BaseField
   /-- The key input `t'`, from the published curve constants, the input and the delivered curve values. -/
   keyInput : Public → AffineInput → ConvOut → BaseField
-  /-- The evaluator's non-collector mask sites at the key `K` (inputs `K + 2^128 · maskTag`, labelled; 683
+  /-- The evaluator's non-collector mask sites at the key `K` (inputs `K + 2^128 · maskTag`, labelled; 546
   queries): the non-collector masks. -/
   nonCollectorReplay : Block → CM (BMR.NonCollector → BaseField)
   /-- The published row constants. -/
@@ -97,17 +97,17 @@ structure RouteMView [FieldCertificate] (Public : Type) where
 
 /-! ### The opening of route M -/
 
-/-- The 273 collectors, digit by digit, in the order `rowX_x9`, `rowY_x9`, `rowZ_x9`. -/
+/-- The 273 collectors, digit by digit, in the order `rowX_x9`, `rowY_cubic`, `rowZ_x9`. -/
 def collectorList : List BMR.Collector :=
   (List.finRange 91).flatMap fun d =>
-    [⟨(d, .inl .rowX_x9), Or.inl rfl⟩, ⟨(d, .inl .rowY_x9), Or.inr (Or.inl rfl)⟩,
+    [⟨(d, .inl .rowX_x9), Or.inl rfl⟩, ⟨(d, .inl .rowY_cubic), Or.inr (Or.inl rfl)⟩,
       ⟨(d, .inl .rowZ_x9), Or.inr (Or.inr rfl)⟩]
 
 /-- The collector number `c = 3 d + k`. -/
 def collectorIndex (c : BMR.Collector) : ℕ :=
   3 * c.1.1.val + match c.1.2 with
     | .inl .rowX_x9 => 0
-    | .inl .rowY_x9 => 1
+    | .inl .rowY_cubic => 1
     | _ => 2
 
 /-- The point of answer `j` of collector site `k`, read at the key `K`. -/

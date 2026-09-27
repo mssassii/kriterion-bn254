@@ -182,7 +182,7 @@ structure CrtChain (FI EI Public : Type) where
 
 /-- **The six hops from `G0` to `I`** with the error terms of `Glue/Budget.lean`. -/
 structure ChainHops [Finite FI] [Finite EI] (C : CrtChain FI EI Public) : Prop where
-  /-- `G0 → G0T`, P6a1: `995,088 / p`. -/
+  /-- `G0 → G0T`, P6a1: `945,076 / p`. -/
   table : HopBound C.real C.tablePlanted fun _ _ => tCollisionError
   /-- `G0T → G0U`, P1: one swap. -/
   swap : HopBound C.tablePlanted C.padSwapped fun _ _ => padSwapError

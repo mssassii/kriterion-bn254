@@ -162,8 +162,9 @@ theorem entries_congr (scalar : NonZeroScalar) (c : Entry.Coins) {T T' : TagTabl
     EntryCorrect.entriesOf (H8.tagHash T) scalar c = EntryCorrect.entriesOf (H8.tagHash T') scalar c := by
   funext o
   rw [entriesOf_tagHash, entriesOf_tagHash]
-  have ho := lt_trans o.isLt DigestSplit.digitCount_lt
-  rw [h.at _ (by rw [DigestSplit.family_final _ ho]; decide)]
+  have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+  have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+  rw [h.at _ (by rw [DigestSplit.family_final _ h0]; decide), h.at _ (by rw [DigestSplit.family_final _ h1]; decide)]
 
 /-- **A coordinate's published conversion material reads no pad position.** -/
 theorem convVector_congr (S coord : ℕ) (hc : coord < 2) (small : S ≤ 1000) (Δ : Block) (Z : ℕ → Block)

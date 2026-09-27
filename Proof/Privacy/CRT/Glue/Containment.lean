@@ -126,17 +126,14 @@ theorem keyInput_family (t : BaseField) : tagFamily (maskKeyInput t / 2 ^ 128) =
   exact maskKeyTag_family
 
 theorem mem_nonCollector {H : HashN} {K : Block} {n : ℕ} (inside : n ∈ asked H (nonCollectorMasksM K digitCount)) :
-    ∃ k j, k < 228 ∧ j < 3 ∧ n = hashInput K (maskTag 1 k j) := by
+    ∃ k j, k < 182 ∧ j < 3 ∧ n = hashInput K (maskTag 1 k j) := by
   rw [asked_nonCollectorMasksM] at inside
-  have pairs : pairSites digitCount = 227 := by decide
-  have single : singleSites digitCount = 1 := by decide
-  rw [if_pos single, List.mem_append] at inside
-  rcases inside with inPairs | inSingle
-  · obtain ⟨k, _, x_in⟩ := List.mem_flatMap.mp inPairs
-    obtain ⟨j, _, rfl⟩ := List.mem_map.mp x_in
-    exact ⟨k.val, j.val, by have := k.isLt; omega, j.isLt, rfl⟩
-  · obtain ⟨j, _, rfl⟩ := List.mem_map.mp inSingle
-    exact ⟨pairSites digitCount, j.val, by omega, by have := j.isLt; omega, rfl⟩
+  have pairs : pairSites digitCount = 182 := by decide
+  have single : ¬ singleSites digitCount = 1 := by decide
+  rw [if_neg single, List.append_nil] at inside
+  obtain ⟨k, _, x_in⟩ := List.mem_flatMap.mp inside
+  obtain ⟨j, _, rfl⟩ := List.mem_map.mp x_in
+  exact ⟨k.val, j.val, by have := k.isLt; omega, j.isLt, rfl⟩
 
 theorem mem_collector {H : HashN} {K : Block} {n : ℕ} (inside : n ∈ asked H (collectorMasksM K digitCount)) :
     ∃ k j, k < 273 ∧ j < 2 ∧ n = hashInput K (maskTag 0 k j) := by
@@ -223,7 +220,9 @@ theorem asked_reachDecodedCM (H : HashN) (pub : Kriterion.CRT.Entry.Public) (u :
     asked H (Paths.reachDecodedCM pub u labels) =
       asked H (Kriterion.CRT.Entry.replay pub u labels) ++
         (digestList labels u ++ (List.finRange digitCount).flatMap fun o =>
-          [hashInput (digestKey H coordinateBitCount (Kriterion.CRT.Entry.labelsOf labels) u) (digestFinalTag o.val)]) := by
+          [hashInput (digestKey H coordinateBitCount (Kriterion.CRT.Entry.labelsOf labels) u) (digestFinalTag (2 * o.val)),
+            hashInput (digestKey H coordinateBitCount (Kriterion.CRT.Entry.labelsOf labels) u)
+              (digestFinalTag (2 * o.val + 1))]) := by
   unfold Paths.reachDecodedCM
   rw [if_pos valid]
   unfold Kriterion.CRT.Entry.reachCM
@@ -289,16 +288,14 @@ theorem viewEntries_eq (valid : validate u = true) (table : TagTable)
   case finals =>
     intro e member
     obtain ⟨n, inside, rfl⟩ := List.mem_map.mp member
-    obtain ⟨o, _, n_in⟩ := List.mem_flatMap.mp inside
-    rw [List.mem_singleton] at n_in
-    subst n_in
-    have ho : o.val < 65536 := lt_of_lt_of_le o.isLt (by decide)
+    obtain ⟨o, hs, rfl⟩ := Align.mem_finals inside
+    have ho : o < 65536 := lt_of_lt_of_le hs (by decide)
     have labelled : Paths.SameVisible.Labelled (hashInput (digestKey (schemeHash (tableOracle (FI := Empty)
         (EI := Empty) (vtOf source u table drawn))) coordinateBitCount
-        (Kriterion.CRT.Entry.labelsOf (Kriterion.CRT.Entry.labels source u)) u) (digestFinalTag o.val)) :=
-      ⟨⟨9, 0, 0, 0, 0, o.val, 0⟩, ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, ho,
+        (Kriterion.CRT.Entry.labelsOf (Kriterion.CRT.Entry.labels source u)) u) (digestFinalTag o)) :=
+      ⟨⟨9, 0, 0, 0, 0, o, 0⟩, ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, ho,
         by norm_num⟩, _, rfl⟩
-    show ¬ (visTag Kriterion.CRT.Entry.table u (((hashInput _ (digestFinalTag o.val) : ℕ) : BaseField).val / 2 ^ 128)
+    show ¬ (visTag Kriterion.CRT.Entry.table u (((hashInput _ (digestFinalTag o) : ℕ) : BaseField).val / 2 ^ 128)
       = true)
     rw [labelled.val, digestFinal_invisible u _ ho]
     decide

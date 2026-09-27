@@ -6,8 +6,8 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 
 | block | cells | sampler |
 |---|---|---|
-| `fields` | `fieldBase + index`, `index < 367`: the curve constants, then the row constants `3 + 4 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
-| `bytes` | `exceptionBase + index`, `index < 546` | release-r1's `bytes` (8 coins each) |
+| `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row constants `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
+| `bytes` | `exceptionBase + index`, `index < 1092` | release-r1's `bytes` (8 coins each) |
 | `joins` | `sourceJoin κ index`, `index < joinCount` | 128 coins |
 | `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 128` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 85` | bounded rejection below `m_i` over `digitWidth m_i` coins |

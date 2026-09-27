@@ -11,7 +11,8 @@ tape whose coins carry the bridge input `t` and the digest's exceptional inputs:
 3. family 7 (the Embryo masks, read at `K = (hash t).1`): visible iff `u` is on the curve;
 4. family 8 (the digest labels): visible iff the entry's bit is the bit `u` holds, **on and off the curve** (the digest
    is keyed on raw Lamport labels, unlike xinshu's gadget);
-5. family 9 (the digest finals): the final of digit `o` is visible iff `u = exc_o`, read from the tape;
+5. family 9 (the digest finals): the final of site `s` (two per digit: `s = 2o` at the `Q = K` input, `s = 2o + 1` at
+   the `Q = 2K` input) is visible iff `u = exc_s`, read from the tape;
 6. everything else (and every permutation entry, of which the CRT entry has none, D2): hidden.
 -/
 

@@ -1,8 +1,8 @@
 /-
 **P8's family-9 row: a hidden digest final that the reach asks** (`Flags.CrtFinalCoincide`, `Flags/CoincidenceSplit.lean`).
 
-On the table oracle every hash is answered by its tag alone, so the garbler's final of digit `o` is asked at
-`hashInput key_o (digestFinalTag o)` with `key_o` the XOR of the table's first blocks at `exc_o`'s digest-label
+On the table oracle every hash is answered by its tag alone, so the garbler's final of site `o` (two per digit, one
+per exceptional kind) is asked at `hashInput key_o (digestFinalTag o)` with `key_o` the XOR of the table's first blocks at `exc_o`'s digest-label
 positions (`keyT T exc_o`), and the reach asks its finals at `keyT T u` (`garbler_final`, `reach_final`). A hidden
 reached final therefore forces `keyT T exc_o = keyT T u` with `exc_o ≠ u` (`hidden_final`). The two inputs differ in
 some bit `(c0, p0)`; at the position of `exc_o`'s label there, `keyT T exc_o` is that position's first block XOR a
@@ -10,7 +10,7 @@ part that ignores it (`keyT_update`), while `keyT T u` and the published value i
 `view_ignores`: the published value reads the table only at families other than 8). The position lies outside every
 site (`lpos_away`), so under the swapped table it is uniform and independent of the rest (`indep_swapped_pos`), and
 the coincidence has conditional mass `2^-128` against every weight on the published value (`fresh_le`). A union over
-the 91 digits gives `91/2^128`.
+the 182 final sites gives `182/2^128`.
 
 * `keyT`, `lpos`: the table key of an input and the digest-label positions;
 * `fresh_le`: the generic freshness bound at one non-site position;
@@ -103,9 +103,7 @@ theorem lpos_away (c : Fin 2) (p : Fin coordinateBitCount) {b : ℕ} (hb : b < 2
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ fam
     · simp only [siteTags, List.mem_map, List.mem_range] at ht
       obtain ⟨j, hj, rfl⟩ := ht
-      have hj' : j < 3 := by
-        have : j < (if k = 227 then 2 else 3) := hj
-        split at this <;> omega
+      have hj' : j < 3 := hj
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ fam
 
 /-- **The table key of an input**: the XOR of the table's first blocks at the input's digest-label positions. -/
@@ -302,7 +300,7 @@ theorem hashInput_label_inj {A B : Block} {t t' : ℕ} (h : hashInput A t = hash
 theorem garbler_final (scalar : NonZeroScalar) (c : Kriterion.CRT.Entry.Coins) (T : TagTable) (n : ℕ)
     (inG : n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)) (Kriterion.CRT.Entry.garbleCM scalar c))
     (fam9 : tagFamily (n / 2 ^ 128) = 9) :
-    ∃ o : Fin digitCount, ∃ w, Kriterion.CRT.Entry.exceptional scalar c o.val = some w ∧
+    ∃ o : Fin (2 * digitCount), ∃ w, Kriterion.CRT.Entry.exceptional scalar c o.val = some w ∧
       n = hashInput (keyT T w) (digestFinalTag o.val) := by
   have notIn : ∀ {α : Type} {S : Set Paths.TagKey} {program : CM α}, Paths.Tagged S program →
       (∀ k ∈ S, k.fam ≠ 9) → n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)) program → False := by
@@ -345,11 +343,12 @@ theorem garbler_final (scalar : NonZeroScalar) (c : Kriterion.CRT.Entry.Coins) (
     split at inEntry
     · exact absurd inEntry List.not_mem_nil
     · rename_i phi hd
-      rw [List.mem_singleton] at inEntry
-      have hexc : Kriterion.CRT.Entry.exceptional scalar c o.val =
-          some (Exception.exceptionalInput phi ((Kriterion.CRT.Entry.outputKeysOf scalar c).get o).offset.coordinates) :=
-        Align.exceptional_some scalar c o phi hd
-      exact ⟨o, _, hexc, by rw [inEntry, eval_digestTableM, garblerKey_table]⟩
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+      rcases inEntry with inEntry | inEntry
+      · exact ⟨⟨2 * o.val, by have := o.isLt; omega⟩, _, Align.exceptional_some scalar c o phi hd,
+          by rw [inEntry, eval_digestTableM, garblerKey_table]⟩
+      · exact ⟨⟨2 * o.val + 1, by have := o.isLt; omega⟩, _, Align.triple_some scalar c o phi hd,
+          by rw [inEntry, eval_digestTableM, garblerKey_table]⟩
 
 theorem fullReplayKeys_fam9 : ∀ k ∈ Paths.fullReplayKeys, k.fam ≠ 9 := by
   rintro k (inC | inK | inM)
@@ -364,7 +363,7 @@ theorem fullReplayKeys_fam9 : ∀ k ∈ Paths.fullReplayKeys, k.fam ≠ 9 := by
 theorem reach_final [FieldCertificate] [GroupCertificate] (H : HashN) (pub : Kriterion.CRT.Entry.Public)
     (u : AffineInput) (labels : LamportSignature) (n : ℕ)
     (inside : n ∈ asked H (Paths.reachDecodedCM pub u labels)) (fam9 : tagFamily (n / 2 ^ 128) = 9) :
-    ∃ o : Fin digitCount,
+    ∃ o : Fin (2 * digitCount),
       n = hashInput (digestKey H coordinateBitCount (Kriterion.CRT.Entry.labelsOf labels) u) (digestFinalTag o.val) := by
   have notIn : ∀ {α : Type} {S : Set Paths.TagKey} {program : CM α}, Paths.Tagged S program →
       (∀ k ∈ S, k.fam ≠ 9) → n ∈ asked H program → False := by
@@ -374,7 +373,7 @@ theorem reach_final [FieldCertificate] [GroupCertificate] (H : HashN) (pub : Kri
     exact away k member (fam ▸ fam9)
   have fromDigest : n ∈ asked H (digestEvalM coordinateBitCount digitCount (Kriterion.CRT.Entry.labelsOf labels) u
       (fun o => pub.exception.get o)) →
-      ∃ o : Fin digitCount,
+      ∃ o : Fin (2 * digitCount),
         n = hashInput (digestKey H coordinateBitCount (Kriterion.CRT.Entry.labelsOf labels) u)
           (digestFinalTag o.val) := by
     intro inDigest
@@ -389,8 +388,8 @@ theorem reach_final [FieldCertificate] [GroupCertificate] (H : HashN) (pub : Kri
         (lt_of_lt_of_le p.isLt (by decide)) (by omega)).1
       rw [Align.hashInput_div, fam8] at fam9
       omega
-    · simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at inFinals
-      exact inFinals
+    · obtain ⟨s, hs, rfl⟩ := Align.mem_finals inFinals
+      exact ⟨⟨s, hs⟩, rfl⟩
   unfold Paths.reachDecodedCM at inside
   simp only [asked_bind, asked_pure, List.append_nil] at inside
   by_cases valid : validate u = true
@@ -409,8 +408,8 @@ theorem reach_final [FieldCertificate] [GroupCertificate] (H : HashN) (pub : Kri
         omega) inConv).elim
     · exact fromDigest inDigest
 
-/-- Digit `o`'s final coincides at `u`: its exceptional input differs from `u` and has `u`'s table key. -/
-def Bad (scalar : NonZeroScalar) (u : AffineInput) (o : Fin digitCount) (c : Kriterion.CRT.Entry.Coins)
+/-- Final site `o`'s final coincides at `u`: its exceptional input differs from `u` and has `u`'s table key. -/
+def Bad (scalar : NonZeroScalar) (u : AffineInput) (o : Fin (2 * digitCount)) (c : Kriterion.CRT.Entry.Coins)
     (T : TagTable) : Prop :=
   ∃ w, Kriterion.CRT.Entry.exceptional scalar c o.val = some w ∧ w ≠ u ∧ keyT T w = keyT T u
 
@@ -422,7 +421,7 @@ theorem hidden_final (field : FieldCertificate) (group : @GroupCertificate field
     letI := @Fintype.ofFinite Empty inferInstance
     letI := Classical.decEq Empty
     Flags.HiddenReached crtEntry Kriterion.CRT.Entry.table parameter scalar (c, T) u e → Flags.entryFamily e = 9 →
-      ∃ o : Fin digitCount, Bad scalar u o c T := by
+      ∃ o : Fin (2 * digitCount), Bad scalar u o c T := by
   intro hidden fam
   obtain ⟨inG, inR, hiddenRule⟩ := hidden
   rw [StageTwo.garblerEntries_eq] at inG
@@ -447,7 +446,7 @@ theorem hidden_final (field : FieldCertificate) (group : @GroupCertificate field
     (hashInput_label_inj (hnw.symm.trans hno')).trans (digestKey_table T _ u)
   have slot : tagSlot (n / 2 ^ 128) = o.val := by
     rw [hnw, Align.hashInput_div]
-    exact (Align.digestFinalTag_fields (lt_trans o.isLt DigestSplit.digitCount_lt)).2
+    exact (Align.digestFinalTag_fields (lt_trans o.isLt (by decide))).2
   rw [Align.crtDesigned_hash, labelled.val, Align.designTag_final _ _ _ fam9, slot] at hiddenRule
   dsimp only [Instance.crtEntry] at hiddenRule
   refine ⟨o, w, hexc, fun wu => ?_, keys⟩
@@ -500,9 +499,9 @@ theorem bits_differ {w u : AffineInput} (ne : w ≠ u) :
   revert hp0
   cases (coordNat w c0).testBit p0.val <;> cases (coordNat u c0).testBit p0.val <;> simp
 
-/-- **One digit's coincidence** has mass `2^-128` against every weight on the published value, per coins. -/
+/-- **One final site's coincidence** has mass `2^-128` against every weight on the published value, per coins. -/
 theorem digit_le [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput)
-    (weight : crtEntry.Public → ℝ≥0∞) (o : Fin digitCount) (c : crtEntry.Coins) :
+    (weight : crtEntry.Public → ℝ≥0∞) (o : Fin (2 * digitCount)) (c : crtEntry.Coins) :
     ∑' T, swappedTableLaw crtLayout T *
         (weight (stageOneView crtEntry parameter scalar (c, T)) * Flags.ind (Bad scalar u o c T)) ≤
       (2 ^ 128 : ℝ≥0∞)⁻¹ * ∑' T, swappedTableLaw crtLayout T * weight (stageOneView crtEntry parameter scalar (c, T)) := by
@@ -555,12 +554,12 @@ theorem tape_le (F G : TableTape crtEntry → ℝ≥0∞) (ε : ℝ≥0∞)
   rw [PublicFirst.tsum_map_mul, PublicFirst.tsum_map_mul, mul_left_comm]
   exact mul_le_mul' le_rfl (each c)
 
-theorem ofReal_91 : ENNReal.ofReal (91 / 2 ^ 128) = 91 * (2 ^ 128 : ℝ≥0∞)⁻¹ := by
+theorem ofReal_182 : ENNReal.ofReal (182 / 2 ^ 128) = 182 * (2 ^ 128 : ℝ≥0∞)⁻¹ := by
   rw [ENNReal.ofReal_div_of_pos (by positivity), ENNReal.ofReal_pow (by norm_num), ENNReal.ofReal_ofNat,
     ENNReal.ofReal_ofNat, div_eq_mul_inv]
 
 /-- **P8's family-9 row for the concrete entry**: a hidden digest final asked by the reach has mass at most
-`91/2^128` under the swapped tape, against every weight on the published value. -/
+`182/2^128` (two final sites per digit) under the swapped tape, against every weight on the published value. -/
 theorem crtEntry_finalCoincide : Flags.CrtFinalCoincide := by
   intro field group parameter scalar u
   letI := field
@@ -571,7 +570,7 @@ theorem crtEntry_finalCoincide : Flags.CrtFinalCoincide := by
   have split : ∀ tape : TableTape crtEntry,
       Flags.ind (∃ e, Flags.HiddenReached crtEntry Kriterion.CRT.Entry.table parameter scalar tape u e ∧
           Flags.entryFamily e = 9) ≤
-        ∑ o : Fin digitCount, Flags.ind (Bad scalar u o tape.1 tape.2) := by
+        ∑ o : Fin (2 * digitCount), Flags.ind (Bad scalar u o tape.1 tape.2) := by
     rintro ⟨c, T⟩
     by_cases any : ∃ e, Flags.HiddenReached crtEntry Kriterion.CRT.Entry.table parameter scalar (c, T) u e ∧
         Flags.entryFamily e = 9
@@ -579,20 +578,20 @@ theorem crtEntry_finalCoincide : Flags.CrtFinalCoincide := by
       obtain ⟨e, hidden, fam⟩ := any
       obtain ⟨o, bad⟩ := hidden_final field group parameter scalar u c T e hidden fam
       calc (1 : ℝ≥0∞) = Flags.ind (Bad scalar u o c T) := (Flags.ind_of bad).symm
-        _ ≤ ∑ o' : Fin digitCount, Flags.ind (Bad scalar u o' c T) :=
+        _ ≤ ∑ o' : Fin (2 * digitCount), Flags.ind (Bad scalar u o' c T) :=
           Finset.single_le_sum (f := fun o' => Flags.ind (Bad scalar u o' c T)) (fun _ _ => zero_le)
             (Finset.mem_univ o)
     · unfold Flags.ind
       rw [if_neg any]
       exact zero_le
-  have perDigit : ∀ o : Fin digitCount,
+  have perDigit : ∀ o : Fin (2 * digitCount),
       ∑' tape, swappedTableTape crtEntry tape *
           (weight (stageOneView crtEntry parameter scalar tape) * Flags.ind (Bad scalar u o tape.1 tape.2)) ≤
         (2 ^ 128 : ℝ≥0∞)⁻¹ *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape) :=
     fun o => tape_le _ _ _ fun c => digit_le parameter scalar u weight o c
-  have h91 : ((digitCount : ℕ) : ℝ≥0∞) = 91 := by
-    rw [show digitCount = 91 from rfl]
+  have h182 : ((2 * digitCount : ℕ) : ℝ≥0∞) = 182 := by
+    rw [show 2 * digitCount = 182 from rfl]
     norm_num
   calc ∑' tape, swappedTableTape crtEntry tape *
         (weight (stageOneView crtEntry parameter scalar tape) *
@@ -600,18 +599,18 @@ theorem crtEntry_finalCoincide : Flags.CrtFinalCoincide := by
             Flags.entryFamily e = 9))
       ≤ ∑' tape, swappedTableTape crtEntry tape *
           (weight (stageOneView crtEntry parameter scalar tape) *
-            ∑ o : Fin digitCount, Flags.ind (Bad scalar u o tape.1 tape.2)) :=
+            ∑ o : Fin (2 * digitCount), Flags.ind (Bad scalar u o tape.1 tape.2)) :=
         ENNReal.tsum_le_tsum fun tape => mul_le_mul' le_rfl (mul_le_mul' le_rfl (split tape))
-    _ = ∑ o : Fin digitCount, ∑' tape, swappedTableTape crtEntry tape *
+    _ = ∑ o : Fin (2 * digitCount), ∑' tape, swappedTableTape crtEntry tape *
           (weight (stageOneView crtEntry parameter scalar tape) * Flags.ind (Bad scalar u o tape.1 tape.2)) := by
         simp_rw [Finset.mul_sum]
         exact Summable.tsum_finsetSum fun _ _ => ENNReal.summable
-    _ ≤ ∑ _o : Fin digitCount, (2 ^ 128 : ℝ≥0∞)⁻¹ *
+    _ ≤ ∑ _o : Fin (2 * digitCount), (2 ^ 128 : ℝ≥0∞)⁻¹ *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape) :=
         Finset.sum_le_sum fun o _ => perDigit o
-    _ = ENNReal.ofReal (91 / 2 ^ 128) *
+    _ = ENNReal.ofReal (182 / 2 ^ 128) *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape) := by
-        rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, h91, ofReal_91, mul_assoc]
+        rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul, h182, ofReal_182, mul_assoc]
 
 end
 

@@ -5,8 +5,8 @@ to the CRT chain).
 The frozen hop `publicFirst` of `crt_oracleAdaptivePrivacy_of` follows from two named obligations:
 
 * `CrtCoincidenceBound T coincidenceError` (P8): under `G1U`'s stage 1 the reach's entries differ from the designed
-  ones with mass at most `94/2^128` (the 91 digest-key collisions `key(u) = key_o` with `u ≠ exc_o`, the off-curve
-  mask key, the two `Δ = 0` events);
+  ones with mass at most `185/2^128` (the 182 digest-key collisions `key(u) = key_s` with `u ≠ exc_s`, two final
+  sites per digit, the off-curve mask key, the two `Δ = 0` events);
 * `CrtMiddleObligation T` (P7 and P8): two flagged games, `upper` below `G1U°` and `lower` below `HW`, with `upper`'s
   flag mass at most `stageOneTouchError q₁ + smudgeError + exceptionalError` and their total variation at most
   `padSwapError` (the off-curve third swap). xinshu's `M'` and `M` are the intended witnesses.

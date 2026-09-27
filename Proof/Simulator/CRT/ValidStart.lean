@@ -218,9 +218,9 @@ theorem gammaOf_publish (src : Kriterion.CRT.Entry.Source) (d : Fin digitCount) 
   rw [Vector.get_eq_getElem, Vector.getElem_ofFn]
 
 omit [FieldCertificate] in
-/-- The row cell `3 + 4 d + slot` of the stage-1 field cells. -/
-theorem fieldOf_row (src : Kriterion.CRT.Entry.Source) (d : Fin 91) (slot : Nat) (small : slot < 4) :
-    CrtPieces.fieldOf src (3 + 4 * d.val + slot) = CrtWire.rowField (src.rows d) slot := by
+/-- The row cell `3 + 3 d + slot` of the stage-1 field cells. -/
+theorem fieldOf_row (src : Kriterion.CRT.Entry.Source) (d : Fin 91) (slot : Nat) (small : slot < 3) :
+    CrtPieces.fieldOf src (3 + 3 * d.val + slot) = CrtWire.rowField (src.rows d) slot := by
   have dSmall := d.isLt
   unfold CrtPieces.fieldOf
   rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), dif_pos (by omega)]
@@ -244,7 +244,7 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
   have lb : labelBase = 2 ^ 44 := rfl
   have lc : labelCount = 508 := rfl
   have fb : fieldBase = 2 ^ 40 := rfl
-  have fc : CrtStage1.fieldCount = 367 := rfl
+  have fc : CrtStage1.fieldCount = 276 := rfl
   have keptLow : ∀ n, n < requestBase → Kept n := by
     intro n small
     refine ⟨by omega, ?_, ?_⟩ <;> omega
@@ -289,17 +289,17 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
   · exact field 1 (by decide)
   · exact field 2 (by decide)
   · have dSmall := d.isLt
-    have cell : ∀ slot, slot < 4 → middle.ram (word (Opening.rowCell d.val slot)) =
-        fieldWord (CrtPieces.fieldOf (CrtSource.extract memory.ram) (3 + 4 * d.val + slot)) := by
+    have cell : ∀ slot, slot < 3 → middle.ram (word (Opening.rowCell d.val slot)) =
+        fieldWord (CrtPieces.fieldOf (CrtSource.extract memory.ram) (3 + 3 * d.val + slot)) := by
       intro slot small
-      rw [show Opening.rowCell d.val slot = fieldBase + (3 + 4 * d.val + slot) by
+      rw [show Opening.rowCell d.val slot = fieldBase + (3 + 3 * d.val + slot) by
           unfold Opening.rowCell curveCellCount; omega,
         field _ (by omega)]
-    rw [cell 0 (by decide), cell 1 (by decide), cell 2 (by decide), cell 3 (by decide)]
+    rw [cell 0 (by decide), cell 1 (by decide), cell 2 (by decide)]
     generalize CrtSource.extract memory.ram = src
     rw [gammaOf_publish src d, fieldOf_row src d 0 (by decide), fieldOf_row src d 1 (by decide),
-      fieldOf_row src d 2 (by decide), fieldOf_row src d 3 (by decide)]
-    exact ⟨rfl, rfl, rfl, rfl⟩
+      fieldOf_row src d 2 (by decide)]
+    exact ⟨rfl, rfl, rfl⟩
 
 end Start
 

@@ -305,12 +305,17 @@ theorem digest_to_garbler {n : ℕ} (entries : Fin digitCount → Exception.Entr
     simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at inLabels
     obtain ⟨c, p, rfl⟩ := inLabels
     exact garbler_of_mem H scalar coins (Or.inr (Or.inr (Or.inr (Or.inr (label_in_table H coins u c p)))))
-  · simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at inFinals
-    obtain ⟨o, rfl⟩ := inFinals
-    obtain ⟨fam, _⟩ := Align.digestFinalTag_fields (o := o.val)
-      (by have := o.isLt; simp only [digitCount] at this; omega)
-    rw [hashInput_div, visTag_final fam] at vis
-    cases vis
+  · simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_cons, List.not_mem_nil,
+      or_false] at inFinals
+    obtain ⟨o, rfl | rfl⟩ := inFinals
+    · obtain ⟨fam, _⟩ := Align.digestFinalTag_fields (o := 2 * o.val)
+        (by have := o.isLt; simp only [digitCount] at this; omega)
+      rw [hashInput_div, visTag_final fam] at vis
+      cases vis
+    · obtain ⟨fam, _⟩ := Align.digestFinalTag_fields (o := 2 * o.val + 1)
+        (by have := o.isLt; simp only [digitCount] at this; omega)
+      rw [hashInput_div, visTag_final fam] at vis
+      cases vis
 
 /-- **A reach input at a visible tag is the garbler's.** -/
 theorem reach_to_garbler [FieldCertificate] [GroupCertificate] :

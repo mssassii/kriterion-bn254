@@ -237,14 +237,12 @@ theorem bodyEvalM_closed (κ : ℕ) (hκ : κ < 2) (S : ℕ) (hS : S = padS κ) 
 /-- **The non-collector mask sites are whole sites.** -/
 theorem nonCollectorMasksM_closed (K : Block) : SiteClosed (nonCollectorMasksM K digitCount) := fun H => by
   rw [asked_nonCollectorMasksM]
-  have pairs : pairSites digitCount = 227 := by decide
-  have single : singleSites digitCount = 1 := by decide
-  rw [if_pos single]
-  refine ClosedList.append (ClosedList.flatMap _ _ fun k _ => ?_) ?_
-  · have kLt : k.val < 227 := lt_of_lt_of_eq k.isLt pairs
-    have answers : layoutAnswers (.mask 1 k.val) = 3 := by
-      show (if k.val = 227 then 2 else 3) = 3
-      rw [if_neg (by omega)]
+  have pairs : pairSites digitCount = 182 := by decide
+  have single : ¬ singleSites digitCount = 1 := by decide
+  rw [if_neg single, List.append_nil]
+  refine ClosedList.flatMap _ _ fun k _ => ?_
+  · have kLt : k.val < 182 := lt_of_lt_of_eq k.isLt pairs
+    have answers : layoutAnswers (.mask 1 k.val) = 3 := rfl
     have listEq : ((List.finRange 3).map fun j => hashInput K (maskTag 1 k.val j.val)) =
         ((List.range (layoutAnswers (.mask 1 k.val))).map fun j => maskTag 1 k.val j).map
           fun tag => hashInput K tag := by
@@ -255,17 +253,6 @@ theorem nonCollectorMasksM_closed (K : Block) : SiteClosed (nonCollectorMasksM K
     obtain ⟨j, hj, rfl⟩ := List.mem_map.mp tagIn
     rw [List.mem_range, answers] at hj
     exact siteOf_maskTag (by norm_num) (by omega) (by omega)
-  · have listEq : ((List.finRange 2).map fun j => hashInput K (maskTag 1 (pairSites digitCount) j.val)) =
-        ((List.range (layoutAnswers (.mask 1 227))).map fun j => maskTag 1 227 j).map fun tag => hashInput K tag := by
-      have answers : layoutAnswers (.mask 1 227) = 2 := rfl
-      rw [answers, pairs, List.map_map, ← List.map_coe_finRange_eq_range, List.map_map]
-      rfl
-    rw [listEq]
-    refine closedList_site K (.mask 1 227) _ (siteTags_mask 1 227) fun tag tagIn => ?_
-    obtain ⟨j, hj, rfl⟩ := List.mem_map.mp tagIn
-    rw [List.mem_range] at hj
-    have : layoutAnswers (.mask 1 227) = 2 := rfl
-    exact siteOf_maskTag (by norm_num) (by norm_num) (by omega)
 
 end Sites
 

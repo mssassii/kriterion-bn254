@@ -357,8 +357,9 @@ theorem replayKeys_siteTags : SiteTagsOK crtLayout replayKeys := by
   · obtain ⟨inLayout, _⟩ := nonCollectorKeys_sites k inM range site isSite
     refine ⟨inLayout, ?_⟩
     have pairs := pairSites_digitCount
+    have single := singleSites_digitCount
     have facts : k.fam = 7 ∧ k.coord = 0 ∧ k.idx = 0 ∧ k.stage = 1 ∧ k.level = 0 ∧
-        ((k.slot < 227 ∧ k.part < 3) ∨ (k.slot = 227 ∧ k.part < 2)) := by
+        (k.slot < 182 ∧ k.part < 3) := by
       rcases inM with inP | inS
       · simp only [maskStageKeys, Set.mem_setOf_eq] at inP
         omega
@@ -371,8 +372,8 @@ theorem replayKeys_siteTags : SiteTagsOK crtLayout replayKeys := by
     show k.code ∈ (List.range (Layout.layoutAnswers (.mask 1 k.slot))).map
       fun j => tagCode Family.mask 0 0 1 0 k.slot j
     refine List.mem_map.mpr ⟨k.part, List.mem_range.mpr ?_, ?_⟩
-    · show k.part < if k.slot = 227 then 2 else 3
-      split <;> omega
+    · show k.part < 3
+      omega
     · unfold TagKey.code
       rw [seven, kCoord, kIdx, kStage, kLevel]
       rfl

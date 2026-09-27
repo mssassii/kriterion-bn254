@@ -1,23 +1,22 @@
 /-
-Which oracle instructions the machine issues.
+Which oracle instructions a block issues.
 
-* **Stage 1 issues none.** `Stage1.program` is `NoOracle`, so its law is an oracle-free law on
-  memory and leaves the lazy oracle untouched (`sem_noOracle`); with `stage1_run`, the whole
-  stage-1 run returns the incoming oracle state unchanged (`stage1_run_oracle`).
-* **The invalid branch issues none**: the stage-2 prefix and `Stage2.invalid` are `NoOracle`
-  (`stage2_invalid_oracle`).
-* **The valid branch issues only the four fixed shapes** `query 0` (fixed forward), `query 2`
-  (EncPRF forward), `query 4` (hash) and `program 0` (fixed forward), all on the operand
-  registers `R12 … R15` (`valid_oracleOps`); every constant loaded into the index register is
-  the ordinal of a fold index `hotIdx`, a scale index `scaleIdx`, or an EncPRF index `encIdx`
-  (`valid_indexConstants`).
+* `Prog.NoOracle`: a program with no oracle operation; its law is an oracle-free law on memory (`Prog.memSem`) and
+  leaves the lazy oracle untouched (`sem_noOracle`). The samplers, the emissions, the stage-2 prefix and the invalid
+  arm are `NoOracle`.
+* `Prog.OpsSatisfy`: every operation of a program satisfies a predicate (`ValidOracle`: the query and program shapes
+  on the operand registers `R12 … R15`).
 -/
 
 import Proof.Simulator.Runs
+import Construction.Simulator.Stage2
+import Construction.Simulator.Stage1
+-- `Construction.PGS.Index` brings the Mathlib instances `Sampling.uniform_product`'s `classical` simp relies on.
+import Construction.PGS.Index
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 
-open Cryptography Cryptography.BoundedMachine Design Blocks
+open Cryptography Cryptography.BoundedMachine Blocks
 
 /-! ### Oracle-free programs -/
 
@@ -134,22 +133,6 @@ theorem noOracle_emitWord (address width : Nat) : (emitWord address width).NoOra
 theorem noOracle_emitZero (width : Nat) : (emitZero width).NoOracle :=
   ⟨rfl, noOracle_rep _ _ fun _ _ => ⟨rfl, rfl, rfl⟩⟩
 
-theorem noOracle_serializeChunk (chunk : Nat) : (Stage1.serializeChunk chunk).NoOracle :=
-  ⟨noOracle_emitZero 2, noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _⟩
-
-/-- **Stage 1 has no oracle instruction.** -/
-theorem stage1_noOracle : Stage1.program.NoOracle := by
-  refine ⟨noOracle_rep _ _ fun _ _ => ?_, noOracle_rep _ _ fun _ _ => ?_,
-    noOracle_rep _ _ fun _ _ => ?_, noOracle_rep _ _ fun _ _ => ?_, ?_, noOracle_zeroRegs _⟩
-  · exact ⟨noOracle_bounded _ _ _ _ ⟨rfl, rfl⟩ ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
-  · exact ⟨noOracle_sampleWord _, ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
-  · exact ⟨noOracle_sampleWord _, ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
-  · exact ⟨noOracle_sampleWord _, ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩
-  · exact ⟨noOracle_rep _ _ fun _ _ => noOracle_serializeChunk _,
-      noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _,
-      noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _,
-      noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _⟩
-
 theorem noOracle_parseWord (address : Nat) : (Request.parseWord address).NoOracle :=
   ⟨rfl, noOracle_rep _ _ (fun _ _ => ⟨trivial, rfl, rfl, rfl⟩), rfl, rfl⟩
 
@@ -209,220 +192,5 @@ theorem opsSatisfy_rep {allowed : Op → Prop} (count : Nat) (body : Nat → Pro
   | succ count ih =>
       rw [Prog.rep]
       exact ⟨ih fun index bound => each index (by omega), each count (by omega)⟩
-
-section Valid
-
-variable (ordF : PlanB.FixedIndex → Nat) (ordE : EncPRF.PermutationIndex → Nat)
-
-private theorem plainOps {program : Prog} (free : program.NoOracle) :
-    program.OpsSatisfy ValidOracle :=
-  opsSatisfy_of_noOracle validOracle_plain program free
-
-private theorem fixedQuery : ValidOracle (.query 0 rIndex rInput rFirst rSecond) :=
-  ⟨Or.inl rfl, rfl, rfl, rfl, rfl⟩
-
-theorem replay_element (spec : Replay.LaneSpec) (chunk switch index : Nat) :
-    (Replay.element ordF spec chunk switch index).OpsSatisfy ValidOracle := by
-  unfold Replay.element
-  exact ⟨trivial, fixedQuery, trivial, trivial, fixedQuery, trivial, trivial, fixedQuery, trivial,
-    trivial, trivial, trivial, trivial, trivial, trivial, trivial, ⟨trivial, trivial⟩, trivial,
-    ⟨trivial, trivial⟩⟩
-
-theorem replay_guarded (spec : Replay.LaneSpec) (chunk switch index : Nat) :
-    (Replay.guardedElement ordF spec chunk switch index).OpsSatisfy ValidOracle := by
-  unfold Replay.guardedElement
-  split
-  · exact ⟨⟨trivial, trivial⟩, trivial, trivial, replay_element ordF spec chunk switch index, trivial⟩
-  · exact replay_element ordF spec chunk switch index
-
-theorem replay_chunkBody (spec : Replay.LaneSpec) (designated : Bool) (chunk : Nat) :
-    (Replay.chunkBody ordF spec designated chunk).OpsSatisfy ValidOracle := by
-  unfold Replay.chunkBody
-  have foldArm (entry : Nat) : (Replay.foldArm ordF spec chunk entry).OpsSatisfy ValidOracle := by
-    unfold Replay.foldArm Replay.foldPair
-    exact ⟨⟨trivial, fixedQuery, trivial, trivial, fixedQuery, trivial, trivial⟩,
-      ⟨trivial, trivial⟩, ⟨trivial, trivial⟩, trivial, trivial, ⟨trivial, trivial⟩,
-      ⟨trivial, trivial⟩, trivial, ⟨trivial, trivial⟩, trivial, ⟨trivial, trivial⟩⟩
-  refine ⟨?_, ?_, opsSatisfy_rep _ _ fun switch _ => ?_, ⟨trivial, trivial⟩,
-    opsSatisfy_rep _ _ fun _ _ => ?_⟩
-  · unfold Replay.chunkPrefix
-    exact ⟨⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, ⟨trivial, trivial⟩, trivial,
-      trivial, ⟨trivial, trivial⟩, ⟨trivial, trivial⟩, foldArm 0, foldArm 1⟩
-  · split
-    · unfold Replay.designatedPrefix
-      exact plainOps ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, rfl, rfl, rfl, ⟨rfl, rfl⟩, rfl, ⟨rfl, rfl⟩,
-        rfl, rfl, ⟨rfl, rfl⟩⟩
-    · trivial
-  · unfold Replay.switchStep Replay.switchBody
-    refine ⟨⟨trivial, trivial⟩, trivial, trivial, ⟨⟨trivial, trivial⟩, ⟨trivial, trivial⟩, trivial,
-      trivial, ?_⟩, trivial⟩
-    unfold Replay.switchElements
-    split
-    · exact opsSatisfy_rep _ _ fun digit _ => by
-        unfold Replay.designatedDigit
-        exact ⟨replay_element ordF spec chunk switch _, replay_guarded ordF spec chunk switch _,
-          replay_element ordF spec chunk switch _, replay_guarded ordF spec chunk switch _,
-          replay_guarded ordF spec chunk switch _⟩
-    · exact opsSatisfy_rep _ _ fun _ _ => replay_element ordF spec chunk switch _
-  · unfold Replay.joinTerm
-    exact ⟨⟨trivial, trivial⟩, trivial, ⟨trivial, trivial⟩, trivial, ⟨trivial, trivial⟩⟩
-
-theorem replay_ops : (Replay.program ordF ordE).OpsSatisfy ValidOracle := by
-  unfold Replay.program
-  refine ⟨?_, opsSatisfy_rep _ _ fun _ _ => replay_chunkBody ordF _ _ _,
-    opsSatisfy_rep _ _ fun _ _ => replay_chunkBody ordF _ _ _, ?_, ?_,
-    ⟨replay_chunkBody ordF _ _ _, opsSatisfy_rep _ _ fun _ _ => replay_chunkBody ordF _ _ _⟩,
-    opsSatisfy_rep _ _ fun _ _ => replay_chunkBody ordF _ _ _⟩
-  · unfold Replay.initAcc
-    exact ⟨trivial, opsSatisfy_rep _ _ fun _ _ => ⟨trivial, trivial⟩⟩
-  · unfold Replay.bridge
-    refine ⟨⟨trivial, trivial⟩, ⟨trivial, trivial⟩, trivial, trivial, trivial, ⟨trivial, trivial⟩,
-      ⟨trivial, trivial⟩, trivial, trivial, ⟨trivial, trivial⟩, trivial, trivial,
-      ⟨trivial, trivial⟩, trivial, trivial, ⟨trivial, trivial⟩, trivial, trivial,
-      ⟨trivial, trivial⟩, trivial, trivial, ⟨trivial, trivial⟩, trivial, ⟨trivial, trivial⟩,
-      trivial, ⟨Or.inr (Or.inr rfl), rfl, rfl, rfl, rfl⟩, ⟨trivial, trivial⟩, ⟨trivial, trivial⟩⟩
-  · unfold Replay.whiten
-    exact ⟨⟨trivial, trivial⟩, ⟨trivial, trivial⟩, opsSatisfy_rep _ _ fun _ _ => by
-      unfold Replay.whitenOne
-      exact ⟨trivial, ⟨Or.inr (Or.inl rfl), rfl, rfl, rfl, rfl⟩, trivial, ⟨trivial, trivial⟩,
-        trivial, ⟨trivial, trivial⟩⟩⟩
-
-theorem opening_ops : (Opening.program ordF).OpsSatisfy ValidOracle := by
-  unfold Opening.program
-  simp only [Prog.seqList]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, plainOps (noOracle_zeroRegs _), trivial⟩
-  · have curveRoot (source : Register) : (Opening.curveRoot source).NoOracle := by
-      unfold Opening.curveRoot
-      simp only [Prog.seqList]
-      exact ⟨rfl, rfl, rfl, rfl, rfl, noOracle_rep _ _ (fun _ _ => by
-        unfold Opening.sqrtRound
-        exact ⟨rfl, by split <;> first | rfl | trivial⟩), trivial⟩
-    exact opsSatisfy_rep _ _ fun _ _ => by
-      unfold Opening.tailOne
-      simp only [Prog.seqList]
-      refine plainOps ⟨noOracle_bounded _ _ _ _ ?_ ?_, noOracle_zeroRegs _, trivial⟩
-      · unfold Opening.testCurveX
-        simp only [Prog.seqList]
-        exact ⟨rfl, rfl, curveRoot _, rfl, rfl, rfl, rfl, rfl, trivial⟩
-      · unfold Opening.storeCurvePoint
-        simp only [Prog.seqList]
-        exact ⟨curveRoot _, ⟨rfl, trivial⟩, rfl, rfl, rfl, rfl, rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩,
-          ⟨rfl, rfl⟩, trivial⟩
-  · -- Horner and the head clamp: oracle-free
-    unfold Opening.horner Opening.clearP Opening.head Opening.storePoint
-    simp only [Prog.seqList]
-    have betaMul : Opening.betaMul.NoOracle := by
-      unfold Opening.betaMul Opening.copyPoint Opening.clearP
-      simp only [Prog.seqList]
-      exact ⟨⟨rfl, rfl, rfl, trivial⟩, ⟨rfl, rfl, rfl, trivial⟩, noOracle_rep _ _ (fun _ _ => by
-        unfold Opening.betaRound
-        exact ⟨rfl, by split <;> first | rfl | trivial⟩), trivial⟩
-    exact plainOps ⟨⟨rfl, rfl, rfl, trivial⟩, noOracle_rep _ _ (fun _ _ => by
-        unfold Opening.hornerStep Opening.loadPoint
-        simp only [Prog.seqList]
-        exact ⟨betaMul, ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, trivial⟩, rfl, trivial⟩),
-      ⟨betaMul, ⟨⟨rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, rfl,
-        ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, trivial⟩, noOracle_zeroRegs _, trivial⟩, trivial⟩,
-        trivial⟩, trivial⟩
-  · -- the randomisers
-    exact plainOps (noOracle_rep _ _ fun _ _ =>
-      ⟨noOracle_bounded _ _ _ _ ⟨rfl, rfl, rfl, rfl⟩ ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩)
-  · -- the lifts
-    exact plainOps (noOracle_rep _ _ fun _ _ => by
-      unfold Opening.liftOne Opening.loadPoint
-      simp only [Prog.seqList]
-      exact ⟨⟨rfl, rfl⟩, rfl, rfl, ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, trivial⟩, rfl, rfl, rfl,
-        rfl, rfl, rfl, rfl, rfl, rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩,
-        noOracle_zeroRegs _, trivial⟩)
-  · -- the collector targets
-    exact plainOps (noOracle_rep _ _ fun _ _ => by
-      unfold Opening.solveDigit Opening.addScaled Opening.addCell Opening.finishTarget
-        Opening.finishTargetOverY
-      simp only [Prog.seqList, Prog.NoOracle, loadAt, storeAt, cst, ar, Op.isOracle, and_true,
-        true_and, noOracle_zeroRegs])
-  · -- the preimages
-    exact plainOps (noOracle_rep _ _ fun _ _ => noOracle_rep _ _ fun _ _ => by
-      unfold Opening.preimageOne Opening.limbsOf Opening.shr128
-      simp only [Prog.seqList]
-      exact ⟨⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, noOracle_bounded _ _ _ _ rfl ⟨rfl, rfl⟩,
-        noOracle_zeroRegs _,
-        ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl,
-          rfl, rfl, rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩,
-          ⟨rfl, rfl⟩, rfl, ⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩,
-          ⟨rfl, rfl⟩, rfl, ⟨rfl, rfl⟩, rfl, rfl, ⟨rfl, rfl⟩, noOracle_zeroRegs _, trivial⟩,
-        trivial⟩)
-  · -- the 819 programs
-    exact opsSatisfy_rep _ _ fun _ _ => opsSatisfy_rep _ _ fun _ _ => opsSatisfy_rep _ _ fun _ _ => by
-      unfold Opening.programOne Opening.selectIndex
-      simp only [Prog.seqList]
-      exact ⟨⟨trivial, trivial⟩, ⟨trivial, trivial⟩, trivial,
-        opsSatisfy_rep _ _ (fun _ _ => ⟨⟨trivial, trivial⟩, trivial, trivial,
-          ⟨trivial, trivial⟩, trivial⟩),
-        ⟨rfl, rfl, rfl, rfl, rfl⟩, trivial⟩
-
-/-- **The valid arm issues only the four allowed oracle shapes.** -/
-theorem valid_ops : (Stage2.valid ordF ordE).OpsSatisfy ValidOracle := by
-  unfold Stage2.valid
-  simp only [Prog.seqList]
-  exact ⟨replay_ops ordF ordE, opening_ops ordF,
-    plainOps (noOracle_rep _ _ fun _ _ => noOracle_emitWord _ _), trivial⟩
-
-end Valid
-
-/-! ### The runs leave the oracle untouched -/
-
-section Runs
-
-variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
-  [Fintype FixedIndex] [Fintype EncIndex] [DecidableEq FixedIndex] [DecidableEq EncIndex]
-variable (ordF : PlanB.FixedIndex → Nat) (ordE : EncPRF.PermutationIndex → Nat)
-
-/-- **Stage 1 makes no oracle call**: its run is an oracle-free law followed by a halt that
-returns the incoming oracle state unchanged. -/
-theorem stage1_run_oracle (memory : Memory) (rest : List Bool)
-    (request : memory.bits 0 = false :: false :: rest) (oracle : OState FixedIndex EncIndex) :
-    (Top.machine ordF ordE).run Design.firstFuel ⟨0, memory⟩ oracle =
-      (Stage1.program.memSem (Top.afterTag memory rest)).map fun result => result.map fun final =>
-        (atPc (Top.machine ordF ordE) stage1Halt final, oracle, Design.firstFuel) := by
-  rw [Top.stage1_run ordF ordE memory rest request oracle,
-    sem_noOracle _ stage1_noOracle, PMF.bind_map, PMF.map]
-  congr 1
-  funext result
-  cases result <;> rfl
-
-/-- **Stage 2, split at the output tag.** The prefix is oracle-free; on a clear flag (the
-invalid output) the arm is oracle-free as well, so the run returns the incoming oracle state
-unchanged; on a set flag the valid arm runs on the lazy oracle. -/
-theorem stage2_run_split (memory : Memory) (rest : List Bool)
-    (request : memory.bits 0 = false :: true :: rest) (oracle : OState FixedIndex EncIndex) :
-    (Top.machine ordF ordE).run Design.secondFuel ⟨0, memory⟩ oracle =
-      (Request.prefixProgram.memSem (Top.afterTag memory rest)).bind fun result => match result with
-        | none => PMF.pure none
-        | some middle =>
-            if middle.registers rFlag = 0 then
-              (Stage2.invalid.memSem middle).map fun final => final.map fun last =>
-                (atPc (Top.machine ordF ordE) invalidHalt last, oracle,
-                  2 + prefixCost + 1 + invalidSize + 1)
-            else
-              (Stage2.valid ordF ordE |>.sem middle oracle).bind fun final => match final with
-                | none => PMF.pure none
-                | some (last, updated) => PMF.pure (some (atPc (Top.machine ordF ordE) validHalt last,
-                    updated, Design.secondFuel)) := by
-  rw [Top.stage2_run ordF ordE memory rest request oracle, sem_noOracle _ prefix_noOracle,
-    PMF.bind_map]
-  congr 1
-  funext result
-  cases result with
-  | none => rfl
-  | some middle =>
-      simp only [Function.comp_apply, Option.map_some]
-      split
-      · rw [sem_noOracle _ invalid_noOracle, PMF.bind_map, PMF.map]
-        congr 1
-        funext final
-        cases final <;> rfl
-      · rfl
-
-end Runs
 
 end Kriterion.ArgoMAC.PlanB.SimMachine

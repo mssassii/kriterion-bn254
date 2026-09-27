@@ -66,8 +66,8 @@ theorem cells_keep {final stored : Memory}
     exact valid.digits n inside
 
 omit [FieldCertificate] in
-/-- The encodings of a coordinate number at most `458`. -/
-theorem encCount_le (κ : Nat) : CrtStage1.encCount κ ≤ 458 := by
+/-- The encodings of a coordinate number at most `367`. -/
+theorem encCount_le (κ : Nat) : CrtStage1.encCount κ ≤ 367 := by
   unfold CrtStage1.encCount Entry.xCount Entry.yCount
   split <;> omega
 

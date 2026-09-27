@@ -381,6 +381,7 @@ def zeroLabelBase : PlanB.Coord → Nat
 def rowRandomness (seed : BitVec 256) (row : Nat) : FieldMacToECMac.RowRandomness :=
   let base := 60_000 + row * 16
   { rho := nonZeroBase (field seed base)
+    tau := nonZeroBase (field seed (base + 9))
     x := {
       r1 := field seed (base + 1)
       r2 := field seed (base + 2)
@@ -401,7 +402,7 @@ def randomness (seed : BitVec 256) : Garbling.Randomness := {
     exact offsets_clamped
   pointRandomness := Vector.ofFn fun row => rowRandomness seed row.val
   exceptionPad := Vector.ofFn fun row =>
-    Vector.ofFn fun slot => Exception.lowByte (block seed (200_000 + row.val * 6 + slot.val))
+    Vector.ofFn fun slot => Exception.lowByte (block seed (200_000 + row.val * 12 + slot.val))
   bridgeKey := field seed 1
   curveMask := nonZeroBase (field seed 2)
   curveR1 := field seed 3

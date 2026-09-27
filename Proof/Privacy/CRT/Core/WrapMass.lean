@@ -4,8 +4,8 @@
 Under the uniform coins, every CRT offset `O_e` is uniform on `[0, M)`: the readout `V ↦ Σ_ρ ρ V_ρ[e]` is a
 surjective additive map onto the residue tuples (slot `ρ = 1` has coefficient `1`), a surjective additive map
 pushes the uniform law to the uniform law, and the CRT map is a bijection from residue tuples onto `Fin M`. So the
-wrap event `O_e > M − B` has mass at most `(B − 1)/M`, and the union over the 733 encodings gives
-`733 (B − 1)/M`.
+wrap event `O_e > M − B` has mass at most `(B − 1)/M`, and the union over the 642 encodings gives
+`642 (B − 1)/M`.
 -/
 
 import Proof.Privacy.CRT.Core.BodyMaskRowParts
@@ -138,7 +138,7 @@ theorem card_wrap_le (M B : ℕ) : Fintype.card {x : Fin M // M - B < x.val} ≤
 end WrapMass
 
 open WrapMass in
-/-- **(P45.c)** The wrap event has mass at most `733 (B − 1) / M` under the uniform coins. -/
+/-- **(P45.c)** The wrap event has mass at most `642 (B − 1) / M` under the uniform coins. -/
 theorem bmr_wrap_mass (T : CrtTable) [∀ i, NeZero (T.modulus i)] (facts : TableFacts T) :
     ((PMF.uniformOfFintype (Coins T)).toOuterMeasure {c | ∃ e, hint c e = true}).toReal ≤
       (Fintype.card Enc : ℝ) * ((T.wrapBound : ℝ) - 1) / T.product := by

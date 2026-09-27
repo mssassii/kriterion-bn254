@@ -5,6 +5,7 @@ serializer's sense (`CrtPieces.SourceHolds`) whenever every cell is in range (`C
 -/
 
 import Proof.Simulator.CRT.Stage1Stored
+import Proof.Simulator.CutoffSource
 
 namespace Kriterion.CRT.SimMachine
 
@@ -26,9 +27,9 @@ def recordNat (d : Draw) (r : Nat) : Nat :=
 /-- **The source of the draws.** -/
 def sourceOf (d : Draw) : Source where
   curve := (total 0 d.fields 0, total 0 d.fields 1, total 0 d.fields 2)
-  rows g := ⟨total 0 d.fields (3 + 4 * g.val), total 0 d.fields (3 + 4 * g.val + 1),
-    total 0 d.fields (3 + 4 * g.val + 2), total 0 d.fields (3 + 4 * g.val + 3)⟩
-  exception g := Vector.ofFn fun b : Fin 6 => BitVec.ofNat 8 (total 0 d.bytes (6 * g.val + b.val))
+  rows g := ⟨total 0 d.fields (3 + 3 * g.val), total 0 d.fields (3 + 3 * g.val + 1),
+    total 0 d.fields (3 + 3 * g.val + 2)⟩
+  exception g := Vector.ofFn fun b : Fin 12 => BitVec.ofNat 8 (total 0 d.bytes (12 * g.val + b.val))
   joins κ i := BitVec.ofNat 128 (total 0 d.joins (κ.val * joinCount + i.val))
   pins κ k lane := ((total 0 d.pins ((κ.val * pinCount + k.val) * 128 + lane.val) : Nat) : ZMod (2 ^ pinWidth k))
   recX e := ⟨recordNat d e.val % Entry.table.product, Nat.mod_lt _ Entry.table_product_pos⟩
@@ -60,7 +61,7 @@ variable [FieldCertificate]
 
 theorem fieldOf_extract (ram : Word → Word) (index : Nat) (inside : index < fieldCount) :
     fieldOf (extract ram) index = total 0 (readDraw ram).fields index := by
-  have small : index < 367 := inside
+  have small : index < 276 := inside
   unfold fieldOf extract sourceOf
   by_cases h0 : index = 0
   · subst h0; rfl
@@ -69,11 +70,11 @@ theorem fieldOf_extract (ram : Word → Word) (index : Nat) (inside : index < fi
   by_cases h2 : index = 2
   · subst h2; rfl
   rw [if_neg h0, if_neg h1, if_neg h2, dif_pos (by omega)]
-  obtain ⟨q, r, hr, split⟩ : ∃ q r, r < 4 ∧ index = 3 + 4 * q + r :=
-    ⟨(index - 3) / 4, (index - 3) % 4, Nat.mod_lt _ (by norm_num), by omega⟩
+  obtain ⟨q, r, hr, split⟩ : ∃ q r, r < 3 ∧ index = 3 + 3 * q + r :=
+    ⟨(index - 3) / 3, (index - 3) % 3, Nat.mod_lt _ (by norm_num), by omega⟩
   subst split
-  simp only [show 3 + 4 * q + r - 3 = 4 * q + r by omega, show (4 * q + r) / 4 = q by omega,
-    show (4 * q + r) % 4 = r by omega]
+  simp only [show 3 + 3 * q + r - 3 = 3 * q + r by omega, show (3 * q + r) / 3 = q by omega,
+    show (3 * q + r) % 3 = r by omega]
   interval_cases r <;> rfl
 
 theorem field_cell (ram : Word → Word) (valid : CellsValid ram) (index : Nat) (inside : index < fieldCount) :
@@ -83,9 +84,9 @@ theorem field_cell (ram : Word → Word) (valid : CellsValid ram) (index : Nat) 
   rw [ZMod.val_natCast, Nat.mod_eq_of_lt (valid.fields index inside)]
   exact (CrtSerial.word_toNat_self _).symm
 
-theorem byte_cell (ram : Word → Word) (valid : CellsValid ram) (d : Fin 91) (b : Fin 6) :
-    ram (word (exceptionBase + (6 * d.val + b.val))) = word ((extract ram).exception d)[b.val].toNat := by
-  have inside : 6 * d.val + b.val < exceptionByteCount := by
+theorem byte_cell (ram : Word → Word) (valid : CellsValid ram) (d : Fin 91) (b : Fin 12) :
+    ram (word (exceptionBase + (12 * d.val + b.val))) = word ((extract ram).exception d)[b.val].toNat := by
+  have inside : 12 * d.val + b.val < exceptionByteCount := by
     have := d.isLt; have := b.isLt; unfold exceptionByteCount; omega
   simp only [extract, sourceOf, Vector.getElem_ofFn, BitVec.toNat_ofNat]
   rw [total_apply _ _ _ inside]
@@ -132,7 +133,7 @@ theorem convHolds_extract (ram : Word → Word) (valid : CellsValid ram) (κ : F
 theorem digit_cell (ram : Word → Word) (κ e i : Nat) (hκ : κ < 2) (he : e < encCount κ) (hi : i < moduliCount) :
     digitAddr ((if κ = 0 then e else Entry.xCount + e) * moduliCount + i) = Layout.residueCell κ i e := by
   have : moduliCount = 85 := rfl
-  have : Entry.xCount = 458 := rfl
+  have : Entry.xCount = 367 := rfl
   unfold digitAddr recordCoord recordIndex
   unfold encCount at he
   interval_cases κ
@@ -147,8 +148,8 @@ theorem digitsSmall_of_valid (ram : Word → Word) (valid : CellsValid ram) : Cr
     have := CrtSerial.encCount_le κ
     unfold encCount at he
     have : moduliCount = 85 := rfl
-    have : recordCount = 733 := rfl
-    have : Entry.xCount = 458 := rfl
+    have : recordCount = 642 := rfl
+    have : Entry.xCount = 367 := rfl
     have : Entry.yCount = 275 := rfl
     split_ifs at he ⊢ <;> simp only [*] at * <;> nlinarith
   have bound := valid.digits _ n_in
@@ -164,8 +165,8 @@ theorem recordNat_eq (ram : Word → Word) (κ e : Nat) (hκ : κ < 2) (he : e <
   have n_in : (if κ = 0 then e else Entry.xCount + e) * moduliCount + i < recordCount * moduliCount := by
     unfold encCount at he
     have : moduliCount = 85 := rfl
-    have : recordCount = 733 := rfl
-    have : Entry.xCount = 458 := rfl
+    have : recordCount = 642 := rfl
+    have : Entry.xCount = 367 := rfl
     have : Entry.yCount = 275 := rfl
     split_ifs at he ⊢ <;> simp only [*] at * <;> nlinarith
   rw [total_apply _ _ _ n_in]

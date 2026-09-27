@@ -3,12 +3,12 @@
 
 | hop | term | value |
 |---|---|---|
-| `G0 → G0T` | `tCollisionError = 995,088 / p` (`t` equal to a labelled garbler input) | `2^-233.67` |
-| `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `728 δ₃` | `2^-113.07` |
+| `G0 → G0T` | `tCollisionError = 945,076 / p` (`t` equal to a labelled garbler input) | `2^-233.75` |
+| `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `637 δ₃` | `2^-113.5` |
 | `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (4/2^128 + 1/(p − 1))` | linear |
-| `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-104.55` + ... |
-| `HW → H` | `outputKernelError = 364/(r − 1)` | `2^-245.1` |
-| `H → I` | `padSwapError` (untouched sites only, no per-query term; F4) | `2^-113.07` |
+| `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-104.74` + ... |
+| `HW → H` | `outputKernelError = 455/(r − 1)` | `2^-244.8` |
+| `H → I` | `padSwapError` (untouched sites only, no per-query term; F4) | `2^-113.51` |
 | `I → M` | `machineCutoffError = 2^-128` | `2^-128` |
 
 Every term is a fraction of two naturals (`frac`), so its share of the unit reduces to one closed `Nat.ble` of
@@ -65,22 +65,22 @@ theorem M_pos : 0 < BudgetData.M := by decide +kernel
 
 /-! ### The terms -/
 
-/-- `G0 → G0T`: the bridge input `t` equals one of the garbler's 995,088 inputs (D11). -/
-def tCollisionError : ℝ := frac 995088 BudgetData.p
+/-- `G0 → G0T`: the bridge input `t` equals one of the garbler's 945,076 inputs (D11). -/
+def tCollisionError : ℝ := frac 945076 BudgetData.p
 
-/-- One pad-and-mask swap: `padSwapNum / 2^4352` (the pad-reading biases of both coordinates at slack 120) plus `728 δ₃`, `δ₃ = (2^384 mod p)/2^384`, over the common denominator `2^4352`. -/
+/-- One pad-and-mask swap: `padSwapNum / 2^4352` (the pad-reading biases of both coordinates at slack 120) plus `637 δ₃`, `δ₃ = (2^384 mod p)/2^384`, over the common denominator `2^4352`. -/
 def padSwapError : ℝ :=
   frac BudgetData.padSwapNumer BudgetData.padSwapDenom
 
-/-- The CRT smudge-and-hint term `(1466 (p − 1)^2 + 273 p) / M` (kept with its
-`273 p / M` part as an upper bound). The main term is doubled, `2 · 733 (B − 1)/M`,
+/-- The CRT smudge-and-hint term `(1284 (p − 1)^2 + 273 p) / M` (kept with its
+`273 p / M` part as an upper bound). The main term is doubled, `2 · 642 (B − 1)/M`,
 because route M's middle game flags the two-sided window `[0, B − 1) ∪ (M − B, M)` of the CRT values (it cannot see
 `a_e v`, so a real offset with the hint set may land at either end; `Core/H8.lean`, `replayWraps`). -/
-def smudgeError : ℝ := frac (1466 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) BudgetData.M
+def smudgeError : ℝ := frac (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) BudgetData.M
 
 /-- The window term of the hidden hop: the tapes on which a curve encoding's offset lies near
 the wrap window, where its hint could pin the curve mask; charged once, outside the per-query charge. Bounded by the
-smudge term (five encodings against its 733-encoding union bound). -/
+smudge term (five encodings against its 642-encoding union bound). -/
 def hiddenWindowError : ℝ := smudgeError
 
 /-- The per-query charge of the hidden hop, `4/2^128 + 1/(p − 1)`. -/
@@ -97,15 +97,16 @@ def stageOneTouchCharge : ℝ := crtHiddenCharge
 /-- The stage-1 touch flag of `G1U → HW`: `q₁ · (4/2^128 + 1/(p − 1))`. -/
 def stageOneTouchError (first : ℕ) : ℝ := (first : ℝ) * stageOneTouchCharge
 
-/-- The doubling event, `273/(r − 1)` (route M's doubling flag covers
-`T = K` and `K = −T` for each of the 91 digits, and the certificates give only `#Point ≥ r`). -/
-def exceptionalError : ℝ := frac 273 (BudgetData.r - 1)
+/-- The exceptional event, `364/(r − 1)` (route M's doubling flag covers `T = K`, `T = −K` and the sign row's
+zero `T = 2K` for each of the 91 digits, and the certificates give only `#Point ≥ r`). -/
+def exceptionalError : ℝ := frac 364 (BudgetData.r - 1)
 
-/-- Coincidences, `94/2^128` (91 digest keys, the off-curve mask key, two `Δ = 0` events). -/
-def coincidenceError : ℝ := frac 94 (2 ^ 128)
+/-- Coincidences, `185/2^128` (182 digest keys, one per exceptional kind of each digit, the off-curve mask key, two
+`Δ = 0` events). -/
+def coincidenceError : ℝ := frac 185 (2 ^ 128)
 
-/-- `HW → H`: the output kernel, `364/(r − 1)`. -/
-def outputKernelError : ℝ := frac 364 (BudgetData.r - 1)
+/-- `HW → H`: the output kernel, `455/(r − 1)`. -/
+def outputKernelError : ℝ := frac 455 (BudgetData.r - 1)
 
 /-- `I → M`: the machine's sampler cutoff, `2^-128`. -/
 def machineCutoffError : ℝ := frac 1 (2 ^ 128)
@@ -130,12 +131,12 @@ theorem crtHiddenCharge_eq :
   field_simp
   ring
 
-theorem exceptionalError_eq : exceptionalError = 273 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
+theorem exceptionalError_eq : exceptionalError = 364 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
   unfold exceptionalError frac
   rw [scalarFieldModulus_eq, Nat.cast_sub one_lt_r.le, Nat.cast_one]
   norm_num
 
-theorem outputKernelError_eq : outputKernelError = 364 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
+theorem outputKernelError_eq : outputKernelError = 455 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
   unfold outputKernelError frac
   rw [scalarFieldModulus_eq, Nat.cast_sub one_lt_r.le, Nat.cast_one]
   norm_num
@@ -150,17 +151,17 @@ theorem stageOneTouchCharge_eq :
 
 /-! ### The shares, decided by the kernel (the inequalities of `BudgetData`, section "Each term") -/
 
-theorem collision_share : 995088 * 2 ^ 100 * 1000 ≤ BudgetData.p := by decide +kernel
+theorem collision_share : 945076 * 2 ^ 100 * 1000 ≤ BudgetData.p := by decide +kernel
 
 theorem padSwap_share : BudgetData.padSwapNumer * 2 ^ 100 * 1000 ≤ BudgetData.padSwapDenom := by decide +kernel
 
-theorem smudge_share : (1466 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 20 ≤ BudgetData.M := by decide +kernel
+theorem smudge_share : (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 20 ≤ BudgetData.M := by decide +kernel
 
-theorem exceptional_share : 273 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
+theorem exceptional_share : 364 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
 
-theorem outputKernel_share : 364 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
+theorem outputKernel_share : 455 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
 
-theorem coincidence_share : 94 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kernel
+theorem coincidence_share : 185 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kernel
 
 theorem machineCutoff_share : 1 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kernel
 

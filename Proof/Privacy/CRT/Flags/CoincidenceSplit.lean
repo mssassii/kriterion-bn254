@@ -10,12 +10,12 @@ rule hides (`HiddenReached`, `coincide_hiddenReached`). Split by the entry's tag
 * families 7 and 10 (masks and key), `CrtKeyMaskHidden`: never (on the curve the rule shows them, off
   it the reach does not ask them);
 * family 8 (digest labels), `CrtLabelCoincide`: never (the reach asks only the part equal to `u`'s bit);
-* family 9 (digest finals), `CrtFinalCoincide`: at most `91/2^128` against every weight on the published
+* family 9 (digest finals), `CrtFinalCoincide`: at most `182/2^128` against every weight on the published
   value;
 * families 11 and above: no garbler entry (`crtEntry_garbler_small`).
 
 `crtCoincidenceGuess_of`: `CrtCoincidenceGuess crtEntry Entry.table coincidenceError` from these five inputs
-(`93/2^128 ≤ 94/2^128`).
+(`184/2^128 ≤ 185/2^128`).
 -/
 
 import Proof.Privacy.CRT.Flags.Coincidence
@@ -121,8 +121,8 @@ def CrtLabelCoincide : Prop :=
     letI := Classical.decEq Empty
     HiddenReached crtEntry Entry.table parameter scalar tape u e → entryFamily e ≠ 8
 
-/-- **Family 9**: a hidden digest final asked by the reach (`key(u)_o = key_o` with `u ≠ exc_o`) has mass
-at most `91/2^128` under the swapped tape, against every weight on the published value. -/
+/-- **Family 9**: a hidden digest final asked by the reach (`key(u)_o = key_o` with `u ≠ exc_o`, `o` one of the
+two final sites of a digit) has mass at most `182/2^128` under the swapped tape, against every weight on the published value. -/
 def CrtFinalCoincide : Prop :=
   ∀ (field : FieldCertificate) (group : @GroupCertificate field) (parameter : ℕ) (scalar : NonZeroScalar)
     (u : AffineInput),
@@ -134,7 +134,7 @@ def CrtFinalCoincide : Prop :=
       ∑' tape, swappedTableTape crtEntry tape *
           (weight (stageOneView crtEntry parameter scalar tape) *
             ind (∃ e, HiddenReached crtEntry Entry.table parameter scalar tape u e ∧ entryFamily e = 9))
-        ≤ ENNReal.ofReal (91 / 2 ^ 128) *
+        ≤ ENNReal.ofReal (182 / 2 ^ 128) *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape)
 
 /-! ### 3. The assembly -/
@@ -203,10 +203,10 @@ theorem crtCoincidenceGuess_of (conv : CrtConvCoincide) (delta : CrtDeltaGuess) 
         ring
     _ ≤ ENNReal.ofReal (2 / 2 ^ 128) *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape) +
-        ENNReal.ofReal (91 / 2 ^ 128) *
+        ENNReal.ofReal (182 / 2 ^ 128) *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape) :=
         add_le_add (delta field group parameter scalar weight) (final field group parameter scalar u weight)
-    _ = ENNReal.ofReal (93 / 2 ^ 128) *
+    _ = ENNReal.ofReal (184 / 2 ^ 128) *
           ∑' tape, swappedTableTape crtEntry tape * weight (stageOneView crtEntry parameter scalar tape) := by
         rw [← add_mul, ← ENNReal.ofReal_add (by positivity) (by positivity)]
         norm_num

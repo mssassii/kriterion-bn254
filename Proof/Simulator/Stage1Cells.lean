@@ -155,6 +155,10 @@ theorem word_injective {first second : Nat} (firstSmall : first < 2 ^ 256)
     Nat.mod_eq_of_lt secondSmall] at this
   exact this
 
+theorem word_ne {first second : Nat} (firstSmall : first < 2 ^ 256) (secondSmall : second < 2 ^ 256)
+    (different : first ≠ second) : word first ≠ word second :=
+  fun same => different (word_injective firstSmall secondSmall same)
+
 /-! ### The cells -/
 
 /-- The store of one field cell. -/

@@ -1,14 +1,15 @@
 /-
 **P45: the joint body-mask-row lemma, formulation 1 of F2**.
 
-The layer's coins, after the swap `G0T → G0U`: every pad vector (every modulus, slot and encoding), the 728 Embryo
+The layer's coins, after the swap `G0T → G0U`: every pad vector (every modulus, slot and encoding), the 637 Embryo
 masks, the row randomizers and the curve coins. Formulation 1 takes the row offsets `b_e = (O_e : F_p) − π_e` as
 coins, so the slopes are functions of coins, each hot pad vector is a translate of its residue join, the
-per-digit bijection sends the row offsets and `r4` to the published constants and the non-collector row values, and
-the masks are derived.
+per-digit bijection sends the row offsets to the published constants and the non-collector row values, and
+the masks are derived. The row randomizers are all unused coins (the coefficient cut carries every coefficient in the
+slopes, and the sign row's shift `t` is a function of an offset).
 
 Encodings are indexed structurally: `Enc = (Fin 91 × XElement ⊕ CurveXElement) ⊕ (Fin 91 × YElement ⊕ CurveYElement)`
-(`458 + 275 = 733`); the construction's flat order is a bijection onto `Fin 458` and `Fin 275` (row P45.0). The
+(`367 + 275 = 642`); the construction's flat order is a bijection onto `Fin 367` and `Fin 275` (row P45.0). The
 table `T` is abstract (`CrtTable`); `TableFacts` lists what the statements need of it.
 
 Statements (proved in `Core/BodyMaskRowJoint.lean`, `Core/BodyMaskRowOff.lean` and `Core/WrapMass.lean`):
@@ -17,7 +18,7 @@ Statements (proved in `Core/BodyMaskRowJoint.lean`, `Core/BodyMaskRowOff.lean` a
   the curve;
 * `bmr_real_eq_ideal` (P45.b, `BodyMaskRowJoint.lean`): off the wrap event, the real outputs are the ideal outputs
   of the image;
-* `bmr_wrap_mass` (P45.c, in `Core/WrapMass.lean`, proved): the wrap event has mass at most `733 (B − 1)/M`;
+* `bmr_wrap_mass` (P45.c, in `Core/WrapMass.lean`, proved): the wrap event has mass at most `642 (B − 1)/M`;
 * `bmr_core` (`BodyMaskRowJoint.lean`): the exact core, `CoreUntilBad`'s `realCore = simCore` for this layer;
 * the same three off the curve (`bmrEquivOff`, `bmr_real_eq_ideal_off`, `bmr_core_off`, `BodyMaskRowOff.lean`).
 -/
@@ -36,13 +37,13 @@ noncomputable section
 
 /-! ### Encodings -/
 
-/-- The 458 encodings of coordinate `x`: 91 digits × 5 point elements, and the 3 curve elements. -/
+/-- The 367 encodings of coordinate `x`: 91 digits × 4 point elements, and the 3 curve elements. -/
 abbrev XEnc := (Fin 91 × XElement) ⊕ CurveXElement
 /-- The 275 encodings of coordinate `y`: 91 digits × 3 point elements, and the 2 curve elements. -/
 abbrev YEnc := (Fin 91 × YElement) ⊕ CurveYElement
-/-- All 733 encodings. -/
+/-- All 642 encodings. -/
 abbrev Enc := XEnc ⊕ YEnc
-/-- The 728 row encodings: one per digit and row element. -/
+/-- The 637 row encodings: one per digit and row element. -/
 abbrev RowEnc := Fin 91 × Biquadratic.Element
 
 /-- A row encoding as an encoding. -/
@@ -60,16 +61,16 @@ def coordOf : Enc → ℕ
   | .inl _ => 0
   | .inr _ => 1
 
-/-- The collectors: the `x` slots `rowX_x9`, `rowY_x9`, `rowZ_x9` of every digit (D3). -/
+/-- The collectors: the `x` slots `rowX_x9`, `rowY_cubic`, `rowZ_x9` of every digit (D3). -/
 def IsCollector (element : Biquadratic.Element) : Prop :=
-  element = .inl .rowX_x9 ∨ element = .inl .rowY_x9 ∨ element = .inl .rowZ_x9
+  element = .inl .rowX_x9 ∨ element = .inl .rowY_cubic ∨ element = .inl .rowZ_x9
 
 instance (element : Biquadratic.Element) : Decidable (IsCollector element) := by
   unfold IsCollector; infer_instance
 
 /-- The 273 collector encodings. -/
 abbrev Collector := {r : RowEnc // IsCollector r.2}
-/-- The 455 non-collector row encodings. -/
+/-- The 364 non-collector row encodings. -/
 abbrev NonCollector := {r : RowEnc // ¬ IsCollector r.2}
 
 /-! ### The table and the context -/
@@ -96,8 +97,8 @@ variable [∀ i, NeZero (T.modulus i)]
 /-- Every pad vector: modulus index, slot, encoding (the per-coordinate pad vectors of D6, reindexed). -/
 abbrev Pads := (i : Fin T.count) → ZMod (T.modulus i) → Enc → ZMod (T.modulus i)
 
-/-- **The coins of the layer**: pads, the 728 masks, `r4` and the seven unused randomizers of each digit, and the
-curve coins `(t, mask ≠ 0, r1, r2)`. -/
+/-- **The coins of the layer**: pads, the 637 masks, the eight unused row randomizers of each digit (`r4` and seven
+more), and the curve coins `(t, mask ≠ 0, r1, r2)`. -/
 abbrev Coins := Pads T × (RowEnc → BaseField) × (Fin 91 → BaseField) × (Fin 91 → Fin 7 → BaseField) ×
   (BaseField × {m : BaseField // m ≠ 0} × BaseField × BaseField)
 
@@ -109,10 +110,10 @@ theorem one_ne_zero_base : (1 : BaseField) ≠ 0 := by decide
 /-- The curve mask's type, nonempty. -/
 instance nonZeroBaseNonempty : Nonempty {m : BaseField // m ≠ 0} := ⟨⟨1, one_ne_zero_base⟩⟩
 
-/-- `RowGamma` is four field elements. -/
-def rowGammaEquiv : RowGamma ≃ BaseField × BaseField × BaseField × BaseField where
-  toFun g := (g.xC0, g.yC0, g.yC4, g.zC0)
-  invFun t := ⟨t.1, t.2.1, t.2.2.1, t.2.2.2⟩
+/-- `RowGamma` is three field elements. -/
+def rowGammaEquiv : RowGamma ≃ BaseField × BaseField × BaseField where
+  toFun g := (g.xC0, g.yC4, g.zC0)
+  invFun t := ⟨t.1, t.2.1, t.2.2⟩
   left_inv _ := rfl
   right_inv _ := rfl
 
@@ -139,7 +140,7 @@ def Coins.curveMask (c : Coins T) : BaseField := c.2.2.2.2.2.1.1
 def Coins.r1 (c : Coins T) : BaseField := c.2.2.2.2.2.2.1
 def Coins.r2 (c : Coins T) : BaseField := c.2.2.2.2.2.2.2
 
-/-- The eight randomizers of a digit from `r4` and the seven unused ones (only `y.r4` is read). -/
+/-- The eight randomizers of a digit from `r4` and the seven others (none is read). -/
 def rowRand (r4 : BaseField) (unused : Fin 7 → BaseField) :
     Biquadratic.XRandomness × Biquadratic.YRandomness × Biquadratic.ZRandomness :=
   (⟨unused 0, unused 1, unused 2⟩, ⟨unused 3, unused 4, r4, unused 5⟩, ⟨unused 6⟩)
@@ -159,7 +160,7 @@ def offsetF (c : Coins T) (e : Enc) : BaseField := (offset c e : BaseField)
 /-- **The row offset** `b_e = (O_e : F_p) − π_e` of a row encoding (formulation 1's coin). -/
 def rowOffset (c : Coins T) (r : RowEnc) : BaseField := offsetF c (rowEnc r) - c.mask r
 
-/-- The digit's eight slopes, from its row offsets (`Biquadratic.slopes`). -/
+/-- The digit's seven slopes, from its row offsets (`Biquadratic.slopes`). -/
 def digitSlopes (ctx : Context) (c : Coins T) (d : Fin 91) : Biquadratic.Values :=
   let rand := rowRand (c.r4 d) (c.unused d)
   Biquadratic.slopes (ctx.rows d) rand.1 rand.2.1 rand.2.2 fun element => rowOffset c (d, element)
@@ -181,10 +182,9 @@ def join (ctx : Context) (c : Coins T) (e : Enc) (i : Fin T.count) : ZMod (T.mod
 /-- The wrap hint `[O_e > M − B]` (D7). -/
 def hint (c : Coins T) (e : Enc) : Bool := wrapHint T.product T.wrapBound (offset c e)
 
-/-- The digit's four published constants (`garbleRow` on the row offsets). -/
+/-- The digit's three published constants (`garbleRow` on the row offsets). -/
 def gamma (ctx : Context) (c : Coins T) (d : Fin 91) : RowGamma :=
-  let rand := rowRand (c.r4 d) (c.unused d)
-  FieldMacToECMac.garbleRow (ctx.rows d) ⟨ctx.rho d, rand.1, rand.2.1, rand.2.2⟩ fun element => rowOffset c (d, element)
+  FieldMacToECMac.garbleRow (ctx.rows d) fun element => rowOffset c (d, element)
 
 /-- The curve check's three published constants. -/
 def curveTable (c : Coins T) : BaseField × BaseField × BaseField :=
@@ -246,7 +246,7 @@ instance sourceFintype : Fintype (Source T) := instFintypeProd _ _
 instance visibleFintype (u : AffineInput) : Fintype (Visible T u) := instFintypeProd _ _
 
 instance sourceNonempty : Nonempty (Source T) :=
-  ⟨(fun _ _ => 0, fun _ => ⟨0, 0, 0, 0⟩, (0, 0, 0))⟩
+  ⟨(fun _ _ => 0, fun _ => ⟨0, 0, 0⟩, (0, 0, 0))⟩
 
 instance coldNonempty (u : AffineInput) : Nonempty (Cold T u) := ⟨fun _ _ _ => 0⟩
 
@@ -255,10 +255,11 @@ instance visibleNonempty (u : AffineInput) : Nonempty (Visible T u) := ⟨(fun _
 /-- The outputs: (published cells, hints), visible cells, the collector masks, the bridge key. -/
 abbrev Out (u : AffineInput) := (Source T × (Enc → Bool)) × Visible T u × (Collector → BaseField) × BaseField
 
-/-- The residual coordinates: the seven unused randomizers of each digit and the curve mask. -/
-abbrev Residual := (Fin 91 → Fin 7 → BaseField) × {m : BaseField // m ≠ 0}
+/-- The residual coordinates: the eight unused randomizers of each digit (`r4`, then the seven others) and the curve
+mask. -/
+abbrev Residual := (Fin 91 → BaseField) × (Fin 91 → Fin 7 → BaseField) × {m : BaseField // m ≠ 0}
 
-instance residualNonempty : Nonempty Residual := ⟨(fun _ _ => 0, ⟨1, one_ne_zero_base⟩)⟩
+instance residualNonempty : Nonempty Residual := ⟨(fun _ => 0, fun _ _ => 0, ⟨1, one_ne_zero_base⟩)⟩
 
 instance cellsResidualNonempty (u : AffineInput) : Nonempty ((Source T × Visible T u) × Residual) :=
   ⟨((Classical.arbitrary _, Classical.arbitrary _), Classical.arbitrary _)⟩
@@ -283,21 +284,20 @@ def realOut (ctx : Context) (u : AffineInput) (c : Coins T) : Out T u :=
   (((join ctx c, gamma ctx c, curveTable c), hint c), (coldOf u c, fun r => c.mask r.1),
     fun r => c.mask r.1, c.bridge)
 
-/-- The true row values of a digit at `u` (xinshu's `rowTarget`). -/
+/-- The true row values of a digit at `u` (xinshu's `rowTarget`; the sign row in the `y` slot). -/
 def rowTarget (rows : Coordinates.Rows) (u : AffineInput) : FieldMacToECMac.HomogeneousValue :=
   ⟨rows.x.constant + rows.x.x * u.x + rows.x.y * u.y + rows.x.xSquared * u.x ^ 2,
-   rows.y.constant + rows.y.y * u.y + rows.y.xy * u.x * u.y + rows.y.xSquared * u.x ^ 2 +
-     rows.y.ySquared * u.y ^ 2,
+   rows.y.constant + rows.y.y * u.y + rows.y.xSquared * u.x ^ 2 + rows.y.ySquared * u.y ^ 2,
    rows.z.constant + rows.z.x * u.x⟩
 
 /-- **The route-M collector solve**: the row-level value of a collector that makes its row equal the target, given
 the published constants and the other elements' row-level values (the `X` and `Z` collectors have multiplier 1,
-the `Y` collector `y`). -/
+the sign row's collector `x²`, divided out as the inverse `(x · x)⁻¹`). -/
 def collectorSolve (target : FieldMacToECMac.HomogeneousValue) (g : RowGamma) (u : AffineInput)
     (values : Biquadratic.Values) : Biquadratic.Element → BaseField
   | .inl .rowX_x9 => target.x - (g.xC0 + values (.inl .rowX_x7) * u.x + values (.inr .rowX_y10))
-  | .inl .rowY_x9 => (target.y - (g.yC0 + g.yC4 * u.x ^ 2 + values (.inl .rowY_x7) * u.x ^ 2 +
-      values (.inr .rowY_y8) * u.y + values (.inr .rowY_y10))) * u.y⁻¹
+  | .inl .rowY_cubic => (target.y - (g.yC4 * u.x ^ 2 + values (.inr .rowY_y8) * u.y +
+      values (.inr .rowY_y10))) * (u.x * u.x)⁻¹
   | .inl .rowZ_x9 => target.z - g.zC0
   | _ => 0
 
@@ -349,11 +349,12 @@ theorem uniform_map_equiv {A B : Type*} [Fintype A] [Nonempty A] [Fintype B] [No
 /-- The outputs off the curve: (published cells, hints) and the cold pad entries (masks and bridge hidden). -/
 abbrev OutOff (u : AffineInput) := (Source T × (Enc → Bool)) × Cold T u
 
-/-- The residual off the curve: per digit the masks of the four row encodings whose offsets no constant absorbs
-(`rowX_x7`, `rowX_y10`, `rowY_x9`, `rowY_y8`), `r4`, the unused randomizers and the curve mask. -/
-abbrev ResidualOff := (Fin 91 → Fin 4 → BaseField) × (Fin 91 → BaseField) × Residual
+/-- The residual off the curve: per digit the row offsets of the four row encodings that no constant absorbs
+(`rowX_x7`, `rowX_y10`, `rowY_y8`, `rowY_y10`; offsets, not masks, because the sign row's slopes of `rowY_y8` and
+`rowY_y10` read each other's offset), then the on-curve residual (`r4`, the unused randomizers, the curve mask). -/
+abbrev ResidualOff := (Fin 91 → Fin 4 → BaseField) × Residual
 
-instance residualOffNonempty : Nonempty ResidualOff := ⟨(fun _ _ => 0, fun _ => 0, Classical.arbitrary _)⟩
+instance residualOffNonempty : Nonempty ResidualOff := ⟨(fun _ _ => 0, Classical.arbitrary _)⟩
 
 instance residualOffFintype : Fintype ResidualOff := instFintypeProd _ _
 

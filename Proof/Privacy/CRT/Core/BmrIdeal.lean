@@ -354,7 +354,8 @@ def cOf (k : ℕ) : BMR.Collector :=
   ⟨TargetLaw.collRow k, by
     unfold TargetLaw.collRow collectorSlot
     dsimp only
-    split_ifs <;> simp [TargetLaw.xElemOfSlot, BMR.IsCollector]⟩
+    rcases (by omega : k % 3 = 0 ∨ k % 3 = 1 ∨ k % 3 = 2) with h | h | h <;>
+      simp [h, TargetLaw.xElemOfSlot, BMR.IsCollector]⟩
 
 theorem cOf_collectorIndex (c : BMR.Collector) : cOf (collectorIndex c) = c := by
   obtain ⟨⟨d, e⟩, he⟩ := c
@@ -377,10 +378,7 @@ theorem cOf_collectorIndex (c : BMR.Collector) : cOf (collectorIndex c) = c := b
 /-- A non-collector row. -/
 theorem ncRow_not (n : ℕ) : ¬ BMR.IsCollector (TargetLaw.ncRow n).2 := by
   unfold TargetLaw.ncRow
-  split_ifs
-  · rcases Nat.mod_two_eq_zero_or_one n with h | h <;>
-      simp [h, TargetLaw.xElemOfSlot, BMR.IsCollector]
-  · simp [BMR.IsCollector]
+  split_ifs <;> simp [BMR.IsCollector]
 
 /-- The targets with the collector masks replaced. -/
 def merge (τ : TargetLaw.Targets) (π : BMR.Collector → BaseField) : TargetLaw.Targets :=
@@ -396,11 +394,7 @@ theorem maskInv_merge_pair (τ : TargetLaw.Targets) (π : BMR.Collector → Base
   rw [dif_neg (ncRow_not _), dif_neg (ncRow_not _)]
 
 theorem maskInv_merge_single (τ : TargetLaw.Targets) (π : BMR.Collector → BaseField) :
-    (TargetLaw.maskInv (merge τ π).2).single = (TargetLaw.maskInv τ.2).single := by
-  show (merge τ π).2 (TargetLaw.ncRow 454) = τ.2 (TargetLaw.ncRow 454)
-  unfold merge
-  dsimp only
-  rw [dif_neg (ncRow_not _)]
+    (TargetLaw.maskInv (merge τ π).2).single = (TargetLaw.maskInv τ.2).single := rfl
 
 theorem maskInv_merge_collector (τ : TargetLaw.Targets) (π : BMR.Collector → BaseField) {k : ℕ} (hk : k < 273) :
     atNat (TargetLaw.maskInv (merge τ π).2).collector 0 k = π (cOf k) := by
@@ -422,7 +416,7 @@ theorem matchT_merge (τ : TargetLaw.Targets) (π : BMR.Collector → BaseField)
     · exact absurd rfl (other k hk)
     · show PadLaw.matchSite τ.1 _ ∩ TargetLaw.maskMatch _ _ = PadLaw.matchSite τ.1 _ ∩ TargetLaw.maskMatch _ _
       unfold TargetLaw.maskMatch
-      rw [maskInv_merge_pair, maskInv_merge_single]
+      rw [maskInv_merge_pair]
       rfl
 
 /-! ### 5. The heart: programming the collector sites of the kernel's table -/
@@ -642,7 +636,7 @@ theorem sites_prod (z : V u → Block × Block) (τ : TargetLaw.Targets) (π : B
           · rfl
       rw [one, mul_one, visMatch_other u z member other, matchT_merge τ π member other]
   have hprod : (crtLayout.sites.map (hfac u valid π z)).prod = ((List.range 273).map (qk u valid π z)).prod := by
-    show ((Layout.padSites ++ ((List.range 273).map (SiteId.mask 0) ++ (List.range 228).map (SiteId.mask 1))).map
+    show ((Layout.padSites ++ ((List.range 273).map (SiteId.mask 0) ++ (List.range 182).map (SiteId.mask 1))).map
       (hfac u valid π z)).prod = _
     rw [List.map_append, List.map_append, List.prod_append, List.prod_append, List.map_map, List.map_map]
     have pads : (Layout.padSites.map (hfac u valid π z)).prod = 1 := by
@@ -650,7 +644,7 @@ theorem sites_prod (z : V u → Block × Block) (τ : TargetLaw.Targets) (π : B
       obtain ⟨s, member, rfl⟩ := List.mem_map.mp inside
       obtain ⟨κ, i, ρ, rfl, -⟩ := Layout.mem_padSites member
       rfl
-    have ones : ((List.range 228).map (hfac u valid π z ∘ SiteId.mask 1)).prod = 1 := by
+    have ones : ((List.range 182).map (hfac u valid π z ∘ SiteId.mask 1)).prod = 1 := by
       refine List.prod_eq_one fun x inside => ?_
       obtain ⟨k, -, rfl⟩ := List.mem_map.mp inside
       rfl
@@ -823,8 +817,9 @@ theorem replayMasks_eq (pub : Kriterion.CRT.Entry.Public) (u : AffineInput) (lab
 /-- On sparse rows P45's row target is the evaluated row. -/
 theorem rowTarget_eq_evaluateRow (rows : Coordinates.Rows) (u : AffineInput)
     (sparse : FieldMacToECMac.SparseRow rows) : BMR.rowTarget rows u = FieldMacToECMac.evaluateRow rows u := by
-  obtain ⟨xXY, xY2, yX, zY, zXY, zX2, zY2⟩ := sparse
-  simp only [BMR.rowTarget, FieldMacToECMac.evaluateRow, Coordinates.evaluate, xXY, xY2, yX, zY, zXY, zX2, zY2]
+  obtain ⟨xXY, xY2, yX, yXY, zY, zXY, zX2, zY2⟩ := sparse
+  simp only [BMR.rowTarget, FieldMacToECMac.evaluateRow, Coordinates.evaluate, xXY, xY2, yX, yXY, zY, zXY, zX2,
+    zY2]
   congr 1 <;> ring
 
 /-- **The true rows are P45's row targets at the coins' context.** -/

@@ -81,10 +81,14 @@ theorem digestOther_delta (scalar : NonZeroScalar) (u : AffineInput) (tape : Tab
     rw [asked_garbleEntryM] at inEntry
     split at inEntry
     · exact absurd inEntry List.not_mem_nil
-    · rw [List.mem_singleton] at inEntry
-      rw [inEntry, hashInput_div] at fam8
-      have := (digestFinalTag_fields (o := o.val) (by have := o.isLt; simp only [digitCount] at this; omega)).1
-      omega
+    · simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+      rcases inEntry with inEntry | inEntry
+      · rw [inEntry, hashInput_div] at fam8
+        have := (digestFinalTag_fields (o := 2 * o.val) (by have := o.isLt; simp only [digitCount] at this; omega)).1
+        omega
+      · rw [inEntry, hashInput_div] at fam8
+        have := (digestFinalTag_fields (o := 2 * o.val + 1) (by have := o.isLt; simp only [digitCount] at this; omega)).1
+        omega
 
 /-- The evaluator's labels in the stage-2 view are the honest labels of the tape's coins at `u`. -/
 theorem stageTwoView_labels [field : FieldCertificate] [group : GroupCertificate] (parameter : ℕ)

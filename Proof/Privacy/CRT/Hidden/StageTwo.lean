@@ -123,7 +123,7 @@ integer `(O + a·v) mod M` of an encoding lies in the window `[0, B − 1) ∪ (
 its offset is near an edge; the event does not depend on the input. -/
 def nearEdge (offset : ℕ) : Prop := offset < Entry.table.wrapBound ∨ Entry.table.product < offset + 2 * Entry.table.wrapBound
 
-/-- **The bad event**: a curve encoding's offset (`x` encodings `455 ..`, `y` encodings `273 ..`) is near an edge. -/
+/-- **The bad event**: a curve encoding's offset (`x` encodings `364 ..`, `y` encodings `273 ..`) is near an edge. -/
 def curveNearEdge (tape : TableTape Instance.crtEntry) : Prop :=
   (∃ e : Fin Entry.xCount, Kriterion.ArgoMAC.PlanB.pointElementCountX ≤ e.val ∧
       nearEdge ((EntryCorrect.gxOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2)) tape.1).offset e)) ∨

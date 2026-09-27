@@ -3,10 +3,11 @@
 `Laws.OffSplit` in `Laws/MiddleOff.lean`).
 
 Off the curve the shadow runs the reach `reachOffCM`: the conversion blocks `C`, the digest labels at `u`'s bits `D`,
-then the 91 finals `F`, each at `hashInput key (digestFinalTag o)` with `key` the XOR of the answers at `D`. On the
+then the 182 finals `F` (two sites per digit), each at `hashInput key (digestFinalTag s)` with `key` the XOR of the
+answers at `D`. On the
 table (`offAnswer t`) the private run stores exactly `C ++ D ++ F` with the table's answers (`tableRunOff_empty`).
 
-* `P` is the 91 final positions (`DigestSplit.finalPos`): outside every site (`final_away`), invisible (family 9).
+* `P` is the 182 final positions (`DigestSplit.finalPos`): outside every site (`final_away`), invisible (family 9).
 * `xs t` is `F`: it reads the table only at `D` (family 8), so it ignores `P`; its tags are the final positions,
   pairwise distinct.
 * The reveal reads only the conversion blocks (families at most 6, `Flags.replayWraps_congr`), so it ignores `P`.
@@ -60,9 +61,36 @@ theorem offPoints_eq (t : TagTable) {α : Type} : ∀ P : CM α, offPoints t P =
       rw [offPoints_eq t (next _)]
       rfl
 
-/-- The finals the reach asks at the digest key `key`. -/
+/-- The finals the reach asks at the digest key `key`: two sites per digit. -/
 def finalsAt (key : Block) : List ℕ :=
-  (List.finRange digitCount).flatMap fun o => [hashInput key (digestFinalTag o.val)]
+  (List.finRange digitCount).flatMap fun o =>
+    [hashInput key (digestFinalTag (2 * o.val)), hashInput key (digestFinalTag (2 * o.val + 1))]
+
+/-- The final sites in the reach's order. -/
+def sitesList : List DigestSplit.FinalSite :=
+  (List.finRange digitCount).flatMap fun o => [DigestSplit.siteOf o 0, DigestSplit.siteOf o 1]
+
+theorem finalsAt_sites (key : Block) :
+    finalsAt key = sitesList.map fun s => hashInput key (digestFinalTag s.val) := by
+  unfold finalsAt sitesList
+  rw [List.map_flatMap]
+  rfl
+
+theorem sitesList_nodup : sitesList.Nodup := by
+  unfold sitesList
+  rw [List.nodup_flatMap]
+  refine ⟨fun o _ => ?_, (List.nodup_finRange _).imp fun {a b} ne => ?_⟩
+  · refine List.nodup_cons.mpr ⟨fun h => ?_, List.nodup_singleton _⟩
+    have := congrArg Fin.val (List.mem_singleton.mp h)
+    simp only [DigestSplit.siteOf, Fin.val_zero, Fin.val_one] at this
+    omega
+  · have ne' : a.val ≠ b.val := fun h => ne (Fin.ext h)
+    intro x hx hy
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hx hy
+    rcases hx with rfl | rfl <;> rcases hy with h | h <;>
+      · have := congrArg Fin.val h
+        simp only [DigestSplit.siteOf, Fin.val_zero, Fin.val_one] at this
+        omega
 
 theorem asked_reachOff (X : HashN) (pub : Entry.Public) (u : AffineInput) (L : LamportSignature) :
     asked X (EntryReading.reachOffCM pub u L) =
@@ -126,22 +154,22 @@ theorem label_visible (X : HashN) (u : AffineInput) (labels : Fin 2 → Fin coor
 
 theorem final_small (key : Block) : ∀ n ∈ finalsAt key, Small n ∧ tagFamily (n / 2 ^ 128) = 9 := by
   intro n hn
-  simp only [finalsAt, List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at hn
-  obtain ⟨o, rfl⟩ := hn
-  have ho := lt_trans o.isLt DigestSplit.digitCount_lt
-  refine ⟨small_hashInput _ _ (DigestSplit.digestFinalTag_lt _ ho), ?_⟩
+  rw [finalsAt_sites] at hn
+  obtain ⟨s, -, rfl⟩ := List.mem_map.mp hn
+  have hs := DigestSplit.finalSite_lt s
+  refine ⟨small_hashInput _ _ (DigestSplit.digestFinalTag_lt _ hs), ?_⟩
   rw [Align.hashInput_div]
-  exact (Align.digestFinalTag_fields ho).1
+  exact (Align.digestFinalTag_fields hs).1
 
 /-! ### The final positions -/
 
-/-- **`P`**: the 91 final positions. -/
+/-- **`P`**: the 182 final positions, two sites per digit. -/
 def finalSet : Finset (Fin (2 ^ 40)) :=
-  Finset.univ.image fun o : Fin digitCount => DigestSplit.finalPos o.val
+  Finset.univ.image fun o : DigestSplit.FinalSite => DigestSplit.finalPos o.val
 
 theorem mem_finalSet {p : Fin (2 ^ 40)} (hp : p ∈ finalSet) : tagFamily p.val = 9 := by
   obtain ⟨o, -, rfl⟩ := Finset.mem_image.mp hp
-  exact DigestSplit.family_final o.val (lt_trans o.isLt DigestSplit.digitCount_lt)
+  exact DigestSplit.family_final o.val (DigestSplit.finalSite_lt o)
 
 theorem not_mem_finalSet {p : Fin (2 ^ 40)} (hp : tagFamily p.val ≠ 9) : p ∉ finalSet :=
   fun mem => hp (mem_finalSet mem)
@@ -373,25 +401,26 @@ theorem crtOffDecomp (source : (viewHere crtEntry).Source) (u : AffineInput) (of
     exact Bool.false_ne_true vis
   -- the tags of xs are pairwise distinct
   · intro t
-    unfold xsOf finalsAt
-    rw [List.map_map]
-    have form : (tagOfInput ∘ Nat.cast : ℕ → Fin (2 ^ 40)) ∘ (fun o : Fin digitCount =>
+    unfold xsOf
+    rw [List.map_map, finalsAt_sites, List.map_map]
+    have form : (tagOfInput ∘ Nat.cast : ℕ → Fin (2 ^ 40)) ∘ (fun o : DigestSplit.FinalSite =>
         hashInput (keyOf source u t) (digestFinalTag o.val)) = fun o => DigestSplit.finalPos o.val := by
       funext o
       simp only [Function.comp]
-      have ho := lt_trans o.isLt DigestSplit.digitCount_lt
+      have ho := DigestSplit.finalSite_lt o
       rw [tagOfInput_small (small_hashInput _ _ (DigestSplit.digestFinalTag_lt _ ho))]
       apply Fin.ext
       show hashInput _ _ / 2 ^ 128 = (DigestSplit.finalPos o.val).val
       rw [Align.hashInput_div, DigestSplit.finalPos_val _ ho]
-    rw [Align.flatMap_singleton_eq_map, List.map_map, form]
-    exact (List.nodup_finRange _).map DigestSplit.finalPos_injective
+    rw [form]
+    exact sitesList_nodup.map DigestSplit.finalPos_injective
   -- the tags of xs lie in P
   · intro t x hx
-    unfold xsOf finalsAt at hx
-    simp only [List.mem_map, List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at hx
-    obtain ⟨n, ⟨o, rfl⟩, rfl⟩ := hx
-    have ho := lt_trans o.isLt DigestSplit.digitCount_lt
+    unfold xsOf at hx
+    rw [finalsAt_sites, List.map_map] at hx
+    obtain ⟨o, -, rfl⟩ := List.mem_map.mp hx
+    have ho := DigestSplit.finalSite_lt o
+    simp only [Function.comp_apply]
     rw [tagOfInput_small (small_hashInput _ _ (DigestSplit.digestFinalTag_lt _ ho))]
     refine Finset.mem_image.mpr ⟨o, Finset.mem_univ _, Fin.ext ?_⟩
     show (DigestSplit.finalPos o.val).val = hashInput _ _ / 2 ^ 128

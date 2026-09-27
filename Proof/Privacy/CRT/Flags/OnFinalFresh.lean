@@ -4,7 +4,7 @@
 
 After the collector programs the private state stores exactly the full replay's inputs (`Contain.containment`), which
 are never digest labels (family 8) nor finals (family 9). The shadow's digest on the curve then asks `u`'s 508 digest
-labels, all fresh, and the 91 finals at their key, the XOR of the first blocks of the answers at the digest labels. A
+labels, all fresh, and the 182 finals (two per digit) at their key, the XOR of the first blocks of the answers at the digest labels. A
 family-9 point is stored at the end only if it is one of these finals, which fixes the key to the point's label part.
 
 The bound is a generic fact about the lazy reader (`fresh_xor`): if a program asks every point of a nonempty list `S`
@@ -475,13 +475,13 @@ theorem onFinalFresh_at (scalar : NonZeroScalar) (Q : Point)
       rw [same, labelled.val] at fam
       omega
     · obtain ⟨small, _⟩ := OffDecomp.final_small _ m final
-      simp only [OffDecomp.finalsAt, List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at final
-      obtain ⟨o, rfl⟩ := final
+      unfold OffDecomp.finalsAt at final
+      obtain ⟨o, -, rfl⟩ := Align.mem_finals final
       show digestKey (ansN p.2) coordinateBitCount
         (Kriterion.CRT.Entry.labelsOf (Kriterion.CRT.Entry.labels source u)) u = BitVec.ofNat 128 (x.val % 2 ^ 128)
       generalize digestKey (ansN p.2) coordinateBitCount
         (Kriterion.CRT.Entry.labelsOf (Kriterion.CRT.Entry.labels source u)) u = key at same small
-      have hv : x.val = hashInput key (digestFinalTag o.val) := by rw [same]; exact small.1
+      have hv : x.val = hashInput key (digestFinalTag o) := by rw [same]; exact small.1
       apply BitVec.eq_of_toNat_eq
       rw [BitVec.toNat_ofNat, hv]
       unfold hashInput

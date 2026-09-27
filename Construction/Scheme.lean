@@ -140,7 +140,7 @@ instance zRandomnessFinite : Finite Biquadratic.ZRandomness :=
 
 instance rowRandomnessFinite : Finite FieldMacToECMac.RowRandomness :=
   Finite.of_injective
-    (fun value : FieldMacToECMac.RowRandomness => (value.rho, value.x, value.y, value.z)) (by
+    (fun value : FieldMacToECMac.RowRandomness => (value.rho, value.tau, value.x, value.y, value.z)) (by
       intro first second equal
       cases first
       cases second

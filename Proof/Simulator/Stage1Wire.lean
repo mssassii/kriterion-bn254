@@ -1,19 +1,16 @@
 /-
-**The bits of the Plan B wire encoding.**
-
-`wire_bits`: the flattened byte bits of `Wire.encoding.encode value` are, in order, the curve
-triple and the `91 × 4` row constants (`256` bits each), the `91 × 6` gadget bytes (`8`), the
-four fold-join vectors (`128`), and the `127` chunk words; `pack_bits` reads a chunk word as its
-`733` slots of `254` bits and two zero bits. Every statement is symbolic in the counts; no encoding of a concrete
-width is ever unfolded.
+**Bits of encodings**, for the CRT machine's wire (`Proof/Simulator/CRT/Stage1Wire.lean`): an encoding's bytes
+behind a regular head (`encodeOf`, so that no encoding of a concrete width is ever unfolded), the byte bits of pairs,
+maps and vectors, little-endian digit sums (`digitSum_bits`), the regrouping of flattened lists (`flatten_ofFn_add`,
+`flatten_ofFn_mul`) and the emitted bits of a stored word (`bitRun_ofNat`).
 -/
 
 import Proof.Simulator.Stage1Bits
-import Proof.Simulator.CutoffSource
+import Proof.Simulator.Emit
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 
-open BN254 Cryptography Kriterion.ArgoMAC.Phase3.Glue
+open BN254 Cryptography
 
 /-- The byte bits of a flattened list of byte lists. -/
 theorem byteBits_flatten (lists : List (List (Fin 256))) :
@@ -46,87 +43,36 @@ theorem byteBits_vector {α : Type} (encoding : Encoding α) (count : Nat) (valu
   rw [vector_encode, byteBits_flatten, List.map_ofFn]
   rfl
 
-end Kriterion.ArgoMAC.PlanB.SimMachine
 
-namespace Kriterion.ArgoMAC.PlanB.Wire
+/-! ### Regrouping flattened lists -/
 
-open BN254 Cryptography Kriterion.GarbledCircuit Kriterion.ArgoMAC.PlanB.SimMachine
-open private field block chunkWord gadgetByte entry gadget rowGamma curveTriple rowVector hotVector
-  scaleVector from Construction.PGS.Encoding
+theorem flatten_ofFn_add {α : Type} {first second : Nat} (lists : Fin (first + second) → List α) :
+    (List.ofFn lists).flatten =
+      (List.ofFn fun index : Fin first => lists (index.castAdd second)).flatten ++
+        (List.ofFn fun index : Fin second => lists (index.natAdd first)).flatten := by
+  rw [List.ofFn_add, List.flatten_append]
+  rfl
 
-section Fields
+theorem flatten_ofFn_mul {α : Type} {outer inner : Nat} (lists : Fin (outer * inner) → List α) :
+    (List.ofFn lists).flatten =
+      (List.ofFn fun block : Fin outer => (List.ofFn fun index : Fin inner =>
+        lists ⟨block.val * inner + index.val, by
+          have blockSmall := block.isLt
+          have indexSmall := index.isLt
+          calc block.val * inner + index.val < (block.val + 1) * inner := by
+                rw [Nat.add_mul, Nat.one_mul]; omega
+            _ ≤ outer * inner := Nat.mul_le_mul_right _ blockSmall⟩).flatten).flatten := by
+  rw [List.ofFn_mul, List.flatten_flatten, List.map_ofFn]
+  rfl
 
-variable [FieldCertificate]
-
-theorem field_bits (value : BaseField) : byteBits (encodeOf field value) = lsbs 256 value.val :=
-  natural_byteBits 32 _
-
-theorem block_bits (value : Block) : byteBits (encodeOf block value) = lsbs 128 value.toNat :=
-  natural_byteBits 16 _
-
-theorem gadgetByte_bits (value : BitVec 8) :
-    byteBits (encodeOf gadgetByte value) = lsbs 8 value.toNat := by
-  show SimulatorProtocol.bits 8 value.toNat ++ [] = _
-  rw [List.append_nil, bits_eq_lsbs]
-
-theorem chunkWord_bits (value : BitVec chunkJoinBits) :
-    byteBits (encodeOf chunkWord value) = lsbs (8 * chunkJoinBytes) value.toNat :=
-  natural_byteBits chunkJoinBytes _
-
-theorem entry_bits (value : Exception.Entry) :
-    byteBits (encodeOf entry value) =
-      (List.ofFn fun index : Fin 6 => lsbs 8 value[index.val].toNat).flatten := by
-  rw [show entry = gadgetByte.vector 6 from rfl, byteBits_vector]
-  simp only [gadgetByte_bits]
-
-theorem rowGamma_bits (value : RowGamma) :
-    byteBits (encodeOf rowGamma value) =
-      (List.ofFn fun index : Fin 4 => lsbs 256 (rowField value index.val).val).flatten := by
-  rw [show rowGamma = (field.pair (field.pair (field.pair field))).map
-      (fun value : RowGamma => (value.xC0, value.yC0, value.yC4, value.zC0))
-      (fun ⟨xC0, yC0, yC4, zC0⟩ => ⟨xC0, yC0, yC4, zC0⟩)
-      (fun _ => rfl) from rfl, encodeOf_map]
-  rw [encodeOf_pair, encodeOf_pair, encodeOf_pair]
-  simp only [byteBits_append, field_bits]
-  simp [List.ofFn_succ, rowField]
-
-/-- **The bits of the wire encoding.** -/
-theorem wire_bits (value : Public) :
-    byteBits (encoding.encode value) =
-      lsbs 256 value.curve.1.val ++ lsbs 256 value.curve.2.1.val ++ lsbs 256 value.curve.2.2.val ++
-      (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 4 =>
-            lsbs 256 (rowField value.rows[digit.val] index.val).val).flatten).flatten ++
-      (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 6 =>
-            lsbs 8 value.exception[digit.val][index.val].toNat).flatten).flatten ++
-      (List.ofFn fun chunk : Fin foldStepCount => lsbs 128 value.curveXHot[chunk.val].toNat).flatten ++
-      (List.ofFn fun chunk : Fin foldStepCount => lsbs 128 value.curveYHot[chunk.val].toNat).flatten ++
-      (List.ofFn fun chunk : Fin foldStepCount => lsbs 128 value.pointXHot[chunk.val].toNat).flatten ++
-      (List.ofFn fun chunk : Fin foldStepCount => lsbs 128 value.pointYHot[chunk.val].toNat).flatten ++
-      (List.ofFn fun chunk : Fin chunkCount =>
-          lsbs (8 * chunkJoinBytes) value.scale[chunk.val].toNat).flatten := by
-  rw [encode_eq]
-  unfold encoding
-  rw [encodeOf_map, encodeOf_pair, encodeOf_pair, encodeOf_pair, encodeOf_pair, encodeOf_pair,
-    encodeOf_pair, encodeOf_pair]
-  rw [show curveTriple = field.pair (field.pair field) from rfl, encodeOf_pair, encodeOf_pair]
-  simp only [byteBits_append]
-  rw [field_bits, field_bits, field_bits]
-  rw [show rowVector = rowGamma.vector digitCount from rfl, byteBits_vector]
-  rw [show gadget = entry.vector digitCount from rfl, byteBits_vector]
-  rw [show hotVector = block.vector foldStepCount from rfl, byteBits_vector, byteBits_vector,
-    byteBits_vector, byteBits_vector]
-  rw [show scaleVector = chunkWord.vector chunkCount from rfl, byteBits_vector]
-  simp only [rowGamma_bits, entry_bits, block_bits, chunkWord_bits, List.append_assoc]
-
-end Fields
-
-end Kriterion.ArgoMAC.PlanB.Wire
-
-namespace Kriterion.ArgoMAC.PlanB.SimMachine
-
-open BN254 Cryptography
+/-- The emitted bits of a stored word. -/
+theorem bitRun_ofNat (value width : Nat) (small : width ≤ 256) :
+    bitRun (BitVec.ofNat 256 value) 0 width = lsbs width value := by
+  unfold bitRun lsbs
+  refine congrArg List.ofFn (funext fun index => ?_)
+  rw [Nat.zero_add, BitVec.getLsbD_ofNat]
+  have : index.val < 256 := lt_of_lt_of_le index.isLt small
+  simp [this]
 
 /-! ### The chunk word -/
 
@@ -174,22 +120,5 @@ theorem digitSum_bits (width : Nat) : ∀ (count : Nat) (digit : Fin count → N
       · rw [split, Nat.add_mul_div_left _ _ (Nat.two_pow_pos width), Nat.div_eq_of_lt head,
           Nat.zero_add]
         exact digitSum_bits width count (fun slot => digit slot.succ) (fun slot => small _)
-
-/-- **A chunk word reads as its `733` slots and its two zero bits.** -/
-theorem pack_bits (values : Fin elementCount → BaseField) :
-    lsbs (8 * chunkJoinBytes) (pack values).toNat =
-      (List.ofFn fun slot : Fin elementCount => lsbs coordinateBits (values slot).val).flatten ++
-        lsbs chunkPadBits 0 := by
-  have small : ∀ slot, (values slot).val < 2 ^ coordinateBits := fun slot => val_lt_slot _
-  have width : 8 * chunkJoinBytes = coordinateBits * elementCount + chunkPadBits := by
-    rw [← chunkJoinBits_eq, chunkJoinBits_eq_product]
-  have below := digitSum_lt coordinateBits elementCount (fun slot => (values slot).val) small
-  have sum : (pack values).toNat = digitSum coordinateBits elementCount fun slot => (values slot).val := by
-    unfold pack
-    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt]
-    · rfl
-    · exact lt_of_lt_of_le below (Nat.pow_le_pow_right (by norm_num) slotBits_le_chunkJoinBits)
-  rw [width, sum, lsbs_add, Nat.div_eq_of_lt below,
-    digitSum_bits coordinateBits elementCount _ small]
 
 end Kriterion.ArgoMAC.PlanB.SimMachine

@@ -107,8 +107,8 @@ theorem fields_inRange {site : SiteId} (member : site ∈ crtLayout.sites) :
       omega
     · simp only [siteFields, Family.mask]
       refine ⟨by norm_num, fun j hj => ⟨by norm_num, by norm_num, by norm_num, by norm_num, by omega, ?_⟩⟩
-      have : j < (if k = 227 then 2 else 3) := hj
-      split at this <;> omega
+      have : j < 3 := hj
+      omega
 
 /-- The sites of the real layout are determined by their fields. -/
 theorem siteFields_injective {site site' : SiteId} (same : siteFields site = siteFields site') : site = site' := by
@@ -186,13 +186,9 @@ theorem lengths : ∀ site ∈ crtLayout.sites, ∀ answers ∈ (crtLayout.law s
     · exact length_of_ofFn _ support
   · rcases mem_maskSites mask with ⟨k, rfl, -⟩ | ⟨k, rfl, -⟩
     · exact length_of_ofFn _ support
-    · change answers ∈ (if k = 227 then singleSiteLaw else pairSiteLaw).support at support
-      show answers.length = if k = 227 then 2 else 3
-      split at support
-      · rw [if_pos (by assumption)]
-        exact length_of_ofFn _ support
-      · rw [if_neg (by assumption)]
-        exact length_of_ofFn _ support
+    · change answers ∈ pairSiteLaw.support at support
+      show answers.length = 3
+      exact length_of_ofFn _ support
 
 end RefillLayout
 

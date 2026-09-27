@@ -1,7 +1,7 @@
 /-
 **The mass of the curve-window bad event** (`StageTwo.CurveWindowMass`).
 
-`curveNearEdge` asks whether one of the five curve encodings' CRT offsets (the `x` encodings `455, 456, 457`, the `y`
+`curveNearEdge` asks whether one of the five curve encodings' CRT offsets (the `x` encodings `364, 365, 366`, the `y`
 encodings `273, 274`) lies within `B` of an end of `[0, M)`: `O < B` or `M < O + 2B`. An offset is read from the
 table's pads alone: the garbler asks only labelled inputs below `p`, where the scheme's hash of the table oracle is
 `tagHash` (`CurveWindow.gxOf_tableOracle`), and there BmrEntry's `gxOf_offset` gives P45's offset of the pads. Under
@@ -142,7 +142,7 @@ theorem tape_table (S : Set TagTable) :
 theorem curveNearEdge_sub :
     {tape : TableTape Instance.crtEntry | StageTwo.curveNearEdge tape} ⊆
       (⋃ j : Fin 3, {tape | tape.2 ∈ {T | StageTwo.nearEdge (offsetOfPads (padsOf T)
-          (.inl (BMR.xEncEquiv.symm ⟨455 + j.val, by omega⟩)))}}) ∪
+          (.inl (BMR.xEncEquiv.symm ⟨364 + j.val, by omega⟩)))}}) ∪
         ⋃ j : Fin 2, {tape | tape.2 ∈ {T | StageTwo.nearEdge (offsetOfPads (padsOf T)
           (.inr (BMR.yEncEquiv.symm ⟨273 + j.val, by omega⟩)))}} := by
   intro tape bad
@@ -150,10 +150,10 @@ theorem curveNearEdge_sub :
   simp only [Set.mem_union, Set.mem_iUnion, Set.mem_ofPred_eq]
   rcases bad with ⟨e, low, edge⟩ | ⟨e, low, edge⟩
   · left
-    have lowN : 455 ≤ e.val := low
-    refine ⟨⟨e.val - 455, by have := e.isLt; change e.val < 458 at this; omega⟩, ?_⟩
-    have same : (⟨455 + (e.val - 455), by have := e.isLt; change e.val < 458 at this; omega⟩ : Fin Entry.xCount) = e :=
-      Fin.ext (by show 455 + (e.val - 455) = e.val; omega)
+    have lowN : 364 ≤ e.val := low
+    refine ⟨⟨e.val - 364, by have := e.isLt; change e.val < 367 at this; omega⟩, ?_⟩
+    have same : (⟨364 + (e.val - 364), by have := e.isLt; change e.val < 367 at this; omega⟩ : Fin Entry.xCount) = e :=
+      Fin.ext (by show 364 + (e.val - 364) = e.val; omega)
     have value := gx_offset tape.2 tape.1 (BMR.xEncEquiv.symm e)
     have flat : BMR.xFlat (BMR.xEncEquiv.symm e) = e := BMR.xEncEquiv.apply_symm_apply e
     rw [flat] at value
@@ -194,7 +194,7 @@ theorem crtCurveWindowMass : StageTwo.CurveWindowMass := by
   rw [ENNReal.ofReal_div_of_pos Mpos, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast]
   refine ENNReal.div_le_div_right ?_ _
   have numer : (3 + 2) * (3 * ((BudgetData.p - 1) ^ 2 + 1)) ≤
-      1466 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p := by
+      1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p := by
     decide +kernel
   exact_mod_cast numer
 

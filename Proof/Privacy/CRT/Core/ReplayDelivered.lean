@@ -230,7 +230,7 @@ theorem padVector_congr {m S q q' : ℕ} (hq : q = q') (f : Fin q → Block × B
   funext j
   exact hf j
 
-theorem padCount_x (i : Fin Entry.table.count) : Layout.padCount 0 i.val = Entry.table.padAnswers 458 i := by
+theorem padCount_x (i : Fin Entry.table.count) : Layout.padCount 0 i.val = Entry.table.padAnswers 367 i := by
   unfold Layout.padCount
   exact dif_pos i.isLt
 
@@ -238,9 +238,9 @@ theorem padCount_y (i : Fin Entry.table.count) : Layout.padCount 1 i.val = Entry
   unfold Layout.padCount
   exact dif_pos i.isLt
 
-theorem padValues_x (table : TagTable) (i : Fin Entry.table.count) (ρ : ℕ) (e : Fin 458) (h : e.val < Layout.padS 0) :
+theorem padValues_x (table : TagTable) (i : Fin Entry.table.count) (ρ : ℕ) (e : Fin 367) (h : e.val < Layout.padS 0) :
     H8.padValues table 0 i ρ ⟨e.val, h⟩ =
-      padsAt table (Entry.table.modulus i) 458 (Entry.table.padAnswers 458 i) 0 i.val ρ e := by
+      padsAt table (Entry.table.modulus i) 367 (Entry.table.padAnswers 367 i) 0 i.val ρ e := by
   unfold H8.padValues padsAt
   exact congrFun (padVector_congr (padCount_x i) _ _ fun j =>
     congrArg table (Fin.ext (by simp only [bodyTag, Fin.coe_cast]))) e

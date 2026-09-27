@@ -53,10 +53,8 @@ theorem reach_label_bit [FieldCertificate] [GroupCertificate] (H : HashN) (pub :
       obtain ⟨_, hcoord, hslot, hpart⟩ := Align.digestLabelTag_fields (b := coordBit u c p.val) c.isLt
         (lt_of_lt_of_le p.isLt (by decide)) (by omega)
       rw [hashInput_div, hcoord, hslot, hpart, Align.inputBit_eq_coordBit]
-    · simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_singleton] at inFinals
-      obtain ⟨o, rfl⟩ := inFinals
-      obtain ⟨fam9, _⟩ := Align.digestFinalTag_fields (o := o.val)
-        (by have := o.isLt; simp only [digitCount] at this; omega)
+    · obtain ⟨s, hs, rfl⟩ := Align.mem_finals inFinals
+      obtain ⟨fam9, _⟩ := Align.digestFinalTag_fields (o := s) (by simp only [digitCount] at hs; omega)
       rw [hashInput_div, fam9] at fam8
       cases fam8
   unfold reachDecodedCM at inside

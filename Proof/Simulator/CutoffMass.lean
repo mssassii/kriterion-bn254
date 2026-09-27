@@ -1,12 +1,12 @@
 /-
-**The total cutoff mass and `SamplerCutoff`.**
-
-Every numeric step is exponent arithmetic on powers of two (`CutoffNat`, `CutoffPow`): the draw
-counts are bounded by powers of two (`105,652 ≤ 2^17`, `91 ≤ 2^7`, `273 ≤ 2^9`, `90 ≤ 2^7`) and
-the curve-`x` rejection ratio by `5/8` (`5^3 ≤ 2^7`), so no large numeral is formed.
+**The cutoff masses of the tail samplers** that the CRT machine's rows cutoff uses (`Proof/Simulator/CRT/Cutoff.lean`):
+the curve-`x` sampler aborts with probability below `2^-170` (`curveXAbort_le`) and one over the number of affine
+offsets is below `2^-131` (`affineCount_inv_le`). Every numeric step is exponent arithmetic on powers of two
+(`CutoffNat`, `CutoffPow`): the curve-`x` rejection ratio is bounded by `5/8` (`5^3 ≤ 2^7`), so no large numeral is
+formed.
 -/
 
-import Proof.Simulator.Cutoff
+import Proof.Simulator.CutoffTail
 import Proof.Simulator.CutoffNat
 import Proof.Simulator.CutoffPow
 
@@ -65,60 +65,7 @@ theorem affineCount_inv_le : (affineCount : ENNReal)⁻¹ ≤ ((2 : ENNReal) ^ 1
   exact Nat.le_trans (Nat.pow_le_pow_right (by decide) (by decide : 131 ≤ 252))
     (Nat.le_mul_of_pos_left _ (by decide))
 
-/-- **The total cutoff mass is below `2^-128`.** -/
-theorem cutoffMass_le :
-    (fieldCellCount * rejectLaw fieldWidth (fun value => decide (value < pNat)) attempts none + 0) +
-      ((90 * rejectLaw fieldWidth curveXAccept attempts none + (affineCount : ENNReal)⁻¹) +
-        ((digitCount : ENNReal) *
-            rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none +
-          (((digitCount * 3 : Nat) : ENNReal) * ((2 : ENNReal) ^ 399)⁻¹ + 0))) ≤
-      ((2 : ENNReal) ^ 128)⁻¹ := by
-  have cells : (fieldCellCount : ENNReal) *
-      rejectLaw fieldWidth (fun value => decide (value < pNat)) attempts none ≤
-      ((2 : ENNReal) ^ 130)⁻¹ :=
-    (mul_le_mul' le_rfl fieldAbort_le).trans (mul_inv_pow_le _ 500 130
-      (count_le _ 17 130 500 (by rw [fieldCellCount_eq]; exact Nat.le_of_ble_eq_true rfl)
-        (by decide)))
-  have points : ((90 : Nat) : ENNReal) * rejectLaw fieldWidth curveXAccept attempts none ≤
-      ((2 : ENNReal) ^ 131)⁻¹ :=
-    (mul_le_mul' le_rfl curveXAbort_le).trans
-      (mul_inv_pow_le 90 170 131 (count_le _ 7 131 170 (by decide) (by decide)))
-  rw [Nat.cast_ofNat] at points
-  have tailPart : 90 * rejectLaw fieldWidth curveXAccept attempts none +
-      (affineCount : ENNReal)⁻¹ ≤ ((2 : ENNReal) ^ 130)⁻¹ := by
-    rw [← inv_pow_add_self 130 131 rfl]
-    exact add_le_add points affineCount_inv_le
-  have lambdas : (digitCount : ENNReal) *
-      rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none ≤
-      ((2 : ENNReal) ^ 130)⁻¹ :=
-    (mul_le_mul' le_rfl lambdaAbort_le).trans (mul_inv_pow_le _ 500 130
-      (count_le _ 7 130 500 (by unfold digitCount; decide) (by decide)))
-  have preimages : (((digitCount * 3 : Nat) : ENNReal)) * ((2 : ENNReal) ^ 399)⁻¹ ≤
-      ((2 : ENNReal) ^ 130)⁻¹ :=
-    mul_inv_pow_le _ 399 130 (count_le _ 9 130 399 (by unfold digitCount; decide) (by decide))
-  refine (add_le_add (add_le_add cells le_rfl) (add_le_add tailPart
-    (add_le_add lambdas (add_le_add preimages le_rfl)))).trans (le_of_eq ?_)
-  rw [add_zero, ← add_assoc, inv_pow_add_self 129 130 rfl, inv_pow_add_self 128 129 rfl]
-
 end Numbers
-
-/-! ### The cutoff -/
-
-/-- **`SamplerCutoff`**: the machine's bounded samplers are within `2^-128` of the exact ones in
-the abstract ideal game. -/
-theorem samplerCutoff : SamplerCutoff := by
-  intro field group adversary parameter scalar
-  have lift := AbortClose.optionProduct digitCount (fun _ => lambdaLaw)
-    (fun _ => (PMF.uniformOfFintype NonZeroBase).map some) (fun _ => lambda_close)
-  rw [optionProduct_uniform] at lift
-  have finite : ((2 : ENNReal) ^ 128)⁻¹ ≠ ⊤ := ENNReal.inv_ne_top.mpr (two_pow_ne_zero 128)
-  have bound := @game_close field group (Classical.decEq _) (Classical.decEq _) _ _ _ _
-    boundedSamplers idealSamplers source_close tail_close lift
-    (fun value => (preimage_close value).mono (preimageAbort_le value.val))
-    (ne_top_of_le_ne_top finite cutoffMass_le) adversary parameter scalar
-  refine bound.trans ((ENNReal.toReal_mono finite cutoffMass_le).trans (le_of_eq ?_))
-  unfold machineCutoffError
-  rw [ENNReal.toReal_inv, ENNReal.toReal_pow, ENNReal.toReal_ofNat, one_div]
 
 end
 

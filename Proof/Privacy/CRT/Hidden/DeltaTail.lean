@@ -217,14 +217,19 @@ theorem finals_agree {bits : ℕ} (table : Fin 2 → Fin bits → Block × Block
   rw [asked_garbleEntryM] at inEntry
   split at inEntry
   · exact absurd inEntry List.not_mem_nil
-  · rw [List.mem_singleton] at inEntry
-    subst inEntry
-    have oSmall : o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
-    have small : digestFinalTag o.val < 2 ^ 40 :=
-      Paths.TagKey.code_lt (k := ⟨9, 0, 0, 0, 0, o.val, 0⟩)
-        ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, oSmall, by norm_num⟩
-    exact hash_agree tsame _ _ _ small (cold_of_fam small (by
-      rw [(digestFinalTag_fields oSmall).1]; norm_num))
+  · have final : ∀ (site : ℕ) (label : Block), site < 65536 →
+        hashOf t (hashInput label (digestFinalTag site)) = hashOf t' (hashInput label (digestFinalTag site)) := by
+      intro site label siteSmall
+      have small : digestFinalTag site < 2 ^ 40 :=
+        Paths.TagKey.code_lt (k := ⟨9, 0, 0, 0, 0, site, 0⟩)
+          ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, siteSmall, by norm_num⟩
+      exact hash_agree tsame _ _ _ small (cold_of_fam small (by
+        rw [(digestFinalTag_fields siteSmall).1]; norm_num))
+    have oSmall : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+    rcases inEntry with rfl | rfl
+    · exact final _ _ (by omega)
+    · exact final _ _ oSmall
 
 end Blocks
 
@@ -257,11 +262,13 @@ theorem finals_notShifted {u : AffineInput} {κ : Fin 2} (H : HashN) {bits : ℕ
   rw [asked_garbleEntryM] at inEntry
   split at inEntry
   · exact absurd inEntry List.not_mem_nil
-  · rw [List.mem_singleton] at inEntry
-    subst inEntry
-    have oSmall : o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
-    rw [hashInput_div]
-    exact notShifted (Or.inr (Or.inl (digestFinalTag_fields oSmall).1))
+  · have oSmall : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+    rcases inEntry with rfl | rfl
+    · rw [hashInput_div]
+      exact notShifted (Or.inr (Or.inl (digestFinalTag_fields (o := 2 * o.val) (by omega)).1))
+    · rw [hashInput_div]
+      exact notShifted (Or.inr (Or.inl (digestFinalTag_fields oSmall).1))
 
 end DeltaTail
 

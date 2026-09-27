@@ -195,15 +195,16 @@ def boundedRows : AffineInput → Point → PMF (Option (Fin digitCount → Fiel
       | none => PMF.pure none
       | some lift => PMF.pure (some (targetRows target tail lift))
 
-/-- The rows' extra abort mass: the tail's and the lifts'. -/
+/-- The rows' extra abort mass: the tail's and the lifts' (`91` randomiser pairs). -/
 def rowsMass : ℝ≥0∞ :=
   (90 * rejectLaw fieldWidth curveXAccept attempts none + (affineCount : ℝ≥0∞)⁻¹) +
-    ((digitCount : ℝ≥0∞) * rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none + 0)
+    ((digitCount : ℝ≥0∞) * (((2 : Nat) : ℝ≥0∞) *
+      rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none) + 0)
 
 theorem boundedRows_close (u : AffineInput) (target : Point) :
     AbortClose rowsMass (boundedRows u target) (Security.Phase3.simulatedRows u target) := by
-  have lift := AbortClose.optionProduct digitCount (fun _ => lambdaLaw)
-    (fun _ => (PMF.uniformOfFintype NonZeroBase).map some) (fun _ => lambda_close)
+  have lift := AbortClose.optionProduct digitCount (fun _ => pairLaw)
+    (fun _ => (PMF.uniformOfFintype (NonZeroBase × NonZeroBase)).map some) (fun _ => pair_close)
   rw [optionProduct_uniform] at lift
   unfold boundedRows Security.Phase3.simulatedRows rowsMass
   refine AbortClose.bind_opt tail_close _ _ rfl rfl fun tail => ?_
@@ -219,10 +220,12 @@ theorem rowsMass_le : rowsMass ≤ ((2 : ℝ≥0∞) ^ 129)⁻¹ := by
       ((2 : ℝ≥0∞) ^ 130)⁻¹ := by
     rw [← inv_pow_add_self 130 131 rfl]
     exact add_le_add points affineCount_inv_le
-  have lambdas : (digitCount : ℝ≥0∞) *
-      rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none ≤ ((2 : ℝ≥0∞) ^ 130)⁻¹ :=
-    (mul_le_mul' le_rfl lambdaAbort_le).trans (mul_inv_pow_le _ 500 130
-      (count_le _ 7 130 500 (by unfold digitCount; decide) (by decide)))
+  have lambdas : (digitCount : ℝ≥0∞) * (((2 : Nat) : ℝ≥0∞) *
+      rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none) ≤
+      ((2 : ℝ≥0∞) ^ 130)⁻¹ := by
+    rw [← mul_assoc, ← Nat.cast_mul]
+    exact (mul_le_mul' le_rfl lambdaAbort_le).trans (mul_inv_pow_le _ 500 130
+      (count_le _ 8 130 500 (by unfold digitCount; decide) (by decide)))
   unfold rowsMass
   rw [add_zero, ← inv_pow_add_self 129 130 rfl]
   exact add_le_add tailPart lambdas

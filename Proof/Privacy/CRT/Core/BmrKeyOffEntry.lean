@@ -110,7 +110,7 @@ theorem far_of_not_curveNearEdge (tape : TableTape crtEntry) (h : ¬ StageTwo.cu
   rcases element with x | y
   · left
     refine ⟨BMR.xFlat (.inr x), ?_, ?_⟩
-    · show Kriterion.ArgoMAC.PlanB.pointElementCountX ≤ 455 + x.slot.val
+    · show Kriterion.ArgoMAC.PlanB.pointElementCountX ≤ 364 + x.slot.val
       unfold Kriterion.ArgoMAC.PlanB.pointElementCountX
       omega
     · have e := BmrEntry.gxOf_offset tape.1 tape.2 (.inr x)

@@ -31,7 +31,8 @@ theorem stateTable_merge_empty {FI EI : Type} [DecidableEq FI] [DecidableEq EI] 
   rfl
 
 /-- The doubling event on the rows, without instance arguments (`H8.rowsDoubling` carries unused ones). -/
-def rowsZero (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) : Prop := ∃ d, (targets d).z = 0
+def rowsZero (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) : Prop :=
+  ∃ d, (targets d).z = 0 ∨ (targets d).y = 0
 
 /-- The wrap event on a private state. -/
 def crtWrapOn [FieldCertificate] [GroupCertificate] (source : (viewHere crtEntry).Source) (u : AffineInput)

@@ -111,8 +111,8 @@ def coinsOf (τ : Targets) (layer : Layer) : BMR.Coins Tb := (τ.1, τ.2, layer)
 
 /-- The context part of the scheme's coins: the offsets and `ρ` of each digit. -/
 def ctxPart (coins : Kriterion.ArgoMAC.Scheme.Coins) :
-    FieldMacToECMac.SuccessfulOffsets × (Fin 91 → NonZeroBase) :=
-  (coins.offsets, fun d => (coins.pointRandomness.get d).rho)
+    FieldMacToECMac.SuccessfulOffsets × (Fin 91 → NonZeroBase × NonZeroBase) :=
+  (coins.offsets, fun d => ((coins.pointRandomness.get d).rho, (coins.pointRandomness.get d).tau))
 
 /-- **The layer is uniform and independent of the context part**: for every weight on the scheme's
 coins that reads only the context part and a layer, averaging the coins' own layer is averaging a uniform one. -/
@@ -227,7 +227,9 @@ theorem bmrContextOf_congr (scalar : NonZeroScalar) {coins coins' : Kriterion.Ar
     BmrEntry.bmrContextOf scalar coins = BmrEntry.bmrContextOf scalar coins' := by
   have offsets : coins.offsets = coins'.offsets := congrArg Prod.fst same
   have rho : ∀ d, (coins.pointRandomness.get d).rho = (coins'.pointRandomness.get d).rho :=
-    fun d => congrFun (congrArg Prod.snd same) d
+    fun d => congrArg Prod.fst (congrFun (congrArg Prod.snd same) d)
+  have tau : ∀ d, (coins.pointRandomness.get d).tau = (coins'.pointRandomness.get d).tau :=
+    fun d => congrArg Prod.snd (congrFun (congrArg Prod.snd same) d)
   have keys : Kriterion.CRT.Entry.outputKeysOf scalar coins = Kriterion.CRT.Entry.outputKeysOf scalar coins' := by
     unfold Kriterion.CRT.Entry.outputKeysOf
     rw [offsets]
@@ -235,7 +237,7 @@ theorem bmrContextOf_congr (scalar : NonZeroScalar) {coins coins' : Kriterion.Ar
       FieldMacToECMac.rowsForOutputKeys (Kriterion.CRT.Entry.outputKeysOf scalar coins') coins'.pointRandomness := by
     rw [keys]
     unfold FieldMacToECMac.rowsForOutputKeys
-    simp only [rho]
+    simp only [rho, tau]
   unfold BmrEntry.bmrContextOf
   simp only [rows, rho]
 

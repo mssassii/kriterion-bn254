@@ -4,7 +4,7 @@
 
 | sampler | bound | where |
 |---|---|---|
-| source | `2^-130` | `source_close` here: 367 field cells and 62,305 record digits by bounded rejection |
+| source | `2^-130` | `source_close` here: 276 field cells and 54,570 record digits by bounded rejection |
 | rows | `2^-129` | `Cutoff.boundedRows_close`, `Cutoff.rowsMass_le` (`CrtBounded.rows` is `Cutoff.boundedRows`) |
 | preimage | `2^-399` each, `273 · 2^-399 ≤ 2^-130` | xinshu's `preimage_close`, `preimageAbort_le`; `Cutoff.preimagesMass_le` |
 | fourth | `0` | the machine's fourth block is the view's own uniform block |
@@ -317,23 +317,23 @@ theorem flat_div_mod {J κ i : Nat} (hi : i < J) : (κ * J + i) / J = κ ∧ (κ
 theorem toFin_ofNat_val {w : Nat} (v : Fin (2 ^ w)) : (BitVec.ofNat w v.val).toFin = v :=
   Fin.ext (by simp [Nat.mod_eq_of_lt v.isLt])
 
-theorem fieldCount_eq : fieldCount = 367 := rfl
+theorem fieldCount_eq : fieldCount = 276 := rfl
 
 /-- The field cells of a source: the curve constants, then the row constants. -/
 def exFields (s : Entry.Source) (n : Fin fieldCount) : BaseField :=
   if n.val = 0 then s.curve.1 else if n.val = 1 then s.curve.2.1 else if n.val = 2 then s.curve.2.2
-  else rowField (s.rows ⟨(n.val - 3) / 4, by
-    have small : n.val < 367 := n.isLt
-    show (n.val - 3) / 4 < 91
-    omega⟩) ((n.val - 3) % 4)
+  else rowField (s.rows ⟨(n.val - 3) / 3, by
+    have small : n.val < 276 := n.isLt
+    show (n.val - 3) / 3 < 91
+    omega⟩) ((n.val - 3) % 3)
 
 /-- The exception bytes of a source. -/
 def exBytes (s : Entry.Source) (n : Fin exceptionByteCount) : Fin (2 ^ 8) :=
-  ((s.exception ⟨n.val / 6, by
+  ((s.exception ⟨n.val / 12, by
     have := n.isLt
     unfold exceptionByteCount at this
-    show n.val / 6 < 91
-    omega⟩)[n.val % 6]'(Nat.mod_lt _ (by decide))).toFin
+    show n.val / 12 < 91
+    omega⟩)[n.val % 12]'(Nat.mod_lt _ (by decide))).toFin
 
 theorem joinCoord_lt (n : Fin (2 * Entry.joinCount)) : n.val / Entry.joinCount < 2 :=
   Nat.div_lt_of_lt_mul (lt_of_lt_of_eq n.isLt (Nat.mul_comm 2 Entry.joinCount))
@@ -426,17 +426,17 @@ theorem digits_small (D : Exact) (n : Nat) :
 
 /-! #### Reading back a source -/
 
-theorem exFields_at (s : Entry.Source) (g : Fin digitCount) (k n : Nat) (hk : k < 4) (hn : n = 3 + 4 * g.val + k) :
+theorem exFields_at (s : Entry.Source) (g : Fin digitCount) (k n : Nat) (hk : k < 3) (hn : n = 3 + 3 * g.val + k) :
     total 0 (exFields s) n = rowField (s.rows g) k := by
   have gs : g.val < 91 := g.isLt
   subst hn
-  rw [total_apply _ _ _ (show 3 + 4 * g.val + k < fieldCount from show _ < 367 by omega)]
+  rw [total_apply _ _ _ (show 3 + 3 * g.val + k < fieldCount from show _ < 276 by omega)]
   unfold exFields
-  rw [if_neg (show ¬ (3 + 4 * g.val + k = 0) by omega), if_neg (show ¬ (3 + 4 * g.val + k = 1) by omega),
-    if_neg (show ¬ (3 + 4 * g.val + k = 2) by omega)]
+  rw [if_neg (show ¬ (3 + 3 * g.val + k = 0) by omega), if_neg (show ¬ (3 + 3 * g.val + k = 1) by omega),
+    if_neg (show ¬ (3 + 3 * g.val + k = 2) by omega)]
   congr 1
-  · exact congrArg s.rows (Fin.ext (show (3 + 4 * g.val + k - 3) / 4 = g.val by omega))
-  · show (3 + 4 * g.val + k - 3) % 4 = k
+  · exact congrArg s.rows (Fin.ext (show (3 + 3 * g.val + k - 3) / 3 = g.val by omega))
+  · show (3 + 3 * g.val + k - 3) % 3 = k
     omega
 
 theorem read_curve (s : Entry.Source) : (readSource (exOf s)).curve = s.curve := by
@@ -446,14 +446,14 @@ theorem read_curve (s : Entry.Source) : (readSource (exOf s)).curve = s.curve :=
 
 theorem read_rows (s : Entry.Source) : (readSource (exOf s)).rows = s.rows := by
   funext g
-  show (⟨total 0 (exFields s) (3 + 4 * g.val), total 0 (exFields s) (3 + 4 * g.val + 1),
-    total 0 (exFields s) (3 + 4 * g.val + 2), total 0 (exFields s) (3 + 4 * g.val + 3)⟩ : RowGamma) = s.rows g
-  rw [exFields_at s g 0 (3 + 4 * g.val) (by decide) (by omega), exFields_at s g 1 _ (by decide) rfl,
-    exFields_at s g 2 _ (by decide) rfl, exFields_at s g 3 _ (by decide) rfl]
+  show (⟨total 0 (exFields s) (3 + 3 * g.val), total 0 (exFields s) (3 + 3 * g.val + 1),
+    total 0 (exFields s) (3 + 3 * g.val + 2)⟩ : RowGamma) = s.rows g
+  rw [exFields_at s g 0 (3 + 3 * g.val) (by decide) (by omega), exFields_at s g 1 _ (by decide) rfl,
+    exFields_at s g 2 _ (by decide) rfl]
   exact rowGamma_eq _
 
-theorem exception_get (s : Entry.Source) (a c : Nat) (ha : a < digitCount) (hc : c < 6) (g : Fin digitCount)
-    (b : Nat) (hb : b < 6) (h1 : a = g.val) (h2 : c = b) : (s.exception ⟨a, ha⟩)[c]'hc = (s.exception g)[b]'hb := by
+theorem exception_get (s : Entry.Source) (a c : Nat) (ha : a < digitCount) (hc : c < 12) (g : Fin digitCount)
+    (b : Nat) (hb : b < 12) (h1 : a = g.val) (h2 : c = b) : (s.exception ⟨a, ha⟩)[c]'hc = (s.exception g)[b]'hb := by
   subst h1 h2
   rfl
 
@@ -462,16 +462,16 @@ theorem read_exception (s : Entry.Source) : (readSource (exOf s)).exception = s.
   apply Vector.ext
   intro b hb
   have gs : g.val < 91 := g.isLt
-  show (Vector.ofFn fun b : Fin 6 =>
-    BitVec.ofNat 8 (total 0 (fun n => (exBytes s n).val) (6 * g.val + b.val)))[b] = (s.exception g)[b]
+  show (Vector.ofFn fun b : Fin 12 =>
+    BitVec.ofNat 8 (total 0 (fun n => (exBytes s n).val) (12 * g.val + b.val)))[b] = (s.exception g)[b]
   rw [Vector.getElem_ofFn]
   simp only
-  rw [total_apply _ _ _ (show 6 * g.val + b < exceptionByteCount from show _ < 546 by omega)]
+  rw [total_apply _ _ _ (show 12 * g.val + b < exceptionByteCount from show _ < 1092 by omega)]
   unfold exBytes
   simp only [BitVec.val_toFin]
   rw [bitVec_ofNat_toNat]
-  exact exception_get s _ _ _ _ g b hb (show (6 * g.val + b) / 6 = g.val by omega)
-    (show (6 * g.val + b) % 6 = b by omega)
+  exact exception_get s _ _ _ _ g b hb (show (12 * g.val + b) / 12 = g.val by omega)
+    (show (12 * g.val + b) % 12 = b by omega)
 
 theorem read_joins (s : Entry.Source) : (readSource (exOf s)).joins = s.joins := by
   funext κ i
@@ -545,11 +545,11 @@ theorem read_recX (s : Entry.Source) : (readSource (exOf s)).recX = s.recX := by
   apply Fin.ext
   show CrtSource.recordNat (embed (exOf s)) e.val % Entry.table.product = (s.recX e).val
   have es : e.val < Entry.xCount := e.isLt
-  have es' : e.val < 458 := e.isLt
+  have es' : e.val < 367 := e.isLt
   have at_e : recAt s e.val = (s.recX e).val := by
     unfold recAt
     rw [dif_pos es]
-  rw [read_record s e.val _ (by show e.val < 458 + 275; omega) at_e, mixed_sum, Nat.mod_eq_of_lt (s.recX e).isLt]
+  rw [read_record s e.val _ (by show e.val < 367 + 275; omega) at_e, mixed_sum, Nat.mod_eq_of_lt (s.recX e).isLt]
 
 theorem read_recY (s : Entry.Source) : (readSource (exOf s)).recY = s.recY := by
   funext e
@@ -562,7 +562,7 @@ theorem read_recY (s : Entry.Source) : (readSource (exOf s)).recY = s.recY := by
     rw [dif_neg (show ¬ (Entry.xCount + e.val < Entry.xCount) by omega),
       dif_pos (show Entry.xCount + e.val - Entry.xCount < Entry.yCount by omega)]
     exact recY_val s _ _ e (by omega)
-  rw [read_record s _ _ (by show Entry.xCount + e.val < 458 + 275; show 458 + e.val < 458 + 275; omega) at_e,
+  rw [read_record s _ _ (by show Entry.xCount + e.val < 367 + 275; show 367 + e.val < 367 + 275; omega) at_e,
     mixed_sum, Nat.mod_eq_of_lt (s.recY e).isLt]
 
 theorem read_zeros (s : Entry.Source) : (readSource (exOf s)).zeros = s.zeros := by
@@ -594,13 +594,13 @@ theorem readSource_exOf (s : Entry.Source) : readSource (exOf s) = s := by
 
 /-! #### Reading back exact draws -/
 
-theorem rowField_mk (f : Nat → BaseField) (b k : Nat) (hk : k < 4) :
-    rowField ⟨f b, f (b + 1), f (b + 2), f (b + 3)⟩ k = f (b + k) := by
+theorem rowField_mk (f : Nat → BaseField) (b k : Nat) (hk : k < 3) :
+    rowField ⟨f b, f (b + 1), f (b + 2)⟩ k = f (b + k) := by
   interval_cases k <;> rfl
 
 theorem exFields_read (D : Exact) : exFields (readSource D) = D.1 := by
   funext n
-  have ns : n.val < 367 := n.isLt
+  have ns : n.val < 276 := n.isLt
   unfold exFields
   by_cases h0 : n.val = 0
   · rw [if_pos h0]
@@ -618,23 +618,23 @@ theorem exFields_read (D : Exact) : exFields (readSource D) = D.1 := by
     rw [total_apply _ _ 2 (by decide)]
     exact congrArg D.1 (Fin.ext h2.symm)
   rw [if_neg h0, if_neg h1, if_neg h2]
-  show rowField ⟨total 0 D.1 (3 + 4 * ((n.val - 3) / 4)), total 0 D.1 (3 + 4 * ((n.val - 3) / 4) + 1),
-    total 0 D.1 (3 + 4 * ((n.val - 3) / 4) + 2), total 0 D.1 (3 + 4 * ((n.val - 3) / 4) + 3)⟩ ((n.val - 3) % 4) =
-      D.1 n
+  show rowField ⟨total 0 D.1 (3 + 3 * ((n.val - 3) / 3)), total 0 D.1 (3 + 3 * ((n.val - 3) / 3) + 1),
+    total 0 D.1 (3 + 3 * ((n.val - 3) / 3) + 2)⟩ ((n.val - 3) % 3) = D.1 n
   rw [rowField_mk (fun m => total 0 D.1 m) _ _ (Nat.mod_lt _ (by decide)),
-    show 3 + 4 * ((n.val - 3) / 4) + (n.val - 3) % 4 = n.val by omega, total_apply _ _ _ n.isLt]
+    show 3 + 3 * ((n.val - 3) / 3) + (n.val - 3) % 3 = n.val by omega, total_apply _ _ _ n.isLt]
 
 theorem exBytes_read (D : Exact) : exBytes (readSource D) = D.2.1 := by
   funext n
   apply Fin.ext
-  have ns : n.val < 546 := n.isLt
+  have ns : n.val < 1092 := n.isLt
   unfold exBytes
   simp only [BitVec.val_toFin]
-  show (Vector.ofFn fun b : Fin 6 =>
-      BitVec.ofNat 8 (total 0 (fun m => (D.2.1 m).val) (6 * (n.val / 6) + b.val)))[n.val % 6].toNat = (D.2.1 n).val
+  show (Vector.ofFn fun b : Fin 12 =>
+      BitVec.ofNat 8 (total 0 (fun m => (D.2.1 m).val) (12 * (n.val / 12) + b.val)))[n.val % 12].toNat =
+        (D.2.1 n).val
   rw [Vector.getElem_ofFn]
   simp only [BitVec.toNat_ofNat]
-  rw [show 6 * (n.val / 6) + n.val % 6 = n.val by omega, total_apply _ _ _ n.isLt,
+  rw [show 12 * (n.val / 12) + n.val % 12 = n.val by omega, total_apply _ _ _ n.isLt,
     Nat.mod_eq_of_lt (D.2.1 n).isLt]
 
 theorem exJoins_read (D : Exact) : exJoins (readSource D) = D.2.2.1 := by
@@ -663,7 +663,7 @@ theorem exPins_read (D : Exact) : exPins (readSource D) = D.2.2.2.1 := by
 
 theorem recAt_read (D : Exact) (r : Nat) (inside : r < recordCount) :
     recAt (readSource D) r = CrtSource.recordNat (embed D) r % Entry.table.product := by
-  have small : r < 458 + 275 := inside
+  have small : r < 367 + 275 := inside
   unfold recAt
   split
   · rfl
@@ -672,7 +672,7 @@ theorem recAt_read (D : Exact) (r : Nat) (inside : r < recordCount) :
       rw [show Entry.xCount + (r - Entry.xCount) = r by omega]
     · rename_i hx hy
       exfalso
-      exact hy (show r - 458 < 275 by omega)
+      exact hy (show r - 367 < 275 by omega)
 
 theorem exDigits_read (D : Exact) : exDigits (readSource D) = D.2.2.2.2.1 := by
   funext n

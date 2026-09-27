@@ -44,13 +44,9 @@ theorem wellSized_crtLayout : WellSized crtLayout := by
     rcases st with _ | _ | st
     · change answers ∈ singleSiteLaw.support at support
       exact (length_of_ofFn _ support).ge
-    · change answers ∈ (if k = 227 then singleSiteLaw else pairSiteLaw).support at support
-      show (if k = 227 then 2 else 3) ≤ answers.length
-      split at support
-      · rw [if_pos (by assumption)]
-        exact (length_of_ofFn _ support).ge
-      · rw [if_neg (by assumption)]
-        exact (length_of_ofFn _ support).ge
+    · change answers ∈ pairSiteLaw.support at support
+      show 3 ≤ answers.length
+      exact (length_of_ofFn _ support).ge
     · exact Nat.zero_le _
 
 /-- **`CrtMiddleBelow` for an entry on the real layout.** -/

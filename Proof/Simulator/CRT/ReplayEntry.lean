@@ -22,9 +22,9 @@ open Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB BN254
 theorem curveOutput_eq [FieldCertificate] (pub : Entry.Public) (input : AffineInput) (conv : Entry.ConvOut) :
     Entry.curveOutput pub input conv =
       curvePoly input.x input.y pub.curve.1 pub.curve.2.1 pub.curve.2.2
-        (conv.deliveredX ⟨455, by decide⟩) (conv.deliveredY ⟨273, by decide⟩)
-        (conv.deliveredX ⟨456, by decide⟩) (conv.deliveredY ⟨274, by decide⟩)
-        (conv.deliveredX ⟨457, by decide⟩) := by
+        (conv.deliveredX ⟨364, by decide⟩) (conv.deliveredY ⟨273, by decide⟩)
+        (conv.deliveredX ⟨365, by decide⟩) (conv.deliveredY ⟨274, by decide⟩)
+        (conv.deliveredX ⟨366, by decide⟩) := by
   unfold Entry.curveOutput CurveMembership.evaluate curvePoly Entry.curveValuesOf Pipeline.curveValues
     Entry.curvePartX Entry.curvePartY curveXElementIndex curveYElementIndex
   rfl
@@ -32,20 +32,19 @@ theorem curveOutput_eq [FieldCertificate] (pub : Entry.Public) (input : AffineIn
 /-! ### The mask cells -/
 
 theorem maskCellOf_eq (n : Nat) :
-    maskCellOf 91 n = if n < 182 then 2 ^ 57 + (5 * (n / 2) + 2 * (n % 2)) else 2 ^ 57 + 2 ^ 10 + (n - 182) := by
+    maskCellOf 91 n = if n < 91 then 2 ^ 57 + 4 * n else 2 ^ 57 + 2 ^ 10 + (n - 91) := by
   unfold maskCellOf nonCollectorEntry Layout.maskCell
   split_ifs <;> simp
 
 theorem maskCellOf_digitCount (n : Nat) :
-    maskCellOf digitCount n =
-      if n < 182 then 2 ^ 57 + (5 * (n / 2) + 2 * (n % 2)) else 2 ^ 57 + 2 ^ 10 + (n - 182) :=
+    maskCellOf digitCount n = if n < 91 then 2 ^ 57 + 4 * n else 2 ^ 57 + 2 ^ 10 + (n - 91) :=
   maskCellOf_eq n
 
 /-- The layout of the entry's mask stage, with its answer scratch at or above `2 ^ 59`. -/
 theorem entryMaskLayout (maskScratch : Nat) (low : 2 ^ 59 ≤ maskScratch)
     (fits : maskScratch + 6 < 2 ^ 256) :
     MaskLayout (entryMaskCells maskScratch) (nonCollectorCount digitCount) := by
-  have count : nonCollectorCount digitCount = 455 := rfl
+  have count : nonCollectorCount digitCount = 364 := rfl
   have key : Layout.keyCell = 2 ^ 58 := rfl
   refine ⟨by show Layout.keyCell < 2 ^ 256; rw [key]; norm_num, fits,
     fun b bb => by show Layout.keyCell ≠ maskScratch + b; rw [key]; omega, fun n nb => ?_, fun n nb b bb => ?_,
@@ -54,55 +53,47 @@ theorem entryMaskLayout (maskScratch : Nat) (low : 2 ^ 59 ≤ maskScratch)
     rw [maskCellOf_eq] <;> (try rw [maskCellOf_eq]) <;> split_ifs <;> omega
 
 /-- **The masks by non-collector entry**: from the mask stage's post, entry `n`'s cell holds
-`nonCollectorMask` of the replay's mask values. -/
+`nonCollectorMask` of the replay's mask values (the `364` entries are `182` pairs; there is no single site). -/
 theorem maskCells_of_post (pairs : Fin (pairSites digitCount) → BaseField × BaseField) (single : BaseField)
     (memory : Memory)
     (pairCells : ∀ k (kb : k < pairSites digitCount),
       memory.ram (word (maskCellOf digitCount (2 * k))) = fieldWord (pairs ⟨k, kb⟩).1 ∧
         memory.ram (word (maskCellOf digitCount (2 * k + 1))) = fieldWord (pairs ⟨k, kb⟩).2)
-    (singleCell : singleSites digitCount = 1 →
-      memory.ram (word (maskCellOf digitCount (2 * pairSites digitCount))) = fieldWord single)
-    (n : Nat) (nb : n < 455) :
+    (n : Nat) (nb : n < 364) :
     memory.ram (word (maskCellOf digitCount n)) =
       fieldWord (nonCollectorMask (EntryReading.nonCollectorValues (pairs, single)) n) := by
-  have pairsEq : pairSites digitCount = 227 := rfl
+  have pairsEq : pairSites digitCount = 182 := rfl
+  have inPairs : n / 2 < pairSites digitCount := by rw [pairsEq]; omega
   unfold nonCollectorMask
-  by_cases inPairs : n / 2 < pairSites digitCount
-  · rw [dif_pos inPairs]
-    by_cases even : n % 2 = 0
-    · rw [if_pos even]
-      have := (pairCells (n / 2) inPairs).1
-      rw [show 2 * (n / 2) = n by omega] at this
-      exact this
-    · rw [if_neg even]
-      have := (pairCells (n / 2) inPairs).2
-      rw [show 2 * (n / 2) + 1 = n by omega] at this
-      exact this
-  · rw [dif_neg inPairs]
-    have := singleCell rfl
-    rw [show 2 * pairSites digitCount = n by rw [pairsEq] at inPairs ⊢; omega] at this
+  rw [dif_pos inPairs]
+  by_cases even : n % 2 = 0
+  · rw [if_pos even]
+    have := (pairCells (n / 2) inPairs).1
+    rw [show 2 * (n / 2) = n by omega] at this
+    exact this
+  · rw [if_neg even]
+    have := (pairCells (n / 2) inPairs).2
+    rw [show 2 * (n / 2) + 1 = n by omega] at this
     exact this
 
-/-- `maskOf` at a plain `x` slot (`0` or `2`) of digit `d` is non-collector entry `2 d + slot / 2`. -/
-theorem maskOf_x (values : MaskValues digitCount) (d : Nat) (dLt : d < 91) (slot : Nat) (plain : slot = 0 ∨ slot = 2) :
-    maskOf values 0 (5 * d + slot) = nonCollectorMask values (2 * d + slot / 2) := by
+/-- `maskOf` at the plain `x` slot `0` of digit `d` is non-collector entry `d`. -/
+theorem maskOf_x (values : MaskValues digitCount) (d : Nat) (dLt : d < 91) :
+    maskOf values 0 (4 * d + 0) = nonCollectorMask values d := by
+  have dc : 4 * d + 0 < 4 * digitCount := by unfold digitCount; omega
   unfold maskOf
-  have lt : 5 * d + slot < 5 * digitCount := by unfold digitCount; omega
-  have mod : (5 * d + slot) % 5 = slot := by omega
-  have div : (5 * d + slot) / 5 = d := by omega
-  have dc : d < digitCount := by unfold digitCount; omega
-  rcases plain with h | h <;> subst h <;> simp [dc, lt, mod, div]
+  rw [if_pos rfl, if_pos dc, if_neg (by omega), if_neg (by omega), if_neg (by omega),
+    show (4 * d + 0) / 4 = d by omega]
 
-/-- `maskOf` at a `y` point encoding is non-collector entry `2 · 91 + e`. -/
+/-- `maskOf` at a `y` point encoding is non-collector entry `91 + e`. -/
 theorem maskOf_y (values : MaskValues digitCount) (e : Nat) (eLt : e < 273) :
-    maskOf values 1 e = nonCollectorMask values (2 * digitCount + e) := by
+    maskOf values 1 e = nonCollectorMask values (digitCount + e) := by
   unfold maskOf
   have lt : e < 3 * digitCount := by unfold digitCount; omega
   simp [lt]
 
 /-- **The masks of `OutHolds`** from the masks by non-collector entry. -/
 theorem outMasks_of (values : MaskValues digitCount) (memory : Memory)
-    (cells : ∀ n, n < 455 → memory.ram (word (maskCellOf digitCount n)) = fieldWord (nonCollectorMask values n))
+    (cells : ∀ n, n < 364 → memory.ram (word (maskCellOf digitCount n)) = fieldWord (nonCollectorMask values n))
     (nc : Privacy.BMR.NonCollector) :
     memory.ram (word (OutCells.rowMaskCell nc)) =
       fieldWord (Privacy.Instance.toMasks (Entry.maskFunction values) nc) := by
@@ -111,26 +102,18 @@ theorem outMasks_of (values : MaskValues digitCount) (memory : Memory)
   cases element with
   | inl x =>
       cases x
-      · have cell := cells (2 * d.val) (by omega)
+      · have cell := cells d.val (by omega)
         rw [maskCellOf_digitCount, if_pos (by omega)] at cell
-        show memory.ram (word (Layout.maskCell 0 (5 * d.val + 0))) = fieldWord (maskOf values 0 (5 * d.val + 0))
-        rw [maskOf_x values d.val dLt 0 (Or.inl rfl)]
+        show memory.ram (word (Layout.maskCell 0 (4 * d.val + 0))) = fieldWord (maskOf values 0 (4 * d.val + 0))
+        rw [maskOf_x values d.val dLt]
         unfold Layout.maskCell
-        rw [show 2 * d.val / 2 = d.val by omega, show 2 * d.val % 2 = 0 by omega] at cell
         simpa using cell
       · exact absurd (Or.inl rfl) plain
-      · have cell := cells (2 * d.val + 1) (by omega)
-        rw [maskCellOf_digitCount, if_pos (by omega)] at cell
-        show memory.ram (word (Layout.maskCell 0 (5 * d.val + 2))) = fieldWord (maskOf values 0 (5 * d.val + 2))
-        rw [maskOf_x values d.val dLt 2 (Or.inr rfl)]
-        unfold Layout.maskCell
-        rw [show (2 * d.val + 1) / 2 = d.val by omega, show (2 * d.val + 1) % 2 = 1 by omega] at cell
-        simpa using cell
       · exact absurd (Or.inr (Or.inl rfl)) plain
       · exact absurd (Or.inr (Or.inr rfl)) plain
   | inr y =>
       have slotLt := y.slot.isLt
-      have cell := cells (2 * 91 + (3 * d.val + y.slot.val)) (by
+      have cell := cells (91 + (3 * d.val + y.slot.val)) (by
         have : y.slot.val < 3 := slotLt
         omega)
       rw [maskCellOf_digitCount, if_neg (by omega)] at cell
@@ -138,7 +121,7 @@ theorem outMasks_of (values : MaskValues digitCount) (memory : Memory)
         fieldWord (maskOf values 1 (3 * d.val + y.slot.val))
       rw [maskOf_y values _ (by have : y.slot.val < 3 := slotLt; omega)]
       unfold Layout.maskCell
-      rw [show 2 * 91 + (3 * d.val + y.slot.val) - 182 = 3 * d.val + y.slot.val by omega] at cell
+      rw [show 91 + (3 * d.val + y.slot.val) - 91 = 3 * d.val + y.slot.val by omega] at cell
       simpa [digitCount] using cell
 
 /-! ### The composition -/
@@ -157,7 +140,7 @@ theorem decoded_not_mask (maskScratch : Nat) (low : 2 ^ 59 ≤ maskScratch)
     (fits : maskScratch + 6 < 2 ^ 256) (κ e : Nat) (κLe : κ ≤ 1) (eLt : e < 1024) :
     ¬ maskWrites (entryMaskCells maskScratch) (nonCollectorCount digitCount)
       (word (Layout.decodedCell κ e)) := by
-  have count : nonCollectorCount digitCount = 455 := rfl
+  have count : nonCollectorCount digitCount = 364 := rfl
   unfold Layout.decodedCell
   rintro (⟨b, bb, same⟩ | ⟨n, nb, same⟩)
   · dsimp only [entryMaskCells] at bb same
@@ -170,7 +153,7 @@ theorem decoded_not_mask (maskScratch : Nat) (low : 2 ^ 59 ≤ maskScratch)
     rw [maskCellOf_digitCount] at this
     split_ifs at this <;> omega
 
-theorem maskTag_small (site part : Nat) (siteLe : site ≤ 227) (partLt : part < 3) :
+theorem maskTag_small (site part : Nat) (siteLe : site ≤ 182) (partLt : part < 3) :
     maskTag 1 site part < 2 ^ 127 := by
   unfold maskTag tagCode Family.mask
   have : (2 : Nat) ^ 60 < 2 ^ 127 := Nat.pow_lt_pow_right (by norm_num) (by norm_num)
@@ -244,8 +227,8 @@ theorem agree_entryReplay (pub : Entry.Public) (input : AffineInput)
         by show m2.ram (word fieldBase) = _; rw [inputNow _ (Or.inr (Or.inr (Or.inl rfl)))]; exact c0Cell,
         by show m2.ram (word (fieldBase + 1)) = _; rw [inputNow _ (Or.inr (Or.inr (Or.inr (Or.inl rfl))))]; exact c1Cell,
         by show m2.ram (word (fieldBase + 2)) = _; rw [inputNow _ (Or.inr (Or.inr (Or.inr (Or.inr rfl))))]; exact c2Cell,
-        xNow ⟨455, by decide⟩, yCells ⟨273, by decide⟩, xNow ⟨456, by decide⟩,
-        yCells ⟨274, by decide⟩, xNow ⟨457, by decide⟩⟩)
+        xNow ⟨364, by decide⟩, yCells ⟨273, by decide⟩, xNow ⟨365, by decide⟩,
+        yCells ⟨274, by decide⟩, xNow ⟨366, by decide⟩⟩)
   obtain ⟨keyCell3, frame3⟩ := post3
   rw [TreeLaws.monad_bind, liftHash_bind,
     ← bindOpt_pure_right ((maskStage (entryMaskCells maskScratch) digitCount).tree m3)]
@@ -273,7 +256,7 @@ theorem agree_entryReplay (pub : Entry.Public) (input : AffineInput)
         rw [frame4.ram _ (decoded_not_mask maskScratch low fits 1 _ le_rfl (by omega)),
           frame3.ram _ (notKey 1 _ le_rfl (by omega)), yCells]
         rfl
-  · exact outMasks_of _ m4 (maskCells_of_post rest.1 rest.2 m4 pairCells singleCell) nc
+  · exact outMasks_of _ m4 (maskCells_of_post rest.1 rest.2 m4 pairCells) nc
   · show m4.ram (word Layout.keyCell) = blockWord key
     rw [frame4.ram (word Layout.keyCell)
       (MaskLayout.not_writes _ _ (entryMaskLayout maskScratch low fits) _ le_rfl)]

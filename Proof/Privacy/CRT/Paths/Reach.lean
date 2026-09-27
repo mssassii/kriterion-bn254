@@ -2,7 +2,7 @@
 **The evaluator's reach is `Tagged`** (for `viewOnce` and `CrtThirdSwap`):
 
 * `digestKeyM_tagged`, `digestEvalM_tagged`: the digest evaluator asks one label per position (family 8, the part
-  is the input's bit) and one final per digit (family 9);
+  is the input's bit) and two finals per digit (family 9, sites `2o` and `2o + 1`);
 * `replay_tagged`, `reachCM_tagged`: the full replay (conversion and body blocks, the key, all mask sites) and the
   reach on the curve (`Entry.reachCM`: the replay, then the digest);
 * `reachOffCM_tagged`: the reach off the curve (`EntryReading.reachOffCM`: the conversion blocks, then the
@@ -56,24 +56,39 @@ theorem digestKeyM_tagged (bits : Nat) (bitsLe : bits ≤ 65536) (labels : Fin 2
     simp only [positionKeys, digestLabelKeys, Set.mem_setOf_eq] at inS ⊢
     omega
 
-/-- **The digest evaluator**: the key's labels, then one final per digit. -/
-theorem digestEvalM_tagged (bits digits : Nat) (bitsLe : bits ≤ 65536) (digitsLe : digits ≤ 65536)
+/-- **The digest evaluator**: the key's labels, then both finals of every digit. -/
+theorem digestEvalM_tagged (bits digits : Nat) (bitsLe : bits ≤ 65536) (digitsLe : digits ≤ 32768)
     (labels : Fin 2 → Fin bits → Block) (u : AffineInput) (entries : Fin digits → Exception.Entry) :
     Tagged (digestLabelKeys bits ∪ digestFinalKeys digits) (digestEvalM bits digits labels u entries) := by
   unfold digestEvalM
   refine Tagged.bind' (digestKeyM_tagged bits bitsLe labels u) (fun key => ?_) ?_ ?_ le_rfl
-  · refine (Tagged.tableM (S := fun o => {⟨9, 0, 0, 0, 0, o, 0⟩}) digits (fun o => ?_)
-      fun i j _ _ different => ⟨Set.disjoint_singleton.mpr (by simp; omega),
-        siteDisjoint_of_fam fun k inS => by rw [Set.mem_singleton_iff.mp inS]; exact ⟨by norm_num, by norm_num⟩⟩).mono
-      ?_
-    · unfold finalMaskM
-      exact Tagged.bind_pure (Tagged.bind_pure (Tagged.h128M ({⟨9, 0, 0, 0, 0, o.val, 0⟩} : Set TagKey) _
-        (digestFinalTag o.val) ⟨9, 0, 0, 0, 0, o.val, 0⟩ rfl rfl
+  · refine (Tagged.tableM (S := finalDigitKeys) digits (fun o => ?_)
+      fun i j _ _ different => ⟨Set.disjoint_left.mpr fun k inI inJ => by
+          simp only [finalDigitKeys, Set.mem_setOf_eq] at inI inJ; omega,
+        siteDisjoint_of_fam fun k inS => by
+          simp only [finalDigitKeys, Set.mem_setOf_eq] at inS; omega⟩).mono ?_
+    · have key0 : (⟨9, 0, 0, 0, 0, 2 * o.val, 0⟩ : TagKey).InRange :=
         ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num,
-          show o.val < 65536 by have := o.isLt; omega, by norm_num⟩) _) _
+          show 2 * o.val < 65536 by have := o.isLt; omega, by norm_num⟩
+      have key1 : (⟨9, 0, 0, 0, 0, 2 * o.val + 1, 0⟩ : TagKey).InRange :=
+        ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num,
+          show 2 * o.val + 1 < 65536 by have := o.isLt; omega, by norm_num⟩
+      unfold finalMaskM
+      refine Tagged.bind' (Tagged.bind_pure (Tagged.h128M ({⟨9, 0, 0, 0, 0, 2 * o.val, 0⟩} : Set TagKey) _
+          (digestFinalTag (2 * o.val)) ⟨9, 0, 0, 0, 0, 2 * o.val, 0⟩ rfl rfl key0) _)
+        (S' := {⟨9, 0, 0, 0, 0, 2 * o.val + 1, 0⟩})
+        (fun _ => Tagged.bind_pure (Tagged.bind_pure (Tagged.h128M
+          ({⟨9, 0, 0, 0, 0, 2 * o.val + 1, 0⟩} : Set TagKey) _ (digestFinalTag (2 * o.val + 1))
+          ⟨9, 0, 0, 0, 0, 2 * o.val + 1, 0⟩ rfl rfl key1) _) _)
+        (Set.disjoint_singleton.mpr fun same => by simp only [TagKey.mk.injEq] at same; omega)
+        (siteDisjoint_of_fam fun k inS => by
+          rw [Set.mem_singleton_iff.mp inS]; exact ⟨by norm_num, by norm_num⟩) ?_
+      rintro k (inS | inS) <;> rw [Set.mem_singleton_iff.mp inS]
+      · exact ⟨rfl, rfl, rfl, rfl, rfl, show 2 * o.val / 2 = o.val by omega, rfl⟩
+      · exact ⟨rfl, rfl, rfl, rfl, rfl, show (2 * o.val + 1) / 2 = o.val by omega, rfl⟩
     · rintro k ⟨o, small, inS⟩
-      rw [Set.mem_singleton_iff.mp inS]
-      exact ⟨rfl, rfl, rfl, rfl, rfl, small, rfl⟩
+      simp only [finalDigitKeys, digestFinalKeys, Set.mem_setOf_eq] at inS ⊢
+      omega
   · refine Set.disjoint_left.mpr fun k inI inJ => ?_
     simp only [digestLabelKeys, digestFinalKeys, Set.mem_setOf_eq] at inI inJ
     omega

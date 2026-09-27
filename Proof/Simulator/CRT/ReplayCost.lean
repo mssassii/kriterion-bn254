@@ -210,15 +210,13 @@ theorem size_decodeAll_le (dc : DecodeCells) (mods : Nat → Nat) (count wrapB n
 
 theorem size_keyBlock (kc : KeyCells) : (keyBlock kc).size = 42 := rfl
 
-theorem size_maskStage (mc : MaskCells) : (maskStage mc Kriterion.ArgoMAC.PlanB.digitCount).size = 227 * 55 + 32 := by
+theorem size_maskStage (mc : MaskCells) : (maskStage mc Kriterion.ArgoMAC.PlanB.digitCount).size = 182 * 55 := by
   simp only [maskStage, Prog.size_seq]
   rw [Prog.size_rep _ _ 55 (fun k _ => by
     simp only [maskPairSite, Prog.size_seq, castQueries]
     rw [Prog.size_rep _ _ 9 (fun _ _ => rfl)]
     rfl)]
-  rw [if_pos (by decide)]
-  simp only [maskSingleSite, Prog.size_seq, castQueries]
-  rw [Prog.size_rep _ _ 9 (fun _ _ => rfl)]
+  rw [if_neg (by decide)]
   rfl
 
 /-! ### The whole replay -/
@@ -289,7 +287,7 @@ theorem replay_size_cost_le : Machine.replay.size ≤ 2 ^ 47 ∧ Machine.replay.
     rw [Prog.size_seq, Prog.size_seq, Prog.size_seq]
   have size : Machine.replay.size ≤ 2 ^ 47 := by
     rw [split, size_keyBlock, size_maskStage]
-    have bound : (2 : Nat) ^ 45 + (2 ^ 45 + (42 + (227 * 55 + 32))) ≤ 2 ^ 47 := by norm_num
+    have bound : (2 : Nat) ^ 45 + (2 ^ 45 + (42 + 182 * 55)) ≤ 2 ^ 47 := by norm_num
     exact le_trans (Nat.add_le_add x (Nat.add_le_add y le_rfl)) bound
   exact ⟨size, (cost_le_size _).trans size⟩
 

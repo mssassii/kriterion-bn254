@@ -237,7 +237,7 @@ theorem JointExactnessBound.publicFirstHop {hybrids : Hybrids}
 /-- **`H_open`** (P1, `Phase3/Opening.lean`): the output-kernel coupling, real digit rows versus
 the tail/head-clamp/lift sampler. -/
 structure OpeningBound (hybrids : Hybrids) : Prop where
-  /-- `HW → H`: `ε_pt = 364/(r−1)`. -/
+  /-- `HW → H`: `ε_pt = 455/(r−1)`. -/
   kernel : HopBound hybrids.publicFirst hybrids.opened fun _ _ => outputKernelError
 
 /-- **`H_abort`**: the lazy-abort mass of the 819 designated programs, **charged per stage-1 query
@@ -353,7 +353,7 @@ theorem planB_oracleAdaptivePrivacy (simulator : BoundedMachine.Simulator) (hybr
       letI := @Fintype.ofFinite EncPRF.PermutationIndex inferInstance
       letI := Classical.decEq PlanB.FixedIndex
       letI := Classical.decEq EncPRF.PermutationIndex
-      GarbledCircuit.OracleAdaptivePrivacy (@Scheme.scheme field group) PlanB.Wire.encoding 2976089
+      GarbledCircuit.OracleAdaptivePrivacy (@Scheme.scheme field group) PlanB.Wire.encoding 2606820
         (@uniformRandomTape Scheme.Coins (@Fintype.ofFinite Scheme.Coins inferInstance)
           Scheme.witness)
         (fun parameter scalar coins =>

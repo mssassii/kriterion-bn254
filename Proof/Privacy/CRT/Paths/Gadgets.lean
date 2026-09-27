@@ -77,18 +77,21 @@ theorem maskKeys_siteDisjoint {S S' : Set TagKey} (hS : ∀ k ∈ S, k.fam = 7) 
   · exact absurd sameSite.1 stage
   · exact absurd sameSite.2 slot
 
-/-- The keys of the non-collector mask sites (stage 1: the pairs, three answers, then the single site, two). -/
+/-- The keys of the non-collector mask sites (stage 1: the pairs, three answers, then the single site, two, if
+there is one). -/
 def nonCollectorKeys (digits : Nat) : Set TagKey :=
-  maskStageKeys 1 (pairSites digits) 3 ∪ maskSiteKeys 1 (pairSites digits) 2
+  maskStageKeys 1 (pairSites digits) 3 ∪ maskSiteKeys 1 (pairSites digits) (2 * singleSites digits)
 
 /-- **The non-collector masks** (route M's replay part). -/
 theorem nonCollectorMasksM_tagged (K : Block) (digits : Nat) (small : pairSites digits < 65536) :
     Tagged (nonCollectorKeys digits) (nonCollectorMasksM K digits) := by
   unfold nonCollectorMasksM pairMasksM singleMaskM
   refine Tagged.bind' (maskSites_tagged K 1 (pairSites digits) 3 (by norm_num) (by omega) (by norm_num) _)
-    (S' := maskSiteKeys 1 (pairSites digits) 2) (fun pairs => ?_) ?_ ?_ le_rfl
-  · refine Tagged.bind_empty (Tagged.ite (fun _ => Tagged.bind_pure (siteAnswersM_tagged K 1 _ 2 (by norm_num)
-      small (by norm_num)) _) fun _ => (Tagged.pure _ _).mono (Set.empty_subset _)) fun _ => Tagged.pure _ _
+    (S' := maskSiteKeys 1 (pairSites digits) (2 * singleSites digits)) (fun pairs => ?_) ?_ ?_ le_rfl
+  · refine Tagged.bind_empty (Tagged.ite (fun one => ?_) fun _ => (Tagged.pure _ _).mono (Set.empty_subset _))
+      fun _ => Tagged.pure _ _
+    rw [one]
+    exact Tagged.bind_pure (siteAnswersM_tagged K 1 _ 2 (by norm_num) small (by norm_num)) _
   · refine Set.disjoint_left.mpr fun k inI inJ => ?_
     simp only [maskStageKeys, maskSiteKeys, Set.mem_setOf_eq] at inI inJ
     omega
@@ -121,9 +124,13 @@ theorem maskAnswersM_tagged (K : Block) (digits : Nat) (collectors : collectorSi
 def digestLabelKeys (bits : Nat) : Set TagKey :=
   {k | k.fam = 8 ∧ k.coord < 2 ∧ k.idx = 0 ∧ k.stage = 0 ∧ k.level = 0 ∧ k.slot < bits ∧ k.part < 2}
 
-/-- The keys of the digest finals (family 9): the digit below `digits`. -/
+/-- The keys of the digest finals (family 9): the final site below `2 * digits`. -/
 def digestFinalKeys (digits : Nat) : Set TagKey :=
-  {k | k.fam = 9 ∧ k.coord = 0 ∧ k.idx = 0 ∧ k.stage = 0 ∧ k.level = 0 ∧ k.slot < digits ∧ k.part = 0}
+  {k | k.fam = 9 ∧ k.coord = 0 ∧ k.idx = 0 ∧ k.stage = 0 ∧ k.level = 0 ∧ k.slot < 2 * digits ∧ k.part = 0}
+
+/-- The keys of digit `o`'s two final sites, `2 o` and `2 o + 1`. -/
+def finalDigitKeys (o : Nat) : Set TagKey :=
+  {k | k.fam = 9 ∧ k.coord = 0 ∧ k.idx = 0 ∧ k.stage = 0 ∧ k.level = 0 ∧ k.slot / 2 = o ∧ k.part = 0}
 
 /-- The keys of one digest position (both bits). -/
 def positionKeys (coord position : Nat) : Set TagKey :=
@@ -183,30 +190,48 @@ theorem digestTableM_tagged (bits : Nat) (bitsLe : bits ≤ 65536) (zero : Fin 2
     simp only [positionKeys, digestLabelKeys, Set.mem_setOf_eq] at inS ⊢
     omega
 
-/-- **The garbler's digest**: the table, then one final per nonzero digit. -/
-theorem digestGarbleM_tagged (bits digits : Nat) (bitsLe : bits ≤ 65536) (digitsLe : digits ≤ 65536)
+/-- **The garbler's entry of one digit**: nothing for a zero digit, the two finals of its kinds otherwise. -/
+theorem garbleEntryM_tagged {bits : Nat} (table : Fin 2 → Fin bits → Block × Block) (o : Nat) (oLt : o < 32768)
+    (digit : Digit) (offset : BN254.AffineInput) (pad : Exception.Entry) :
+    Tagged (finalDigitKeys o) (garbleEntryM table o digit offset pad) := by
+  have key0 : (⟨9, 0, 0, 0, 0, 2 * o, 0⟩ : TagKey).InRange :=
+    ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, show 2 * o < 65536 by omega, by norm_num⟩
+  have key1 : (⟨9, 0, 0, 0, 0, 2 * o + 1, 0⟩ : TagKey).InRange :=
+    ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num, show 2 * o + 1 < 65536 by omega,
+      by norm_num⟩
+  unfold garbleEntryM
+  split
+  · exact Tagged.pure _ _
+  · unfold finalMaskM
+    dsimp only
+    refine Tagged.bind' (Tagged.bind_pure (Tagged.h128M ({⟨9, 0, 0, 0, 0, 2 * o, 0⟩} : Set TagKey) _
+        (digestFinalTag (2 * o)) ⟨9, 0, 0, 0, 0, 2 * o, 0⟩ rfl rfl key0) _)
+      (S' := {⟨9, 0, 0, 0, 0, 2 * o + 1, 0⟩})
+      (fun _ => Tagged.bind_pure (Tagged.bind_pure (Tagged.h128M ({⟨9, 0, 0, 0, 0, 2 * o + 1, 0⟩} : Set TagKey)
+        _ (digestFinalTag (2 * o + 1)) ⟨9, 0, 0, 0, 0, 2 * o + 1, 0⟩ rfl rfl key1) _) _)
+      (Set.disjoint_singleton.mpr fun same => by simp only [TagKey.mk.injEq] at same; omega)
+      (siteDisjoint_of_fam fun k inS => by rw [Set.mem_singleton_iff.mp inS]; exact ⟨by norm_num, by norm_num⟩) ?_
+    rintro k (inS | inS) <;> rw [Set.mem_singleton_iff.mp inS]
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, show 2 * o / 2 = o by omega, rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, show (2 * o + 1) / 2 = o by omega, rfl⟩
+
+/-- **The garbler's digest**: the table, then the two finals of every nonzero digit. -/
+theorem digestGarbleM_tagged (bits digits : Nat) (bitsLe : bits ≤ 65536) (digitsLe : digits ≤ 32768)
     (zero : Fin 2 → Fin bits → Block) (delta : Fin 2 → Block) (digitOf : Fin digits → Digit)
     (offsetOf : Fin digits → BN254.AffineInput) (padOf : Fin digits → Exception.Entry) :
     Tagged (digestLabelKeys bits ∪ digestFinalKeys digits)
       (digestGarbleM bits digits zero delta digitOf offsetOf padOf) := by
   unfold digestGarbleM
   refine Tagged.bind' (digestTableM_tagged bits bitsLe zero delta) (fun table => ?_) ?_ ?_ le_rfl
-  · refine (Tagged.tableM (S := fun o => {⟨9, 0, 0, 0, 0, o, 0⟩}) digits (fun o => ?_)
-      fun i j _ _ different => ⟨Set.disjoint_singleton.mpr (by simp; omega),
-        siteDisjoint_of_fam fun k inS => by rw [Set.mem_singleton_iff.mp inS]; exact ⟨by norm_num, by norm_num⟩⟩).mono
-      ?_
-    · unfold garbleEntryM
-      split
-      · exact (Tagged.pure _ _)
-      · unfold finalMaskM
-        dsimp only
-        exact Tagged.bind_pure (Tagged.bind_pure (Tagged.h128M ({⟨9, 0, 0, 0, 0, o.val, 0⟩} : Set TagKey) _
-          (digestFinalTag o.val) ⟨9, 0, 0, 0, 0, o.val, 0⟩ rfl rfl
-          ⟨by norm_num, by norm_num, by norm_num, by norm_num, by norm_num,
-            show o.val < 65536 by have := o.isLt; omega, by norm_num⟩) _) _
-    · rintro k ⟨o, small, inS⟩
-      rw [Set.mem_singleton_iff.mp inS]
-      exact ⟨rfl, rfl, rfl, rfl, rfl, small, rfl⟩
+  · refine (Tagged.tableM (S := finalDigitKeys) digits
+      (fun o => garbleEntryM_tagged table o.val (by have := o.isLt; omega) _ _ _)
+      fun i j _ _ different => ⟨Set.disjoint_left.mpr fun k inI inJ => by
+          simp only [finalDigitKeys, Set.mem_setOf_eq] at inI inJ; omega,
+        siteDisjoint_of_fam fun k inS => by
+          simp only [finalDigitKeys, Set.mem_setOf_eq] at inS; omega⟩).mono ?_
+    rintro k ⟨o, small, inS⟩
+    simp only [finalDigitKeys, digestFinalKeys, Set.mem_setOf_eq] at inS ⊢
+    omega
   · refine Set.disjoint_left.mpr fun k inI inJ => ?_
     simp only [digestLabelKeys, digestFinalKeys, Set.mem_setOf_eq] at inI inJ
     omega

@@ -272,7 +272,8 @@ def crtShadowOffCurve (source : (view).Source) (u : AffineInput) : CM Unit :=
 
 /-- The doubling reveal: a target row with `Z = 0` (at `u = exc_o` the incomplete addition's `Z` vanishes, and also
 at the negated offset; its mass is `exceptionalError`). -/
-def rowsDoubling (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) : Prop := ∃ d, (targets d).z = 0
+def rowsDoubling (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) : Prop :=
+  ∃ d, (targets d).z = 0 ∨ (targets d).y = 0
 
 /-- The CRT values `w_e` of both coordinates, as the replay computes them on a table. -/
 def replayCrtValues (source : (view).Source) (u : AffineInput) (table : TagTable) :

@@ -211,7 +211,7 @@ theorem pad_mem_sites {κ i ρ : Nat} (κLt : κ < 2) (iLt : i < 85) (ρLt : ρ 
   simp only [Layout.padSites, List.mem_flatMap, List.mem_map, List.mem_range]
   exact ⟨κ, κLt, i, iLt, ρ, ρLt, rfl⟩
 
-theorem mask_mem_sites {k : Nat} (kLt : k < 228) : SiteId.mask 1 k ∈ crtLayout.sites :=
+theorem mask_mem_sites {k : Nat} (kLt : k < 182) : SiteId.mask 1 k ∈ crtLayout.sites :=
   List.mem_append.mpr (Or.inr (List.mem_append.mpr (Or.inr (List.mem_map.mpr ⟨k, List.mem_range.mpr kLt, rfl⟩))))
 
 theorem coordEvalKeys_sites (S coord : Nat) (coordLt : coord < 2) :
@@ -240,13 +240,16 @@ theorem replayConvKeys_sites : SitesOK crtLayout replayConvKeys := by
   · exact coordEvalKeys_sites _ 0 (by norm_num) k inX
   · exact coordEvalKeys_sites _ 1 (by norm_num) k inY
 
-theorem pairSites_digitCount : pairSites digitCount = 227 := by decide
+theorem pairSites_digitCount : pairSites digitCount = 182 := by decide
+
+theorem singleSites_digitCount : singleSites digitCount = 0 := by decide
 
 /-- The non-collector replay's keys are at stage-1 mask sites of the layout. -/
 theorem nonCollectorKeys_sites : SitesOK crtLayout (nonCollectorKeys digitCount) := by
   intro k inK range site isSite
   have pairs := pairSites_digitCount
-  have facts : k.fam = 7 ∧ k.stage = 1 ∧ k.slot < 228 := by
+  have single := singleSites_digitCount
+  have facts : k.fam = 7 ∧ k.stage = 1 ∧ k.slot < 182 := by
     rcases inK with inP | inS
     · simp only [maskStageKeys, Set.mem_setOf_eq] at inP
       omega

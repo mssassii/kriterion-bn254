@@ -1,13 +1,14 @@
 /-
-The fixed register, RAM and stack layout of the Plan B simulator machine, and the numeric
-constants its code embeds. Every other machine module reads its addresses from here.
+The fixed register, RAM and stack layout of release-r1's simulator blocks, and the numeric
+constants their code embeds (the CRT machine adds its own regions above `2 ^ 51`,
+`Construction/Simulator/CRT/Layout.lean`).
 
 **Registers.** `R0`–`R5` are sampler / arithmetic scratch, `R6`–`R8` and `R9`–`R11` are the two
 point registers of `pointAdd`, `R12`–`R15` are the fixed oracle operands (index, input, first
 answer, second answer).
 
-**RAM.** Disjoint regions at `2 ^ 40 .. 2 ^ 50`. Stage 1 writes only `field`, `exception`,
-`hot` and `key`; stage 2 reads those and writes the rest.
+**RAM.** Disjoint regions at `2 ^ 40 .. 2 ^ 50`: the published field cells and exception bytes, the
+parsed request, the selected labels, scalar temporaries, the opening's cells and the Lamport key.
 
 **Stacks.** Stack `0` is the protocol request, stack `1` the private coin stack (every coin is
 pushed and immediately popped, so it is empty between instructions blocks), stack `3` the
@@ -55,24 +56,15 @@ abbrev rSecond : Register := 15
 
 /-! ### RAM regions -/
 
-/-- The `93,458` public field cells, in `Wire.encoding` order: curve (3), rows (`91 · 4`),
-scale (`127 · 733`). -/
+/-- The public field cells, in `Wire.encoding` order: curve (3), rows (`91 · 3`). -/
 def fieldBase : Nat := 2 ^ 40
-/-- The `546` exception bytes. -/
+/-- The `1,092` exception bytes. -/
 def exceptionBase : Nat := 2 ^ 41
-/-- The `4 · 127` fold joins: `curveX`, `curveY`, `pointX`, `pointY`. -/
-def hotBase : Nat := 2 ^ 42
 /-- The parsed request: `u.x`, `u.y`, the two output tag bits, `Q.x`, `Q.y`. -/
 def requestBase : Nat := 2 ^ 43
-/-- The `508` raw labels sampled in stage 2. -/
+/-- The `508` labels selected in stage 2. -/
 def labelBase : Nat := 2 ^ 44
-/-- The `508` EncPRF-whitened labels. -/
-def whiteBase : Nat := 2 ^ 45
-/-- The `733` delivered-value accumulators, in chunk-word slot order. -/
-def accBase : Nat := 2 ^ 46
-/-- The current chunk's four one-hot labels, then the designated label `E*` at offset `4`. -/
-def hotLabelBase : Nat := 2 ^ 47
-/-- Scalar temporaries (see `tmp*`). -/
+/-- Scalar temporaries (see `tmpM`). -/
 def tmpBase : Nat := 2 ^ 48
 /-- The opening: digit points, randomisers, lifted rows, targets. -/
 def openBase : Nat := 2 ^ 49
@@ -80,20 +72,13 @@ def openBase : Nat := 2 ^ 49
 (bits `0 .. 253` are `x`, `254 .. 507` are `y`). Sampled in stage 1. -/
 def keyBase : Nat := 2 ^ 50
 
-/-- Field-cell counts. -/
+/-- Field-cell counts: the curve constants, then the row constants (`91 · 3`: `xC0, yC4, zC0`). -/
 def curveCellCount : Nat := 3
-def rowCellCount : Nat := 91 * 4
-def scaleCellCount : Nat := 127 * 733
-def fieldCellCount : Nat := curveCellCount + rowCellCount + scaleCellCount
-/-- The first scale cell. -/
-def scaleCellBase : Nat := fieldBase + curveCellCount + rowCellCount
-def exceptionByteCount : Nat := 91 * 6
-def hotBlockCount : Nat := 4 * 127
+def rowCellCount : Nat := 91 * 3
+/-- The exception bytes: `12` per digit. -/
+def exceptionByteCount : Nat := 91 * 12
 def labelCount : Nat := 508
 def keyBlockCount : Nat := 2 * 508
-
-theorem fieldCellCount_eq : fieldCellCount = 93458 := by
-  norm_num [fieldCellCount, curveCellCount, rowCellCount, scaleCellCount]
 
 /-! ### Request cells -/
 
@@ -106,34 +91,20 @@ def reqQY : Nat := requestBase + 5
 
 /-! ### Temporaries -/
 
-def tmpAlpha : Nat := tmpBase
-def tmpBit0 : Nat := tmpBase + 1
-def tmpCoef : Nat := tmpBase + 2
-def tmpK1 : Nat := tmpBase + 3
-def tmpK2 : Nat := tmpBase + 4
-def tmpKappa : Nat := tmpBase + 5
-def tmpJStar : Nat := tmpBase + 6
-def tmpL0 : Nat := tmpBase + 7
-def tmpL1 : Nat := tmpBase + 8
-def tmpT : Nat := tmpBase + 9
-def tmpVal : Nat := tmpBase + 10
-def tmpY : Nat := tmpBase + 11
-def tmpO0 : Nat := tmpBase + 12
-def tmpO1 : Nat := tmpBase + 13
-def tmpO2 : Nat := tmpBase + 14
+/-- The preimage multiplier `m` of the current collector site. -/
 def tmpM : Nat := tmpBase + 15
 
 /-! ### Opening cells -/
 
 /-- Digit point `d` (tag, x, y). -/
 def openPoint (digit : Nat) : Nat := openBase + 3 * digit
-/-- The tail scalar of digit `d`. -/
-def openScalar (digit : Nat) : Nat := openBase + 300 + digit
-/-- The lift randomiser of digit `d`. -/
+/-- The lift randomiser `λ_d` of digit `d` (the `X` and `Z` rows). -/
 def openLambda (digit : Nat) : Nat := openBase + 400 + digit
+/-- The sign-row randomiser `t_d` of digit `d`. -/
+def openTau (digit : Nat) : Nat := openBase + 800 + digit
 /-- The lifted row target `W_d` (X, Y, Z). -/
 def openRow (digit : Nat) : Nat := openBase + 500 + 3 * digit
-/-- The collector target `y*` of (digit, collector). -/
+/-- The collector mask of (digit, collector), which the preimage sampler reads. -/
 def openTarget (digit collector : Nat) : Nat := openBase + 1000 + 3 * digit + collector
 /-- Limb `b` of the preimage of (digit, collector). -/
 def openLimb (digit collector block : Nat) : Nat := openBase + 2000 + 9 * digit + 3 * collector + block

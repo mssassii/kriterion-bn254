@@ -23,7 +23,7 @@ theorem joinCount_eq : joinCount = 1534 := by decide +kernel
 
 theorem pinCount_eq : pinCount = 200 := CrtConv.pinCount_eq
 
-theorem recordCount_eq : recordCount = 733 := rfl
+theorem recordCount_eq : recordCount = 642 := rfl
 
 /-! ### Reading the draws back -/
 
@@ -67,7 +67,7 @@ theorem pinAddr_range (n : Nat) (small : n < 2 * (pinCount * 128)) :
 theorem digitAddr_range (n : Nat) (small : n < recordCount * moduliCount) :
     2 ^ 53 ≤ digitAddr n ∧ digitAddr n < 2 ^ 53 + 2 ^ 25 := by
   unfold digitAddr recordCoord recordIndex Layout.residueCell
-  simp only [show recordCount = 733 from rfl, show moduliCount = 85 from rfl, show Entry.xCount = 458 from rfl] at *
+  simp only [show recordCount = 642 from rfl, show moduliCount = 85 from rfl, show Entry.xCount = 367 from rfl] at *
   constructor <;> split_ifs <;> omega
 
 theorem joinAddr_injective (first second : Nat) (firstSmall : first < 2 * joinCount)
@@ -97,8 +97,8 @@ theorem digitAddr_injective (first second : Nat) (firstSmall : first < recordCou
   · have := digitAddr_range first firstSmall; omega
   · have := digitAddr_range second secondSmall; omega
   · unfold digitAddr recordCoord recordIndex Layout.residueCell
-    simp only [show recordCount = 733 from rfl, show moduliCount = 85 from rfl,
-      show Entry.xCount = 458 from rfl] at *
+    simp only [show recordCount = 642 from rfl, show moduliCount = 85 from rfl,
+      show Entry.xCount = 367 from rfl] at *
     split_ifs <;> omega
 
 /-! ### The stores -/
@@ -190,7 +190,7 @@ theorem stored_joins (memory : Memory) (d : Draw) (n : Fin (2 * joinCount)) :
 
 theorem stored_bytes (memory : Memory) (d : Draw) (n : Fin exceptionByteCount) :
     (storedMem memory d).ram (word (exceptionBase + n.val)) = BitVec.ofNat 256 (d.bytes n) := by
-  have small : n.val < 546 := n.isLt
+  have small : n.val < 1092 := n.isLt
   rw [stored_ram_upto_joins memory d _ (by unfold exceptionBase; omega) (by unfold exceptionBase; omega)
       (by unfold exceptionBase keyBase labelCount; omega) (by unfold exceptionBase; omega) (by unfold exceptionBase; omega),
     foldStore_ram_off _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount) _ _ _
@@ -203,7 +203,7 @@ theorem stored_bytes (memory : Memory) (d : Draw) (n : Fin exceptionByteCount) :
 
 theorem stored_fields (memory : Memory) (d : Draw) (n : Fin fieldCount) :
     (storedMem memory d).ram (word (fieldBase + n.val)) = BitVec.ofNat 256 (d.fields n).val := by
-  have small : n.val < 367 := n.isLt
+  have small : n.val < 276 := n.isLt
   rw [stored_ram_upto_joins memory d _ (by unfold fieldBase; omega) (by unfold fieldBase; omega)
       (by unfold fieldBase keyBase labelCount; omega) (by unfold fieldBase; omega) (by unfold fieldBase; omega),
     foldStore_ram_off _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount) _ _ _

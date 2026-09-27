@@ -3,13 +3,12 @@
 
 `Wire.encoding`'s field, block, byte, entry, row, curve and record encoders are private to
 `Construction/CRT/Public.lean`; `encoding_eq` restates the encoding with public copies (`rfl`). `wire_bits`: the
-byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × 4 × 256`), the exception
-bytes (`91 × 6 × 8`), the two conversion vectors (`3546 × 128` bits each) and the records (`624` bits each), least
+byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × 3 × 256`), the exception
+bytes (`91 × 12 × 8`), the two conversion vectors (`3546 × 128` bits each) and the records (`624` bits each), least
 significant first.
 -/
 
 import Proof.Simulator.Stage1Wire
-import Proof.Simulator.Stage1Match
 import Construction.CRT.Layout
 
 namespace Kriterion.CRT.SimMachine
@@ -48,13 +47,13 @@ def gadgetByte : Kriterion.Encoding (BitVec 8) :=
     (fun value => by simp)
 
 /-- One exception entry. -/
-def entry : Kriterion.Encoding Exception.Entry := gadgetByte.vector 6
+def entry : Kriterion.Encoding Exception.Entry := gadgetByte.vector 12
 
 /-- One digit's row constants. -/
 def rowGamma : Kriterion.Encoding RowGamma :=
-  (field.pair (field.pair (field.pair field))).map
-    (fun value => (value.xC0, value.yC0, value.yC4, value.zC0))
-    (fun ⟨xC0, yC0, yC4, zC0⟩ => ⟨xC0, yC0, yC4, zC0⟩)
+  (field.pair (field.pair field)).map
+    (fun value => (value.xC0, value.yC4, value.zC0))
+    (fun ⟨xC0, yC4, zC0⟩ => ⟨xC0, yC4, zC0⟩)
     (fun _ => rfl)
 
 /-- The curve constants. -/
@@ -94,25 +93,24 @@ theorem record_bits (value : Record) : byteBits (encodeOf record value) = lsbs 6
 
 theorem entry_bits (value : Exception.Entry) :
     byteBits (encodeOf entry value) =
-      (List.ofFn fun index : Fin 6 => lsbs 8 value[index.val].toNat).flatten := by
-  rw [show entry = gadgetByte.vector 6 from rfl, byteBits_vector]
+      (List.ofFn fun index : Fin 12 => lsbs 8 value[index.val].toNat).flatten := by
+  rw [show entry = gadgetByte.vector 12 from rfl, byteBits_vector]
   simp only [gadgetByte_bits]
 
-/-- The four row constants of a digit by slot. -/
+/-- The three row constants of a digit by slot. -/
 def rowField (gamma : RowGamma) : Nat → BaseField
   | 0 => gamma.xC0
-  | 1 => gamma.yC0
-  | 2 => gamma.yC4
+  | 1 => gamma.yC4
   | _ => gamma.zC0
 
 theorem rowGamma_bits (value : RowGamma) :
     byteBits (encodeOf rowGamma value) =
-      (List.ofFn fun index : Fin 4 => lsbs 256 (rowField value index.val).val).flatten := by
-  rw [show rowGamma = (field.pair (field.pair (field.pair field))).map
-      (fun value : RowGamma => (value.xC0, value.yC0, value.yC4, value.zC0))
-      (fun ⟨xC0, yC0, yC4, zC0⟩ => ⟨xC0, yC0, yC4, zC0⟩)
+      (List.ofFn fun index : Fin 3 => lsbs 256 (rowField value index.val).val).flatten := by
+  rw [show rowGamma = (field.pair (field.pair field)).map
+      (fun value : RowGamma => (value.xC0, value.yC4, value.zC0))
+      (fun ⟨xC0, yC4, zC0⟩ => ⟨xC0, yC4, zC0⟩)
       (fun _ => rfl) from rfl, encodeOf_map]
-  rw [encodeOf_pair, encodeOf_pair, encodeOf_pair]
+  rw [encodeOf_pair, encodeOf_pair]
   simp only [byteBits_append, field_bits]
   simp [List.ofFn_succ, rowField]
 
@@ -121,10 +119,10 @@ theorem wire_bits (value : Entry.Public) :
     byteBits (Entry.Wire.encoding.encode value) =
       lsbs 256 value.curve.1.val ++ lsbs 256 value.curve.2.1.val ++ lsbs 256 value.curve.2.2.val ++
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 4 =>
+          (List.ofFn fun index : Fin 3 =>
             lsbs 256 (rowField value.rows[digit.val] index.val).val).flatten).flatten ++
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 6 =>
+          (List.ofFn fun index : Fin 12 =>
             lsbs 8 value.exception[digit.val][index.val].toNat).flatten).flatten ++
       (List.ofFn fun k : Fin convCount => lsbs 128 value.crtX[k.val].toNat).flatten ++
       (List.ofFn fun k : Fin convCount => lsbs 128 value.crtY[k.val].toNat).flatten ++

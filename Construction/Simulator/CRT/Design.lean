@@ -10,7 +10,7 @@ The layout is release-r1's (`Construction/Simulator/Design.lean`), with the vali
 | `2 ..` | stage 1 (M2: sample the source, write the Lamport key, serialize `Wire.encoding`), then `halt` |
 | next | the stage-2 prefix (release-r1's parse and label selection), then `branch rFlag` |
 | next | the invalid arm (release-r1's label emission), then `halt` |
-| next | the valid arm: the replay (conversion, body, key, non-collector masks), the rows (release-r1's tail points, Horner and head clamp, lambdas, lifts), the collector solve, the 273 preimages with their fourth blocks, the 546 programs, the label emission; then `halt` |
+| next | the valid arm: the replay (conversion, body, key, non-collector masks), the rows (release-r1's tail points, Horner and head clamp, the randomiser pairs, the two-scale lifts), the collector solve, the 273 preimages with their fourth blocks, the 546 programs, the label emission; then `halt` |
 | last | reject `halt` |
 
 Every block has one cost on every non-aborting path (release-r1's padded `ite`), so a stage that does not abort
@@ -119,11 +119,11 @@ theorem totalCost_le (b : Blocks) (within : b.Within (2 ^ 55)) : totalCost b ≤
 
 /-! ### The blocks the machine already has -/
 
-theorem size_solveDigit (d : Nat) : (Solve.solveDigit d).size = 74 := rfl
-theorem cost_solveDigit (d : Nat) : (Solve.solveDigit d).cost = 74 := rfl
+theorem size_solveDigit (d : Nat) : (Solve.solveDigit d).size = 66 := rfl
+theorem cost_solveDigit (d : Nat) : (Solve.solveDigit d).cost = 66 := rfl
 
-theorem size_solve : Solve.solve.size = 91 * 74 := Prog.size_rep _ _ _ fun _ _ => size_solveDigit _
-theorem cost_solve : Solve.solve.cost = 91 * 74 := Prog.cost_rep _ _ _ fun _ _ => cost_solveDigit _
+theorem size_solve : Solve.solve.size = 91 * 66 := Prog.size_rep _ _ _ fun _ _ => size_solveDigit _
+theorem cost_solve : Solve.solve.cost = 91 * 66 := Prog.cost_rep _ _ _ fun _ _ => cost_solveDigit _
 
 theorem size_preimageSite (d c : Nat) : (Preimages.preimageSite d c).size = 236623 + (6 + 7 * 128) := by
   simp only [Preimages.preimageSite, Preimages.fourthCoin, Prog.size_seq, Opening.size_preimageOne,
@@ -142,11 +142,11 @@ theorem cost_preimages : Preimages.preimages.cost = 91 * (3 * (169548 + (6 + 5 *
 /-- The rows: release-r1's tail points, Horner and head clamp, lambdas and lifts. -/
 def rowsProgram : Prog := Prog.seqList [Opening.tail, Opening.horner, Opening.lambdas, Opening.lifts]
 
-theorem size_rows : rowsProgram.size = 90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34 := by
+theorem size_rows : rowsProgram.size = 90 * 589865 + (3 + 90 * 397 + 439) + 91 * (2 * 457743) + 91 * 33 := by
   simp only [rowsProgram, Prog.seqList, Prog.size_seq, Opening.size_tail, Opening.size_horner,
     Opening.size_lambdas, Opening.size_lifts, Prog.size]
 
-theorem cost_rows : rowsProgram.cost = 90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34 := by
+theorem cost_rows : rowsProgram.cost = 90 * 459290 + (3 + 90 * 397 + 415) + 91 * (2 * 327692) + 91 * 33 := by
   simp only [rowsProgram, Prog.seqList, Prog.cost_seq, Opening.cost_tail, Opening.cost_horner,
     Opening.cost_lambdas, Opening.cost_lifts, Prog.cost]
 
@@ -156,9 +156,9 @@ def blocks (stage1 replay : Block) : Blocks where
   prefixBlock := ⟨9692 + (labelCount * 11 + 4) + 5, 5109 + (labelCount * 11 + 4) + 5⟩
   invalid := ⟨labelCount * (2 + 3 * 128), labelCount * (2 + 3 * 128)⟩
   replay := replay
-  rows := ⟨90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34,
-    90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34⟩
-  solve := ⟨91 * 74, 91 * 74⟩
+  rows := ⟨90 * 589865 + (3 + 90 * 397 + 439) + 91 * (2 * 457743) + 91 * 33,
+    90 * 459290 + (3 + 90 * 397 + 415) + 91 * (2 * 327692) + 91 * 33⟩
+  solve := ⟨91 * 66, 91 * 66⟩
   preimages := ⟨91 * (3 * (236623 + (6 + 7 * 128))), 91 * (3 * (169548 + (6 + 5 * 128)))⟩
   programs := ⟨91 * (3 * 18), 91 * (3 * 18)⟩
   emit := ⟨labelCount * (2 + 3 * 128), labelCount * (2 + 3 * 128)⟩

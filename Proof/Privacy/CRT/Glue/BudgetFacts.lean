@@ -11,7 +11,7 @@ import Proof.Privacy.CRT.Glue.BudgetData
 namespace Kriterion.CRT.BudgetData
 
 /-- The numerator of one pad-and-mask swap over `padSwapDenom`. -/
-@[irreducible] def padSwapNumer : Nat := padSwapNum + 728 * (2 ^ 384 % p) * 2 ^ 3968
+@[irreducible] def padSwapNumer : Nat := padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968
 
 /-- The common denominator `2^4352` of the pad terms. -/
 @[irreducible] def padSwapDenom : Nat := 2 ^ 4352

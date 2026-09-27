@@ -140,7 +140,7 @@ def hotTag (T : CrtTable) (u : AffineInput) (tag : ℕ) : Bool :=
 /-! ### Sites (F4) -/
 
 /-- A site: the pad vector of one `(coordinate, modulus index, residue)` (family 6), or one mask site
-`(stage, site)` (family 7: stage 0 the 273 collector sites, stage 1 the 228 paired sites). -/
+`(stage, site)` (family 7: stage 0 the 273 collector sites, stage 1 the 182 paired sites). -/
 inductive SiteId where
   | pad (coord idx residue : ℕ)
   | mask (stage site : ℕ)

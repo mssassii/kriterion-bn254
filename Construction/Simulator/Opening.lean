@@ -1,6 +1,6 @@
 /-
-Stage 2, part 2: the opening of a valid input to `Q = f_k(u)` (design note B §1.2–§2.2, in the
-order of P3's `AbstractSimulator.opening`):
+The release-r1 opening blocks that the CRT machine's valid arm runs (`Construction/Simulator/CRT/Design.lean`,
+`rowsProgram`; `Construction/Simulator/CRT/Preimages.lean`), in the order of the abstract simulator's rows kernel:
 
 1. `tail`: `90` uniform finite curve points `D_d = (x, ±√(x³ + 3))`, `d = 1 .. 90`: `x` by
    bounded rejection over `254` coins, accepted when `x < p` and `x³ + 3` is a square (the
@@ -9,19 +9,16 @@ order of P3's `AbstractSimulator.opening`):
 2. `horner`: `H = pointHorner β (D_1 … D_90)` by `P ← D_d + β · P` from `d = 90` down, with the
    constant multiple `β · P` unrolled over the `192` bits of `β`; the head clamp
    `D_0 = Q − β · H`, aborting when `β · H = O` (no clamped offset exists);
-3. `lambdas`: `91` randomisers `λ_d ∈ [1, p)`;
-4. `lifts`: `W_d = (λ² x', λ³ y', tag · λ)` with `x' = 1 + tag · (x − 1)`, i.e. `liftRow`;
-5. `solve`: the running rows `X, Y, Z` of every digit on the accumulated (designated-free)
-   values and `y*_{d,c} = κ · μ_c⁻¹ · (W_d.c − row_c)`, `μ = (1, y, 1)` (the `Y` collector is the
-   mixed element, which rides on `y`);
-6. `preimages`: for every `(d, c)`, `m < q + [y* < ρ]` by bounded rejection over `131` coins and
-   the limbs of `y* + p · m`;
-7. `programs`: the `819` programs `fixedForward (scale pointX 0 j* (5d + slot c) b) E* ↦ o_b ⊕ E*`,
-   digit → collector → block; `j*` is dynamic, so each index constant sits in a four-way
-   selection on `j*`.
+3. `lambdas`: `91` randomiser pairs `(λ_d, t_d) ∈ [1, p)²`, `λ_d` then `t_d` for each digit;
+4. `lifts`: `W_d = (λ² x', t² y, tag · λ)` with `x' = 1 + tag · (x − 1)` (the identity's words are
+   `(0, 0, 0)`, so its sign row is `0`), i.e. `liftRow`;
+5. `preimageOne`: for a collector site `(d, c)`, `m < q + [y* < ρ]` by bounded rejection over `131` coins and the
+   limbs of `y* + p · m`.
+
+`rowCell d k` is the published row constant `k` of digit `d` (`xC0, yC4, zC0`).
 -/
 
-import Construction.Simulator.Replay
+import Construction.Simulator.Blocks
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 
@@ -107,70 +104,30 @@ def head : Prog :=
 /-- `H`, then the head clamp. -/
 def horner : Prog := seqList [clearP, rep 90 fun index => hornerStep (90 - index), head]
 
-/-- One randomiser `λ_d ∈ [1, p)`. -/
-def lambdaOne (digit : Nat) : Prog :=
-  .seq (bounded fieldWidth (testPositiveBelow pNat) attempts (storeAt (openLambda digit) rOut))
+/-- One randomiser in `[1, p)`, stored at `address`. -/
+def nonZeroCell (address : Nat) : Prog :=
+  .seq (bounded fieldWidth (testPositiveBelow pNat) attempts (storeAt address rOut))
     (zeroRegs samplerScratch)
+
+/-- The randomiser pair of digit `d`: `λ_d` (the `X` and `Z` rows), then `t_d` (the sign row). -/
+def lambdaOne (digit : Nat) : Prog :=
+  .seq (nonZeroCell (openLambda digit)) (nonZeroCell (openTau digit))
 
 def lambdas : Prog := rep 91 lambdaOne
 
-/-- `W_d = liftRow D_d λ_d`. -/
+/-- `W_d = liftRow D_d λ_d t_d`. -/
 def liftOne (digit : Nat) : Prog :=
-  seqList [loadAt rA (openLambda digit), ar .fieldMul rB rA rA, ar .fieldMul rC rB rA,
-    loadPoint ⟨rD, rE, rF⟩ (openPoint digit), cst rAcc 1,
+  seqList [loadAt rA (openLambda digit), ar .fieldMul rB rA rA, loadAt rC (openTau digit),
+    ar .fieldMul rC rC rC, loadPoint ⟨rD, rE, rF⟩ (openPoint digit), cst rAcc 1,
     ar .fieldSub rE rE rAcc, ar .fieldMul rE rE rD, ar .fieldAdd rE rE rAcc,
-    ar .fieldSub rF rF rAcc, ar .fieldMul rF rF rD, ar .fieldAdd rF rF rAcc,
     ar .fieldMul rE rE rB, ar .fieldMul rF rF rC, ar .fieldMul rD rD rA,
     storeAt (openRow digit) rE, storeAt (openRow digit + 1) rF, storeAt (openRow digit + 2) rD,
     zeroRegs [rAcc, rAddr, rA, rB, rC, rD, rE, rF]]
 
 def lifts : Prog := rep 91 liftOne
 
-/-- The row-constant cell `k` of digit `d` (`xC0, yC0, yC4, zC0`). -/
-def rowCell (digit slot : Nat) : Nat := fieldBase + curveCellCount + 4 * digit + slot
-
-/-- `rAcc += RAM[cell] · R[factor]`. -/
-def addScaled (cell : Nat) (factor : Register) : Prog :=
-  seqList [loadAt rSel cell, ar .fieldMul rSel rSel factor, ar .fieldAdd rAcc rAcc rSel]
-
-/-- `rAcc += RAM[cell]`. -/
-def addCell (cell : Nat) : Prog := seqList [loadAt rSel cell, ar .fieldAdd rAcc rAcc rSel]
-
-/-- `RAM[target] = κ · (RAM[row] − rAcc)`. -/
-def finishTarget (row target : Nat) : Prog :=
-  seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, ar .fieldMul rSel rSel rF,
-    storeAt target rSel]
-
-/-- `RAM[target] = κ · (RAM[row] − rAcc) · y⁻¹` with `y` in `rB` (the `Y` collector rides on `y`);
-`rAcc` is free once the difference is formed and receives `y⁻¹`. -/
-def finishTargetOverY (row target : Nat) : Prog :=
-  seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, ar .fieldMul rSel rSel rF,
-    ar .fieldInv rAcc rB rB, ar .fieldMul rSel rSel rAcc, storeAt target rSel]
-
-/-- The accumulator cell of x-slot `s` and y-slot `s` of the point lanes. -/
-def xCell (slot : Nat) : Nat := accBase + slot
-def yCell (slot : Nat) : Nat := accBase + 458 + slot
-
-/-- The three collector targets of digit `d` (rows in `evaluateX/Y/Z` order). -/
-def solveDigit (digit : Nat) : Prog :=
-  seqList [loadAt rA reqX, loadAt rB reqY, ar .fieldMul rC rA rA, ar .fieldMul rD rB rB,
-    ar .fieldMul rE rA rB, loadAt rF tmpKappa,
-    -- X row: c0 + v[x7] x + v[x9] + v[y10] (the other coefficients ride in the slopes)
-    loadAt rAcc (rowCell digit 0), addScaled (xCell (5 * digit)) rA,
-    addCell (xCell (5 * digit + 1)), addCell (yCell (3 * digit)),
-    finishTarget (openRow digit) (openTarget digit 0),
-    -- Y row: c0 + c4 x² + v[x7] x² + v[x9] y + v[y8] y + v[y10];
-    -- the collector `x9` rides on `y`, so the target is scaled by `y⁻¹`
-    loadAt rAcc (rowCell digit 1), addScaled (rowCell digit 2) rC,
-    addScaled (xCell (5 * digit + 2)) rC, addScaled (xCell (5 * digit + 3)) rB,
-    addScaled (yCell (3 * digit + 1)) rB, addCell (yCell (3 * digit + 2)),
-    finishTargetOverY (openRow digit + 1) (openTarget digit 1),
-    -- Z row: c0 + v[x9]
-    loadAt rAcc (rowCell digit 3), addCell (xCell (5 * digit + 4)),
-    finishTarget (openRow digit + 2) (openTarget digit 2),
-    zeroRegs [rAcc, rAddr, rSel, rA, rB, rC, rD, rE, rF]]
-
-def solve : Prog := rep 91 solveDigit
+/-- The row-constant cell `k` of digit `d` (`xC0, yC4, zC0`). -/
+def rowCell (digit slot : Nat) : Nat := fieldBase + curveCellCount + 3 * digit + slot
 
 /-- `target ← source >> 128` (clobbers `rAddr`). -/
 def shr128 (target source : Register) : Prog := .seq (cst rAddr 128) (ar .shiftRight target source rAddr)
@@ -198,35 +155,6 @@ def preimageOne (digit collector : Nat) : Prog :=
     ar .less rD rC rAddr, cst rAddr preimageQuotient, ar .add rB rD rAddr,
     bounded multiplierWidth (testBelowRegister rB) attempts (storeAt tmpM rOut),
     zeroRegs samplerScratch, limbsOf digit collector]
-
-def preimages : Prog := rep 91 fun digit => rep 3 fun collector => preimageOne digit collector
-
-/-- The x-slot of collector `c` inside its digit: `rowX_x9 = 1`, `rowY_x9 = 3`, `rowZ_x9 = 4`. -/
-def collectorSlot (collector : Nat) : Nat :=
-  if collector = 0 then 1 else if collector = 1 then 3 else 4
-
-variable (ordF : FixedIndex → Nat)
-
-/-- Load the index of `(d, c, b)` at the dynamic switch `j*`. -/
-def selectIndex (digit collector block : Nat) : Prog :=
-  rep 4 fun switch =>
-    seqList [loadAt rA tmpJStar, cst rB switch, ar .xor rA rA rB,
-      .ite rA (.skip 0)
-        (cst rIndex (ordF (Replay.scaleIdx .pointX 0 switch
-          (5 * digit + collectorSlot collector) block)))]
-
-/-- One program `E* ↦ o_b ⊕ E*`. -/
-def programOne (digit collector block : Nat) : Prog :=
-  seqList [loadAt rInput (hotLabelBase + 4), loadAt rFirst (openLimb digit collector block),
-    ar .xor rFirst rFirst rInput, selectIndex ordF digit collector block,
-    .op (.program 0 rIndex rInput rFirst rSecond)]
-
-def programs : Prog :=
-  rep 91 fun digit => rep 3 fun collector => rep 3 fun block => programOne ordF digit collector block
-
-/-- **The opening.** -/
-def program : Prog :=
-  seqList [tail, horner, lambdas, lifts, solve, preimages, programs ordF, zeroRegs allRegisters]
 
 /-! ### Sizes and costs -/
 
@@ -305,37 +233,36 @@ theorem cost_horner : horner.cost = 3 + 90 * 397 + 415 := by
   unfold horner clearP; prog_size
   rw [cost_rep _ _ _ fun _ _ => cost_hornerStep _, cost_head]
 
-theorem size_lambdaOne (digit : Nat) : (lambdaOne digit).size = 457743 := by
-  unfold lambdaOne
+theorem size_nonZeroCell (address : Nat) : (nonZeroCell address).size = 457743 := by
+  unfold nonZeroCell
   simp only [Prog.size_seq, size_zeroRegs, samplerScratch, List.length_cons, List.length_nil]
   rw [size_bounded _ _ _ _ (by rw [cost_storeAt]; omega)]
   simp only [testPositiveBelow, Prog.size_seq, size_cst, ar, Prog.size, size_storeAt, cost_storeAt,
     fieldWidth, attempts]
-theorem cost_lambdaOne (digit : Nat) : (lambdaOne digit).cost = 327692 := by
-  unfold lambdaOne
+theorem cost_nonZeroCell (address : Nat) : (nonZeroCell address).cost = 327692 := by
+  unfold nonZeroCell
   simp only [Prog.cost_seq, cost_zeroRegs, samplerScratch, List.length_cons, List.length_nil]
   rw [cost_bounded _ _ _ _ (by rw [cost_storeAt]; omega)]
   simp only [testPositiveBelow, Prog.cost_seq, cost_cst, ar, Prog.cost, cost_storeAt,
     fieldWidth, attempts]
 
-theorem size_lambdas : lambdas.size = 91 * 457743 := size_rep _ _ _ fun _ _ => size_lambdaOne _
-theorem cost_lambdas : lambdas.cost = 91 * 327692 := cost_rep _ _ _ fun _ _ => cost_lambdaOne _
+theorem size_lambdaOne (digit : Nat) : (lambdaOne digit).size = 2 * 457743 := by
+  unfold lambdaOne; rw [Prog.size_seq, size_nonZeroCell, size_nonZeroCell]
+theorem cost_lambdaOne (digit : Nat) : (lambdaOne digit).cost = 2 * 327692 := by
+  unfold lambdaOne; rw [Prog.cost_seq, cost_nonZeroCell, cost_nonZeroCell]
 
-theorem size_liftOne (digit : Nat) : (liftOne digit).size = 34 := by
+theorem size_lambdas : lambdas.size = 91 * (2 * 457743) :=
+  size_rep _ _ _ fun _ _ => size_lambdaOne _
+theorem cost_lambdas : lambdas.cost = 91 * (2 * 327692) :=
+  cost_rep _ _ _ fun _ _ => cost_lambdaOne _
+
+theorem size_liftOne (digit : Nat) : (liftOne digit).size = 33 := by
   unfold liftOne loadPoint; prog_size
-theorem cost_liftOne (digit : Nat) : (liftOne digit).cost = 34 := by
+theorem cost_liftOne (digit : Nat) : (liftOne digit).cost = 33 := by
   unfold liftOne loadPoint; prog_size
 
-theorem size_lifts : lifts.size = 91 * 34 := size_rep _ _ _ fun _ _ => size_liftOne _
-theorem cost_lifts : lifts.cost = 91 * 34 := cost_rep _ _ _ fun _ _ => cost_liftOne _
-
-theorem size_solveDigit (digit : Nat) : (solveDigit digit).size = 76 := by
-  unfold solveDigit addScaled addCell finishTarget finishTargetOverY; prog_size
-theorem cost_solveDigit (digit : Nat) : (solveDigit digit).cost = 76 := by
-  unfold solveDigit addScaled addCell finishTarget finishTargetOverY; prog_size
-
-theorem size_solve : solve.size = 91 * 76 := size_rep _ _ _ fun _ _ => size_solveDigit _
-theorem cost_solve : solve.cost = 91 * 76 := cost_rep _ _ _ fun _ _ => cost_solveDigit _
+theorem size_lifts : lifts.size = 91 * 33 := size_rep _ _ _ fun _ _ => size_liftOne _
+theorem cost_lifts : lifts.cost = 91 * 33 := cost_rep _ _ _ fun _ _ => cost_liftOne _
 
 theorem size_limbsOf (digit collector : Nat) : (limbsOf digit collector).size = 58 := by
   unfold limbsOf shr128; prog_size
@@ -355,65 +282,6 @@ theorem cost_preimageOne (digit collector : Nat) : (preimageOne digit collector)
     samplerScratch, List.length_cons, List.length_nil, Prog.cost]
   rw [cost_bounded _ _ _ _ (by rw [cost_storeAt]; omega)]
   simp only [testBelowRegister, ar, Prog.cost, cost_storeAt, multiplierWidth, attempts]
-
-theorem size_preimages : preimages.size = 91 * (3 * 236623) :=
-  size_rep _ _ _ fun _ _ => size_rep _ _ _ fun _ _ => size_preimageOne _ _
-theorem cost_preimages : preimages.cost = 91 * (3 * 169548) :=
-  cost_rep _ _ _ fun _ _ => cost_rep _ _ _ fun _ _ => cost_preimageOne _ _
-
-theorem size_selectIndex (digit collector block : Nat) :
-    (selectIndex ordF digit collector block).size = 4 * 7 := by
-  unfold selectIndex
-  rw [size_rep _ _ 7 fun _ _ => by
-    simp only [seqList, Prog.size_seq, size_loadAt, ar, Prog.size, Prog.padSet,
-      Prog.padClear, Prog.cost, cst]
-    norm_num]
-theorem cost_selectIndex (digit collector block : Nat) :
-    (selectIndex ordF digit collector block).cost = 4 * 6 := by
-  unfold selectIndex
-  rw [cost_rep _ _ 6 fun _ _ => by
-    simp only [seqList, Prog.cost_seq, cost_loadAt, ar, Prog.cost, cst]
-    norm_num]
-
-theorem size_programOne (digit collector block : Nat) :
-    (programOne ordF digit collector block).size = 34 := by
-  unfold programOne; prog_size; rw [size_selectIndex]
-theorem cost_programOne (digit collector block : Nat) :
-    (programOne ordF digit collector block).cost = 30 := by
-  unfold programOne; prog_size; rw [cost_selectIndex]
-
-theorem size_programs : (programs ordF).size = 91 * (3 * (3 * 34)) :=
-  size_rep _ _ _ fun _ _ => size_rep _ _ _ fun _ _ => size_rep _ _ _ fun _ _ =>
-    size_programOne ordF _ _ _
-theorem cost_programs : (programs ordF).cost = 91 * (3 * (3 * 30)) :=
-  cost_rep _ _ _ fun _ _ => cost_rep _ _ _ fun _ _ => cost_rep _ _ _ fun _ _ =>
-    cost_programOne ordF _ _ _
-
-/-- The opening's code size. -/
-def programSize : Nat :=
-  90 * 589865 + (3 + 90 * 397 + 439) + 91 * 457743 + 91 * 34 + 91 * 76 + 91 * (3 * 236623) +
-    91 * (3 * (3 * 34)) + 16
-
-/-- The opening's cost. -/
-def programCost : Nat :=
-  90 * 459290 + (3 + 90 * 397 + 415) + 91 * 327692 + 91 * 34 + 91 * 76 + 91 * (3 * 169548) +
-    91 * (3 * (3 * 30)) + 16
-
-theorem size_program : (program ordF).size = programSize := by
-  unfold program
-  rw [seqList, seqList, seqList, seqList, seqList, seqList, seqList, seqList, seqList,
-    Prog.size_seq, Prog.size_seq, Prog.size_seq, Prog.size_seq, Prog.size_seq, Prog.size_seq,
-    Prog.size_seq, Prog.size_seq, size_tail, size_horner, size_lambdas, size_lifts, size_solve,
-    size_preimages, size_programs, size_zeroRegs, allRegisters, List.length_finRange]
-  rfl
-
-theorem cost_program : (program ordF).cost = programCost := by
-  unfold program
-  rw [seqList, seqList, seqList, seqList, seqList, seqList, seqList, seqList, seqList,
-    Prog.cost_seq, Prog.cost_seq, Prog.cost_seq, Prog.cost_seq, Prog.cost_seq, Prog.cost_seq,
-    Prog.cost_seq, Prog.cost_seq, cost_tail, cost_horner, cost_lambdas, cost_lifts, cost_solve,
-    cost_preimages, cost_programs, cost_zeroRegs, allRegisters, List.length_finRange]
-  rfl
 
 end Sizes
 

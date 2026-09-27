@@ -84,12 +84,12 @@ theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
   · simp only [List.mem_map, List.mem_range] at inFields
     obtain ⟨index, bound, same⟩ := inFields
     subst same
-    have : index < 367 := bound
+    have : index < 276 := bound
     exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), le_rfl⟩
   · simp only [List.mem_map, List.mem_range] at inBytes
     obtain ⟨index, bound, same⟩ := inBytes
     subst same
-    have : index < 546 := bound
+    have : index < 1092 := bound
     exact ⟨by unfold exceptionBase; omega, Or.inl (by unfold exceptionBase tmpBase; omega), by norm_num⟩
   · exact convPieces_safe 0 (by decide) p inConv0
   · exact convPieces_safe 1 (by decide) p inConv1
@@ -102,7 +102,7 @@ theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
     subst same
     exact ⟨by decide, bound⟩
 
-theorem encCount_le (κ : Nat) : encCount κ ≤ 458 := by
+theorem encCount_le (κ : Nat) : encCount κ ≤ 367 := by
   unfold encCount
   split <;> decide
 

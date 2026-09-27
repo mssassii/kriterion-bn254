@@ -459,7 +459,7 @@ theorem crtLayout_answers_le : ∀ site ∈ crtLayout.sites, crtLayout.answers s
   · rcases Layout.mem_maskSites mask with ⟨k, rfl, _⟩ | ⟨k, rfl, _⟩
     · show 2 ≤ 64
       omega
-    · show (if k = 227 then 2 else 3) ≤ 64
-      split <;> omega
+    · show 3 ≤ 64
+      omega
 
 end Kriterion.CRT.Privacy

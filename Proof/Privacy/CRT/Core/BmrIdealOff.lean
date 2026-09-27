@@ -20,6 +20,7 @@ import Proof.Privacy.CRT.Core.ReplayDelivered
 import Proof.Privacy.CRT.Core.SourceSplit
 import Proof.Privacy.CRT.Core.EncIndex
 import Proof.Correctness.CRT.EntryDelivery
+import Proof.Correctness.JacobianMixed
 
 namespace Kriterion.CRT.Privacy.BmrOff
 
@@ -116,17 +117,12 @@ theorem not_doubling_of_off (scalar : NonZeroScalar) (tape : TableTape crtEntry)
     (off : ¬ OnCurve u) : ¬ H8.Doubling crtEntry scalar tape u := by
   rintro ⟨o, hexc⟩
   change Kriterion.CRT.Entry.exceptional scalar tape.1 o = some u at hexc
-  unfold Kriterion.CRT.Entry.exceptional at hexc
-  split_ifs at hexc with inRange
-  generalize hkey : (Kriterion.CRT.Entry.outputKeysOf scalar tape.1).get ⟨o, inRange⟩ = key at hexc
-  dsimp only at hexc
-  cases hphi : digitEndomorphismBase key.digit with
-  | none => rw [hphi] at hexc; cases hexc
-  | some phi =>
-    rw [hphi] at hexc
-    simp only [Option.some.injEq] at hexc
-    exact off (hexc ▸ exceptionalInput_onCurve' phi (digitEndomorphismBasePowSix key.digit phi hphi) _
-      key.offset.onCurve)
+  obtain ⟨inRange, phi, hphi, kinds⟩ := Kriterion.CRT.Entry.exceptional_cases scalar tape.1 o u hexc
+  have six := digitEndomorphismBasePowSix _ phi hphi
+  have kOn := ((Kriterion.CRT.Entry.outputKeysOf scalar tape.1).get ⟨o / 2, inRange⟩).offset.onCurve
+  rcases kinds with ⟨-, rfl⟩ | ⟨-, rfl⟩
+  · exact off (exceptionalInput_onCurve' phi six _ kOn)
+  · exact off (exceptionalInput_onCurve' phi six _ (Kriterion.ArgoMAC.JacobianMixed.doubleOffset_onCurve _ kOn))
 
 end OffCurve
 

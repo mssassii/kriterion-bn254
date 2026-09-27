@@ -8,7 +8,8 @@
   labels in the label region and a clear flag.
 -/
 
-import Proof.Simulator.Stage1Law
+import Proof.Simulator.Stage1Serialize
+import Proof.Simulator.Stage1Wire
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 

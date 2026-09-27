@@ -4,8 +4,9 @@
 * `collector_eq_solve` (P45.2, proved): on the curve, a collector's row-level value is the route-M solve at the true
   rows from the published constants and the other elements' values (the cut rows' algebra; xinshu's
   `designated_eq_solve` without the switch factor).
-* `rowEquiv` (P45.2): a digit's eight row offsets and `r4` against its four published constants and its five
-  non-collector row values (the cut-row form of xinshu's `digitEquiv`, `JointExactness.lean:731`).
+* `rowEquiv` (P45.2): a digit's seven row offsets against its three published constants and its four
+  non-collector row values (the cut-row form of xinshu's `digitEquiv`, `JointExactness.lean:731`); the sign row's
+  `(y8, y10)` block has determinant `(3 - y²) / 3`, never zero because `3` is not a square.
 * `curveEquivCrt` (P45.3): `(t, r1, r2)` against the curve constants, the curve mask fixed.
 * `noWrap_delivered` (P45.4): off the wrap event the evaluator delivers `a_e v + (O_e : F_p)`.
 -/
@@ -27,19 +28,18 @@ def nonCollectorValues (values : Biquadratic.Values) : Biquadratic.Values := fun
 
 /-- **P45.2, the collector solve.** On the curve, every collector's delivered value is the route-M solve at the
 true rows. -/
-theorem collector_eq_solve [FieldCertificate] (rows : Coordinates.Rows) (rho : NonZeroBase) (r4 : BaseField)
+theorem collector_eq_solve [FieldCertificate] (rows : Coordinates.Rows) (r4 : BaseField)
     (unused : Fin 7 → BaseField) (offsets : Biquadratic.Values) (u : AffineInput) (onCurve : OnCurve u)
     (element : Biquadratic.Element) (collector : IsCollector element) :
     let rand := rowRand r4 unused
     Biquadratic.delivered rows rand.1 rand.2.1 rand.2.2 offsets u element =
-      collectorSolve (rowTarget rows u)
-        (FieldMacToECMac.garbleRow rows ⟨rho, rand.1, rand.2.1, rand.2.2⟩ offsets) u
+      collectorSolve (rowTarget rows u) (FieldMacToECMac.garbleRow rows offsets) u
         (nonCollectorValues (Biquadratic.delivered rows rand.1 rand.2.1 rand.2.2 offsets u)) element := by
   intro rand
   have xRow := Biquadratic.evaluateEncodedX rows rand.1 rand.2.1 rand.2.2 offsets u
   have yRow := Biquadratic.evaluateEncodedY rows rand.1 rand.2.1 rand.2.2 offsets u onCurve
   have zRow := Biquadratic.evaluateEncodedZ rows rand.1 rand.2.1 rand.2.2 offsets u
-  have yNe := Security.Phase3.onCurve_y_ne_zero u onCurve
+  have xNe := Security.Phase3.onCurve_x_ne_zero u onCurve
   simp only [Biquadratic.evaluateX, Biquadratic.garbleX] at xRow
   simp only [Biquadratic.evaluateY, Biquadratic.garbleY] at yRow
   simp only [Biquadratic.evaluateZ, Biquadratic.garbleZ] at zRow
@@ -55,127 +55,127 @@ theorem collector_eq_solve [FieldCertificate] (rows : Coordinates.Rows) (rho : N
       Biquadratic.garbleZ, Sum.inl.injEq, reduceCtorEq, or_self, or_false, false_or, if_false]
     linear_combination zRow
 
-/-- The five non-collector elements. -/
+/-- The four non-collector elements. -/
 abbrev NonCollectorElem := {element : Biquadratic.Element // ¬ IsCollector element}
 
-/-- The five non-collector elements, named. -/
+/-- The four non-collector elements, named. -/
 def ncXx7 : NonCollectorElem := ⟨.inl .rowX_x7, by simp [IsCollector]⟩
-def ncYx7 : NonCollectorElem := ⟨.inl .rowY_x7, by simp [IsCollector]⟩
 def ncXy10 : NonCollectorElem := ⟨.inr .rowX_y10, by simp [IsCollector]⟩
 def ncYy8 : NonCollectorElem := ⟨.inr .rowY_y8, by simp [IsCollector]⟩
 def ncYy10 : NonCollectorElem := ⟨.inr .rowY_y10, by simp [IsCollector]⟩
 
-/-- The forward map of the cut-row bijection: the four published constants and the five non-collector delivered
-values of a digit, from its eight row offsets and `r4` (the seven unused randomizers do not enter). -/
-def rowForward (rows : Coordinates.Rows) (rho : NonZeroBase) (u : AffineInput)
-    (coins : Biquadratic.Values × BaseField) : RowGamma × (NonCollectorElem → BaseField) :=
-  let rand := rowRand coins.2 fun _ => 0
-  (FieldMacToECMac.garbleRow rows ⟨rho, rand.1, rand.2.1, rand.2.2⟩ coins.1,
-    fun element => Biquadratic.delivered rows rand.1 rand.2.1 rand.2.2 coins.1 u element.1)
+/-- The forward map of the cut-row bijection: the three published constants and the four non-collector delivered
+values of a digit, from its seven row offsets (no randomizer enters). -/
+def rowForward (rows : Coordinates.Rows) (u : AffineInput) (offsets : Biquadratic.Values) :
+    RowGamma × (NonCollectorElem → BaseField) :=
+  let rand := rowRand 0 fun _ => 0
+  (FieldMacToECMac.garbleRow rows offsets,
+    fun element => Biquadratic.delivered rows rand.1 rand.2.1 rand.2.2 offsets u element.1)
 
-/-- `r4` read back from the `Y` row's `c4` and the cubic element's value (divides by `x`). -/
-def solvedR4 (rows : Coordinates.Rows) (u : AffineInput) (g : RowGamma) (v : NonCollectorElem → BaseField) :
-    BaseField :=
-  (rows.y.xSquared - g.yC4 - v ncYx7) * u.x⁻¹
+/-- The determinant of the sign row's `(y8, y10)` block, `3 - y²`: never zero, since `3` is not a square. -/
+def signDet (u : AffineInput) : BaseField := 3 - u.y ^ 2
+
+theorem signDet_ne_zero [FieldCertificate] (u : AffineInput) : signDet u ≠ 0 := by
+  intro zero
+  exact Security.Phase3.three_not_square ⟨u.y, by unfold signDet at zero; linear_combination zero⟩
+
+/-- `3⁻¹`, as the construction's `inverseThree`. -/
+theorem inverseThree_eq [FieldCertificate] : Biquadratic.inverseThree = (3 : BaseField)⁻¹ :=
+  (eq_inv_of_mul_eq_one_right Biquadratic.three_mul_inverseThree)
+
+/-- The `y8` offset solved from the two sign-row values (the `(y8, y10)` block's inverse). -/
+def solvedY8 (rows : Coordinates.Rows) (u : AffineInput) (v : NonCollectorElem → BaseField) : BaseField :=
+  (3 * v ncYy8 - (rows.y.constant - v ncYy10 + rows.y.y * u.y + 3 * rows.y.ySquared) * u.y) * (signDet u)⁻¹
 
 /-- The offsets solved in xinshu's order (`JointExactness.lean:458-480`, cut rows). -/
 def solvedK (rows : Coordinates.Rows) (u : AffineInput) (g : RowGamma) (v : NonCollectorElem → BaseField) :
     Biquadratic.Values
   | .inl .rowX_x7 => v ncXx7 - rows.x.xSquared * u.x
   | .inr .rowX_y10 => v ncXy10 - rows.x.y * u.y
-  | .inl .rowY_x7 => rows.y.xSquared - g.yC4
-  | .inr .rowY_y8 => v ncYy8 - (solvedR4 rows u g v + rows.y.ySquared) * u.y
-  | .inr .rowY_y10 => rows.y.constant - 3 * solvedR4 rows u g v - g.yC0
   | .inl .rowX_x9 => rows.x.constant - g.xC0 - (v ncXy10 - rows.x.y * u.y)
-  | .inl .rowY_x9 => rows.y.y - (v ncYy8 - (solvedR4 rows u g v + rows.y.ySquared) * u.y) -
-      (v ncYy10 - (rows.y.constant - 3 * solvedR4 rows u g v - g.yC0)) * u.y⁻¹
+  | .inl .rowY_cubic => rows.y.xSquared - g.yC4
+  | .inr .rowY_y8 => solvedY8 rows u v
+  | .inr .rowY_y10 => v ncYy10 - (rows.y.y - solvedY8 rows u v) * u.y
   | .inl .rowZ_x9 => rows.z.constant - g.zC0
 
 section RowEquiv
 
 variable [FieldCertificate]
 
-/-- **P45.2, the cut-row bijection** at a good input (`x ≠ 0 ≠ y`): the eight row offsets and `r4` against the four
-published constants and the five non-collector row values. -/
-def rowEquiv (rows : Coordinates.Rows) (rho : NonZeroBase) (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) :
-    Biquadratic.Values × BaseField ≃ RowGamma × (NonCollectorElem → BaseField) where
-  toFun := rowForward rows rho u
-  invFun out := (solvedK rows u out.1 out.2, solvedR4 rows u out.1 out.2)
-  left_inv coins := by
-    obtain ⟨K, r4⟩ := coins
-    have hx := good.1
-    have hy := good.2
-    have r4eq : solvedR4 rows u (rowForward rows rho u (K, r4)).1 (rowForward rows rho u (K, r4)).2 = r4 := by
-      simp only [solvedR4, rowForward, FieldMacToECMac.garbleRow, Biquadratic.garbleY, Biquadratic.delivered,
-        Biquadratic.slopes, Biquadratic.coordValue, ncYx7, rowRand]
-      rw [show rows.y.xSquared - (rows.y.xSquared - K (.inl .rowY_x7)) - (-r4 * u.x + K (.inl .rowY_x7))
-          = r4 * u.x by ring]
+/-- **P45.2, the cut-row bijection**: the seven row offsets against the three published constants and the four
+non-collector row values. It divides only by `3 - y²`, which is never zero, so it holds at every input; the
+`good` argument is kept for the callers' uniform signature. -/
+def rowEquiv (rows : Coordinates.Rows) (u : AffineInput) (_good : u.x ≠ 0 ∧ u.y ≠ 0) :
+    Biquadratic.Values ≃ RowGamma × (NonCollectorElem → BaseField) where
+  toFun := rowForward rows u
+  invFun out := solvedK rows u out.1 out.2
+  left_inv K := by
+    have det := signDet_ne_zero u
+    have three : (3 : BaseField) ≠ 0 := left_ne_zero_of_mul_eq_one Biquadratic.three_mul_inverseThree
+    have y8eq : solvedY8 rows u (rowForward rows u K).2 = K (.inr .rowY_y8) := by
+      simp only [solvedY8, rowForward, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue,
+        Biquadratic.signShift, ncYy8, ncYy10, inverseThree_eq]
+      unfold signDet at det ⊢
       field_simp
-    refine Prod.ext ?_ r4eq
+      ring
     funext element
-    rcases element with (_ | _ | _ | _ | _) | (_ | _ | _) <;>
-      simp only [solvedK, r4eq] <;>
+    rcases element with (_ | _ | _ | _) | (_ | _ | _) <;>
+      simp only [solvedK, y8eq] <;>
       simp only [rowForward, FieldMacToECMac.garbleRow, Biquadratic.garbleX, Biquadratic.garbleY,
-        Biquadratic.garbleZ, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, ncXx7, ncYx7,
+        Biquadratic.garbleZ, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, ncXx7,
         ncXy10, ncYy8, ncYy10, rowRand] <;>
-      (try field_simp) <;> ring
+      ring
   right_inv out := by
     obtain ⟨g, v⟩ := out
-    have hx := good.1
-    have hy := good.2
+    have det := signDet_ne_zero u
+    have three : (3 : BaseField) ≠ 0 := left_ne_zero_of_mul_eq_one Biquadratic.three_mul_inverseThree
     refine Prod.ext ?_ ?_
     · simp only [rowForward, FieldMacToECMac.garbleRow, Biquadratic.garbleX, Biquadratic.garbleY,
-        Biquadratic.garbleZ, solvedK, solvedR4, rowRand]
+        Biquadratic.garbleZ, solvedK]
       cases g
       simp only [RowGamma.mk.injEq]
-      refine ⟨by ring, by ring, by ring, by ring⟩
+      refine ⟨by ring, by ring, by ring⟩
     · funext element
       obtain ⟨element, notCollector⟩ := element
-      rcases element with (_ | _ | _ | _ | _) | (_ | _ | _)
+      rcases element with (_ | _ | _ | _) | (_ | _ | _)
       · simp only [rowForward, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, solvedK,
-          solvedR4, rowRand, ncXx7, ncYx7, ncXy10, ncYy8, ncYy10]
-        (try field_simp)
+          rowRand, ncXx7]
         ring
       · exact (notCollector (Or.inl rfl)).elim
-      · simp only [rowForward, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, solvedK,
-          solvedR4, rowRand, ncXx7, ncYx7, ncXy10, ncYy8, ncYy10]
-        (try field_simp)
-        ring
       · exact (notCollector (Or.inr (Or.inl rfl))).elim
       · exact (notCollector (Or.inr (Or.inr rfl))).elim
       · simp only [rowForward, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, solvedK,
-          solvedR4, rowRand, ncXx7, ncYx7, ncXy10, ncYy8, ncYy10]
-        (try field_simp)
+          rowRand, ncXy10]
         ring
       · simp only [rowForward, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, solvedK,
-          solvedR4, rowRand, ncXx7, ncYx7, ncXy10, ncYy8, ncYy10]
-        (try field_simp)
+          Biquadratic.signShift, rowRand, ncYy8, ncYy10, solvedY8, inverseThree_eq]
+        unfold signDet at det ⊢
+        field_simp
         ring
       · simp only [rowForward, Biquadratic.delivered, Biquadratic.slopes, Biquadratic.coordValue, solvedK,
-          solvedR4, rowRand, ncXx7, ncYx7, ncXy10, ncYy8, ncYy10]
-        (try field_simp)
+          rowRand, ncYy10]
         ring
 
 /-- The unused randomizers do not enter the delivered values. -/
-theorem delivered_rowRand (rows : Coordinates.Rows) (K : Biquadratic.Values) (u : AffineInput) (r4 : BaseField)
-    (unused unused' : Fin 7 → BaseField) :
+theorem delivered_rowRand (rows : Coordinates.Rows) (K : Biquadratic.Values) (u : AffineInput)
+    (r4 r4' : BaseField) (unused unused' : Fin 7 → BaseField) :
     Biquadratic.delivered rows (rowRand r4 unused).1 (rowRand r4 unused).2.1 (rowRand r4 unused).2.2 K u =
-      Biquadratic.delivered rows (rowRand r4 unused').1 (rowRand r4 unused').2.1 (rowRand r4 unused').2.2 K u := by
+      Biquadratic.delivered rows (rowRand r4' unused').1 (rowRand r4' unused').2.1 (rowRand r4' unused').2.2 K u := by
   funext element
-  rcases element with (_ | _ | _ | _ | _) | (_ | _ | _) <;> rfl
+  rcases element with (_ | _ | _ | _) | (_ | _ | _) <;> rfl
 
-/-- `rowEquiv` computes the construction's constants and the delivered values, for any unused randomizers. -/
-theorem rowEquiv_apply (rows : Coordinates.Rows) (rho : NonZeroBase) (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0)
+/-- `rowEquiv` computes the construction's constants and the delivered values, for any randomizers. -/
+theorem rowEquiv_apply (rows : Coordinates.Rows) (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0)
     (offsets : Biquadratic.Values) (r4 : BaseField) (unused : Fin 7 → BaseField) :
     let rand := rowRand r4 unused
-    rowEquiv rows rho u good (offsets, r4) =
-      (FieldMacToECMac.garbleRow rows ⟨rho, rand.1, rand.2.1, rand.2.2⟩ offsets,
+    rowEquiv rows u good offsets =
+      (FieldMacToECMac.garbleRow rows offsets,
         fun element => Biquadratic.delivered rows rand.1 rand.2.1 rand.2.2 offsets u element.1) := by
   intro rand
-  show rowForward rows rho u (offsets, r4) = _
+  show rowForward rows u offsets = _
   refine Prod.ext rfl ?_
   funext element
-  exact congrFun (delivered_rowRand rows offsets u r4 (fun _ => 0) unused) element.1
+  exact congrFun (delivered_rowRand rows offsets u 0 r4 (fun _ => 0) unused) element.1
 
 end RowEquiv
 

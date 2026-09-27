@@ -3,14 +3,15 @@
 
 Off the curve the masks and the bridge are hidden, so the visible cells are the cold pad entries only. The bijection
 sends the coins to the published cells (joins, row constants, curve constants) and the cold entries, with the
-residual: per digit the masks of the four row encodings whose offsets no constant absorbs (`rowX_x7`, `rowX_y10`,
-`rowY_x9`, `rowY_y8`), `r4`, the unused randomizers and the curve mask. No division occurs, so the input is
+residual: per digit the row **offsets** of the four row encodings that no constant absorbs (`rowX_x7`, `rowX_y10`,
+`rowY_y8`, `rowY_y10`), `r4`, the unused randomizers and the curve mask. No division occurs, so the input is
 arbitrary.
 
-The inverse per digit: the four residual encodings have slopes that do not read any offset (`c4`, `c2`, `c3`,
-`r4 + c5`), so their hot pads, offsets and row offsets `b = (O : F_p) − π` come first; then the slopes of `rowX_x9`
-and `rowY_y10`; the four absorbed row offsets come from the constants (`X.c0`, `Y.c0`, `Y.c4`, `Z.c0`), and their
-masks are `(O : F_p) − b`. The curve is as on the curve.
+The inverse per digit: the four residual offsets are read directly and the three absorbed ones come from the
+constants (`X.c0`, `S.c4`, `Z.c0`), so every slope is known before any pad (the sign row's slopes of `rowY_y8` and
+`rowY_y10` read each other's offset, which is why the residual holds offsets and not masks); then every hot pad
+entry from its join, its cold entries and its slope, and the masks `π = (O : F_p) − b`. The curve is as on the
+curve.
 -/
 
 import Proof.Privacy.CRT.Core.BodyMaskRowJoint
@@ -28,31 +29,26 @@ open Joint
 variable {T : CrtTable} [∀ i, NeZero (T.modulus i)]
 
 /-- The four residual row elements of a digit. -/
-def residualElem : Fin 4 → Biquadratic.Element := ![.inl .rowX_x7, .inr .rowX_y10, .inl .rowY_x9, .inr .rowY_y8]
+def residualElem : Fin 4 → Biquadratic.Element :=
+  ![.inl .rowX_x7, .inr .rowX_y10, .inr .rowY_y8, .inr .rowY_y10]
 
 /-- The forward map off the curve. -/
 def forwardOff (ctx : Context) (u : AffineInput) (c : Coins T) : (Source T × Cold T u) × ResidualOff :=
   (((join ctx c, gamma ctx c, curveTable c), coldOf u c),
-    (fun d k => c.mask (d, residualElem k), c.r4, (c.unused, c.2.2.2.2.2.1)))
+    (fun d k => rowOffset c (d, residualElem k), c.r4, (c.unused, c.2.2.2.2.2.1)))
 
 section Inverse
 
 variable (ctx : Context) (u : AffineInput) (out : (Source T × Cold T u) × ResidualOff)
 
-/-- The field offset of a row encoding at a given slope. -/
-def kAt (d : Fin 91) (element : Biquadratic.Element) (a : BaseField) : BaseField :=
-  padOffset (fullPad u out.1.1.1 out.1.2 a (rowEnc (d, element)))
-
-/-- The row offsets of a digit, recovered. -/
+/-- The row offsets of a digit, recovered: the residual's four, and the three the constants absorb. -/
 def bOff (d : Fin 91) : Biquadratic.Values
-  | .inl .rowX_x7 => kAt u out d (.inl .rowX_x7) (ctx.rows d).x.xSquared - out.2.1 d 0
-  | .inr .rowX_y10 => kAt u out d (.inr .rowX_y10) (ctx.rows d).x.y - out.2.1 d 1
-  | .inl .rowY_x9 => kAt u out d (.inl .rowY_x9) (ctx.rows d).y.xy - out.2.1 d 2
-  | .inr .rowY_y8 => kAt u out d (.inr .rowY_y8) (out.2.2.1 d + (ctx.rows d).y.ySquared) - out.2.1 d 3
-  | .inl .rowX_x9 => (ctx.rows d).x.constant - (out.1.1.2.1 d).xC0 -
-      (kAt u out d (.inr .rowX_y10) (ctx.rows d).x.y - out.2.1 d 1)
-  | .inr .rowY_y10 => (ctx.rows d).y.constant - 3 * out.2.2.1 d - (out.1.1.2.1 d).yC0
-  | .inl .rowY_x7 => (ctx.rows d).y.xSquared - (out.1.1.2.1 d).yC4
+  | .inl .rowX_x7 => out.2.1 d 0
+  | .inr .rowX_y10 => out.2.1 d 1
+  | .inr .rowY_y8 => out.2.1 d 2
+  | .inr .rowY_y10 => out.2.1 d 3
+  | .inl .rowX_x9 => (ctx.rows d).x.constant - (out.1.1.2.1 d).xC0 - out.2.1 d 1
+  | .inl .rowY_cubic => (ctx.rows d).y.xSquared - (out.1.1.2.1 d).yC4
   | .inl .rowZ_x9 => (ctx.rows d).z.constant - (out.1.1.2.1 d).zC0
 
 /-- The curve randomizers and offsets in the chain order. -/
@@ -122,39 +118,21 @@ theorem ky4Off_forward : ky4Off u (forwardOff ctx u c) = curveK c (.inr .y4) :=
 theorem ky6Off_forward : ky6Off u (forwardOff ctx u c) = curveK c (.inr .y6) :=
   padOffset_forwardOff ctx u c _ _ (by rw [ky4Off_forward]; rfl)
 
-theorem kAt_forward (d : Fin 91) (element : Biquadratic.Element) (a : BaseField)
-    (ha : a = slope ctx c (rowEnc (d, element))) :
-    kAt u (forwardOff ctx u c) d element a = offsetF c (rowEnc (d, element)) :=
-  padOffset_forwardOff ctx u c _ _ ha
-
 theorem bOff_forward (d : Fin 91) : bOff ctx u (forwardOff ctx u c) d = fun element => rowOffset c (d, element) := by
   funext element
-  rcases element with (_ | _ | _ | _ | _) | (_ | _ | _)
-  · show kAt u (forwardOff ctx u c) d (.inl .rowX_x7) (ctx.rows d).x.xSquared - c.mask (d, .inl .rowX_x7) = _
-    rw [kAt_forward ctx u c d (.inl .rowX_x7) (ctx.rows d).x.xSquared rfl]
-    rfl
-  · show (ctx.rows d).x.constant - (gamma ctx c d).xC0 -
-      (kAt u (forwardOff ctx u c) d (.inr .rowX_y10) (ctx.rows d).x.y - c.mask (d, .inr .rowX_y10)) = _
-    rw [kAt_forward ctx u c d (.inr .rowX_y10) (ctx.rows d).x.y rfl]
+  rcases element with (_ | _ | _ | _) | (_ | _ | _)
+  · rfl
+  · show (ctx.rows d).x.constant - (gamma ctx c d).xC0 - rowOffset c (d, .inr .rowX_y10) =
+      rowOffset c (d, .inl .rowX_x9)
     simp only [gamma, FieldMacToECMac.garbleRow, Biquadratic.garbleX]
-    unfold rowOffset
     ring
   · simp only [bOff, forwardOff, gamma, FieldMacToECMac.garbleRow, Biquadratic.garbleY]
     ring
-  · show kAt u (forwardOff ctx u c) d (.inl .rowY_x9) (ctx.rows d).y.xy - c.mask (d, .inl .rowY_x9) = _
-    rw [kAt_forward ctx u c d (.inl .rowY_x9) (ctx.rows d).y.xy rfl]
-    rfl
   · simp only [bOff, forwardOff, gamma, FieldMacToECMac.garbleRow, Biquadratic.garbleZ]
     ring
-  · show kAt u (forwardOff ctx u c) d (.inr .rowX_y10) (ctx.rows d).x.y - c.mask (d, .inr .rowX_y10) = _
-    rw [kAt_forward ctx u c d (.inr .rowX_y10) (ctx.rows d).x.y rfl]
-    rfl
-  · show kAt u (forwardOff ctx u c) d (.inr .rowY_y8) (c.r4 d + (ctx.rows d).y.ySquared) -
-      c.mask (d, .inr .rowY_y8) = _
-    rw [kAt_forward ctx u c d (.inr .rowY_y8) (c.r4 d + (ctx.rows d).y.ySquared) rfl]
-    rfl
-  · simp only [bOff, forwardOff, gamma, FieldMacToECMac.garbleRow, Biquadratic.garbleY, rowRand, Coins.r4]
-    ring
+  · rfl
+  · rfl
+  · rfl
 
 theorem slopeOff_forward (e : Enc) : slopeOff ctx u (forwardOff ctx u c) e = slope ctx c e := by
   rcases e with ((⟨d, x⟩ | x) | (⟨d, y⟩ | y))
@@ -232,12 +210,11 @@ theorem coldOf_backwardOff : coldOf u (backwardOff ctx u out) = out.1.2 := by
 theorem gamma_backwardOff (d : Fin 91) : gamma ctx (backwardOff ctx u out) d = out.1.1.2.1 d := by
   unfold gamma
   simp only [rowOffset_backwardOff]
-  show FieldMacToECMac.garbleRow _ _ (bOff ctx u out d) = _
-  simp only [FieldMacToECMac.garbleRow, Biquadratic.garbleX, Biquadratic.garbleY, Biquadratic.garbleZ, bOff,
-    rowRand, backwardOff, Coins.r4, Coins.unused]
-  obtain ⟨xC0, yC0, yC4, zC0⟩ := out.1.1.2.1 d
+  show FieldMacToECMac.garbleRow _ (bOff ctx u out d) = _
+  simp only [FieldMacToECMac.garbleRow, Biquadratic.garbleX, Biquadratic.garbleY, Biquadratic.garbleZ, bOff]
+  obtain ⟨xC0, yC4, zC0⟩ := out.1.1.2.1 d
   simp only [RowGamma.mk.injEq]
-  refine ⟨by ring, by ring, by ring, by ring⟩
+  refine ⟨by ring, by ring, by ring⟩
 
 theorem curveTable_backwardOff : curveTable (backwardOff ctx u out) = out.1.1.2.2 := by
   unfold curveTable CurveMembership.garble
@@ -249,27 +226,10 @@ theorem curveTable_backwardOff : curveTable (backwardOff ctx u out) = out.1.1.2.
   refine ⟨by ring, by ring, by ring⟩
 
 theorem residual_backwardOff :
-    (fun d k => (backwardOff ctx u out).mask (d, residualElem k)) = out.2.1 := by
+    (fun d k => rowOffset (backwardOff ctx u out) (d, residualElem k)) = out.2.1 := by
   funext d k
-  show masksOff ctx u out (d, residualElem k) = _
-  unfold masksOff
-  fin_cases k
-  · show padOffset (fullPad u out.1.1.1 out.1.2 (ctx.rows d).x.xSquared (rowEnc (d, .inl .rowX_x7))) -
-      (padOffset (fullPad u out.1.1.1 out.1.2 (ctx.rows d).x.xSquared (rowEnc (d, .inl .rowX_x7))) -
-        out.2.1 d 0) = out.2.1 d 0
-    rw [sub_sub_cancel]
-  · show padOffset (fullPad u out.1.1.1 out.1.2 (ctx.rows d).x.y (rowEnc (d, .inr .rowX_y10))) -
-      (padOffset (fullPad u out.1.1.1 out.1.2 (ctx.rows d).x.y (rowEnc (d, .inr .rowX_y10))) -
-        out.2.1 d 1) = out.2.1 d 1
-    rw [sub_sub_cancel]
-  · show padOffset (fullPad u out.1.1.1 out.1.2 (ctx.rows d).y.xy (rowEnc (d, .inl .rowY_x9))) -
-      (padOffset (fullPad u out.1.1.1 out.1.2 (ctx.rows d).y.xy (rowEnc (d, .inl .rowY_x9))) -
-        out.2.1 d 2) = out.2.1 d 2
-    rw [sub_sub_cancel]
-  · show padOffset (fullPad u out.1.1.1 out.1.2 (out.2.2.1 d + (ctx.rows d).y.ySquared) (rowEnc (d, .inr .rowY_y8))) -
-      (padOffset (fullPad u out.1.1.1 out.1.2 (out.2.2.1 d + (ctx.rows d).y.ySquared) (rowEnc (d, .inr .rowY_y8))) -
-        out.2.1 d 3) = out.2.1 d 3
-    rw [sub_sub_cancel]
+  rw [rowOffset_backwardOff]
+  fin_cases k <;> rfl
 
 theorem forwardOff_backwardOff : forwardOff ctx u (backwardOff ctx u out) = out := by
   have joinEq := join_backwardOff ctx u out
@@ -278,7 +238,7 @@ theorem forwardOff_backwardOff : forwardOff ctx u (backwardOff ctx u out) = out 
   have tableEq := curveTable_backwardOff ctx u out
   have residEq := residual_backwardOff ctx u out
   show (((join ctx _, gamma ctx _, curveTable _), coldOf u _),
-    (fun d k => (backwardOff ctx u out).mask (d, residualElem k), out.2.2.1, (out.2.2.2.1, out.2.2.2.2))) = out
+    (fun d k => rowOffset (backwardOff ctx u out) (d, residualElem k), out.2.2.1, (out.2.2.2.1, out.2.2.2.2))) = out
   rw [joinEq, gammaEq, tableEq, coldEq, residEq]
 
 end Right

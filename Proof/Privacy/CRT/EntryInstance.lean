@@ -34,7 +34,7 @@ import Proof.Privacy.Phase3.Opened
 
 * `reachProgram`: `Entry.reachM` followed by the evaluator's decode, so that it has `evaluateProgram`'s result type
   (`CrtEntry.reachProgram`); its queries are `Entry.reachM`'s;
-* `nonCollectorValues`: the mask values the 683 non-collector answers determine (collector entries `0`, never read),
+* `nonCollectorValues`: the mask values the 546 non-collector answers determine (collector entries `0`, never read),
   read by `Entry.maskFunction`; `maskOf_eq_of_noncollector` shows they agree with `maskOf` of every mask at every
   non-collector slot. -/
 
@@ -86,14 +86,14 @@ def nonCollectorValues (rest : (Fin (pairSites digitCount) → BaseField × Base
     MaskValues digitCount :=
   { collector := fun _ => 0, pair := rest.1, single := rest.2 }
 
-/-- The non-collector mask sites at the key `K` (683 queries), read as masks by row encoding. -/
+/-- The non-collector mask sites at the key `K` (546 queries), read as masks by row encoding. -/
 def nonCollectorReplay (key : Block) : CM (Entry.RowEncoding → BaseField) :=
   nonCollectorMasksM key digitCount >>= fun rest => pure (Entry.maskFunction (nonCollectorValues rest))
 
-/-- `maskOf` reads the collector masks only at the `x` slots `1, 3, 4` of a digit. -/
+/-- `maskOf` reads the collector masks only at the `x` slots `1, 2, 3` of a digit. -/
 theorem maskOf_eq_of_noncollector {first second : MaskValues digitCount} (pair : first.pair = second.pair)
     (single : first.single = second.single) (coord e : ℕ)
-    (slot : ¬ (coord = 0 ∧ e < 5 * digitCount ∧ (e % 5 = 1 ∨ e % 5 = 3 ∨ e % 5 = 4))) :
+    (slot : ¬ (coord = 0 ∧ e < 4 * digitCount ∧ (e % 4 = 1 ∨ e % 4 = 2 ∨ e % 4 = 3))) :
     maskOf first coord e = maskOf second coord e := by
   unfold maskOf nonCollectorMask
   split_ifs <;> simp_all

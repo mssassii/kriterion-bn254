@@ -214,7 +214,8 @@ theorem maskValues_keyFree (T T' : TagTable) (agree : ∀ q, q ≠ keyPos → T 
     have := c.isLt; unfold collectorSites digitCount at this; omega
   have hp : ∀ k : Fin (pairSites digitCount), k.val < 65536 := fun k => by
     have := k.isLt; unfold pairSites nonCollectorCount digitCount at this; omega
-  have hs : pairSites digitCount < 65536 := by unfold pairSites nonCollectorCount digitCount; norm_num
+  have single : ¬ singleSites digitCount = 1 := by decide
+  rw [if_neg single, if_neg single]
   congr 1
   · funext c
     rw [siteAnswers_table T K K' 0 c.val 2 (by norm_num) (hc c) (by norm_num),
@@ -222,8 +223,6 @@ theorem maskValues_keyFree (T T' : TagTable) (agree : ∀ q, q ≠ keyPos → T 
   · funext k
     rw [siteAnswers_table T K K' 1 k.val 3 (by norm_num) (hp k) (by norm_num),
       siteAnswers_agree T T' agree K' 1 k.val 3 (by norm_num) (hp k) (by norm_num)]
-  · rw [siteAnswers_table T K K' 1 (pairSites digitCount) 2 (by norm_num) hs (by norm_num),
-      siteAnswers_agree T T' agree K' 1 (pairSites digitCount) 2 (by norm_num) hs (by norm_num)]
 
 /-! ### The garbling and the stage-2 view do not read the key's position off the curve -/
 
@@ -472,9 +471,7 @@ theorem away_of_family (pos : Fin (2 ^ 40)) (six : tagFamily pos.val ≠ 6) (sev
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ six seven
     · simp only [siteTags, List.mem_map, List.mem_range] at ht
       obtain ⟨j, hj, rfl⟩ := ht
-      have hj' : j < 3 := by
-        have : j < (if k = 227 then 2 else 3) := hj
-        split at this <;> omega
+      have hj' : j < 3 := hj
       exact ne (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩ six seven
 
 theorem keyPos_away : ∀ site ∈ crtLayout.sites, keyPos ∉ (siteTags crtLayout site).map tagPos :=
@@ -722,13 +719,15 @@ theorem digest_eval_otherFree (zero : Fin 2 → Fin coordinateBitCount → Block
         (schemeHash (tableOracle (FI := Empty) (EI := Empty) T')) := by
   rw [eval_digestGarbleM, eval_digestGarbleM]
   funext o
-  have ho : o.val < 65536 := lt_trans o.isLt (by decide)
+  have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+  have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
   unfold digestEntries garbleEntry
   cases digitEndomorphismBase (digitOf o) with
   | none => rfl
   | some phi =>
       simp only
-      rw [finalMask_table T _ o.val ho, finalMask_table T' _ o.val ho, agree _ (finalPos_ne_other o.val ho u κ i)]
+      rw [finalMask_table T _ _ h0, finalMask_table T' _ _ h0, agree _ (finalPos_ne_other _ h0 u κ i),
+        finalMask_table T _ _ h1, finalMask_table T' _ _ h1, agree _ (finalPos_ne_other _ h1 u κ i)]
 
 /-- **The garbling does not read the other bit's label.** -/
 theorem garbleCM_eval_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2)
@@ -763,6 +762,34 @@ theorem gAsked_labelled (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagT
   · exact tagged (mask_tagged _) a
   · exact tagged (digest_tagged scalar coins) a
 
+/-- The garbler's key at `u` does not read the other bit's label at `u`. -/
+theorem key_otherFree (u : AffineInput) (κ : Fin 2) (i : Fin coordinateBitCount) (T T' : TagTable)
+    (agree : ∀ q, q ≠ otherPos u κ i → T q = T' q) :
+    garblerKey (tableOn T) u = garblerKey (tableOn T') u := by
+  unfold garblerKey tableOn
+  refine congrArg (fun f => xorFold f) (funext fun κ' => congrArg (fun f => xorFold f) (funext fun i' => ?_))
+  have ne := labelPos_ne_other u κ κ' i i'
+  split
+  · rename_i one
+    rw [one] at ne
+    dsimp only
+    rw [agree _ ne]
+  · rename_i zero
+    have z : coordBit u κ' i'.val = 0 := by have := coordBit_lt u κ' i'.val; omega
+    rw [z] at ne
+    dsimp only
+    rw [agree _ ne]
+
+/-- A designed final of site `s` is at the key of `u`: its exceptional input is `u`. -/
+theorem final_filter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2)
+    (i : Fin coordinateBitCount) (T T' : TagTable) (agree : ∀ q, q ≠ otherPos u κ i → T q = T' q) (s : ℕ)
+    (hs : s < 65536) (w : AffineInput) (ex : Entry.exceptional scalar coins s = some w)
+    (designed : designTag Entry.table (Entry.exceptional scalar coins) u (digestFinalTag s) = true) :
+    hashInput (garblerKey (tableOn T) w) (digestFinalTag s) = hashInput (garblerKey (tableOn T') w) (digestFinalTag s) := by
+  obtain ⟨hf, hslot⟩ := digestFinalTag_fields hs
+  rw [designTag_final _ _ _ hf, hslot, beq_iff_eq, ex, Option.some.injEq] at designed
+  rw [designed, key_otherFree u κ i T T' agree]
+
 /-- **The designed digest inputs do not read the other bit's label.** -/
 theorem digestFilter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2)
     (i : Fin coordinateBitCount) (T T' : TagTable) (agree : ∀ q, q ≠ otherPos u κ i → T q = T' q) :
@@ -785,35 +812,27 @@ theorem digestFilter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u
   rw [asked_tableM, asked_tableM, List.filter_flatMap, List.filter_flatMap]
   refine congrArg (fun g => List.flatMap g (List.finRange digitCount)) (funext fun o => ?_)
   rw [asked_garbleEntryM, asked_garbleEntryM]
-  have ho : o.val < 65536 := lt_trans o.isLt (by decide)
-  obtain ⟨hf, hs⟩ := digestFinalTag_fields ho
+  have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+  have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
   cases selected : digitEndomorphismBase ((Entry.outputKeysOf scalar coins).get o).digit with
   | none => rfl
   | some phi =>
       simp only
-      rw [List.filter_cons, List.filter_cons, List.filter_nil, hashInput_div, hashInput_div]
-      by_cases designed : designTag Entry.table (Entry.exceptional scalar coins) u (digestFinalTag o.val) = true
-      · rw [if_pos designed, if_pos designed]
-        have ex := designed
-        rw [designTag_final _ _ _ hf, hs, beq_iff_eq, exceptional_some scalar coins o phi selected,
-          Option.some.injEq] at ex
-        rw [ex]
-        have key : garblerKey (tableOn T) u = garblerKey (tableOn T') u := by
-          unfold garblerKey tableOn
-          refine congrArg (fun f => xorFold f) (funext fun κ' => congrArg (fun f => xorFold f) (funext fun i' => ?_))
-          have ne := labelPos_ne_other u κ κ' i i'
-          split
-          · rename_i one
-            rw [one] at ne
-            dsimp only
-            rw [agree _ ne]
-          · rename_i zero
-            have z : coordBit u κ' i'.val = 0 := by have := coordBit_lt u κ' i'.val; omega
-            rw [z] at ne
-            dsimp only
-            rw [agree _ ne]
-        rw [key]
-      · rw [if_neg designed, if_neg designed]
+      rw [List.filter_cons, List.filter_cons, List.filter_cons, List.filter_cons, List.filter_nil,
+        hashInput_div, hashInput_div, hashInput_div, hashInput_div]
+      have e0 := final_filter_otherFree scalar coins u κ i T T' agree _ h0 _
+        (exceptional_some scalar coins o phi selected)
+      have e1 := final_filter_otherFree scalar coins u κ i T T' agree _ h1 _
+        (triple_some scalar coins o phi selected)
+      by_cases d0 : designTag Entry.table (Entry.exceptional scalar coins) u (digestFinalTag (2 * o.val)) = true
+      · rw [if_pos d0, if_pos d0, e0 d0]
+        by_cases d1 : designTag Entry.table (Entry.exceptional scalar coins) u (digestFinalTag (2 * o.val + 1)) = true
+        · rw [if_pos d1, if_pos d1, e1 d1]
+        · rw [if_neg d1, if_neg d1]
+      · rw [if_neg d0, if_neg d0]
+        by_cases d1 : designTag Entry.table (Entry.exceptional scalar coins) u (digestFinalTag (2 * o.val + 1)) = true
+        · rw [if_pos d1, if_pos d1, e1 d1]
+        · rw [if_neg d1, if_neg d1]
 
 /-- **The designed garbler inputs do not read the other bit's label.** -/
 theorem designedInputs_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2)
@@ -871,10 +890,10 @@ theorem stageTwoView_otherFree [FieldCertificate] [GroupCertificate] (parameter 
   dsimp only
   rw [hl]
 
-/-- **A garbler input of family 9 is a final**, labelled with the digit's key at its exceptional input. -/
+/-- **A garbler input of family 9 is a final**, labelled with the digit's key at the exceptional input of its site. -/
 theorem final_of_fam9 (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagTable) (N : ℕ)
     (inside : N ∈ gAsked scalar (coins, T)) (fam : tagFamily (N / 2 ^ 128) = 9) :
-    ∃ o : Fin digitCount, ∃ e, Entry.exceptional scalar coins o.val = some e ∧
+    ∃ o : Fin (2 * digitCount), ∃ e, Entry.exceptional scalar coins o.val = some e ∧
       N = hashInput (garblerKey (tableOn T) e) (digestFinalTag o.val) := by
   rw [gAsked_eq] at inside
   simp only [List.mem_append] at inside
@@ -912,8 +931,10 @@ theorem final_of_fam9 (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagTab
       split at inEntry
       · exact absurd inEntry List.not_mem_nil
       · rename_i phi selected
-        rw [List.mem_singleton] at inEntry
-        exact ⟨o, _, exceptional_some scalar coins o phi selected, inEntry⟩
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+        rcases inEntry with inEntry | inEntry
+        · exact ⟨⟨2 * o.val, by have := o.isLt; omega⟩, _, exceptional_some scalar coins o phi selected, inEntry⟩
+        · exact ⟨⟨2 * o.val + 1, by have := o.isLt; omega⟩, _, triple_some scalar coins o phi selected, inEntry⟩
 
 /-! ### The key of a digit, one label at a time -/
 

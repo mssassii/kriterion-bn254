@@ -398,8 +398,10 @@ theorem pub_shift (scalar : NonZeroScalar) (coins : Entry.Coins) {κ s s' : ℕ}
       EntryCorrect.entriesOf (H8.tagHash A) scalar coins := by
     funext o
     rw [entriesOf_tagHash, entriesOf_tagHash]
-    have ho := lt_trans o.isLt DigestSplit.digitCount_lt
-    rw [pos_agree hκ hs6 hs6' shift _ (by rw [DigestSplit.family_final _ ho]; decide)]
+    have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+    have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+    rw [pos_agree hκ hs6 hs6' shift _ (by rw [DigestSplit.family_final _ h0]; decide),
+      pos_agree hκ hs6 hs6' shift _ (by rw [DigestSplit.family_final _ h1]; decide)]
   have gx : EntryCorrect.gxOf (H8.tagHash A') coins = EntryCorrect.gxOf (H8.tagHash A) coins :=
     coordEq xCount 0 (by decide) (by norm_num) _ _
   have gy : EntryCorrect.gyOf (H8.tagHash A') coins = EntryCorrect.gyOf (H8.tagHash A) coins :=

@@ -6,8 +6,8 @@ The targets a tag table holds are its P45 pads and its row masks (`bmrTargetsOf`
 
 * a table's targets are those of its site draws (`targetsOf_overwrite`), and they equal `τ` exactly when every site's
   draw matches `τ` (`targetsOfDraws_iff`): a pad site its digits (`PadLaw.matchSite`), a mask site its masks
-  (`maskMatch`), through the one-to-one reading of the 728 row masks from the 273 collector sites, the 227 pair sites
-  and the single site (`maskFun_maskInv`, `maskInv_maskFun`);
+  (`maskMatch`), through the one-to-one reading of the 637 row masks from the 273 collector sites and the 182 pair
+  sites (`maskFun_maskInv`, `maskInv_maskFun`; there is no single site, and its mask value is `0`);
 * a site matches any targets with the same mass (`siteMass_const`: every site's law is a fibre law);
 * so the mass of "the table shows `w` at the positions `pos` and holds the targets `τ`" is a product over sites, and
   it is the same for `τ'` whenever `τ` and `τ'` agree at every site that holds one of the positions
@@ -106,11 +106,11 @@ def readSingleL (a : List (Block × Block)) : BaseField := readSingle fun j => a
 /-- A three-answer site's reading of a list. -/
 def readPairL (a : List (Block × Block)) : BaseField × BaseField := readPair fun j => a.getD j.val (0, 0)
 
-/-- The masks read from drawn mask-site answers. -/
+/-- The masks read from drawn mask-site answers (no single site: its value is `0`). -/
 def mvOfDraws (A : SiteId → List (Block × Block)) : MaskValues digitCount where
   collector c := readSingleL (A (.mask 0 c.val))
   pair k := readPairL (A (.mask 1 k.val))
-  single := readSingleL (A (.mask 1 227))
+  single := 0
 
 /-- P45's row masks from mask values (`bmrMasksOf`'s body). -/
 def maskFun (v : MaskValues digitCount) : BMR.RowEnc → BaseField
@@ -124,7 +124,7 @@ theorem bmrMasksOf_eq (table : TagTable) :
 
 theorem answers_mask0 (c : ℕ) : crtLayout.answers (.mask 0 c) = 2 := rfl
 
-theorem answers_mask1 (k : ℕ) : crtLayout.answers (.mask 1 k) = if k = 227 then 2 else 3 := rfl
+theorem answers_mask1 (k : ℕ) : crtLayout.answers (.mask 1 k) = 3 := rfl
 
 theorem getD_siteAnswersOf_mask (table : TagTable) (st k j : ℕ) (hj : j < crtLayout.answers (.mask st k)) :
     (Laws.siteAnswersOf crtLayout table (.mask st k)).getD j (0, 0) = table (tagPos (maskTag st k j)) := by
@@ -144,8 +144,8 @@ theorem siteAnswers_tagHash (table : TagTable) (st k n : ℕ) :
 /-- **The masks of a tag table are read from its mask sites.** -/
 theorem maskValues_eq (table : TagTable) :
     maskValues (H8.tagHash table) 0 digitCount = mvOfDraws (Laws.siteAnswersOf crtLayout table) := by
-  have single : singleSites digitCount = 1 := by decide
-  have pairs : pairSites digitCount = 227 := by decide
+  have single : singleSites digitCount = 0 := by decide
+  have pairs : pairSites digitCount = 182 := by decide
   have hc : ∀ c : Fin (collectorSites digitCount), readSingle (siteAnswers (H8.tagHash table) 0 0 c.val 2) =
       readSingleL (Laws.siteAnswersOf crtLayout table (.mask 0 c.val)) := by
     intro c
@@ -155,19 +155,12 @@ theorem maskValues_eq (table : TagTable) :
   have hp : ∀ k : Fin (pairSites digitCount), readPair (siteAnswers (H8.tagHash table) 0 1 k.val 3) =
       readPairL (Laws.siteAnswersOf crtLayout table (.mask 1 k.val)) := by
     intro k
-    have hk : k.val < 227 := by have := k.isLt; omega
     show readPair _ = readPair _
     refine congrArg readPair (funext fun j => ?_)
-    rw [getD_siteAnswersOf_mask table 1 k.val j.val (by rw [answers_mask1, if_neg (by omega)]; exact j.isLt),
-      siteAnswers_tagHash]
-  have hs : readSingle (siteAnswers (H8.tagHash table) 0 1 227 2) =
-      readSingleL (Laws.siteAnswersOf crtLayout table (.mask 1 227)) := by
-    show readSingle _ = readSingle _
-    refine congrArg readSingle (funext fun j => ?_)
-    rw [getD_siteAnswersOf_mask table 1 227 j.val (by rw [answers_mask1, if_pos rfl]; exact j.isLt),
-      siteAnswers_tagHash]
+    rw [getD_siteAnswersOf_mask table 1 k.val j.val (by rw [answers_mask1]; exact j.isLt), siteAnswers_tagHash]
   unfold maskValues mvOfDraws
-  simp only [single, if_true, hc, hp, pairs, hs]
+  simp only [single, hc, hp, pairs]
+  rfl
 
 /-! ### 3. The row masks are the mask values, one to one -/
 
@@ -175,8 +168,7 @@ theorem maskValues_eq (table : TagTable) :
 def xElemOfSlot : ℕ → XElement
   | 0 => .rowX_x7
   | 1 => .rowX_x9
-  | 2 => .rowY_x7
-  | 3 => .rowY_x9
+  | 2 => .rowY_cubic
   | _ => .rowZ_x9
 
 /-- The `y` element of a slot. -/
@@ -185,7 +177,7 @@ def yElemOfSlot : ℕ → YElement
   | 1 => .rowY_y8
   | _ => .rowY_y10
 
-theorem xslot_of {s : ℕ} (hs : s < 5) : (xElemOfSlot s).slot.val = s := by
+theorem xslot_of {s : ℕ} (hs : s < 4) : (xElemOfSlot s).slot.val = s := by
   interval_cases s <;> rfl
 
 theorem yslot_of {s : ℕ} (hs : s < 3) : (yElemOfSlot s).slot.val = s := by
@@ -205,72 +197,87 @@ theorem digitOf_val (d : Fin 91) : digitOf d.val = d := Fin.ext (Nat.mod_eq_of_l
 /-- The row encoding of collector `c`: digit `c / 3`, `x` slot `collectorSlot (c % 3)`. -/
 def collRow (c : ℕ) : BMR.RowEnc := (digitOf (c / 3), .inl (xElemOfSlot (collectorSlot (c % 3))))
 
-/-- The row encoding of non-collector entry `n`. -/
+/-- The row encoding of non-collector entry `n`: the `x` slot 0 of digit `n` for `n < 91`, then the `y` encodings. -/
 def ncRow (n : ℕ) : BMR.RowEnc :=
-  if n < 182 then (digitOf (n / 2), .inl (xElemOfSlot (2 * (n % 2))))
-  else (digitOf ((n - 182) / 3), .inr (yElemOfSlot ((n - 182) % 3)))
+  if n < 91 then (digitOf n, .inl .rowX_x7)
+  else (digitOf ((n - 91) / 3), .inr (yElemOfSlot ((n - 91) % 3)))
 
-/-- The mask values that give the row masks `τ`. -/
+/-- The mask values that give the row masks `τ` (the unused single site `0`). -/
 def maskInv (τ : BMR.RowEnc → BaseField) : MaskValues digitCount where
   collector c := τ (collRow c.val)
   pair k := (τ (ncRow (2 * k.val)), τ (ncRow (2 * k.val + 1)))
-  single := τ (ncRow 454)
+  single := 0
 
 theorem collectorSites_eq : collectorSites digitCount = 273 := by decide
 
-theorem pairSites_eq : pairSites digitCount = 227 := by decide
+theorem pairSites_eq : pairSites digitCount = 182 := by decide
 
 theorem coll_lt (c : Fin (collectorSites digitCount)) : c.val < 273 := by
   have := c.isLt
   have := collectorSites_eq
   omega
 
-theorem pair_lt (k : Fin (pairSites digitCount)) : k.val < 227 := by
+theorem pair_lt (k : Fin (pairSites digitCount)) : k.val < 182 := by
   have := k.isLt
   have := pairSites_eq
   omega
 
 theorem lt_coll {c : ℕ} (hc : c < 273) : c < collectorSites digitCount := by rw [collectorSites_eq]; exact hc
 
-theorem lt_pair {k : ℕ} (hk : k < 227) : k < pairSites digitCount := by rw [pairSites_eq]; exact hk
+theorem lt_pair {k : ℕ} (hk : k < 182) : k < pairSites digitCount := by rw [pairSites_eq]; exact hk
 
 theorem atNat_collector (v : MaskValues digitCount) {c : ℕ} (hc : c < 273) (default : BaseField) :
     atNat v.collector default c = v.collector ⟨c, lt_coll hc⟩ := by
   unfold atNat
   rw [dif_pos (lt_coll hc)]
 
-theorem nonCollector_pair (v : MaskValues digitCount) {n : ℕ} (hn : n < 454) :
+theorem nonCollector_pair (v : MaskValues digitCount) {n : ℕ} (hn : n < 364) :
     nonCollectorMask v n =
       if n % 2 = 0 then (v.pair ⟨n / 2, lt_pair (by omega)⟩).1 else (v.pair ⟨n / 2, lt_pair (by omega)⟩).2 := by
   unfold nonCollectorMask
   rw [dif_pos (lt_pair (by omega))]
 
-theorem nonCollector_single (v : MaskValues digitCount) : nonCollectorMask v 454 = v.single := by
-  unfold nonCollectorMask
-  rw [dif_neg (by rw [pairSites_eq]; omega)]
-
-/-- The mask of an `x` encoding index `e < 455`. -/
-theorem maskOf_x (v : MaskValues digitCount) {e : ℕ} (he : e < 455) :
+/-- The mask of an `x` encoding index `e < 364`. -/
+theorem maskOf_x (v : MaskValues digitCount) {e : ℕ} (he : e < 364) :
     maskOf v 0 e =
-      if e % 5 = 1 then atNat v.collector 0 (3 * (e / 5))
-      else if e % 5 = 3 then atNat v.collector 0 (3 * (e / 5) + 1)
-      else if e % 5 = 4 then atNat v.collector 0 (3 * (e / 5) + 2)
-      else nonCollectorMask v (2 * (e / 5) + (if e % 5 = 2 then 1 else 0)) := by
+      if e % 4 = 1 then atNat v.collector 0 (3 * (e / 4))
+      else if e % 4 = 2 then atNat v.collector 0 (3 * (e / 4) + 1)
+      else if e % 4 = 3 then atNat v.collector 0 (3 * (e / 4) + 2)
+      else nonCollectorMask v (e / 4) := by
   unfold maskOf
-  rw [if_pos rfl, if_pos (by show e < 5 * 91; omega)]
+  rw [if_pos rfl, if_pos (by show e < 4 * 91; omega)]
 
 /-- The mask of a `y` encoding index `e < 273`. -/
 theorem maskOf_y (v : MaskValues digitCount) {e : ℕ} (he : e < 273) :
-    maskOf v 1 e = nonCollectorMask v (2 * 91 + e) := by
+    maskOf v 1 e = nonCollectorMask v (91 + e) := by
   unfold maskOf
   rw [if_neg one_ne_zero, if_pos (by show e < 3 * 91; omega)]
   rfl
 
-theorem xIndex_val (d : Fin 91) (x : XElement) : (xElementIndex d x).val = 5 * d.val + x.slot.val := rfl
+theorem xIndex_val (d : Fin 91) (x : XElement) : (xElementIndex d x).val = 4 * d.val + x.slot.val := rfl
 
 theorem yIndex_val (d : Fin 91) (y : YElement) : (yElementIndex d y).val = 3 * d.val + y.slot.val := rfl
 
 theorem digit_lt (d : Fin 91) : d.val < 91 := d.isLt
+
+/-- The mask of the row of non-collector entry `n < 364` is `nonCollectorMask v n`. -/
+theorem maskFun_ncRow (v : MaskValues digitCount) {n : ℕ} (hn : n < 364) :
+    maskFun v (ncRow n) = nonCollectorMask v n := by
+  by_cases low : n < 91
+  · have ev : ncRow n = (digitOf n, .inl .rowX_x7) := if_pos low
+    rw [ev]
+    show maskOf v 0 (xElementIndex _ _).val = _
+    have dig : (digitOf n).val = n := by show n % 91 = n; omega
+    have slot : XElement.rowX_x7.slot.val = 0 := rfl
+    rw [xIndex_val, dig, slot, maskOf_x _ (by omega)]
+    rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), show (4 * n + 0) / 4 = n by omega]
+  · have ev : ncRow n = (digitOf ((n - 91) / 3), .inr (yElemOfSlot ((n - 91) % 3))) := if_neg low
+    rw [ev]
+    show maskOf v 1 (yElementIndex _ _).val = _
+    have hs : (n - 91) % 3 < 3 := Nat.mod_lt _ (by norm_num)
+    have dig : (digitOf ((n - 91) / 3)).val = (n - 91) / 3 := by show (n - 91) / 3 % 91 = (n - 91) / 3; omega
+    rw [yIndex_val, yslot_of hs, dig, maskOf_y _ (by omega),
+      show 91 + (3 * ((n - 91) / 3) + (n - 91) % 3) = n by omega]
 
 /-- **The row masks of `maskInv τ` are `τ`.** -/
 theorem maskFun_maskInv (τ : BMR.RowEnc → BaseField) : maskFun (maskInv τ) = τ := by
@@ -278,43 +285,42 @@ theorem maskFun_maskInv (τ : BMR.RowEnc → BaseField) : maskFun (maskInv τ) =
   rcases r with ⟨d, x | y⟩
   · have hd := digit_lt d
     show maskOf (maskInv τ) 0 (xElementIndex d x).val = τ (d, .inl x)
-    have hs : x.slot.val < 5 := x.slot.isLt
+    have hs : x.slot.val < 4 := x.slot.isLt
     rw [xIndex_val, maskOf_x _ (by omega)]
     generalize hsv : x.slot.val = s at hs ⊢
     have hx : x = xElemOfSlot s := by rw [← hsv, xElemOfSlot_slot]
     subst hx
     interval_cases s
-    · -- slot 0: non-collector `2d`
-      rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (show ¬ (5 * d.val + 0) % 5 = 2 by omega),
-        show 2 * ((5 * d.val + 0) / 5) + 0 = 2 * d.val by omega, nonCollector_pair _ (by omega), if_pos (by omega)]
-      show τ (ncRow (2 * (2 * d.val / 2))) = _
-      rw [show 2 * (2 * d.val / 2) = 2 * d.val by omega]
-      unfold ncRow
-      rw [if_pos (by omega), show 2 * d.val / 2 = d.val by omega, show 2 * d.val % 2 = 0 by omega, digitOf_val]
+    · -- slot 0: non-collector `d`
+      rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), show (4 * d.val + 0) / 4 = d.val by omega]
+      rcases Nat.mod_two_eq_zero_or_one d.val with h | h
+      · rw [nonCollector_pair _ (by omega), if_pos h]
+        show τ (ncRow (2 * (d.val / 2))) = _
+        rw [show 2 * (d.val / 2) = d.val by omega]
+        unfold ncRow
+        rw [if_pos (by omega), digitOf_val]
+        rfl
+      · rw [nonCollector_pair _ (by omega), if_neg (by omega)]
+        show τ (ncRow (2 * (d.val / 2) + 1)) = _
+        rw [show 2 * (d.val / 2) + 1 = d.val by omega]
+        unfold ncRow
+        rw [if_pos (by omega), digitOf_val]
+        rfl
     · -- slot 1: collector `3d`
-      rw [if_pos (by omega), show (5 * d.val + 1) / 5 = d.val by omega, atNat_collector _ (by omega)]
+      rw [if_pos (by omega), show (4 * d.val + 1) / 4 = d.val by omega, atNat_collector _ (by omega)]
       show τ (collRow (3 * d.val)) = _
       unfold collRow
       rw [show 3 * d.val / 3 = d.val by omega, show 3 * d.val % 3 = 0 by omega, digitOf_val]
       rfl
-    · -- slot 2: non-collector `2d + 1`
-      rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_pos (show (5 * d.val + 2) % 5 = 2 by omega),
-        show 2 * ((5 * d.val + 2) / 5) + 1 = 2 * d.val + 1 by omega, nonCollector_pair _ (by omega),
-        if_neg (by omega)]
-      show τ (ncRow (2 * ((2 * d.val + 1) / 2) + 1)) = _
-      rw [show 2 * ((2 * d.val + 1) / 2) + 1 = 2 * d.val + 1 by omega]
-      unfold ncRow
-      rw [if_pos (by omega), show (2 * d.val + 1) / 2 = d.val by omega, show (2 * d.val + 1) % 2 = 1 by omega,
-        digitOf_val]
-    · -- slot 3: collector `3d + 1`
-      rw [if_neg (by omega), if_pos (by omega), show (5 * d.val + 3) / 5 = d.val by omega,
+    · -- slot 2: collector `3d + 1`
+      rw [if_neg (by omega), if_pos (by omega), show (4 * d.val + 2) / 4 = d.val by omega,
         atNat_collector _ (by omega)]
       show τ (collRow (3 * d.val + 1)) = _
       unfold collRow
       rw [show (3 * d.val + 1) / 3 = d.val by omega, show (3 * d.val + 1) % 3 = 1 by omega, digitOf_val]
       rfl
-    · -- slot 4: collector `3d + 2`
-      rw [if_neg (by omega), if_neg (by omega), if_pos (by omega), show (5 * d.val + 4) / 5 = d.val by omega,
+    · -- slot 3: collector `3d + 2`
+      rw [if_neg (by omega), if_neg (by omega), if_pos (by omega), show (4 * d.val + 3) / 4 = d.val by omega,
         atNat_collector _ (by omega)]
       show τ (collRow (3 * d.val + 2)) = _
       unfold collRow
@@ -323,73 +329,44 @@ theorem maskFun_maskInv (τ : BMR.RowEnc → BaseField) : maskFun (maskInv τ) =
   · have hd := digit_lt d
     show maskOf (maskInv τ) 1 (yElementIndex d y).val = τ (d, .inr y)
     have hs : y.slot.val < 3 := y.slot.isLt
-    rw [yIndex_val, maskOf_y _ (by omega)]
-    by_cases last : 2 * 91 + (3 * d.val + y.slot.val) = 454
-    · rw [last, nonCollector_single]
-      show τ (ncRow 454) = _
+    rw [yIndex_val, maskOf_y _ (by omega), nonCollector_pair _ (by omega)]
+    split_ifs with even
+    · show τ (ncRow (2 * ((91 + (3 * d.val + y.slot.val)) / 2))) = _
+      rw [show 2 * ((91 + (3 * d.val + y.slot.val)) / 2) = 91 + (3 * d.val + y.slot.val) by omega]
       unfold ncRow
-      rw [if_neg (by norm_num)]
-      have ed : digitOf ((454 - 182) / 3) = d := Fin.ext (by show (454 - 182) / 3 % 91 = d.val; omega)
-      rw [ed, show (454 - 182) % 3 = y.slot.val by omega, yElemOfSlot_slot]
-    · rw [nonCollector_pair _ (by omega)]
-      split_ifs with even
-      · show τ (ncRow (2 * ((2 * 91 + (3 * d.val + y.slot.val)) / 2))) = _
-        rw [show 2 * ((2 * 91 + (3 * d.val + y.slot.val)) / 2) = 182 + (3 * d.val + y.slot.val) by omega]
-        unfold ncRow
-        rw [if_neg (by omega), show 182 + (3 * d.val + y.slot.val) - 182 = 3 * d.val + y.slot.val by omega,
-          show (3 * d.val + y.slot.val) / 3 = d.val by omega, show (3 * d.val + y.slot.val) % 3 = y.slot.val by omega,
-          digitOf_val, yElemOfSlot_slot]
-      · show τ (ncRow (2 * ((2 * 91 + (3 * d.val + y.slot.val)) / 2) + 1)) = _
-        rw [show 2 * ((2 * 91 + (3 * d.val + y.slot.val)) / 2) + 1 = 182 + (3 * d.val + y.slot.val) by omega]
-        unfold ncRow
-        rw [if_neg (by omega), show 182 + (3 * d.val + y.slot.val) - 182 = 3 * d.val + y.slot.val by omega,
-          show (3 * d.val + y.slot.val) / 3 = d.val by omega, show (3 * d.val + y.slot.val) % 3 = y.slot.val by omega,
-          digitOf_val, yElemOfSlot_slot]
+      rw [if_neg (by omega), show 91 + (3 * d.val + y.slot.val) - 91 = 3 * d.val + y.slot.val by omega,
+        show (3 * d.val + y.slot.val) / 3 = d.val by omega, show (3 * d.val + y.slot.val) % 3 = y.slot.val by omega,
+        digitOf_val, yElemOfSlot_slot]
+    · show τ (ncRow (2 * ((91 + (3 * d.val + y.slot.val)) / 2) + 1)) = _
+      rw [show 2 * ((91 + (3 * d.val + y.slot.val)) / 2) + 1 = 91 + (3 * d.val + y.slot.val) by omega]
+      unfold ncRow
+      rw [if_neg (by omega), show 91 + (3 * d.val + y.slot.val) - 91 = 3 * d.val + y.slot.val by omega,
+        show (3 * d.val + y.slot.val) / 3 = d.val by omega, show (3 * d.val + y.slot.val) % 3 = y.slot.val by omega,
+        digitOf_val, yElemOfSlot_slot]
 
-/-- The mask of the row of non-collector entry `n < 455` is `nonCollectorMask v n`. -/
-theorem maskFun_ncRow (v : MaskValues digitCount) {n : ℕ} (hn : n < 455) :
-    maskFun v (ncRow n) = nonCollectorMask v n := by
-  by_cases low : n < 182
-  · have ev : ncRow n = (digitOf (n / 2), .inl (xElemOfSlot (2 * (n % 2)))) := if_pos low
-    rw [ev]
-    show maskOf v 0 (xElementIndex _ _).val = _
-    have hs : 2 * (n % 2) < 5 := by omega
-    rw [xIndex_val, xslot_of hs, maskOf_x _ (by show 5 * (n / 2 % 91) + 2 * (n % 2) < 455; omega)]
-    have dig : (digitOf (n / 2)).val = n / 2 := by show n / 2 % 91 = n / 2; omega
-    rw [dig]
-    rcases Nat.mod_two_eq_zero_or_one n with h | h
-    · rw [h, if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        show 2 * ((5 * (n / 2) + 2 * 0) / 5) + 0 = n by omega]
-    · rw [h, if_neg (by omega), if_neg (by omega), if_neg (by omega), if_pos (by omega),
-        show 2 * ((5 * (n / 2) + 2 * 1) / 5) + 1 = n by omega]
-  · have ev : ncRow n = (digitOf ((n - 182) / 3), .inr (yElemOfSlot ((n - 182) % 3))) := if_neg low
-    rw [ev]
-    show maskOf v 1 (yElementIndex _ _).val = _
-    have hs : (n - 182) % 3 < 3 := Nat.mod_lt _ (by norm_num)
-    have dig : (digitOf ((n - 182) / 3)).val = (n - 182) / 3 := by show (n - 182) / 3 % 91 = (n - 182) / 3; omega
-    rw [yIndex_val, yslot_of hs, dig, maskOf_y _ (by omega),
-      show 2 * 91 + (3 * ((n - 182) / 3) + (n - 182) % 3) = n by omega]
-
-/-- **The mask values of row masks `maskFun v` are `v`.** -/
-theorem maskInv_maskFun (v : MaskValues digitCount) : maskInv (maskFun v) = v := by
+/-- **The mask values of row masks `maskFun v` are `v`**, for mask values whose unused single site is `0`. -/
+theorem maskInv_maskFun (v : MaskValues digitCount) (hv : v.single = 0) : maskInv (maskFun v) = v := by
   rcases v with ⟨collector, pair, single⟩
+  change single = 0 at hv
+  subst hv
   unfold maskInv
   congr 1
   · funext c
     have hc : c.val < 273 := coll_lt c
-    have hs : collectorSlot (c.val % 3) < 5 := by unfold collectorSlot; split_ifs <;> omega
+    have hs : collectorSlot (c.val % 3) < 4 := by unfold collectorSlot; omega
     show maskOf _ 0 (xElementIndex _ _).val = _
     have dig : (digitOf (c.val / 3)).val = c.val / 3 := by show c.val / 3 % 91 = c.val / 3; omega
-    rw [xIndex_val, xslot_of hs, dig, maskOf_x _ (by omega)]
+    rw [xIndex_val, xslot_of hs, dig, maskOf_x _ (by unfold collectorSlot; omega)]
+    unfold collectorSlot
     rcases (by omega : c.val % 3 = 0 ∨ c.val % 3 = 1 ∨ c.val % 3 = 2) with h | h | h
-    · rw [h, show collectorSlot 0 = 1 from rfl, if_pos (by omega), show 3 * ((5 * (c.val / 3) + 1) / 5) = c.val by omega,
+    · rw [h, if_pos (by omega), show 3 * ((4 * (c.val / 3) + (0 + 1)) / 4) = c.val by omega,
         atNat_collector _ hc]
-    · rw [h, show collectorSlot 1 = 3 from rfl, if_neg (by omega), if_pos (by omega),
-        show 3 * ((5 * (c.val / 3) + 3) / 5) + 1 = c.val by omega, atNat_collector _ hc]
-    · rw [h, show collectorSlot 2 = 4 from rfl, if_neg (by omega), if_neg (by omega), if_pos (by omega),
-        show 3 * ((5 * (c.val / 3) + 4) / 5) + 2 = c.val by omega, atNat_collector _ hc]
+    · rw [h, if_neg (by omega), if_pos (by omega),
+        show 3 * ((4 * (c.val / 3) + (1 + 1)) / 4) + 1 = c.val by omega, atNat_collector _ hc]
+    · rw [h, if_neg (by omega), if_neg (by omega), if_pos (by omega),
+        show 3 * ((4 * (c.val / 3) + (2 + 1)) / 4) + 2 = c.val by omega, atNat_collector _ hc]
   · funext k
-    have hk : k.val < 227 := pair_lt k
+    have hk : k.val < 182 := pair_lt k
     show (maskFun _ (ncRow (2 * k.val)), maskFun _ (ncRow (2 * k.val + 1))) = _
     rw [maskFun_ncRow _ (by omega), maskFun_ncRow _ (by omega), nonCollector_pair _ (by omega),
       nonCollector_pair _ (by omega), if_pos (by omega), if_neg (by omega)]
@@ -406,7 +383,7 @@ theorem masksOfDraws_eq_iff (A : SiteId → List (Block × Block)) (τ : BMR.Row
   constructor
   · intro same
     rw [← same]
-    exact (maskInv_maskFun _).symm
+    exact (maskInv_maskFun _ rfl).symm
   · intro same
     unfold masksOfDraws
     rw [same, maskFun_maskInv]
@@ -414,7 +391,7 @@ theorem masksOfDraws_eq_iff (A : SiteId → List (Block × Block)) (τ : BMR.Row
 theorem mask0_mem {c : ℕ} (hc : c < 273) : SiteId.mask 0 c ∈ Layout.maskSites :=
   List.mem_append_left _ (List.mem_map.mpr ⟨c, List.mem_range.mpr hc, rfl⟩)
 
-theorem mask1_mem {k : ℕ} (hk : k < 228) : SiteId.mask 1 k ∈ Layout.maskSites :=
+theorem mask1_mem {k : ℕ} (hk : k < 182) : SiteId.mask 1 k ∈ Layout.maskSites :=
   List.mem_append_right _ (List.mem_map.mpr ⟨k, List.mem_range.mpr hk, rfl⟩)
 
 theorem mvOfDraws_congr {A A' : SiteId → List (Block × Block)} (same : ∀ s ∈ Layout.maskSites, A s = A' s) :
@@ -425,15 +402,14 @@ theorem mvOfDraws_congr {A A' : SiteId → List (Block × Block)} (same : ∀ s 
     rw [same _ (mask0_mem (coll_lt c))]
   · funext k
     rw [same _ (mask1_mem (by have := pair_lt k; omega))]
-  · rw [same _ (mask1_mem (by norm_num))]
 
 /-- The event on one mask site that its reading matches the mask values `v`. -/
 def maskMatch (v : MaskValues digitCount) : SiteId → Set (List (Block × Block))
   | .mask 0 c => {a | readSingleL a = atNat v.collector 0 c}
-  | .mask 1 k => if k < 227 then {a | readPairL a = atNat v.pair (0, 0) k} else {a | readSingleL a = v.single}
+  | .mask 1 k => {a | readPairL a = atNat v.pair (0, 0) k}
   | _ => Set.univ
 
-theorem mvOfDraws_eq_iff (A : SiteId → List (Block × Block)) (v : MaskValues digitCount) :
+theorem mvOfDraws_eq_iff (A : SiteId → List (Block × Block)) (v : MaskValues digitCount) (hv : v.single = 0) :
     mvOfDraws A = v ↔ ∀ s ∈ Layout.maskSites, A s ∈ maskMatch v s := by
   constructor
   · rintro rfl s member
@@ -441,18 +417,14 @@ theorem mvOfDraws_eq_iff (A : SiteId → List (Block × Block)) (v : MaskValues 
     · show readSingleL (A (.mask 0 c)) = atNat (mvOfDraws A).collector 0 c
       rw [atNat_collector _ hc]
       rfl
-    · by_cases pair : k < 227
-      · show A (.mask 1 k) ∈ (if k < 227 then _ else _)
-        rw [if_pos pair]
-        show readPairL (A (.mask 1 k)) = atNat (mvOfDraws A).pair (0, 0) k
-        unfold atNat
-        rw [dif_pos (lt_pair pair)]
-        rfl
-      · have : k = 227 := by omega
-        subst this
-        exact rfl
+    · show readPairL (A (.mask 1 k)) = atNat (mvOfDraws A).pair (0, 0) k
+      unfold atNat
+      rw [dif_pos (lt_pair hk)]
+      rfl
   · intro hit
     rcases v with ⟨collector, pair, single⟩
+    change single = 0 at hv
+    subst hv
     unfold mvOfDraws
     congr 1
     · funext c
@@ -463,15 +435,12 @@ theorem mvOfDraws_eq_iff (A : SiteId → List (Block × Block)) (v : MaskValues 
       unfold atNat
       rw [dif_pos c.isLt]
     · funext k
-      have hk : k.val < 227 := pair_lt k
-      have := hit _ (mask1_mem (by omega : k.val < 228))
-      change A (.mask 1 k.val) ∈ (if k.val < 227 then _ else _) at this
-      rw [if_pos hk] at this
+      have hk : k.val < 182 := pair_lt k
+      have := hit _ (mask1_mem hk)
       change readPairL (A (.mask 1 k.val)) = atNat pair (0, 0) k.val at this
       rw [this]
       unfold atNat
       rw [dif_pos k.isLt]
-    · exact hit _ (mask1_mem (by norm_num : 227 < 228))
 
 /-! ### 4. Every site's reading is uniform -/
 
@@ -516,19 +485,9 @@ theorem maskMatch_mass (v v' : MaskValues digitCount) {s : SiteId} (member : s �
   · show Layout.singleSiteLaw.toOuterMeasure {a | readSingleL a = _} =
       Layout.singleSiteLaw.toOuterMeasure {a | readSingleL a = _}
     rw [singleSite_mass, singleSite_mass]
-  · by_cases pair : k < 227
-    · have law : crtLayout.law (.mask 1 k) = Layout.pairSiteLaw := by
-        show (if k = 227 then Layout.singleSiteLaw else Layout.pairSiteLaw) = _
-        rw [if_neg (by omega)]
-      show (crtLayout.law (.mask 1 k)).toOuterMeasure (if k < 227 then _ else _) =
-        (crtLayout.law (.mask 1 k)).toOuterMeasure (if k < 227 then _ else _)
-      rw [if_pos pair, if_pos pair, law, pairSite_mass, pairSite_mass]
-    · have law : crtLayout.law (.mask 1 k) = Layout.singleSiteLaw := by
-        show (if k = 227 then Layout.singleSiteLaw else Layout.pairSiteLaw) = _
-        rw [if_pos (by omega)]
-      show (crtLayout.law (.mask 1 k)).toOuterMeasure (if k < 227 then _ else _) =
-        (crtLayout.law (.mask 1 k)).toOuterMeasure (if k < 227 then _ else _)
-      rw [if_neg pair, if_neg pair, law, singleSite_mass, singleSite_mass]
+  · show Layout.pairSiteLaw.toOuterMeasure {a | readPairL a = _} =
+      Layout.pairSiteLaw.toOuterMeasure {a | readPairL a = _}
+    rw [pairSite_mass, pairSite_mass]
 
 /-! ### 5. The targets of the drawn sites -/
 
@@ -547,7 +506,7 @@ theorem targetsOfDraws_iff (A : SiteId → List (Block × Block)) (τ : Targets)
   have pads : PadLaw.padsOfDraws A = τ.1 ↔ ∀ s ∈ Layout.padSites, A s ∈ PadLaw.matchSite τ.1 s := by
     have := congrArg (A ∈ ·) (PadLaw.preimage_padsOfDraws τ.1)
     simpa only [Set.mem_preimage, Set.mem_singleton_iff, Set.mem_ofPred_eq, eq_iff_iff] using this
-  have masks := (masksOfDraws_eq_iff A τ.2).trans (mvOfDraws_eq_iff A (maskInv τ.2))
+  have masks := (masksOfDraws_eq_iff A τ.2).trans (mvOfDraws_eq_iff A (maskInv τ.2) rfl)
   rw [targetsOfDraws, Prod.ext_iff, pads, masks]
   show _ ↔ ∀ s ∈ Layout.padSites ++ Layout.maskSites, _
   constructor

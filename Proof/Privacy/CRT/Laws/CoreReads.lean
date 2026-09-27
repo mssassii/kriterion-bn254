@@ -152,9 +152,8 @@ theorem realRest_congr (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInp
   rw [realRest_pair, realRest_pair, inputMacKey_congr zero delta]
   exact congrArg _ (funext agree)
 
-theorem finalPos_family (o : Fin digitCount) : tagFamily (DigestSplit.finalPos o.val).val = 9 := by
-  have small : o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
-  rw [DigestSplit.finalPos_val o.val small]
+theorem finalPos_family (s : ℕ) (small : s < 65536) : tagFamily (DigestSplit.finalPos s).val = 9 := by
+  rw [DigestSplit.finalPos_val s small]
   exact tagFamily_tagCode ⟨by decide, by decide, by decide, by decide, small, by decide⟩
 
 /-- **The exception entries read the coins and the table at the finals.** -/
@@ -165,7 +164,9 @@ theorem exception_congr (parameter : ℕ) (scalar : NonZeroScalar) (c : crtEntry
   rw [DigestSplit.realGarbled_exception, DigestSplit.realGarbled_exception]
   refine congrArg Vector.ofFn (funext fun o => ?_)
   dsimp only
-  rw [agree _ (finalPos_family o)]
+  have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+  have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+  rw [agree _ (finalPos_family _ h0), agree _ (finalPos_family _ h1)]
 
 /-- **The conversion material of `y` reads the table at keys of coordinate 1 only.** -/
 theorem crtY_congr (parameter : ℕ) (scalar : NonZeroScalar) (c : crtEntry.Coins) {t t' : TagTable}

@@ -4,12 +4,14 @@ masks `π_c = v_c − τ_c`, with `τ_c` the row-level value that makes the coll
 (`BMR.collectorSolve`) and `v_c` the collector's delivered value. The masks go to release-r1's `openTarget d c`, where
 the verbatim `Opening.preimageOne` reads them.
 
-Cells read: the request (`reqX`, `reqY`), the row constants (`Opening.rowCell d k`), the replay's delivered values
-and masks (`Layout.decodedCell`, `Layout.maskCell`), and the target rows (`openRow d + k`, written by the lifts).
+Cells read: the request (`reqX`, `reqY`), the row constants (`Opening.rowCell d k`: `xC0, yC4, zC0`), the replay's
+delivered values and masks (`Layout.decodedCell`, `Layout.maskCell`), and the target rows (`openRow d + k`, written by
+the lifts). The `x` encodings of digit `d` are `4 d + slot` (`rowX_x7, rowX_x9, rowY_cubic, rowZ_x9`), the `y` ones
+`3 d + slot` (`rowX_y10, rowY_y8, rowY_y10`).
 
-Per row (`BMR.collectorSolve`, the `X` and `Z` collectors with multiplier 1, the `Y` collector `y`):
+Per row (`BMR.collectorSolve`; the `X` and `Z` collectors have multiplier 1, the sign row's `rowY_cubic` has `x²`):
 * `X`: `τ = W.x − (xC0 + r(x7)·x + r(y10))`;
-* `Y`: `τ = (W.y − (yC0 + yC4·x² + r(x7')·x² + r(y8)·y + r(y10')))·y⁻¹`;
+* sign row: `τ = (W.y − (yC4·x² + r(y8)·y + r(y10')))·(x·x)⁻¹`;
 * `Z`: `τ = W.z − zC0`;
 where `r(e) = v_e − π_e` is a non-collector's row-level value.
 -/
@@ -50,27 +52,26 @@ def finishMask (row dec out : Nat) : Prog :=
   Prog.seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, loadAt rD dec, ar .fieldSub rD rD rSel,
     storeAt out rD]
 
-/-- `RAM[out] = RAM[dec] − (RAM[row] − rAcc) · y⁻¹` with `y` in `rB` (`rAcc` is reused for `y⁻¹`). -/
-def finishMaskOverY (row dec out : Nat) : Prog :=
-  Prog.seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, ar .fieldInv rAcc rB rB,
+/-- `RAM[out] = RAM[dec] − (RAM[row] − rAcc) · R[divisor]⁻¹` (`rAcc` is reused for the inverse). -/
+def finishMaskOver (divisor : Register) (row dec out : Nat) : Prog :=
+  Prog.seqList [loadAt rSel row, ar .fieldSub rSel rSel rAcc, ar .fieldInv rAcc divisor divisor,
     ar .fieldMul rSel rSel rAcc, loadAt rD dec, ar .fieldSub rD rD rSel, storeAt out rD]
 
 /-- The `X` row of digit `d` (`rA = x`). -/
 def rowX (d : Nat) : Prog :=
-  Prog.seqList [loadAt rAcc (Opening.rowCell d 0), addRowScaled (decX (5 * d)) (maskX (5 * d)) rA,
-    addRow (decY (3 * d)) (maskY (3 * d)), finishMask (openRow d) (decX (5 * d + 1)) (openTarget d 0)]
+  Prog.seqList [loadAt rAcc (Opening.rowCell d 0), addRowScaled (decX (4 * d)) (maskX (4 * d)) rA,
+    addRow (decY (3 * d)) (maskY (3 * d)), finishMask (openRow d) (decX (4 * d + 1)) (openTarget d 0)]
 
-/-- The `Y` row of digit `d` (`rB = y`, `rC = x²`). -/
+/-- The sign row of digit `d` (`rB = y`, `rC = x · x`). -/
 def rowY (d : Nat) : Prog :=
-  Prog.seqList [loadAt rAcc (Opening.rowCell d 1), addConstScaled (Opening.rowCell d 2) rC,
-    addRowScaled (decX (5 * d + 2)) (maskX (5 * d + 2)) rC,
+  Prog.seqList [cst rAcc 0, addConstScaled (Opening.rowCell d 1) rC,
     addRowScaled (decY (3 * d + 1)) (maskY (3 * d + 1)) rB,
     addRow (decY (3 * d + 2)) (maskY (3 * d + 2)),
-    finishMaskOverY (openRow d + 1) (decX (5 * d + 3)) (openTarget d 1)]
+    finishMaskOver rC (openRow d + 1) (decX (4 * d + 2)) (openTarget d 1)]
 
 /-- The `Z` row of digit `d`. -/
 def rowZ (d : Nat) : Prog :=
-  Prog.seqList [loadAt rAcc (Opening.rowCell d 3), finishMask (openRow d + 2) (decX (5 * d + 4)) (openTarget d 2)]
+  Prog.seqList [loadAt rAcc (Opening.rowCell d 2), finishMask (openRow d + 2) (decX (4 * d + 3)) (openTarget d 2)]
 
 /-- The request's `x`, `y`, `x²` into `rA`, `rB`, `rC`. -/
 def solvePrefix : Prog := Prog.seqList [loadAt rA reqX, loadAt rB reqY, ar .fieldMul rC rA rA]

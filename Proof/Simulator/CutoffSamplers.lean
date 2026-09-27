@@ -6,7 +6,8 @@ bijection from the accepted draws onto a finite type `β` is abort-close to the 
 with extra abort mass the sampler's cutoff `rejectLaw … none`. Instances:
 
 * `fieldCell_close`: a field cell against the uniform field element;
-* `lambda_close`: a lift randomiser against the uniform `NonZeroBase`;
+* `lambda_close`: a lift randomiser against the uniform `NonZeroBase`, and `pair_close`: a
+  randomiser pair against the uniform pair;
 * `preimage_close`: a `sampleFp`-preimage against `idealPreimage`.
 
 `optionProduct_uniform`: independent uniform draws are the uniform law on the product.
@@ -359,6 +360,23 @@ theorem optionProduct_uniform [FieldCertificate] {α : Type} [Fintype α] [Nonem
       funext head
       rw [PMF.map_comp]
       rfl
+
+/-- **A randomiser pair is abort-close to the uniform pair**: two randomisers, read as the pair
+`(draw 0, draw 1)` (a bijection `piFinTwoEquiv`). -/
+theorem pair_close [FieldCertificate] :
+    AbortClose (((2 : Nat) : ENNReal) *
+        rejectLaw fieldWidth (fun value => decide (1 ≤ value ∧ value < pNat)) attempts none)
+      pairLaw ((PMF.uniformOfFintype (NonZeroBase × NonZeroBase)).map some) := by
+  have draws := AbortClose.optionProduct 2 (fun _ => lambdaLaw)
+    (fun _ => (PMF.uniformOfFintype NonZeroBase).map some) (fun _ => lambda_close)
+  rw [optionProduct_uniform] at draws
+  have reindex : (PMF.uniformOfFintype (NonZeroBase × NonZeroBase)).map some =
+      ((PMF.uniformOfFintype (Fin 2 → NonZeroBase)).map some).map
+        (Option.map fun pair => (pair 0, pair 1)) := by
+    rw [PMF.map_comp, ← uniform_equiv (piFinTwoEquiv fun _ => NonZeroBase), PMF.map_comp]
+    rfl
+  rw [reindex]
+  exact draws.map_opt _ rfl
 
 end
 

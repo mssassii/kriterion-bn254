@@ -24,6 +24,9 @@ open Kriterion.ArgoMAC.Phase3.Glue
 
 noncomputable section
 
+/-- The `xor` instruction on words. -/
+private theorem eval_xor (first second : Word) : Arithmetic.xor.eval first second = first ^^^ second := rfl
+
 variable [FieldCertificate]
 
 /-! ### Words -/

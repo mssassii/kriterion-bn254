@@ -1,8 +1,9 @@
 /-
 **P45 at the entry** (H8's `CrtBmrSplit`, parts (a) to (d); `Core/H8.lean` section 5).
 
-* `rowsDoubling_of_doubling`: the doubling event of the real coins shows in the true rows (a target row with `Z = 0`),
-  so route M's reveal `rowsDoubling` covers it when the rows kernel's coins are coupled with the garbler's.
+* `rowsDoubling_of_doubling`: the doubling event of the real coins (either kind) shows in the true rows (a target row
+  with `Z = 0` or `S = 0`), so route M's reveal `rowsDoubling` covers it when the rows kernel's coins are coupled with
+  the garbler's.
 * The real reading, part (a): the garbler's body on a tag table reads P45's pads (`bmrPadsOf`), and its CRT offsets
   are P45's (`gxOf_offset`, `gyOf_offset`).
 -/
@@ -19,30 +20,71 @@ open BN254 Cryptography GarbledCircuit Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB
 
 noncomputable section
 
-/-- **Doubling shows in the true rows**: at `u = exc_o` the incomplete addition's `Z` of digit `o` vanishes
-(`Coordinates.exceptionalZ`). -/
+private theorem two_ne_zero_base : (2 : BaseField) ≠ 0 := by decide
+
+/-- The sign row vanishes at `2K`: the tangent at `−K` passes through `2K` (a polynomial identity in the tangent
+slope `s = 3 k_x² / (2 k_y)` and the curve equation). -/
+theorem sign_double [FieldCertificate] (offset : AffineInput) (onCurve : OnCurve offset) (yNe : offset.y ≠ 0) :
+    Coordinates.evaluate (Coordinates.signCoefficients offset) (Exception.doubleOffset offset) = 0 := by
+  have curve : offset.y ^ 2 - offset.x ^ 3 - 3 = 0 := by
+    have equation : offset.y ^ 2 = offset.x ^ 3 + 3 := onCurve
+    linear_combination equation
+  have two : (2 : BaseField) ≠ 0 := two_ne_zero_base
+  have twoB : (2 : BaseField) * offset.y ≠ 0 := mul_ne_zero two yNe
+  have hs : 2 * offset.y * (3 * offset.x ^ 2 * (2 * offset.y)⁻¹) - 3 * offset.x ^ 2 = 0 := by
+    field_simp
+    ring
+  have key : (2 * offset.y) ^ 6 *
+      Coordinates.evaluate (Coordinates.signCoefficients offset) (Exception.doubleOffset offset) = 0 := by
+    simp only [Coordinates.evaluate, Coordinates.signCoefficients, Exception.doubleOffset]
+    set a := offset.x
+    set b := offset.y
+    set s := 3 * a ^ 2 * (2 * b)⁻¹
+    linear_combination (4*b^3*(243*a^10 + 162*a^8*b*s - 729*a^7*b^2 + 2187*a^7 + 108*a^6*b^2*s^2 -
+        486*a^5*b^3*s + 1458*a^5*b*s + 702*a^4*b^4 + 72*a^4*b^3*s^3 - 4860*a^4*b^2 + 4374*a^4 -
+        324*a^3*b^4*s^2 + 972*a^3*b^2*s^2 + 468*a^2*b^5*s + 48*a^2*b^4*s^4 - 3240*a^2*b^3*s +
+        2916*a^2*b*s - 168*a*b^6 - 216*a*b^5*s^3 + 1296*a*b^4 + 648*a*b^3*s^3 - 5832*a*b^2 +
+        56*b^6*s^2 + 32*b^5*s^5 - 432*b^4*s^2 + 1944*b^2*s^2)) * hs +
+      (-12*b^3*(243*a^9 - 486*a^6*b^2 + 1458*a^6 + 216*a^3*b^4 - 1944*a^3*b^2 - 16*b^6 + 432*b^4)) * curve
+  exact (mul_eq_zero.mp key).resolve_left (pow_ne_zero 6 twoB)
+
+/-- **Doubling shows in the true rows**: at `u = exc_s` the row of digit `s / 2` has `Z = 0` (kind 0, the doubling
+input, `Coordinates.exceptionalZ`) or `S = 0` (kind 1, the sign row's zero at `2K`, `sign_double`). -/
 theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
     (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
     (doubling : ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u) :
     H8.rowsDoubling (Security.Phase3.trueRows scalar coins u) := by
   obtain ⟨o, hexc⟩ := doubling
   unfold Kriterion.CRT.Entry.exceptional at hexc
-  split_ifs at hexc with inRange
-  generalize hkey : (Kriterion.CRT.Entry.outputKeysOf scalar coins).get ⟨o, inRange⟩ = key at hexc
+  by_cases inRange : o / 2 < digitCount
+  swap
+  · rw [dif_neg inRange] at hexc
+    cases hexc
+  rw [dif_pos inRange] at hexc
+  generalize hkey : (Kriterion.CRT.Entry.outputKeysOf scalar coins).get ⟨o / 2, inRange⟩ = key at hexc
   dsimp only at hexc
   cases hphi : digitEndomorphismBase key.digit with
   | none => rw [hphi] at hexc; cases hexc
   | some phi =>
     rw [hphi] at hexc
     simp only [Option.some.injEq] at hexc
-    refine ⟨⟨o, inRange⟩, ?_⟩
+    refine ⟨⟨o / 2, inRange⟩, ?_⟩
     have six := digitEndomorphismBasePowSix key.digit phi hphi
     unfold Security.Phase3.trueRows FieldMacToECMac.evaluateRow
     simp only [FieldMacToECMac.rowsForOutputKeys, Vector.get_ofFn]
     unfold Kriterion.CRT.Entry.outputKeysOf at hkey
     rw [hkey, hphi]
-    rw [(Coordinates.evaluateRowsSome _ _ _ _).2.2, ← hexc, Exception.exceptionalInput_transform phi six]
-    rw [Coordinates.exceptionalZ _ _ rfl, mul_zero]
+    by_cases kind : o % 2 = 0
+    · rw [if_pos kind] at hexc
+      left
+      rw [(Coordinates.evaluateRowsSome _ _ _ _ _).2.2, ← hexc, Exception.exceptionalInput_transform phi six]
+      rw [Coordinates.exceptionalZ _ _ rfl, mul_zero]
+    · rw [if_neg kind] at hexc
+      right
+      rw [(Coordinates.evaluateRowsSome _ _ _ _ _).2.1, ← hexc]
+      unfold Exception.tripleInput
+      rw [Exception.exceptionalInput_transform phi six,
+        sign_double _ key.offset.onCurve (JacobianMixed.noAffineYZero _ key.offset.onCurve), mul_zero]
 
 /-! ### The real reading: pads and offsets -/
 
@@ -200,7 +242,7 @@ theorem offsetsX_eq (table : TagTable) (delta : Block) (zero : ℕ → Block) (K
   rw [gx_offset table delta zero x c reads.pads, maskValues_tagHash]
   rcases x with ⟨d, element⟩ | element
   · simp only [BMR.rowOffset, BMR.rowEnc, reads.mask, bmrMasksOf, BMR.offsetF, Entry.toField, BMR.xFlat]
-  · have past : ¬ 455 + element.slot.val < 5 * digitCount := by
+  · have past : ¬ 364 + element.slot.val < 4 * digitCount := by
       have := element.slot.isLt; simp only [digitCount]; omega
     simp only [BMR.offsetF, BMR.curveEnc, Entry.toField, BMR.xFlat, maskOf, if_pos, past, if_false, sub_zero]
 
@@ -325,7 +367,7 @@ theorem slXOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
     rw [values]
     rfl
   · have high : ¬ (BMR.xFlat (.inr element)).val < pointElementCountX := by
-      show ¬ 455 + element.slot.val < pointElementCountX
+      show ¬ 364 + element.slot.val < pointElementCountX
       unfold pointElementCountX
       omega
     rw [dif_neg high]

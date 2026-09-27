@@ -43,7 +43,7 @@ structure OutHolds (out : ReplayOut) (memory : Memory) : Prop where
 
 /-- The delivered value of `x` encoding `e`. -/
 def dxOf (out : ReplayOut) (e : Nat) : BaseField :=
-  out.delivered (.inl (Privacy.BMR.xEncEquiv.symm ⟨e % 458, Nat.mod_lt _ (by omega)⟩))
+  out.delivered (.inl (Privacy.BMR.xEncEquiv.symm ⟨e % 367, Nat.mod_lt _ (by omega)⟩))
 
 /-- The delivered value of `y` encoding `e`. -/
 def dyOf (out : ReplayOut) (e : Nat) : BaseField :=
@@ -51,7 +51,7 @@ def dyOf (out : ReplayOut) (e : Nat) : BaseField :=
 
 /-- The mask of `x` encoding `e` (`0` at a collector or a curve encoding). -/
 def pxOf (out : ReplayOut) (e : Nat) : BaseField :=
-  match Privacy.BMR.xEncEquiv.symm ⟨e % 458, Nat.mod_lt _ (by omega)⟩ with
+  match Privacy.BMR.xEncEquiv.symm ⟨e % 367, Nat.mod_lt _ (by omega)⟩ with
   | .inl (d, x) => if plain : Privacy.BMR.IsCollector (.inl x) then 0 else out.masks ⟨(d, .inl x), plain⟩
   | .inr _ => 0
 
@@ -62,12 +62,12 @@ def pyOf (out : ReplayOut) (e : Nat) : BaseField :=
   | .inr _ => 0
 
 theorem xSymm (d : Fin 91) (x : XElement) :
-    Privacy.BMR.xEncEquiv.symm ⟨(5 * d.val + x.slot.val) % 458, Nat.mod_lt _ (by decide)⟩ = .inl (d, x) := by
+    Privacy.BMR.xEncEquiv.symm ⟨(4 * d.val + x.slot.val) % 367, Nat.mod_lt _ (by decide)⟩ = .inl (d, x) := by
   rw [Equiv.symm_apply_eq]
   apply Fin.ext
-  have : x.slot.val < 5 := x.slot.isLt
+  have : x.slot.val < 4 := x.slot.isLt
   have := d.isLt
-  show (5 * d.val + x.slot.val) % 458 = (xElementIndex d x).val
+  show (4 * d.val + x.slot.val) % 367 = (xElementIndex d x).val
   rw [Nat.mod_eq_of_lt (by omega)]
   rfl
 
@@ -82,7 +82,7 @@ theorem ySymm (d : Fin 91) (y : YElement) :
   rfl
 
 theorem dxOf_eq (out : ReplayOut) (d : Fin 91) (x : XElement) :
-    dxOf out (5 * d.val + x.slot.val) = out.delivered (Privacy.BMR.rowEnc (d, .inl x)) := by
+    dxOf out (4 * d.val + x.slot.val) = out.delivered (Privacy.BMR.rowEnc (d, .inl x)) := by
   unfold dxOf
   rw [xSymm]
   rfl
@@ -94,7 +94,7 @@ theorem dyOf_eq (out : ReplayOut) (d : Fin 91) (y : YElement) :
   rfl
 
 theorem pxOf_eq (out : ReplayOut) (d : Fin 91) (x : XElement) (plain : ¬ Privacy.BMR.IsCollector (.inl x)) :
-    pxOf out (5 * d.val + x.slot.val) = out.masks ⟨(d, .inl x), plain⟩ := by
+    pxOf out (4 * d.val + x.slot.val) = out.masks ⟨(d, .inl x), plain⟩ := by
   unfold pxOf
   rw [xSymm]
   simp only [plain, dite_false]
@@ -117,20 +117,16 @@ theorem maskFormula_eq (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → R
     (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (d : Fin 91) (c : Fin 3) :
     Solve.maskFormula u.x u.y (gamma d) (targets d) (dxOf out) (pxOf out) (dyOf out) (pyOf out) d.val c =
       Privacy.collectorMasks u out gamma targets (Programs.collectorAt d c) := by
-  have x7 : dxOf out (5 * d.val) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowX_x7)) :=
+  have x7 : dxOf out (4 * d.val) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowX_x7)) :=
     dxOf_eq out d .rowX_x7
-  have x9 : dxOf out (5 * d.val + 1) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowX_x9)) :=
+  have x9 : dxOf out (4 * d.val + 1) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowX_x9)) :=
     dxOf_eq out d .rowX_x9
-  have x7y : dxOf out (5 * d.val + 2) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowY_x7)) :=
-    dxOf_eq out d .rowY_x7
-  have x9y : dxOf out (5 * d.val + 3) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowY_x9)) :=
-    dxOf_eq out d .rowY_x9
-  have x9z : dxOf out (5 * d.val + 4) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowZ_x9)) :=
+  have xc : dxOf out (4 * d.val + 2) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowY_cubic)) :=
+    dxOf_eq out d .rowY_cubic
+  have x9z : dxOf out (4 * d.val + 3) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowZ_x9)) :=
     dxOf_eq out d .rowZ_x9
-  have p7 : pxOf out (5 * d.val) = out.masks ⟨(d, .inl .rowX_x7), by simp [Privacy.BMR.IsCollector]⟩ :=
+  have p7 : pxOf out (4 * d.val) = out.masks ⟨(d, .inl .rowX_x7), by simp [Privacy.BMR.IsCollector]⟩ :=
     pxOf_eq out d .rowX_x7 _
-  have p7y : pxOf out (5 * d.val + 2) = out.masks ⟨(d, .inl .rowY_x7), by simp [Privacy.BMR.IsCollector]⟩ :=
-    pxOf_eq out d .rowY_x7 _
   have y10 : dyOf out (3 * d.val) = out.delivered (Privacy.BMR.rowEnc (d, .inr .rowX_y10)) :=
     dyOf_eq out d .rowX_y10
   have y8 : dyOf out (3 * d.val + 1) = out.delivered (Privacy.BMR.rowEnc (d, .inr .rowY_y8)) :=
@@ -144,7 +140,7 @@ theorem maskFormula_eq (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → R
   · simp only [Solve.maskFormula, x7, x9, p7, y10, q10]
     simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.collectorSolve,
       Privacy.replayRowValues, Privacy.BMR.IsCollector]
-  · simp only [Solve.maskFormula, x7y, x9y, p7y, y8, q8, y10y, q10y]
+  · simp only [Solve.maskFormula, xc, y8, q8, y10y, q10y]
     simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.collectorSolve,
       Privacy.replayRowValues, Privacy.BMR.IsCollector, sq]
   · simp only [Solve.maskFormula, x9z]
@@ -154,7 +150,7 @@ theorem maskFormula_eq (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → R
 
 omit [FieldCertificate] in
 theorem decodedX_holds (out : ReplayOut) (memory : Memory) (holds : OutHolds out memory) (e : Nat)
-    (small : e < 458) : memory.ram (word (Solve.decX e)) = fieldWord (dxOf out e) := by
+    (small : e < 367) : memory.ram (word (Solve.decX e)) = fieldWord (dxOf out e) := by
   have cell := holds.delivered (.inl (Privacy.BMR.xEncEquiv.symm ⟨e, small⟩))
   have flat : (Privacy.BMR.xFlat (Privacy.BMR.xEncEquiv.symm ⟨e, small⟩)).val = e :=
     congrArg Fin.val (Privacy.BMR.xEncEquiv.apply_symm_apply ⟨e, small⟩)
@@ -177,7 +173,7 @@ theorem decodedY_holds (out : ReplayOut) (memory : Memory) (holds : OutHolds out
 omit [FieldCertificate] in
 theorem maskX_holds (out : ReplayOut) (memory : Memory) (holds : OutHolds out memory) (d : Fin 91)
     (x : XElement) (plain : ¬ Privacy.BMR.IsCollector (.inl x)) :
-    memory.ram (word (Solve.maskX (5 * d.val + x.slot.val))) = fieldWord (pxOf out (5 * d.val + x.slot.val)) := by
+    memory.ram (word (Solve.maskX (4 * d.val + x.slot.val))) = fieldWord (pxOf out (4 * d.val + x.slot.val)) := by
   rw [pxOf_eq out d x plain]
   exact holds.masks ⟨(d, .inl x), plain⟩
 
@@ -194,9 +190,8 @@ theorem digitCells_of_out (out : ReplayOut) (memory : Memory) (u : AffineInput) 
     (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (holds : OutHolds out memory)
     (hx : memory.ram (word reqX) = fieldWord u.x) (hy : memory.ram (word reqY) = fieldWord u.y)
     (rows : ∀ d : Fin 91, memory.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC0 ∧
-      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).yC4 ∧
-      memory.ram (word (Opening.rowCell d 3)) = fieldWord (gamma d).zC0)
+      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
+      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0)
     (rowTargets : ∀ d : Fin 91, memory.ram (word (openRow d)) = fieldWord (targets d).x ∧
       memory.ram (word (openRow d + 1)) = fieldWord (targets d).y ∧
       memory.ram (word (openRow d + 2)) = fieldWord (targets d).z)
@@ -206,11 +201,9 @@ theorem digitCells_of_out (out : ReplayOut) (memory : Memory) (u : AffineInput) 
   reqYCell := hy
   row0 := (rows d).1
   row1 := (rows d).2.1
-  row2 := (rows d).2.2.1
-  row3 := (rows d).2.2.2
+  row2 := (rows d).2.2
   decXCell k small := decodedX_holds out memory holds _ (by have := d.isLt; omega)
   maskX0 := maskX_holds out memory holds d .rowX_x7 (by simp [Privacy.BMR.IsCollector])
-  maskX2 := maskX_holds out memory holds d .rowY_x7 (by simp [Privacy.BMR.IsCollector])
   decYCell k small := decodedY_holds out memory holds _ (by have := d.isLt; omega)
   maskYCell k small := by
     interval_cases k

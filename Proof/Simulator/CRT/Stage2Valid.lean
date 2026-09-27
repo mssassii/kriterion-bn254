@@ -28,7 +28,6 @@ import Proof.Simulator.CRT.OutCells
 import Proof.Simulator.CRT.Preimages
 import Proof.Simulator.CRT.Bounded
 import Proof.Simulator.OpeningLaw
-import Proof.Simulator.Stage2Programs
 import Construction.Simulator.CRT.Design
 
 namespace Kriterion.CRT.SimMachine
@@ -89,16 +88,54 @@ theorem noOracle_of_det : ∀ program : Prog, program.OpsSatisfy Op.Det → prog
 theorem det_solve : Solve.solve.OpsSatisfy Op.Det :=
   det_rep _ _ fun d _ => by
     simp only [Solve.solveDigit, Solve.solvePrefix, Solve.rowX, Solve.rowY, Solve.rowZ, Solve.addRowScaled,
-      Solve.addRow, Solve.addConstScaled, Solve.finishMask, Solve.finishMaskOverY, Prog.seqList,
+      Solve.addRow, Solve.addConstScaled, Solve.finishMask, Solve.finishMaskOver, Prog.seqList,
       Prog.OpsSatisfy, loadAt, storeAt, ar, cst, Op.Det, and_self]
 
-/-- The rows program makes no oracle call (release-r1's `openingFree_noOracle`, its first four blocks). -/
+/-- The rows program makes no oracle call (release-r1's tail points, Horner and head clamp, randomisers and lifts). -/
 theorem rows_noOracle : Design.rowsProgram.NoOracle := by
-  have free := openingFree_noOracle
-  unfold openingFree at free
   unfold Design.rowsProgram
-  simp only [Prog.seqList] at free ⊢
-  exact ⟨free.1, free.2.1, free.2.2.1, free.2.2.2.1, trivial⟩
+  simp only [Prog.seqList]
+  have curveRoot (source : Register) : (Opening.curveRoot source).NoOracle := by
+    unfold Opening.curveRoot
+    simp only [Prog.seqList]
+    exact ⟨rfl, rfl, rfl, rfl, rfl, noOracle_rep _ _ (fun _ _ => by
+      unfold Opening.sqrtRound
+      exact ⟨rfl, by split <;> first | rfl | trivial⟩), trivial⟩
+  have betaMul : Opening.betaMul.NoOracle := by
+    unfold Opening.betaMul Opening.copyPoint Opening.clearP
+    simp only [Prog.seqList]
+    exact ⟨⟨rfl, rfl, rfl, trivial⟩, ⟨rfl, rfl, rfl, trivial⟩, noOracle_rep _ _ (fun _ _ => by
+      unfold Opening.betaRound
+      exact ⟨rfl, by split <;> first | rfl | trivial⟩), trivial⟩
+  refine ⟨?_, ?_, ?_, ?_, trivial⟩
+  · exact noOracle_rep _ _ fun _ _ => by
+      unfold Opening.tailOne
+      simp only [Prog.seqList]
+      refine ⟨noOracle_bounded _ _ _ _ ?_ ?_, noOracle_zeroRegs _, trivial⟩
+      · unfold Opening.testCurveX
+        simp only [Prog.seqList]
+        exact ⟨rfl, rfl, curveRoot _, rfl, rfl, rfl, rfl, rfl, trivial⟩
+      · unfold Opening.storeCurvePoint
+        simp only [Prog.seqList]
+        exact ⟨curveRoot _, ⟨rfl, trivial⟩, rfl, rfl, rfl, rfl, rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩,
+          ⟨rfl, rfl⟩, trivial⟩
+  · unfold Opening.horner Opening.clearP Opening.head Opening.storePoint
+    simp only [Prog.seqList]
+    exact ⟨⟨rfl, rfl, rfl, trivial⟩, noOracle_rep _ _ (fun _ _ => by
+        unfold Opening.hornerStep Opening.loadPoint
+        simp only [Prog.seqList]
+        exact ⟨betaMul, ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, trivial⟩, rfl, trivial⟩),
+      ⟨betaMul, ⟨⟨rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, rfl,
+        ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, trivial⟩, noOracle_zeroRegs _, trivial⟩, trivial⟩,
+        trivial⟩, trivial⟩
+  · exact noOracle_rep _ _ fun _ _ =>
+      ⟨⟨noOracle_bounded _ _ _ _ ⟨rfl, rfl, rfl, rfl⟩ ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩,
+        ⟨noOracle_bounded _ _ _ _ ⟨rfl, rfl, rfl, rfl⟩ ⟨rfl, rfl⟩, noOracle_zeroRegs _⟩⟩
+  · exact noOracle_rep _ _ fun _ _ => by
+      unfold Opening.liftOne Opening.loadPoint
+      simp only [Prog.seqList]
+      exact ⟨⟨rfl, rfl⟩, rfl, ⟨rfl, rfl⟩, rfl, ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, trivial⟩, rfl, rfl, rfl,
+        rfl, rfl, rfl, rfl, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ⟨rfl, rfl⟩, noOracle_zeroRegs _, trivial⟩
 
 section Sem
 
@@ -193,7 +230,7 @@ theorem notOpen_rowMaskCell (r : Privacy.BMR.NonCollector) : ¬ OpenCell (word (
   cases e with
   | inl x =>
       have := (PlanB.xElementIndex d x).isLt
-      have count : PlanB.pointElementCountX = 455 := rfl
+      have count : PlanB.pointElementCountX = 364 := rfl
       show ¬ OpenCell (word (Layout.maskCell 0 (PlanB.xElementIndex d x).val))
       apply notOpen_high <;> simp only [Layout.maskCell, openBase] <;> omega
   | inr y =>
@@ -209,7 +246,7 @@ theorem notOpen_keyCell : ¬ OpenCell (word Layout.keyCell) :=
 omit [FieldCertificate] in
 /-- The replay writes nothing below `2 ^ 56`. -/
 theorem replayWrites_low (x : Nat) (small : x < 2 ^ 56) : ¬ Machine.replayWrites (word x) := by
-  have count : nonCollectorCount PlanB.digitCount = 455 := rfl
+  have count : nonCollectorCount PlanB.digitCount = 364 := rfl
   rintro (((inX | inY) | key) | (⟨b, bb, same⟩ | ⟨n, nb, same⟩))
   · exact Machine.coordWrites_high 0 Entry.xCount (by norm_num) (by decide) x small inX
   · exact Machine.coordWrites_high 1 Entry.yCount (by norm_num) (by decide) x small inY
@@ -309,12 +346,17 @@ theorem rows_bind (memory : Memory) (u : AffineInput) (target : Point)
               if inside : digit < 91 then digitPoints target (Vector.ofFn points) ⟨digit, inside⟩ else 0
               with pointsDef
             set lamsN : Nat → BaseField := fun digit =>
-              if inside : digit < 91 then (lams ⟨digit, inside⟩).value else 0 with lamsDef
+              if inside : digit < 91 then (lams ⟨digit, inside⟩).1.value else 0 with lamsDef
+            set tausN : Nat → BaseField := fun digit =>
+              if inside : digit < 91 then (lams ⟨digit, inside⟩).2.value else 0 with tausDef
             obtain ⟨lifted, runLifts, bitsLifted, sameLifted, rowsLifted, _⟩ :=
-              memSem_lifts (foldStore lamMem 91 (headMem memory target points) lams) pointsN lamsN
+              memSem_lifts (foldStore lamMem 91 (headMem memory target points) lams) pointsN lamsN tausN
                 (fun digit inside => by
                   simp only [lamsDef, dif_pos inside]
-                  exact lamFold_at (headMem memory target points) lams ⟨digit, inside⟩)
+                  exact (lamFold_at (headMem memory target points) lams ⟨digit, inside⟩).1)
+                (fun digit inside => by
+                  simp only [tausDef, dif_pos inside]
+                  exact (lamFold_at (headMem memory target points) lams ⟨digit, inside⟩).2)
                 (fun digit inside => by
                   simp only [pointsDef, dif_pos inside]
                   exact pointCells_after memory target points lams ⟨digit, inside⟩) 91 le_rfl
@@ -331,13 +373,13 @@ theorem rows_bind (memory : Memory) (u : AffineInput) (target : Point)
             · have row := rowsLifted d.val d.isLt 0 (by norm_num)
               rw [Nat.add_zero] at row
               rw [row]
-              simp only [pointsDef, lamsDef, dif_pos d.isLt]
+              simp only [pointsDef, lamsDef, tausDef, dif_pos d.isLt]
               rfl
             · rw [rowsLifted d.val d.isLt 1 (by norm_num)]
-              simp only [pointsDef, lamsDef, dif_pos d.isLt]
+              simp only [pointsDef, lamsDef, tausDef, dif_pos d.isLt]
               rfl
             · rw [rowsLifted d.val d.isLt 2 (by norm_num)]
-              simp only [pointsDef, lamsDef, dif_pos d.isLt]
+              simp only [pointsDef, lamsDef, tausDef, dif_pos d.isLt]
               rfl
 
 end Rows
@@ -370,9 +412,8 @@ theorem afterRows_law (out : ReplayOut) (u : AffineInput) (gamma : Fin 91 → Ro
     (post : RowsPost memory next targets) (holds : OutCells.OutHolds out memory)
     (reqXCell : memory.ram (word reqX) = fieldWord u.x) (reqYCell : memory.ram (word reqY) = fieldWord u.y)
     (rowCells : ∀ d : Fin 91, memory.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC0 ∧
-      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).yC4 ∧
-      memory.ram (word (Opening.rowCell d 3)) = fieldWord (gamma d).zC0)
+      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
+      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0)
     (labelCells : ∀ (i : Nat) (bound : i < 508), memory.ram (word (labelBase + i)) = blockWord (labels[i]'bound))
     (empty : memory.bits 3 = []) (oracle : OState FI EI) :
     (afterRowsProg.sem next oracle).bind finishK = abstractAfterRows u out gamma labels targets oracle := by
@@ -386,15 +427,13 @@ theorem afterRows_law (out : ReplayOut) (u : AffineInput) (gamma : Fin 91 → Ro
   have hy : next.ram (word reqY) = fieldWord u.y :=
     (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans reqYCell
   have rowsN : ∀ d : Fin 91, next.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      next.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC0 ∧
-      next.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).yC4 ∧
-      next.ram (word (Opening.rowCell d 3)) = fieldWord (gamma d).zC0 := fun d => by
+      next.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
+      next.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0 := fun d => by
     have := d.isLt
-    refine ⟨?_, ?_, ?_, ?_⟩
+    refine ⟨?_, ?_, ?_⟩
     · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).1
     · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).2.1
-    · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).2.2.1
-    · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).2.2.2
+    · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).2.2
   have labelsN : ∀ (i : Nat) (bound : i < 508), next.ram (word (labelBase + i)) = blockWord (labels[i]'bound) :=
     fun i bound => (post.same _ (not_openCell _ (by unfold labelBase openBase; omega)
       (by unfold labelBase tmpM tmpBase; omega))).trans (labelCells i bound)
@@ -475,9 +514,8 @@ theorem continuation_law (out : ReplayOut) (u : AffineInput) (target : Point) (g
     (request : readWords (memory.ram (word reqTag0), memory.ram (word reqQX), memory.ram (word reqQY)) =
       some target)
     (rowCells : ∀ d : Fin 91, memory.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC0 ∧
-      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).yC4 ∧
-      memory.ram (word (Opening.rowCell d 3)) = fieldWord (gamma d).zC0)
+      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
+      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0)
     (labelCells : ∀ (i : Nat) (bound : i < 508), memory.ram (word (labelBase + i)) = blockWord (labels[i]'bound))
     (empty : memory.bits 3 = []) (oracle : OState FI EI) :
     (restProg.sem memory oracle).bind finishK = afterReplay u target gamma labels (out, oracle) := by
@@ -507,9 +545,8 @@ structure ValidStart [FieldCertificate] (pub : Entry.Public) (input : AffineInpu
   c2Cell : middle.ram (word (fieldBase + 2)) = fieldWord pub.curve.2.2
   outputCells : (middle.ram (word reqTag0), middle.ram (word reqQX), middle.ram (word reqQY)) = outputWords target
   rowCells : ∀ d : Fin 91, middle.ram (word (Opening.rowCell d 0)) = fieldWord (Entry.gammaOf pub d).xC0 ∧
-    middle.ram (word (Opening.rowCell d 1)) = fieldWord (Entry.gammaOf pub d).yC0 ∧
-    middle.ram (word (Opening.rowCell d 2)) = fieldWord (Entry.gammaOf pub d).yC4 ∧
-    middle.ram (word (Opening.rowCell d 3)) = fieldWord (Entry.gammaOf pub d).zC0
+    middle.ram (word (Opening.rowCell d 1)) = fieldWord (Entry.gammaOf pub d).yC4 ∧
+    middle.ram (word (Opening.rowCell d 2)) = fieldWord (Entry.gammaOf pub d).zC0
   labelCells : ∀ (i : Nat) (bound : i < 508), middle.ram (word (labelBase + i)) = blockWord (labels[i]'bound)
   empty : middle.bits 3 = []
 
@@ -586,11 +623,10 @@ theorem valid_law (source : Entry.Source) (input : AffineInput) (target : Point)
         readWords_outputWords])
     (fun d => by
       have := d.isLt
-      refine ⟨?_, ?_, ?_, ?_⟩
+      refine ⟨?_, ?_, ?_⟩
       · exact (keep _ (by addr_arith)).trans (start.rowCells d).1
       · exact (keep _ (by addr_arith)).trans (start.rowCells d).2.1
-      · exact (keep _ (by addr_arith)).trans (start.rowCells d).2.2.1
-      · exact (keep _ (by addr_arith)).trans (start.rowCells d).2.2.2)
+      · exact (keep _ (by addr_arith)).trans (start.rowCells d).2.2)
     (fun i bound => (keep _ (by unfold labelBase; omega)).trans (start.labelCells i bound))
     (by rw [frame.bits]; exact start.empty) o
 

@@ -91,18 +91,19 @@ theorem family_tag40 {k : Paths.TagKey} (range : k.InRange) : tagFamily (Conv.ta
   rw [Nat.mod_eq_of_lt (Paths.TagKey.code_lt range)]
   exact tagFamily_key range
 
-/-- **The digest entries on a tag table**: each reads only its final's answer. -/
+/-- **The digest entries on a tag table**: each reads only its two finals' answers. -/
 theorem entriesOf_tagHash (A : TagTable) (scalar : NonZeroScalar) (coins : Entry.Coins) (o : Fin digitCount) :
     EntryCorrect.entriesOf (H8.tagHash A) scalar coins o =
       DigestSplit.entryOf ((outputKeysOf scalar coins).get o).digit
-        ((outputKeysOf scalar coins).get o).offset.coordinates (coins.exceptionPad.get o, A (DigestSplit.finalPos o.val)) := by
+        ((outputKeysOf scalar coins).get o).offset.coordinates (coins.exceptionPad.get o,
+          (A (DigestSplit.finalPos (2 * o.val)), A (DigestSplit.finalPos (2 * o.val + 1)))) := by
   unfold EntryCorrect.entriesOf digestEntries garbleEntry DigestSplit.entryOf
   cases digitEndomorphismBase ((outputKeysOf scalar coins).get o).digit with
   | none => rfl
   | some phi =>
       simp only
       unfold finalMask h128
-      rw [BmrEntry.tagHash_hashInput]
+      rw [BmrEntry.tagHash_hashInput, BmrEntry.tagHash_hashInput]
       rfl
 
 /-- **The published value reads the table only at families other than 8 and 10.** -/
@@ -142,8 +143,10 @@ theorem pubOf_congr (scalar : NonZeroScalar) (coins : Entry.Coins) (A A' : TagTa
   have entries : EntryCorrect.entriesOf (H8.tagHash A) scalar coins = EntryCorrect.entriesOf (H8.tagHash A') scalar coins := by
     funext o
     rw [entriesOf_tagHash, entriesOf_tagHash]
-    have ho := lt_trans o.isLt DigestSplit.digitCount_lt
-    rw [agree _ (by rw [DigestSplit.family_final _ ho]; decide) (by rw [DigestSplit.family_final _ ho]; decide)]
+    have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+    have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
+    rw [agree _ (by rw [DigestSplit.family_final _ h0]; decide) (by rw [DigestSplit.family_final _ h0]; decide),
+      agree _ (by rw [DigestSplit.family_final _ h1]; decide) (by rw [DigestSplit.family_final _ h1]; decide)]
   unfold EntryCorrect.pubOf
   rw [gx, gy, masks, entries]
 
@@ -177,9 +180,7 @@ theorem away_of_family (p : Fin (2 ^ 40)) (h6 : tagFamily p.val ≠ 6) (h7 : tag
         exact fam67 (Or.inr rfl) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩
       · simp only [siteTags, List.mem_map, List.mem_range] at ht
         obtain ⟨j, hj, rfl⟩ := ht
-        have hj' : j < 3 := by
-          have : j < (if k = 227 then 2 else 3) := hj
-          split at this <;> omega
+        have hj' : j < 3 := hj
         exact fam67 (Or.inr rfl) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩
   rw [heq] at fam
   rcases fam with f | f
@@ -426,12 +427,12 @@ theorem maskCase : OneCase (fun τ => tagFamily τ = 7) ((2 : ℝ≥0∞) ^ 128)
 
 /-! ### Family 9: the digest finals -/
 
-/-- **A garbler input of family 9 is a final at the garbler's key of the digit's exceptional input.** -/
+/-- **A garbler input of family 9 is a final at the garbler's key of an exceptional input of its site.** -/
 theorem final_input (scalar : NonZeroScalar) (coins : Entry.Coins) (A : TagTable) (N : ℕ)
     (inside : N ∈ asked (H8.tagHash A) (garbleCM scalar coins)) (fam : tagFamily (N / 2 ^ 128) = 9) :
-    ∃ (o : Fin digitCount) (phi : BaseField), digitEndomorphismBase ((outputKeysOf scalar coins).get o).digit = some phi ∧
-      N = hashInput (garblerKey (digestTable (H8.tagHash A) coordinateBitCount (zeroOf coins) (deltaOf coins))
-        (Exception.exceptionalInput phi ((outputKeysOf scalar coins).get o).offset.coordinates)) (digestFinalTag o.val) := by
+    ∃ (o : DigestSplit.FinalSite) (w : AffineInput), exceptional scalar coins o.val = some w ∧
+      N = hashInput (garblerKey (digestTable (H8.tagHash A) coordinateBitCount (zeroOf coins) (deltaOf coins)) w)
+        (digestFinalTag o.val) := by
   unfold garbleCM at inside
   simp only [asked_bind, asked_pure, List.append_nil, List.mem_append] at inside
   rcases inside with inX | inY | inKey | inMask | inDigest
@@ -480,9 +481,14 @@ theorem final_input (scalar : NonZeroScalar) (coins : Entry.Coins) (A : TagTable
       split at inEntry
       · exact absurd inEntry List.not_mem_nil
       · rename_i phi selected
-        rw [List.mem_singleton] at inEntry
-        refine ⟨o, phi, selected, ?_⟩
-        rw [inEntry, eval_digestTableM]
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at inEntry
+        rcases inEntry with inEntry | inEntry
+        · refine ⟨DigestSplit.siteOf o 0, _, exceptional_some scalar coins o phi selected, ?_⟩
+          rw [inEntry, eval_digestTableM]
+          rfl
+        · refine ⟨DigestSplit.siteOf o 1, _, triple_some scalar coins o phi selected, ?_⟩
+          rw [inEntry, eval_digestTableM]
+          rfl
 
 /-- The digest table on a tag table. -/
 theorem digestTable_tagHash (A : TagTable) (bits : ℕ) (zero : Fin 2 → Fin bits → Block) (delta : Fin 2 → Block)
@@ -576,11 +582,9 @@ theorem keyRest_ignores (u : AffineInput) :
   rw [SliceC.xorFoldExcept_congr 0 _ _ outer,
     SliceC.xorFoldExcept_congr zeroPos _ _ fun p hp => away 0 p (Or.inr hp)]
 
-/-- The exceptional input of digit `o` for the given coins (the origin for a zero digit). -/
-def excOf (scalar : NonZeroScalar) (c : Entry.Coins) (o : Fin digitCount) : AffineInput :=
-  match digitEndomorphismBase ((outputKeysOf scalar c).get o).digit with
-  | some phi => Exception.exceptionalInput phi ((outputKeysOf scalar c).get o).offset.coordinates
-  | none => ⟨0, 0⟩
+/-- The exceptional input of final site `o` for the given coins (the origin for a zero digit). -/
+def excOf (scalar : NonZeroScalar) (c : Entry.Coins) (o : DigestSplit.FinalSite) : AffineInput :=
+  (exceptional scalar c o.val).getD ⟨0, 0⟩
 
 theorem slot_digestFinalTag (o : ℕ) (ho : o < 65536) : tagSlot (digestFinalTag o) = o :=
   (digestFinalTag_fields ho).2
@@ -589,8 +593,8 @@ theorem slot_digestFinalTag (o : ℕ) (ho : o < 65536) : tagSlot (digestFinalTag
 value does not read. -/
 theorem finalCase : OneCase (fun τ => tagFamily τ = 9) ((2 : ℝ≥0∞) ^ 128)⁻¹ := by
   intro field group parameter scalar view N fam
-  by_cases small : tagSlot (N / 2 ^ 128) < digitCount
-  · obtain ⟨o, ho⟩ : ∃ o : Fin digitCount, o.val = tagSlot (N / 2 ^ 128) := ⟨⟨_, small⟩, rfl⟩
+  by_cases small : tagSlot (N / 2 ^ 128) < 2 * digitCount
+  · obtain ⟨o, ho⟩ : ∃ o : DigestSplit.FinalSite, o.val = tagSlot (N / 2 ^ 128) := ⟨⟨_, small⟩, rfl⟩
     obtain ⟨g, hg⟩ : ∃ g : Block, g = BitVec.ofNat 128 N := ⟨_, rfl⟩
     let pos : Instance.crtEntry.Coins → Fin (2 ^ 40) := fun c => keyPos0 (excOf scalar c o)
     let F : Instance.crtEntry.Coins → TagTable → Block := fun c A =>
@@ -604,15 +608,15 @@ theorem finalCase : OneCase (fun τ => tagFamily τ = 9) ((2 : ℝ≥0∞) ^ 128
       rw [stageOneView_pubT] at hv
       rw [gAsked_eq] at hN
       refine ⟨hv, ?_⟩
-      obtain ⟨o', phi, selected, same⟩ := final_input scalar tape.1 tape.2 N hN fam
+      obtain ⟨o', w, selected, same⟩ := final_input scalar tape.1 tape.2 N hN fam
       have ho' : o' = o := by
         apply Fin.ext
-        rw [ho, same, hashInput_div, slot_digestFinalTag _ (lt_trans o'.isLt DigestSplit.digitCount_lt)]
+        rw [ho, same, hashInput_div, slot_digestFinalTag _ (DigestSplit.finalSite_lt o')]
       rw [ho'] at selected same
-      have exc : excOf scalar tape.1 o =
-          Exception.exceptionalInput phi ((outputKeysOf scalar tape.1).get o).offset.coordinates := by
+      have exc : excOf scalar tape.1 o = w := by
         unfold excOf
         rw [selected]
+        rfl
       show (tape.2 (keyPos0 (excOf scalar tape.1 o))).1 ^^^ F tape.1 tape.2 = g
       have label : g = garblerKey (digestTable (H8.tagHash tape.2) coordinateBitCount (zeroOf tape.1) (deltaOf tape.1))
           (excOf scalar tape.1 o) := by
@@ -640,9 +644,9 @@ theorem finalCase : OneCase (fun τ => tagFamily τ = 9) ((2 : ℝ≥0∞) ^ 128
     intro tape member
     obtain ⟨_, hN⟩ := member
     rw [gAsked_eq] at hN
-    obtain ⟨o', phi, _, same⟩ := final_input scalar tape.1 tape.2 N hN fam
+    obtain ⟨o', w, _, same⟩ := final_input scalar tape.1 tape.2 N hN fam
     refine small ?_
-    rw [same, hashInput_div, slot_digestFinalTag _ (lt_trans o'.isLt DigestSplit.digitCount_lt)]
+    rw [same, hashInput_div, slot_digestFinalTag _ (DigestSplit.finalSite_lt o')]
     exact o'.isLt
 
 end

@@ -135,14 +135,14 @@ def labels (source : Source) (input : AffineInput) : GarbledCircuit.LamportSigna
 /-! ### Finiteness -/
 
 instance rowGammaFinite : Finite RowGamma :=
-  Finite.of_injective (fun gamma : RowGamma => (gamma.xC0, gamma.yC0, gamma.yC4, gamma.zC0)) (by
+  Finite.of_injective (fun gamma : RowGamma => (gamma.xC0, gamma.yC4, gamma.zC0)) (by
     intro first second equal
     cases first
     cases second
     simp_all)
 
 instance entryFinite : Finite Exception.Entry :=
-  Finite.of_injective (fun entry : Exception.Entry => fun index : Fin 6 => entry[index]) (by
+  Finite.of_injective (fun entry : Exception.Entry => fun index : Fin 12 => entry[index]) (by
     intro first second equal
     apply Vector.ext
     intro index bound
@@ -192,7 +192,7 @@ theorem table_product_pos : 0 < table.product := by
 
 instance sourceNonempty : Nonempty Source :=
   ⟨{ curve := (0, 0, 0)
-     rows := fun _ => ⟨0, 0, 0, 0⟩
+     rows := fun _ => ⟨0, 0, 0⟩
      exception := fun _ => Vector.ofFn fun _ => 0
      joins := fun _ _ => 0
      pins := fun _ _ => 0

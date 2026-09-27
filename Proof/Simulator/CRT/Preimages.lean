@@ -13,7 +13,7 @@ The machine's `Preimages.preimages` is `rep 91 (rep 3 preimageSite)`: for site `
   draws (`Programs.AllHold programCells`), the abstract list is `collectorList.map (c, draws c)`, and the frame.
 -/
 
-import Proof.Simulator.OpeningPreimages
+import Proof.Simulator.OpeningPreimage
 import Proof.Simulator.Stage1Cells
 import Proof.Simulator.OracleUse
 import Proof.Simulator.CRT.Programs

@@ -9,8 +9,8 @@ coincidence mass against every weight on the view (`CrtCoincidenceGuess`): the a
 because the stage-1 law of each outcome is a function of the view (`coincidenceMass_eq`).
 
 * `coincideWeight`, `stageOneAt`, `coincidenceMass_eq`, `coincidenceMass_le`;
-* `CrtCoincidenceGuess error`: the per-input guessing bound (the P8 row that carries the mathematics: the 91 digest
-  keys `key(u) = key_o` with `u ≠ exc_o`, and off the curve the mask key `K' = K`);
+* `CrtCoincidenceGuess error`: the per-input guessing bound (the P8 row that carries the mathematics: the 182 digest
+  keys `key(u) = key_s` with `u ≠ exc_s`, two final sites per digit, and off the curve the mask key `K' = K`);
 * `crtCoincidenceBound_of_guess`.
 -/
 

@@ -3,9 +3,9 @@
 
 `crtLayout`:
 * sites: the pad sites `.pad κ i ρ` for `κ < 2`, `i < 85`, `ρ < m_i` (the modulus 256 included), then the mask sites
-  `.mask 0 k` for `k < 273` and `.mask 1 k` for `k < 228`;
-* answers: `bn254Table.padAnswers S_κ i` for a pad site (`S_x = 458`, `S_y = 275`, D5), 2 for `.mask 0 k` and for
-  `.mask 1 227`, 3 for the other `.mask 1 k` (D8);
+  `.mask 0 k` for `k < 273` and `.mask 1 k` for `k < 182`;
+* answers: `bn254Table.padAnswers S_κ i` for a pad site (`S_x = 367`, `S_y = 275`, D5), 2 for `.mask 0 k`, 3 for
+  `.mask 1 k` (D8; the 364 non-collector masks fill 182 pair sites, no single site);
 * law of a pad site: the fibre law of D6's fraction reading (`padVector m S q` of `Swap/Reading.lean`: the digit vector
   `Fin S → ZMod m`, drawn uniformly, then answers uniform on its fibre); law of a mask site: the fibre law of the
   `sampleFp` reading (`readSingle` for two answers, `readPair` for three; `Construction/CRT/Mask.lean`).
@@ -160,8 +160,8 @@ def pairSiteLaw : PMF (List (Block × Block)) := fibreSiteLaw readPair readPair_
 
 /-! ### The real table's pad rows -/
 
-/-- The encodings of coordinate `κ`: 458 for `x`, 275 for `y`. -/
-def padS (κ : ℕ) : ℕ := if κ = 0 then 458 else 275
+/-- The encodings of coordinate `κ`: 367 for `x`, 275 for `y`. -/
+def padS (κ : ℕ) : ℕ := if κ = 0 then 367 else 275
 
 /-- Modulus `i` of the real table (1 off range). -/
 def padModulus (i : ℕ) : ℕ := if h : i < bn254Table.count then bn254Table.modulus ⟨i, h⟩ else 1
@@ -185,7 +185,7 @@ theorem padNum_sum :
       = BudgetData.padSwapNum := by
   decide +kernel
 
-theorem padSwapNumer_eq : BudgetData.padSwapNumer = BudgetData.padSwapNum + 728 * (2 ^ 384 % BudgetData.p) * 2 ^ 3968 := by
+theorem padSwapNumer_eq : BudgetData.padSwapNumer = BudgetData.padSwapNum + 637 * (2 ^ 384 % BudgetData.p) * 2 ^ 3968 := by
   decide +kernel
 
 theorem padSwapDenom_eq' : BudgetData.padSwapDenom = 2 ^ 4352 := by
@@ -200,27 +200,27 @@ def padSites : List SiteId :=
 
 /-- The mask sites. -/
 def maskSites : List SiteId :=
-  (List.range 273).map (SiteId.mask 0) ++ (List.range 228).map (SiteId.mask 1)
+  (List.range 273).map (SiteId.mask 0) ++ (List.range 182).map (SiteId.mask 1)
 
 /-- The answers of a site. -/
 def layoutAnswers : SiteId → ℕ
   | .pad κ i _ => padCount κ i
   | .mask 0 _ => 2
-  | .mask 1 k => if k = 227 then 2 else 3
+  | .mask 1 _ => 3
   | .mask _ _ => 0
 
 /-- The law of a site. -/
 def layoutLaw : SiteId → PMF (List (Block × Block))
   | .pad κ i _ => padSiteLaw (padS κ) (padModulus i) (padCount κ i)
   | .mask 0 _ => singleSiteLaw
-  | .mask 1 k => if k = 227 then singleSiteLaw else pairSiteLaw
+  | .mask 1 _ => pairSiteLaw
   | .mask _ _ => PMF.pure []
 
 /-- The bias of a site. -/
 def layoutBias : SiteId → ℝ≥0∞
   | .pad κ i _ => (padNum κ i : ℝ≥0∞) / 2 ^ 4352
   | .mask 0 _ => delta3
-  | .mask 1 k => if k = 227 then delta3 else delta3 + delta3
+  | .mask 1 _ => delta3 + delta3
   | .mask _ _ => 0
 
 end Layout
@@ -243,7 +243,7 @@ theorem mem_padSites {site : SiteId} (mem : site ∈ padSites) :
   exact ⟨κ, i, ρ, rfl, hκ, hi, hρ⟩
 
 theorem mem_maskSites {site : SiteId} (mem : site ∈ maskSites) :
-    (∃ k, site = .mask 0 k ∧ k < 273) ∨ (∃ k, site = .mask 1 k ∧ k < 228) := by
+    (∃ k, site = .mask 0 k ∧ k < 273) ∨ (∃ k, site = .mask 1 k ∧ k < 182) := by
   simp only [maskSites, List.mem_append, List.mem_map, List.mem_range] at mem
   rcases mem with ⟨k, hk, rfl⟩ | ⟨k, hk, rfl⟩
   · exact Or.inl ⟨k, rfl, hk⟩
@@ -269,9 +269,7 @@ theorem crtLayout_nodup : ∀ site ∈ crtLayout.sites, ((siteTags crtLayout sit
       (by decide)
   · rcases mem_maskSites mask with ⟨k, rfl, hk⟩ | ⟨k, rfl, hk⟩
     · exact nodup_tags Family.mask 0 0 0 k 2 (by omega) (by omega) (by omega) (by omega) (by omega) (by decide)
-    · have count : (if k = 227 then 2 else 3) ≤ 64 := by split <;> omega
-      exact nodup_tags Family.mask 0 0 1 k (if k = 227 then 2 else 3) (by omega) (by omega) (by omega) (by omega)
-        count (by decide)
+    · exact nodup_tags Family.mask 0 0 1 k 3 (by omega) (by omega) (by omega) (by omega) (by omega) (by decide)
 
 theorem pad_close (κ i ρ : ℕ) (hκ : κ < 2) (hi : i < 85) :
     (layoutLaw (.pad κ i ρ)).etvDist (uniformAnswers (layoutAnswers (.pad κ i ρ))) ≤ layoutBias (.pad κ i ρ) := by
@@ -309,9 +307,7 @@ theorem crtLayout_close :
     · exact le_trans (fibreSiteLaw_close _ _) readSingle_etvDist_le
     · show (layoutLaw (.mask 1 k)).etvDist (uniformAnswers (layoutAnswers (.mask 1 k))) ≤ layoutBias (.mask 1 k)
       simp only [layoutLaw, layoutAnswers, layoutBias]
-      split
-      · exact le_trans (fibreSiteLaw_close _ _) readSingle_etvDist_le
-      · exact le_trans (fibreSiteLaw_close _ _) readPair_etvDist_le
+      exact le_trans (fibreSiteLaw_close _ _) readPair_etvDist_le
 
 /-! ### The sum of the biases -/
 
@@ -350,19 +346,13 @@ theorem padSites_sum : (padSites.map layoutBias).sum = (BudgetData.padSwapNum : 
   simp only [outer]
   exact sum_map_div _ _ _
 
-theorem maskSites_sum : (maskSites.map layoutBias).sum = 728 * delta3 := by
+theorem maskSites_sum : (maskSites.map layoutBias).sum = 637 * delta3 := by
   have ones : ((List.range 273).map (SiteId.mask 0)).map layoutBias = (List.range 273).map fun _ => delta3 := by
     rw [List.map_map]; rfl
-  have split : List.range 228 = List.range 227 ++ [227] := List.range_succ
-  have pairs : ((List.range 227).map (SiteId.mask 1)).map layoutBias
-      = (List.range 227).map fun _ => delta3 + delta3 := by
-    rw [List.map_map]
-    refine List.map_congr_left fun k hk => ?_
-    have : k ≠ 227 := by rw [List.mem_range] at hk; omega
-    simp [layoutBias, this]
-  simp only [maskSites, List.map_append, List.sum_append, ones, split, pairs, sum_map_const, List.length_range,
-    List.map_cons, List.map_nil, List.sum_cons, List.sum_nil]
-  simp only [layoutBias, if_true]
+  have pairs : ((List.range 182).map (SiteId.mask 1)).map layoutBias
+      = (List.range 182).map fun _ => delta3 + delta3 := by
+    rw [List.map_map]; rfl
+  simp only [maskSites, List.map_append, List.sum_append, ones, pairs, sum_map_const, List.length_range]
   push_cast
   ring
 
@@ -381,7 +371,7 @@ theorem crtLayout_total : (crtLayout.sites.map layoutBias).sum = ENNReal.ofReal 
     rw [baseFieldModulus_eq, hr]
   have cne : (2 : ℝ≥0∞) ^ 3968 ≠ 0 := pow_ne_zero _ two_ne_zero
   have ctop : (2 : ℝ≥0∞) ^ 3968 ≠ ⊤ := ENNReal.pow_ne_top ENNReal.ofNat_ne_top
-  have maskPart : (728 : ℝ≥0∞) * delta3 = ((728 * r * 2 ^ 3968 : ℕ) : ℝ≥0∞) / 2 ^ 4352 := by
+  have maskPart : (637 : ℝ≥0∞) * delta3 = ((637 * r * 2 ^ 3968 : ℕ) : ℝ≥0∞) / 2 ^ 4352 := by
     rw [deltaEq, Nat.cast_mul, Nat.cast_mul, Nat.cast_pow 2 3968, Nat.cast_two, Nat.cast_ofNat]
     generalize hc : (2 : ℝ≥0∞) ^ 3968 = c at split cne ctop
     rw [split, ENNReal.mul_div_mul_right _ _ cne ctop, mul_div_assoc]

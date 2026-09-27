@@ -37,18 +37,18 @@ deriving DecidableEq, Fintype
 labels, not the per-element offsets. -/
 abbrev EncIndex := EncPRF.PermutationIndex
 
-/-- `#FixedIndex = 4 * 127 * 2 * 2 ^ 2 * 2 + 4 * 127 * 2 ^ 2 * 458 * 3 + 91 * 2 * 254`.
+/-- `#FixedIndex = 4 * 127 * 2 * 2 ^ 2 * 2 + 4 * 127 * 2 ^ 2 * 367 * 3 + 91 * 2 * 254`.
 
 The `hot` and `scale` families run over the **four** lanes (two switch systems on each of the
 two coordinates), not the two coordinates. The `hot` family carries the extra `half : Bool`
 of the repaired two-image fold step, so it is `8128` instead of `4064`; the `scale`
-family (`2791968`) and the `gadget` family (`46228`) are unchanged. The count is *not* a
+family is `2237232` and the `gadget` family `46228`. The count is *not* a
 scored metric and enters no error term: the budget counts construction queries per index, and
 each of the two halves is still queried exactly once.
 
 The proof goes through the derived proxy equivalence and the cardinality of finite products
 and sums; no element of the type is ever enumerated. -/
-theorem card_fixedIndex : Fintype.card FixedIndex = 2846324 := by
+theorem card_fixedIndex : Fintype.card FixedIndex = 2291588 := by
   rw [← Fintype.card_congr FixedIndex.proxyTypeEquiv]
   simp only [Fintype.card_sum, Fintype.card_sigma, Fintype.card_fin, Finset.sum_const,
     Finset.card_univ, smul_eq_mul, card_lane, card_coord, Fintype.card_bool]

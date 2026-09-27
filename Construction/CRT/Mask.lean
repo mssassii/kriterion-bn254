@@ -5,17 +5,17 @@ The evaluator reads the curve check's output `t'`, asks the key `K = (H (hashInp
 (`keyM`; one labelled query, tag `tagCode Family.key 0 0 0 0 0 0`), and reads every row encoding's mask
 from hash answers at `K + 2 ^ 128 * tag`, tag `tagCode 7 0 0 stage 0 site part`:
 
-* **collector sites** (stage 0): the `x` slots 1, 3, 4 of each digit (`rowX_x9`, `rowY_x9`, `rowZ_x9`), site
+* **collector sites** (stage 0): the `x` slots 1, 2, 3 of each digit (`rowX_x9`, `rowY_cubic`, `rowZ_x9`), site
   `c = 3 * digit + k`, two answers each; the mask is `sampleFp a₀.1 a₀.2 a₁.1` (`a₁.2` unused);
-* **non-collector sites** (stage 1): the list of the `x` encodings with slot 0 or 2 (digit-major), then the `y` point
+* **non-collector sites** (stage 1): the list of the `x` encodings with slot 0 (digit-major), then the `y` point
   encodings `0 .. 3 * digits - 1`; entries `2k` and `2k + 1` share site `k` (three answers; masks
   `sampleFp a₀.1 a₀.2 a₁.1` and `sampleFp a₁.2 a₂.1 a₂.2`); an odd last entry has its own site with two answers.
 
 `sampleFp` is `release-r1`'s Rule S reader (`Construction/PGS/Sampler.lean`). With 91 digits: 273 collector sites
-(546 answers), 227 pairs (681) and one single site (2), 1,229 answers (`maskBudget_real`). Route M's replay asks only
-the non-collector answers (`nonCollectorMasksM`, 683 answers), whose values are the full program's non-collector part
-(`eval_nonCollectorMasksM`). The encoding order is `release-r1`'s: `x` encoding `e < 5 * digits` has digit `e / 5` and
-slot `e % 5` (`rowX_x7, rowX_x9, rowY_x7, rowY_x9, rowZ_x9`), `y` encoding `e < 3 * digits` digit `e / 3`; the curve
+(546 answers), 182 pairs (546) and no single site, 1,092 answers (`maskBudget_real`). Route M's replay asks only
+the non-collector answers (`nonCollectorMasksM`, 546 answers), whose values are the full program's non-collector part
+(`eval_nonCollectorMasksM`). The encoding order is `release-r1`'s: `x` encoding `e < 4 * digits` has digit `e / 4` and
+slot `e % 4` (`rowX_x7, rowX_x9, rowY_cubic, rowZ_x9`), `y` encoding `e < 3 * digits` digit `e / 3`; the curve
 encodings after them carry no mask (`maskOf` gives 0).
 -/
 
@@ -35,8 +35,8 @@ def maskTag (stage site part : Nat) : Nat := tagCode Family.mask 0 0 stage 0 sit
 /-- Collector sites: three per digit. -/
 def collectorSites (digits : Nat) : Nat := 3 * digits
 
-/-- Non-collector encodings: two `x` slots and three `y` slots per digit. -/
-def nonCollectorCount (digits : Nat) : Nat := 5 * digits
+/-- Non-collector encodings: one `x` slot and three `y` slots per digit. -/
+def nonCollectorCount (digits : Nat) : Nat := 4 * digits
 
 /-- Pair sites of the non-collector list. -/
 def pairSites (digits : Nat) : Nat := nonCollectorCount digits / 2
@@ -44,12 +44,12 @@ def pairSites (digits : Nat) : Nat := nonCollectorCount digits / 2
 /-- Single sites (0 or 1): the odd last entry of the non-collector list. -/
 def singleSites (digits : Nat) : Nat := nonCollectorCount digits % 2
 
-/-- The `x` slot of collector `k < 3` of a digit: `rowX_x9`, `rowY_x9`, `rowZ_x9`. -/
-def collectorSlot (k : Nat) : Nat := if k = 0 then 1 else if k = 1 then 3 else 4
+/-- The `x` slot of collector `k < 3` of a digit: `rowX_x9`, `rowY_cubic`, `rowZ_x9`. -/
+def collectorSlot (k : Nat) : Nat := k + 1
 
 /-- Entry `n` of the non-collector list, as (coordinate, encoding index). -/
 def nonCollectorEntry (digits n : Nat) : Nat × Nat :=
-  if n < 2 * digits then (0, 5 * (n / 2) + 2 * (n % 2)) else (1, n - 2 * digits)
+  if n < digits then (0, 4 * n) else (1, n - digits)
 
 /-! ### Reading -/
 
@@ -97,17 +97,17 @@ def nonCollectorMask {digits : Nat} (values : MaskValues digits) (n : Nat) : BN2
     if n % 2 = 0 then (values.pair ⟨n / 2, inRange⟩).1 else (values.pair ⟨n / 2, inRange⟩).2
   else values.single
 
-/-- **The mask of an encoding**: `x` encoding `e` of digit `e / 5` and slot `e % 5`, or `y` point encoding `e`;
+/-- **The mask of an encoding**: `x` encoding `e` of digit `e / 4` and slot `e % 4`, or `y` point encoding `e`;
 curve encodings (and indices beyond the point encodings) carry no mask. -/
 def maskOf {digits : Nat} (values : MaskValues digits) (coord e : Nat) : BN254.BaseField :=
   if coord = 0 then
-    if e < 5 * digits then
-      if e % 5 = 1 then atNat values.collector 0 (3 * (e / 5))
-      else if e % 5 = 3 then atNat values.collector 0 (3 * (e / 5) + 1)
-      else if e % 5 = 4 then atNat values.collector 0 (3 * (e / 5) + 2)
-      else nonCollectorMask values (2 * (e / 5) + (if e % 5 = 2 then 1 else 0))
+    if e < 4 * digits then
+      if e % 4 = 1 then atNat values.collector 0 (3 * (e / 4))
+      else if e % 4 = 2 then atNat values.collector 0 (3 * (e / 4) + 1)
+      else if e % 4 = 3 then atNat values.collector 0 (3 * (e / 4) + 2)
+      else nonCollectorMask values (e / 4)
     else 0
-  else if e < 3 * digits then nonCollectorMask values (2 * digits + e) else 0
+  else if e < 3 * digits then nonCollectorMask values (digits + e) else 0
 
 /-- The row value of an encoding: the delivered value minus its mask. -/
 def unmask {digits : Nat} (values : MaskValues digits) (coord e : Nat) (delivered : BN254.BaseField) :
@@ -191,9 +191,9 @@ def maskBudget (digits : Nat) : Nat :=
 /-- Answers of route M's replay: the pairs and the single site. -/
 def nonCollectorBudget (digits : Nat) : Nat := 3 * pairSites digits + 2 * singleSites digits
 
-theorem maskBudget_real : maskBudget 91 = 1229 := by decide
+theorem maskBudget_real : maskBudget 91 = 1092 := by decide
 
-theorem nonCollectorBudget_real : nonCollectorBudget 91 = 683 := by decide
+theorem nonCollectorBudget_real : nonCollectorBudget 91 = 546 := by decide
 
 theorem bounded_keyM (t : BN254.BaseField) : (keyM t).Bounded 1 :=
   FreeQuery.Bounded.bind (bounded_askN _) fun _ => FreeQuery.Bounded.pure' _ 0
@@ -227,7 +227,7 @@ theorem bounded_nonCollectorMasksM (K : Block) (digits : Nat) :
     FreeQuery.Bounded.bind (bounded_singleMaskM K digits) fun _ => FreeQuery.Bounded.pure' _ 0).of_eq
     (by simp [nonCollectorBudget])
 
-/-- **The mask program asks exactly `maskBudget digits` answers** (1,229 with 91 digits). -/
+/-- **The mask program asks exactly `maskBudget digits` answers** (1,092 with 91 digits). -/
 theorem bounded_maskAnswersM (K : Block) (digits : Nat) :
     (maskAnswersM K digits).Bounded (maskBudget digits) :=
   (FreeQuery.Bounded.bind (bounded_collectorMasksM K digits) fun _ =>

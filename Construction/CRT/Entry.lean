@@ -2,8 +2,8 @@
 The configuration-E entry: coins, garbler, the evaluator's replay prefix, the full evaluator and
 the scheme.
 
-Garbler order (queries): the CRT layer of `x` (`coordGarbleM table 458 0`), of `y`
-(`coordGarbleM table 275 1`), the key `K = (H t.val).1` (`keyM`), the 1,229 mask answers
+Garbler order (queries): the CRT layer of `x` (`coordGarbleM table 367 0`), of `y`
+(`coordGarbleM table 275 1`), the key `K = (H t.val).1` (`keyM`), the 1,092 mask answers
 (`maskAnswersM`), the digest labels and finals (`digestGarbleM`). Then the pure assembly
 (release-r1's "offsets first, slopes derived from offsets, joins last"): the element offset of
 a curve encoding is `O_e mod p`, of a row encoding `(O_e mod p) - π_e`; slopes by
@@ -52,14 +52,47 @@ def bridgeInput (coins : Coins) : BaseField := coins.bridgeKey
 def outputKeysOf (scalar : NonZeroScalar) (coins : Coins) : FieldMacToECMac.OutputKeys :=
   FieldMacToECMac.outputKeys construction scalar.value coins.offsets
 
-/-- `exc_o`: the exceptional input of digit `o` (`none` for a zero digit or `o ≥ 91`). -/
-def exceptional (scalar : NonZeroScalar) (coins : Coins) (o : Nat) : Option AffineInput :=
-  if inRange : o < digitCount then
-    let key := (outputKeysOf scalar coins).get ⟨o, inRange⟩
+/-- The exceptional input of final site `s = 2 o + k`: kind `k = 0` is digit `o`'s doubling input
+(`Q = K`), kind `k = 1` its sign row's zero (`Q = 2K`); `none` for a zero digit or `o ≥ 91`. -/
+def exceptional (scalar : NonZeroScalar) (coins : Coins) (s : Nat) : Option AffineInput :=
+  if inRange : s / 2 < digitCount then
+    let key := (outputKeysOf scalar coins).get ⟨s / 2, inRange⟩
     match digitEndomorphismBase key.digit with
     | none => none
-    | some phi => some (Exception.exceptionalInput phi key.offset.coordinates)
+    | some phi => some (if s % 2 = 0 then Exception.exceptionalInput phi key.offset.coordinates
+        else Exception.tripleInput phi key.offset.coordinates)
   else none
+
+/-- **The cases of an exceptional input**: site `s` names digit `s / 2`, which is nonzero, and the input is its
+doubling input (`s` even) or its sign row's zero (`s` odd). -/
+theorem exceptional_cases (scalar : NonZeroScalar) (coins : Coins) (s : Nat) (u : AffineInput)
+    (hexc : exceptional scalar coins s = some u) :
+    ∃ (inRange : s / 2 < digitCount) (phi : BaseField),
+      digitEndomorphismBase ((outputKeysOf scalar coins).get ⟨s / 2, inRange⟩).digit = some phi ∧
+      ((s % 2 = 0 ∧ u = Exception.exceptionalInput phi
+          ((outputKeysOf scalar coins).get ⟨s / 2, inRange⟩).offset.coordinates) ∨
+        (s % 2 = 1 ∧ u = Exception.tripleInput phi
+          ((outputKeysOf scalar coins).get ⟨s / 2, inRange⟩).offset.coordinates)) := by
+  unfold exceptional at hexc
+  by_cases inRange : s / 2 < digitCount
+  swap
+  · rw [dif_neg inRange] at hexc
+    cases hexc
+  rw [dif_pos inRange] at hexc
+  refine ⟨inRange, ?_⟩
+  generalize hkey : (outputKeysOf scalar coins).get ⟨s / 2, inRange⟩ = key at hexc ⊢
+  dsimp only at hexc
+  cases hphi : digitEndomorphismBase key.digit with
+  | none => rw [hphi] at hexc; cases hexc
+  | some phi =>
+    rw [hphi] at hexc
+    dsimp only at hexc
+    refine ⟨phi, rfl, ?_⟩
+    by_cases kind : s % 2 = 0
+    · rw [if_pos kind] at hexc
+      exact Or.inl ⟨kind, (Option.some.inj hexc).symm⟩
+    · rw [if_neg kind] at hexc
+      exact Or.inr ⟨by omega, (Option.some.inj hexc).symm⟩
 
 /-- Coordinate `κ` (`0` is `x`) of the coins' zero labels. -/
 def zeroOf (coins : Coins) (coord : Fin 2) : Fin coordinateBitCount → Block :=
@@ -84,11 +117,11 @@ def offsetsY (offset : Fin yCount → Nat) (masks : MaskValues digitCount) (e : 
     BaseField :=
   toField (offset e) - maskOf masks 1 e.val
 
-/-- The point part (`0 .. 454`) of an `x` vector. -/
+/-- The point part (`0 .. 363`) of an `x` vector. -/
 def pointPartX (values : Fin xCount → BaseField) (e : Fin pointElementCountX) : BaseField :=
   values ⟨e.val, by have := e.isLt; simp only [pointElementCountX, pointElementCountY, xCount, yCount] at *; omega⟩
 
-/-- The curve part (`455 .. 457`) of an `x` vector. -/
+/-- The curve part (`364 .. 366`) of an `x` vector. -/
 def curvePartX (values : Fin xCount → BaseField) (e : Fin curveElementCountX) : BaseField :=
   values ⟨pointElementCountX + e.val, by
     have := e.isLt; simp only [curveElementCountX, pointElementCountX, xCount] at *; omega⟩
@@ -169,7 +202,7 @@ def assemble (scalar : NonZeroScalar) (coins : Coins) (gx : CoordGarbled table x
   { curve := CurveMembership.garble coins.bridgeKey coins.curveMask.value coins.curveR1
       coins.curveR2 curveK
     rows := Vector.ofFn fun digit =>
-      FieldMacToECMac.garbleRow (rows.get digit) (coins.pointRandomness.get digit) (K digit)
+      FieldMacToECMac.garbleRow (rows.get digit) (K digit)
     exception := Vector.ofFn entries
     crtX := convVector gx.pub
     crtY := convVector gy.pub
@@ -256,7 +289,7 @@ def maskFunction (masks : MaskValues digitCount) : RowEncoding → BaseField
   | .inr e => maskOf masks 1 e.val
 
 /-- **The replay prefix** (blocks chunkTree .. masks): `replayConv`, then the key
-query at `t'.val`, then the 1,229 mask answers. -/
+query at `t'.val`, then the 1,092 mask answers. -/
 def replay (pub : Public) (input : AffineInput) (labels : GarbledCircuit.LamportSignature) :
     CM ReplayOut :=
   replayConv pub input labels >>= fun conv =>
@@ -272,7 +305,7 @@ structure RouteMOut where
   pairs : Fin (pairSites digitCount) → BaseField × BaseField
   single : BaseField
 
-/-- **Route M's replay**: `replayConv`, the key query, and only the 683 non-collector
+/-- **Route M's replay**: `replayConv`, the key query, and only the 546 non-collector
 mask answers (the 546 collector answers are programmed by the simulator, not asked). -/
 def replayRouteM (pub : Public) (input : AffineInput) (labels : GarbledCircuit.LamportSignature) :
     CM RouteMOut :=
@@ -306,7 +339,8 @@ def evaluateCM [FieldCertificate] [GroupCertificate] (pub : Public) (input : Aff
             { point := input
               pointMacs := FieldMacToECMac.evaluateHomogeneous (pub.rows, pub.exception)
                 (rowValues out) input
-              exceptionDigits := Vector.ofFn digits }))
+              exceptionDigits := Vector.ofFn fun o => (digits o).1
+              tripleDigits := Vector.ofFn fun o => (digits o).2 }))
 
 /-- The evaluator over the contest's public oracle. -/
 def evaluateM [FieldCertificate] [GroupCertificate] (pub : Public) (input : AffineInput)
@@ -434,11 +468,12 @@ def evaluateProgram [FieldCertificate] [GroupCertificate] (pub : Public) (input 
 /-! ### The evaluator's query path without the curve refusal (for the privacy side's reach) -/
 
 /-- The row layer's result on the replay's output and the digest's digits. -/
-def resultOf (pub : Public) (input : AffineInput) (out : ReplayOut) (digits : Fin digitCount → Digit) :
-    FieldMacToECMac.Result :=
+def resultOf (pub : Public) (input : AffineInput) (out : ReplayOut)
+    (digits : Fin digitCount → Digit × Digit) : FieldMacToECMac.Result :=
   { point := input
     pointMacs := FieldMacToECMac.evaluateHomogeneous (pub.rows, pub.exception) (rowValues out) input
-    exceptionDigits := Vector.ofFn digits }
+    exceptionDigits := Vector.ofFn fun o => (digits o).1
+    tripleDigits := Vector.ofFn fun o => (digits o).2 }
 
 /-- **The reach program**: `evaluateCM`'s on-curve branch without the refusal and the decode (the
 replay, the rows, the digest labels and finals). -/

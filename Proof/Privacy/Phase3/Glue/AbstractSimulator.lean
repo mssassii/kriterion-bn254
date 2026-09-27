@@ -17,13 +17,14 @@ uniform before the game starts (P1's `G0 → G0U`), this is the construction's p
   1. run the honest evaluator's system A, the bridge hash, the 508 whitening pads and system B
      on the lazy oracle (`openingQueriesM`), *skipping* the 819 designated queries
      `fixedForward (scale pointX 0 j* e b) E*` -- `j* = α₀ xor 1`, `e` the three unit collectors
-     `rowX_x9, rowY_x9, rowZ_x9` of each digit, `b` the three blocks -- which are answered
+     `rowX_x9, rowY_cubic, rowZ_x9` of each digit, `b` the three blocks -- which are answered
      virtually by `E*` itself (Davies–Meyer output `0`) and recorded (`runIntercept`); the
      evaluator's rows `R_d` on these values are therefore the collectors' running sums;
   2. draw the 90 tail digit points exactly as the construction's garbler draws its mask points --
      the `free` offsets of a uniform coin (`coinOffsetsLaw`), so no group-order fact is needed --
      then the head clamp `D_0 = Q − β • H(tail)` (group law only; it is `Q + clampedFirst tail`),
-     and the 91 lift randomisers `λ_d`; the target rows are `W_d = lift(D_d, λ_d)`;
+     and the 91 lift randomiser pairs `(λ_d, t_d)`; the target rows are
+     `W_d = lift(D_d, λ_d, t_d) = (λ_d² x, t_d² y, λ_d)`;
   3. solve each collector, `y* = κ · (W_d.c − R_d.c)` with `κ = ι(j*) − ι(α₀) = ±1`;
   4. draw a uniform `sampleFp`-preimage `(o₀, o₁, o₂)` of each `y*` (`y*.val + p·m`, `m` uniform);
   5. program the 819 designated points `E* ↦ o_b xor E*` in order (`LazyOracle.program`); any
@@ -92,7 +93,7 @@ local instance vectorFinite {α : Type} [Finite α] {count : Nat} : Finite (Vect
       exact congrFun equal ⟨index, bound⟩)
 
 instance rowGammaFinite : Finite RowGamma :=
-  Finite.of_injective (fun row : RowGamma => (row.xC0, row.yC0, row.yC4, row.zC0)) (by
+  Finite.of_injective (fun row : RowGamma => (row.xC0, row.yC4, row.zC0)) (by
     intro first second equal
     cases first
     cases second
@@ -136,7 +137,7 @@ noncomputable instance nonZeroBaseFintype : Fintype NonZeroBase := Fintype.ofFin
 
 instance stage1SourceNonempty : Nonempty Stage1Source :=
   ⟨{ curve := (0, 0, 0)
-     rows := Vector.replicate _ ⟨0, 0, 0, 0⟩
+     rows := Vector.replicate _ ⟨0, 0, 0⟩
      exception := Vector.replicate _ (Vector.replicate _ 0)
      curveXHot := Vector.replicate _ 0
      curveYHot := Vector.replicate _ 0
@@ -177,8 +178,9 @@ structure Samplers where
   source : PMF (Option Stage1Source)
   /-- The 90 tail digit points, as the construction's free offsets. -/
   tail : PMF (Option (Vector FieldMacToECMac.AffineOffset 90))
-  /-- The 91 lift randomisers `λ_d ∈ F_p^*`. -/
-  lift : PMF (Option (Fin digitCount → NonZeroBase))
+  /-- The 91 lift randomiser pairs `(λ_d, t_d) ∈ (F_p^*)²`: `λ_d` scales the `X` and `Z` rows, `t_d`
+  the sign row. -/
+  lift : PMF (Option (Fin digitCount → NonZeroBase × NonZeroBase))
   /-- A `sampleFp`-preimage of a field element. -/
   preimage : BaseField → PMF (Option (Block × Block × Block))
 
@@ -193,7 +195,7 @@ tail points drawn by the construction's own offset law. -/
 def idealSamplers : Samplers where
   source := (PMF.uniformOfFintype Stage1Source).map some
   tail := coinOffsetsLaw.map fun offsets => some offsets.free
-  lift := (PMF.uniformOfFintype (Fin digitCount → NonZeroBase)).map some
+  lift := (PMF.uniformOfFintype (Fin digitCount → NonZeroBase × NonZeroBase)).map some
   preimage value := (idealPreimage value).map some
 
 /-- Independent draws from a finite family of abort-or-value samplers; any abort aborts. -/
@@ -225,18 +227,18 @@ def designatedSwitch (bits : BitInput) : Fin (2 ^ chunkWidth chunkZero) :=
 def kappa (bits : BitInput) : BaseField :=
   iota _ (designatedSwitch bits) - iota _ (activeSwitch bits)
 
-/-- The three collectors of a digit, one per row: `rowX_x9`, the `Y` row's mixed element
-`rowY_x9` and `rowZ_x9`. -/
-def collectorElement : Fin 3 → XElement := ![.rowX_x9, .rowY_x9, .rowZ_x9]
+/-- The three collectors of a digit, one per row: `rowX_x9`, the sign row's cubic element
+`rowY_cubic` and `rowZ_x9`. -/
+def collectorElement : Fin 3 → XElement := ![.rowX_x9, .rowY_cubic, .rowZ_x9]
 
 /-- The row coordinate each collector controls. -/
 def collectorComponent : Fin 3 → FieldMacToECMac.HomogeneousValue → BaseField :=
   ![fun value => value.x, fun value => value.y, fun value => value.z]
 
-/-- Each collector's clear multiplier in its row: `1` for `X` and `Z`, `y` for the `Y` row's mixed
-element. -/
+/-- Each collector's clear multiplier in its row: `1` for `X` and `Z`, `x · x` for the sign row's
+cubic element. -/
 def collectorMultiplier : Fin 3 → AffineInput → BaseField :=
-  ![fun _ => 1, fun input => input.y, fun _ => 1]
+  ![fun _ => 1, fun input => input.x * input.x, fun _ => 1]
 
 /-- The designated fixed index of (digit, collector, block). -/
 def designatedIndex (bits : BitInput) (digit : Fin digitCount) (collector block : Fin 3) :
@@ -366,12 +368,13 @@ def openingQueriesM [FieldCertificate] (table : Public) (bits : BitInput) (mac :
 offsets, so no generator (and no `#Point = r` fact) is needed. -/
 def generator [FieldCertificate] : Point := (decodePoint ⟨1, 2⟩).getD 0
 
-/-- The Jacobian lift `(λ²X, λ³Y, λ)`, and `(λ², λ³, 0)` at the identity. -/
-def liftRow [FieldCertificate] (point : Point) (scale : BaseField) :
+/-- The sign-row lift `(λ²X, t²Y, λ)`, and `(λ², 0, 0)` at the identity (the sign row vanishes
+at `T = -K`, where the tangent at `-K` passes). -/
+def liftRow [FieldCertificate] (point : Point) (scale signScale : BaseField) :
     FieldMacToECMac.HomogeneousValue :=
   match point with
-  | .zero => ⟨scale ^ 2, scale ^ 3, 0⟩
-  | .some (x := x) (y := y) _ => ⟨scale ^ 2 * x, scale ^ 3 * y, scale⟩
+  | .zero => ⟨scale ^ 2, 0, 0⟩
+  | .some (x := x) (y := y) _ => ⟨scale ^ 2 * x, signScale ^ 2 * y, scale⟩
 
 /-- The 91 digit points: the 90 tail points are the given offsets' points, and the head is the
 clamp `Q − β • H(tail)`, stated with the group law only, so that `pointHorner β (D_0 :: tail) = Q`
@@ -391,11 +394,12 @@ theorem digitPoints_head [FieldCertificate] [GroupCertificate] (target : Point)
       target + FieldMacToECMac.clampedFirst tail := by
   simp only [digitPoints, dif_pos, FieldMacToECMac.clampedFirst, sub_eq_add_neg]
 
-/-- The target rows `W_d = lift(D_d, λ_d)`. -/
+/-- The target rows `W_d = lift(D_d, λ_d, t_d)`. -/
 def targetRows [FieldCertificate] [GroupCertificate] (target : Point)
-    (tail : Vector FieldMacToECMac.AffineOffset 90) (lift : Fin digitCount → NonZeroBase)
+    (tail : Vector FieldMacToECMac.AffineOffset 90)
+    (lift : Fin digitCount → NonZeroBase × NonZeroBase)
     (digit : Fin digitCount) : FieldMacToECMac.HomogeneousValue :=
-  liftRow (digitPoints target tail digit) (lift digit).value
+  liftRow (digitPoints target tail digit) (lift digit).1.value (lift digit).2.value
 
 /-- The designated mask each collector needs: `y* = κ · μ_c⁻¹ · (W_d.c − R_d.c)`, where `R_d`
 is the evaluator's row with every designated mask at `0` and `μ_c` the collector's multiplier
@@ -506,7 +510,7 @@ def idealHybrid : HybridGame := fun adversary parameter scalar =>
 /-- `M`: the library's ideal game with a closed machine, as a chain game. -/
 def machineHybrid (simulator : BoundedMachine.Simulator) : HybridGame :=
   fun adversary parameter scalar =>
-    LazySimulatorProtocol.idealGame Scheme.scheme Wire.encoding 2976089 simulator adversary
+    LazySimulatorProtocol.idealGame Scheme.scheme Wire.encoding 2606820 simulator adversary
       parameter scalar ()
 
 /-! ### The interface P2's machine must match -/

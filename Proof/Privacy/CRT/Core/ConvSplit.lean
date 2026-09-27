@@ -125,9 +125,7 @@ theorem hot_away (κ v : ℕ) (hκ : κ < 2) :
         heq
     · simp only [siteTags, List.mem_map, List.mem_range] at ht
       obtain ⟨j, hj, rfl⟩ := ht
-      have hj' : j < 3 := by
-        have : j < (if k = 227 then 2 else 3) := hj
-        split at this <;> omega
+      have hj' : j < 3 := hj
       exact site_ne κ v hκ r (by decide) (by decide) ⟨by omega, by omega, by omega, by omega, by omega, by omega⟩
         heq
 
