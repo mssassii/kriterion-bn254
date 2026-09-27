@@ -10,7 +10,7 @@ except the 30 casts 49 to 63 of chunk 31 (`NeverHotCast`), has a tag that is hot
   from its `Tagged` lemma.
 * **Witnesses**: the input `inputAt κ v` (coordinate `κ` is `v`, the other is `0`). Chunk trees and casts:
   `v = s · 2^(8c)`; the body: `v = ρ`; families 2 to 5: a coordinate value whose word value is a target `t` (stage 0
-  `t = y`, stage 1 `t = 2^7 · y`, growth `t = s`, folds `t = ρ`), every target at most `need m ell`.
+  `t = y`, stage 1 `t = 2^width0 · y`, growth `t = s`, folds `t = ρ`), every target at most `need m ell`.
 * **The many-chunk decomposition** (`word_target`): `v = Σ_{c<32} α_c · 256^c` with `α_c < 256` (`α_31 < 48`, so
   `v < 48 · 256^31 ≤ p`) has chunk values `α_c` and word value `Σ_c (α_c · 2^(8c) mod m)`; the reachable word values
   grow chunk by chunk (`reach_succ`) along a per-modulus certificate (`certs`) checked once over the 85 rows by
@@ -476,11 +476,11 @@ theorem wordValue_valueOf (m : ℕ) (α : ℕ → ℕ) (adm : Admissible α 32) 
 
 /-! ### The rows -/
 
-/-- An odd row of the real table is `t9Row 32 m`. -/
+/-- An odd row of the real table uses the selected fallback schedule. -/
 theorem row_eq (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind i = .odd row) :
-    row = t9Row 32 (Entry.table.modulus i) ∧ Entry.table.modulus i ≠ 256 := by
-  change t9Kind (bn254Table.modulus i) = .odd row at hk
-  unfold t9Kind at hk
+    row = fallbackRow 32 (Entry.table.modulus i) ∧ Entry.table.modulus i ≠ 256 := by
+  change fallbackKind (bn254Table.modulus i) = .odd row at hk
+  unfold fallbackKind at hk
   split at hk
   · cases hk
   · rename_i notPow
@@ -489,15 +489,17 @@ theorem row_eq (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind
 
 /-- The shape of an odd row of the real table. -/
 theorem row_shape (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind i = .odd row) :
-    row.width0 = 7 ∧ row.width1 = row.ell - 8 ∧ row.keep = max 7 (row.ell - 5) ∧ 9 ≤ row.ell ∧ row.ell ≤ 14 ∧
+    7 ≤ row.width0 ∧ row.width0 ≤ 8 ∧ row.width1 = row.ell - row.width0 - 1 ∧
+      row.keep = max row.width0 (row.ell - 5) ∧ 9 ≤ row.ell ∧ row.ell ≤ 14 ∧
       32 * (Entry.table.modulus i - 1) < 2 ^ row.ell := by
   have facts := SliceC.bn254_odd i row hk
   obtain ⟨_, w1, sum, _, _, cast, lt⟩ := facts
   obtain ⟨rfl, _⟩ := row_eq i row hk
   have castW : bn254Table.castWidth = 14 := rfl
   rw [table_chunkCount] at lt
-  refine ⟨rfl, rfl, rfl, ?_, by rw [castW] at cast; exact cast, lt⟩
-  have w0 : (t9Row 32 (Entry.table.modulus i)).width0 = 7 := rfl
+  have w0lo : 7 ≤ (fallbackRow 32 (Entry.table.modulus i)).width0 := fallbackWidth0_lower _
+  have w0hi : (fallbackRow 32 (Entry.table.modulus i)).width0 ≤ 8 := fallbackWidth0_upper _
+  refine ⟨w0lo, w0hi, rfl, rfl, ?_, by rw [castW] at cast; exact cast, lt⟩
   omega
 
 /-- **The many-chunk decomposition**: every target up to `need` is the word value of a coordinate value below
@@ -512,7 +514,9 @@ theorem word_target (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table
   split at ok
   · rename_i B ran
     have enough : need (Entry.table.modulus i) (t9Row 32 (Entry.table.modulus i)).ell ≤ B := of_decide_eq_true ok
-    rw [← rowEq] at enough
+    -- The certificate depends only on ell, which the schedule selector preserves.
+    have ellEq : row.ell = (t9Row 32 (Entry.table.modulus i)).ell := congrArg OddRow.ell rowEq
+    rw [← ellEq] at enough
     have reach := reach_run (Entry.table.modulus i) _ 1 _ B (reach_one _ pos) ran
     rw [unpack_length] at reach
     obtain ⟨α, adm, sum⟩ := reach t (le_trans ht enough)
@@ -634,41 +638,59 @@ theorem reach_mod (S κ : ℕ) (hκ : κ < 2) (i : Fin Entry.table.count) (k : T
     show hotTag Entry.table _ (bodyTag κ i.val slot part) = true
     rw [hotTag_body Entry.table _ i trange, coordValue_inputAt hκ hv, Nat.mod_eq_of_lt h1]
     exact beq_self_eq_true slot
-  · obtain ⟨w0, w1, keep, ell9, ell14, big⟩ := row_shape i row hk
-    have p8 : 2 ^ row.ell = 2 ^ 8 * 2 ^ (row.ell - 8) := by
+  · obtain ⟨w0lo, w0hi, w1, keep, ell9, ell14, big⟩ := row_shape i row hk
+    -- CHECK: Elaborate the generalized Nat-subtraction/power identity and the omega
+    -- side goals below; they previously specialized width0 to the numeral 7.
+    have p1 : 2 ^ (row.ell - 1) = 2 ^ row.width0 * 2 ^ row.width1 := by
       rw [← pow_add]; congr 1; omega
-    have p1 : 2 ^ (row.ell - 1) = 2 ^ 7 * 2 ^ (row.ell - 8) := by
-      rw [← pow_add]; congr 1; omega
+    have powLo : 128 ≤ 2 ^ row.width0 := by
+      calc 128 = 2 ^ 7 := by norm_num
+        _ ≤ 2 ^ row.width0 := Nat.pow_le_pow_right (by norm_num) w0lo
+    have powHi : 2 ^ row.width0 ≤ 256 := by
+      calc 2 ^ row.width0 ≤ 2 ^ 8 := Nat.pow_le_pow_right (by norm_num) w0hi
+        _ = 256 := by norm_num
+    have keepLe : row.keep ≤ 9 := by rw [keep]; omega
+    have widthLeKeep : row.width0 ≤ row.keep := by rw [keep]; exact le_max_left _ _
+    have ellKeep : row.ell ≤ 5 + row.keep := by rw [keep]; omega
+    -- Multiplying the successor inequality retains the gap of at least 128 needed by
+    -- the original certificate, for both width0 = 7 and width0 = 8.
+    have stageOneBound : ∀ s < 2 ^ row.width1,
+        2 ^ row.width0 * s ≤ 2 ^ (row.ell - 1) - 128 := by
+      intro s small
+      have scaled : 2 ^ row.width0 * (s + 1) ≤ 2 ^ (row.ell - 1) := by
+        calc 2 ^ row.width0 * (s + 1) ≤ 2 ^ row.width0 * 2 ^ row.width1 :=
+            Nat.mul_le_mul_left _ (by omega)
+          _ = 2 ^ (row.ell - 1) := p1.symm
+      rw [Nat.mul_add, Nat.mul_one] at scaled
+      omega
     simp only [convFine, pairFine, Paths.treeKeys, Paths.castKeys, Paths.growKeys, Paths.foldKeys,
       Set.mem_union, Set.mem_ofPred_eq] at conv
     rcases conv with ((⟨rfl, rfl, rfl, rfl, rfl, h1, h2, h3⟩ | ⟨rfl, rfl, rfl, rfl, rfl, h1, _⟩) |
       ((⟨rfl, rfl, rfl, rfl, rfl, h1, h2, h3⟩ | ⟨rfl, rfl, rfl, rfl, rfl, h1, _⟩) |
       (⟨rfl, rfl, rfl, rfl, rfl, h1, h2, h3⟩ | ⟨rfl, rfl, rfl, rfl, rfl, h1, h2, h3⟩)))
     · -- stage 0 tree: `t = slot`
-      rw [w0] at h2
-      have small : slot < 2 ^ 7 := lt_of_lt_of_le h3 (Nat.pow_le_pow_right (by norm_num) (by omega))
+      have small : slot < 2 ^ row.width0 :=
+        lt_of_lt_of_le h3 (Nat.pow_le_pow_right (by norm_num) (by omega))
       exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) slot (le_need_255 (by omega)) (by
-        simp only [stageValue, if_true, w0, Nat.mod_eq_of_lt small, Nat.mod_eq_of_lt h3]
+        simp only [stageValue, if_true, Nat.mod_eq_of_lt small, Nat.mod_eq_of_lt h3]
         exact beq_self_eq_true slot)
     · -- stage 0 cast: `t = slot`
-      rw [w0] at h1
       exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) slot (le_need_255 (by omega)) (by
-        simp only [stageValue, if_true, w0, Nat.mod_eq_of_lt h1]
+        simp only [stageValue, if_true, Nat.mod_eq_of_lt h1]
         exact beq_self_eq_true slot)
-    · -- stage 1 tree: `t = 2^7 · slot`
+    · -- stage 1 tree: `t = 2^width0 · slot`
       have small : slot < 2 ^ row.width1 := lt_of_lt_of_le h3 (Nat.pow_le_pow_right (by norm_num) (by omega))
-      rw [w1] at small
-      have bound : 2 ^ 7 * slot ≤ 2 ^ (row.ell - 1) - 128 := by omega
-      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) (2 ^ 7 * slot) (le_need_top bound) (by
-        simp only [stageValue, one_ne_zero, if_false, w0, w1,
-          Nat.mul_div_cancel_left _ (by norm_num : 0 < 2 ^ 7), Nat.mod_eq_of_lt small, Nat.mod_eq_of_lt h3]
+      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) (2 ^ row.width0 * slot)
+        (le_need_top (stageOneBound slot small)) (by
+        simp only [stageValue, one_ne_zero, if_false,
+          Nat.mul_div_cancel_left slot (Nat.two_pow_pos row.width0), Nat.mod_eq_of_lt small,
+          Nat.mod_eq_of_lt h3]
         exact beq_self_eq_true slot)
-    · -- stage 1 cast: `t = 2^7 · slot`
-      rw [w1] at h1
-      have bound : 2 ^ 7 * slot ≤ 2 ^ (row.ell - 1) - 128 := by omega
-      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) (2 ^ 7 * slot) (le_need_top bound) (by
-        simp only [stageValue, one_ne_zero, if_false, w0, w1,
-          Nat.mul_div_cancel_left _ (by norm_num : 0 < 2 ^ 7), Nat.mod_eq_of_lt h1]
+    · -- stage 1 cast: `t = 2^width0 · slot`
+      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) (2 ^ row.width0 * slot)
+        (le_need_top (stageOneBound slot h1)) (by
+        simp only [stageValue, one_ne_zero, if_false,
+          Nat.mul_div_cancel_left slot (Nat.two_pow_pos row.width0), Nat.mod_eq_of_lt h1]
         exact beq_self_eq_true slot)
     · -- growth: `t = slot`
       have small : slot < 2 ^ 8 := lt_of_lt_of_le h3 (Nat.pow_le_pow_right (by norm_num) (by omega))
