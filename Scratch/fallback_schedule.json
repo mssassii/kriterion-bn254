@@ -1,0 +1,842 @@
+[
+  {
+    "modulus": 17,
+    "ell": 10,
+    "w0": 8,
+    "w1": 1,
+    "keep": 8,
+    "blocks": 21,
+    "evaluate": 1810,
+    "garble": 1826
+  },
+  {
+    "modulus": 19,
+    "ell": 10,
+    "w0": 8,
+    "w1": 1,
+    "keep": 8,
+    "blocks": 21,
+    "evaluate": 1814,
+    "garble": 1830
+  },
+  {
+    "modulus": 23,
+    "ell": 10,
+    "w0": 8,
+    "w1": 1,
+    "keep": 8,
+    "blocks": 21,
+    "evaluate": 1822,
+    "garble": 1838
+  },
+  {
+    "modulus": 29,
+    "ell": 10,
+    "w0": 8,
+    "w1": 1,
+    "keep": 8,
+    "blocks": 21,
+    "evaluate": 1834,
+    "garble": 1850
+  },
+  {
+    "modulus": 31,
+    "ell": 10,
+    "w0": 8,
+    "w1": 1,
+    "keep": 8,
+    "blocks": 21,
+    "evaluate": 1838,
+    "garble": 1854
+  },
+  {
+    "modulus": 37,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1892,
+    "garble": 1911
+  },
+  {
+    "modulus": 41,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1904,
+    "garble": 1923
+  },
+  {
+    "modulus": 43,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1910,
+    "garble": 1929
+  },
+  {
+    "modulus": 47,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1922,
+    "garble": 1941
+  },
+  {
+    "modulus": 49,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1928,
+    "garble": 1947
+  },
+  {
+    "modulus": 53,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1940,
+    "garble": 1959
+  },
+  {
+    "modulus": 59,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1958,
+    "garble": 1977
+  },
+  {
+    "modulus": 61,
+    "ell": 11,
+    "w0": 8,
+    "w1": 2,
+    "keep": 8,
+    "blocks": 25,
+    "evaluate": 1964,
+    "garble": 1983
+  },
+  {
+    "modulus": 67,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2314,
+    "garble": 2336
+  },
+  {
+    "modulus": 71,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2330,
+    "garble": 2352
+  },
+  {
+    "modulus": 73,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2338,
+    "garble": 2360
+  },
+  {
+    "modulus": 79,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2362,
+    "garble": 2384
+  },
+  {
+    "modulus": 81,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2370,
+    "garble": 2392
+  },
+  {
+    "modulus": 83,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2378,
+    "garble": 2400
+  },
+  {
+    "modulus": 89,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2402,
+    "garble": 2424
+  },
+  {
+    "modulus": 97,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2434,
+    "garble": 2456
+  },
+  {
+    "modulus": 101,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2450,
+    "garble": 2472
+  },
+  {
+    "modulus": 103,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2458,
+    "garble": 2480
+  },
+  {
+    "modulus": 107,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2474,
+    "garble": 2496
+  },
+  {
+    "modulus": 109,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2482,
+    "garble": 2504
+  },
+  {
+    "modulus": 113,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2498,
+    "garble": 2520
+  },
+  {
+    "modulus": 121,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2530,
+    "garble": 2552
+  },
+  {
+    "modulus": 125,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2546,
+    "garble": 2568
+  },
+  {
+    "modulus": 127,
+    "ell": 12,
+    "w0": 8,
+    "w1": 3,
+    "keep": 8,
+    "blocks": 29,
+    "evaluate": 2554,
+    "garble": 2576
+  },
+  {
+    "modulus": 131,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 2993,
+    "garble": 3019
+  },
+  {
+    "modulus": 137,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 3023,
+    "garble": 3049
+  },
+  {
+    "modulus": 139,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 3033,
+    "garble": 3059
+  },
+  {
+    "modulus": 149,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 3083,
+    "garble": 3109
+  },
+  {
+    "modulus": 151,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 3093,
+    "garble": 3119
+  },
+  {
+    "modulus": 157,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 3123,
+    "garble": 3149
+  },
+  {
+    "modulus": 163,
+    "ell": 13,
+    "w0": 8,
+    "w1": 4,
+    "keep": 8,
+    "blocks": 33,
+    "evaluate": 3153,
+    "garble": 3179
+  },
+  {
+    "modulus": 167,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2243,
+    "garble": 2271
+  },
+  {
+    "modulus": 169,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2253,
+    "garble": 2281
+  },
+  {
+    "modulus": 173,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2273,
+    "garble": 2301
+  },
+  {
+    "modulus": 179,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2303,
+    "garble": 2331
+  },
+  {
+    "modulus": 181,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2313,
+    "garble": 2341
+  },
+  {
+    "modulus": 191,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2363,
+    "garble": 2391
+  },
+  {
+    "modulus": 193,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2373,
+    "garble": 2401
+  },
+  {
+    "modulus": 197,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2393,
+    "garble": 2421
+  },
+  {
+    "modulus": 199,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2403,
+    "garble": 2431
+  },
+  {
+    "modulus": 211,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2463,
+    "garble": 2491
+  },
+  {
+    "modulus": 223,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2523,
+    "garble": 2551
+  },
+  {
+    "modulus": 227,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2543,
+    "garble": 2571
+  },
+  {
+    "modulus": 229,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2553,
+    "garble": 2581
+  },
+  {
+    "modulus": 233,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2573,
+    "garble": 2601
+  },
+  {
+    "modulus": 239,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2603,
+    "garble": 2631
+  },
+  {
+    "modulus": 241,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2613,
+    "garble": 2641
+  },
+  {
+    "modulus": 251,
+    "ell": 13,
+    "w0": 7,
+    "w1": 5,
+    "keep": 8,
+    "blocks": 35,
+    "evaluate": 2663,
+    "garble": 2691
+  },
+  {
+    "modulus": 257,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 3972,
+    "garble": 4001
+  },
+  {
+    "modulus": 263,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4002,
+    "garble": 4031
+  },
+  {
+    "modulus": 269,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4032,
+    "garble": 4061
+  },
+  {
+    "modulus": 271,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4042,
+    "garble": 4071
+  },
+  {
+    "modulus": 277,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4072,
+    "garble": 4101
+  },
+  {
+    "modulus": 281,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4092,
+    "garble": 4121
+  },
+  {
+    "modulus": 283,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4102,
+    "garble": 4131
+  },
+  {
+    "modulus": 293,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4152,
+    "garble": 4181
+  },
+  {
+    "modulus": 307,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4222,
+    "garble": 4251
+  },
+  {
+    "modulus": 311,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4242,
+    "garble": 4271
+  },
+  {
+    "modulus": 313,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4252,
+    "garble": 4281
+  },
+  {
+    "modulus": 317,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4272,
+    "garble": 4301
+  },
+  {
+    "modulus": 331,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4342,
+    "garble": 4371
+  },
+  {
+    "modulus": 337,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4372,
+    "garble": 4401
+  },
+  {
+    "modulus": 347,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4422,
+    "garble": 4451
+  },
+  {
+    "modulus": 349,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4432,
+    "garble": 4461
+  },
+  {
+    "modulus": 353,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4452,
+    "garble": 4481
+  },
+  {
+    "modulus": 359,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4482,
+    "garble": 4511
+  },
+  {
+    "modulus": 367,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4522,
+    "garble": 4551
+  },
+  {
+    "modulus": 373,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4552,
+    "garble": 4581
+  },
+  {
+    "modulus": 379,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4582,
+    "garble": 4611
+  },
+  {
+    "modulus": 383,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4602,
+    "garble": 4631
+  },
+  {
+    "modulus": 389,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4632,
+    "garble": 4661
+  },
+  {
+    "modulus": 397,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4672,
+    "garble": 4701
+  },
+  {
+    "modulus": 401,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4692,
+    "garble": 4721
+  },
+  {
+    "modulus": 409,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4732,
+    "garble": 4761
+  },
+  {
+    "modulus": 419,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4782,
+    "garble": 4811
+  },
+  {
+    "modulus": 421,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4792,
+    "garble": 4821
+  },
+  {
+    "modulus": 431,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4842,
+    "garble": 4871
+  },
+  {
+    "modulus": 433,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4852,
+    "garble": 4881
+  },
+  {
+    "modulus": 439,
+    "ell": 14,
+    "w0": 8,
+    "w1": 5,
+    "keep": 9,
+    "blocks": 37,
+    "evaluate": 4882,
+    "garble": 4911
+  }
+]

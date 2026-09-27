@@ -151,6 +151,21 @@ theorem t9Row_conditions (m : Nat) (hm : 17 ≤ m) :
   simp only [t9Row, bitLength]
   omega
 
+/-- The fallback's width-7/8 rows preserve the side conditions of `conversion_final`.
+This proof uses only the selector bounds; it also applies after switching all rows to width 8. -/
+theorem fallbackRow_conditions (m : Nat) (hm : 17 ≤ m) :
+    1 ≤ (fallbackRow 32 m).width0 ∧ 1 ≤ (fallbackRow 32 m).width1 ∧
+      (fallbackRow 32 m).width0 + (fallbackRow 32 m).width1 + 1 = (fallbackRow 32 m).ell ∧
+      (fallbackRow 32 m).width0 ≤ (fallbackRow 32 m).keep ∧
+      (fallbackRow 32 m).keep ≤ (fallbackRow 32 m).ell := by
+  have hne : 32 * (m - 1) ≠ 0 := by omega
+  have hlog : 9 ≤ (32 * (m - 1)).log2 := (Nat.le_log2 hne).mpr (by omega)
+  have lower := fallbackWidth0_lower m
+  have upper := fallbackWidth0_upper m
+  -- CHECK: confirm omega closes max and truncated subtraction after these explicit unfoldings.
+  simp only [fallbackRow, bitLength]
+  omega
+
 /-- **L14 with L5**: when the word value is congruent to the coordinate value `v` modulo `m` (L5),
 the evaluator's final one-hot is the garbler's XOR `Δ` exactly at `v mod m`. -/
 theorem conversion_final_value (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Block)

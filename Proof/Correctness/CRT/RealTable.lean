@@ -24,7 +24,7 @@ theorem bn254_wrap : 2 * bn254Table.wrapBound ≤ bn254Table.product + 1 := by d
 theorem bn254_chunkZero : ∀ i, bn254Table.kind i = .chunkZero →
     bn254Table.modulus i = 2 ^ bn254Table.chunkWidth 0 := by decide +kernel
 
-/-- The closed-form T9 facts of every odd modulus. -/
+/-- The original T9 facts on the real moduli, retained independently of the chosen schedule. -/
 theorem bn254_t9Facts : ∀ i : Fin bn254Table.count, bn254Table.modulus i ≠ 256 →
     1 ≤ (t9Row 32 (bn254Table.modulus i)).width0 ∧ 1 ≤ (t9Row 32 (bn254Table.modulus i)).width1 ∧
       (t9Row 32 (bn254Table.modulus i)).width0 + (t9Row 32 (bn254Table.modulus i)).width1 + 1 =
@@ -35,14 +35,27 @@ theorem bn254_t9Facts : ∀ i : Fin bn254Table.count, bn254Table.modulus i ≠ 2
       bn254Table.chunkCount * (bn254Table.modulus i - 1) < 2 ^ (t9Row 32 (bn254Table.modulus i)).ell := by
   decide +kernel
 
+/-- The fallback facts of every real odd modulus. Only small row data is evaluated here. -/
+theorem bn254_fallbackFacts : ∀ i : Fin bn254Table.count, bn254Table.modulus i ≠ 256 →
+    1 ≤ (fallbackRow 32 (bn254Table.modulus i)).width0 ∧
+      1 ≤ (fallbackRow 32 (bn254Table.modulus i)).width1 ∧
+      (fallbackRow 32 (bn254Table.modulus i)).width0 +
+        (fallbackRow 32 (bn254Table.modulus i)).width1 + 1 = (fallbackRow 32 (bn254Table.modulus i)).ell ∧
+      (fallbackRow 32 (bn254Table.modulus i)).width0 ≤ (fallbackRow 32 (bn254Table.modulus i)).keep ∧
+      (fallbackRow 32 (bn254Table.modulus i)).keep ≤ (fallbackRow 32 (bn254Table.modulus i)).ell ∧
+      (fallbackRow 32 (bn254Table.modulus i)).ell ≤ bn254Table.castWidth ∧
+      bn254Table.chunkCount * (bn254Table.modulus i - 1) <
+        2 ^ (fallbackRow 32 (bn254Table.modulus i)).ell := by
+  decide +kernel
+
 theorem bn254_odd : ∀ i row, bn254Table.kind i = .odd row →
     1 ≤ row.width0 ∧ 1 ≤ row.width1 ∧ row.width0 + row.width1 + 1 = row.ell ∧
       row.width0 ≤ row.keep ∧ row.keep ≤ row.ell ∧ row.ell ≤ bn254Table.castWidth ∧
       bn254Table.chunkCount * (bn254Table.modulus i - 1) < 2 ^ row.ell := by
   intro i row kind
-  have facts := bn254_t9Facts i
-  change t9Kind (bn254Table.modulus i) = .odd row at kind
-  unfold t9Kind at kind
+  have facts := bn254_fallbackFacts i
+  change fallbackKind (bn254Table.modulus i) = .odd row at kind
+  unfold fallbackKind at kind
   split at kind
   · cases kind
   · rename_i notPow

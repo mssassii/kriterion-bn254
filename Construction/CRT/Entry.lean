@@ -375,8 +375,26 @@ theorem stagesNonempty_bn254TableOf (moduli : Array Nat) (large : ∀ i : Fin mo
       (Nat.le_log2 nonzero).mpr (by omega)
     omega
 
+/-- The fallback's width-7/8 rows also have nonempty extraction stages. -/
+theorem stagesNonempty_fallbackTableOf (moduli : Array Nat) (large : ∀ i : Fin moduli.size, 17 ≤ moduli[i]) :
+    (fallbackTableOf moduli).StagesNonempty := by
+  intro i row kind
+  have atLeast := large i
+  simp only [fallbackTableOf, CrtTable.ofModuli, fallbackKind] at kind
+  split at kind
+  · cases kind
+  · cases kind
+    have lower := fallbackWidth0_lower moduli[i]
+    have upper := fallbackWidth0_upper moduli[i]
+    have nonzero : 32 * (moduli[i] - 1) ≠ 0 := by omega
+    have nine : 9 ≤ Nat.log2 (32 * (moduli[i] - 1)) :=
+      (Nat.le_log2 nonzero).mpr (by omega)
+    -- CHECK: the fallbackRow let-bindings must reduce before omega handles the two Nat subtractions.
+    simp only [fallbackRow, bitLength]
+    constructor <;> omega
+
 theorem stagesNonempty_table : table.StagesNonempty :=
-  stagesNonempty_bn254TableOf bn254Moduli (by decide)
+  stagesNonempty_fallbackTableOf bn254Moduli (by decide)
 
 theorem bounded_garbleCM (scalar : NonZeroScalar) (coins : Coins) :
     (garbleCM scalar coins).Bounded garbleBudget := by

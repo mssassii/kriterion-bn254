@@ -19,7 +19,7 @@ So `convPublish` is injective (`convPublish_injective`), hence a bijection of `C
 publish uniform material independent of the rest (`conversion_uniform`, the form of `Core/Inversion.lean`'s
 `bind_map_uniform_of_injective`). The extraction stages use `spec_publish_injective`.
 
-Malformed schedule rows are normalised away by `rowOf` (a row that fails `t9Row_conditions` or has modulus `0` reads
+Malformed schedule rows are normalised away by `rowOf` (a row that fails `RowWF` or has modulus `0` reads
 as the empty row), so the statements hold for every table; the link to the real garbler (`garbler_conv_eq`) assumes
 the table well formed.
 -/
@@ -37,7 +37,7 @@ noncomputable section
 
 /-! ### Rows -/
 
-/-- A well-formed schedule row (`t9Row_conditions`). -/
+/-- A well-formed schedule row (the common T9/fallback side conditions). -/
 def RowWF (row : OddRow) : Prop :=
   1 ≤ row.width0 ∧ 1 ≤ row.width1 ∧ row.width0 + row.width1 + 1 = row.ell ∧ row.width0 ≤ row.keep ∧
     row.keep ≤ row.ell
@@ -595,19 +595,19 @@ theorem garbler_conv_eq (tbl : CrtTable) (wf : ConvTableWF tbl) (S coord v : ℕ
 theorem bn254Moduli_ge : ∀ i : Fin bn254Table.count, 17 ≤ bn254Table.modulus i := by
   decide +kernel
 
-/-- **The real table is well formed** (`t9Row_conditions` at every odd modulus, all `≥ 17`). -/
+/-- **The real table is well formed** (`fallbackRow_conditions` at every odd modulus, all `≥ 17`). -/
 theorem bn254Table_wf : ConvTableWF bn254Table where
   cast := by decide
   rows := by
     intro i row hk
     have hm := bn254Moduli_ge i
     refine ⟨?_, by omega⟩
-    have hkind : bn254Table.kind i = t9Kind (bn254Table.modulus i) := rfl
+    have hkind : bn254Table.kind i = fallbackKind (bn254Table.modulus i) := rfl
     rw [hkind] at hk
-    unfold t9Kind at hk
+    unfold fallbackKind at hk
     split_ifs at hk
     cases hk
-    exact SliceC.t9Row_conditions _ hm
+    exact SliceC.fallbackRow_conditions _ hm
 
 end
 

@@ -118,13 +118,47 @@ def CrtTable.ofModuli (inputBits chunkBits castWidth : Nat) (moduli : Array Nat)
 one-hot, every other modulus gets `t9Row 32 m`. -/
 def t9Kind (m : Nat) : Kind := if m = 256 then .chunkZero else .odd (t9Row 32 m)
 
-/-- A BN254 table on the given moduli (the real one, or a reduced one for the differential
-test). -/
+/-- A T9 BN254 table on the given moduli, retained for reduced tests and the original
+schedule's lemmas. The real table below uses `fallbackTableOf`. -/
 def bn254TableOf (moduli : Array Nat) : CrtTable :=
   CrtTable.ofModuli 254 8 14 moduli t9Kind padSlack (wrapBound BN254.baseFieldModulus)
 
-/-- **The real table**: 85 moduli, schedule T9, slack 120. -/
-def bn254Table : CrtTable := bn254TableOf bn254Moduli
+/-- First extraction width of the 128-bit fallback. These 17 real odd moduli retain
+width 7; the other 67 use width 8. The exact schedule is recorded in
+`Scratch/fallback_schedule.json`; the power-of-two modulus bypasses this selector. -/
+def fallbackWidth0 (m : Nat) : Nat :=
+  if m ∈ ([167, 169, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229,
+    233, 239, 241, 251] : List Nat) then 7 else 8
+
+theorem fallbackWidth0_lower (m : Nat) : 7 ≤ fallbackWidth0 m := by
+  unfold fallbackWidth0
+  split <;> decide
+
+theorem fallbackWidth0_upper (m : Nat) : fallbackWidth0 m ≤ 8 := by
+  unfold fallbackWidth0
+  split <;> decide
+
+/-- The fallback changes the first extraction width, keeping the same word width as T9.
+The second width and kept one-hot follow the same width-parametric formulas. -/
+def fallbackRow (chunks m : Nat) : OddRow :=
+  let ell := bitLength (chunks * (m - 1))
+  let width0 := fallbackWidth0 m
+  { ell, width0, width1 := ell - width0 - 1, keep := max width0 (ell - 5) }
+
+@[simp] theorem fallbackRow_ell (chunks m : Nat) :
+    (fallbackRow chunks m).ell = (t9Row chunks m).ell := rfl
+
+/-- As in T9, modulus 256 is read directly from chunk 0. -/
+def fallbackKind (m : Nat) : Kind :=
+  if m = 256 then .chunkZero else .odd (fallbackRow 32 m)
+
+/-- A BN254 table with the fallback schedule. Kept separate from `bn254TableOf` so
+the existing T9 reduced fixture and generic T9 statements retain their meaning. -/
+def fallbackTableOf (moduli : Array Nat) : CrtTable :=
+  CrtTable.ofModuli 254 8 14 moduli fallbackKind padSlack (wrapBound BN254.baseFieldModulus)
+
+/-- **The real table**: 85 moduli, 67 width-8 and 17 width-7 odd rows, slack 120. -/
+def bn254Table : CrtTable := fallbackTableOf bn254Moduli
 
 /-- The reduced table of the differential test: growth 0, 1 and 2 and
 the power of two. -/
