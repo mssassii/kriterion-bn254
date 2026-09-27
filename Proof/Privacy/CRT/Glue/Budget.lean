@@ -3,7 +3,7 @@
 
 | hop | term | value |
 |---|---|---|
-| `G0 → G0T` | `tCollisionError = 945,076 / p` (`t` equal to a labelled garbler input) | `2^-233.75` |
+| `G0 → G0T` | `tCollisionError = 1,759,967 / p` (`t` equal to a labelled garbler input) | `2^-232.85` |
 | `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `637 δ₃` | `2^-113.5` |
 | `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (4/2^128 + 1/(p − 1))` | linear |
 | `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-104.74` + ... |
@@ -65,8 +65,9 @@ theorem M_pos : 0 < BudgetData.M := by decide +kernel
 
 /-! ### The terms -/
 
-/-- `G0 → G0T`: the bridge input `t` equals one of the garbler's 945,076 inputs (D11). -/
-def tCollisionError : ℝ := frac 945076 BudgetData.p
+/-- `G0 → G0T`: the garbler-input collision term, conservatively charged at the fixed G gate
+1,759,967 (D11), independent of the concrete schedule's smaller query count. -/
+def tCollisionError : ℝ := frac 1759967 BudgetData.p
 
 /-- One pad-and-mask swap: `padSwapNum / 2^4352` (the pad-reading biases of both coordinates at slack 120) plus `637 δ₃`, `δ₃ = (2^384 mod p)/2^384`, over the common denominator `2^4352`. -/
 def padSwapError : ℝ :=
@@ -151,7 +152,7 @@ theorem stageOneTouchCharge_eq :
 
 /-! ### The shares, decided by the kernel (the inequalities of `BudgetData`, section "Each term") -/
 
-theorem collision_share : 945076 * 2 ^ 100 * 1000 ≤ BudgetData.p := by decide +kernel
+theorem collision_share : 1759967 * 2 ^ 100 * 1000 ≤ BudgetData.p := by decide +kernel
 
 theorem padSwap_share : BudgetData.padSwapNumer * 2 ^ 100 * 1000 ≤ BudgetData.padSwapDenom := by decide +kernel
 

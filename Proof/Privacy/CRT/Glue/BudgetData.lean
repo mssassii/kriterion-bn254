@@ -691,8 +691,8 @@ theorem smudgeError_le : Nat.ble ((1284 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 * 20)
 /-- The single-sided smudge term `(642 (p - 1)^2 + 273 p)/M`, at most `1/40` of the unit. -/
 theorem smudgeErrorSingle_le : Nat.ble ((642 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 * 40) M = true := by decide +kernel
 
-/-- The collision term `945076/p` (`t` equal to a garbler input), at most `1/1000`. -/
-theorem collisionError_le : Nat.ble (945076 * 2 ^ 100 * 1000) p = true := by decide +kernel
+/-- The collision term `1759967/p` (the fixed G gate, bounding all garbler inputs), at most `1/1000`. -/
+theorem collisionError_le : Nat.ble (1759967 * 2 ^ 100 * 1000) p = true := by decide +kernel
 
 /-- `364/(r - 1)` and `455/(r - 1)`, each at most `1/1000`. -/
 theorem exceptionalError_le : Nat.ble (364 * 2 ^ 100 * 1000) (r - 1) = true := by decide +kernel
@@ -714,7 +714,7 @@ theorem chainConstant_le_unit :
     Nat.ble
       ((3 * (padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968) * (M * p * (r - 1))
         + (1284 * (p - 1) ^ 2 + 273 * p) * (2 ^ 4352 * p * (r - 1))
-        + 945076 * (2 ^ 4352 * M * (r - 1))
+        + 1759967 * (2 ^ 4352 * M * (r - 1))
         + (364 + 455) * (2 ^ 4352 * M * p)
         + (185 + 1) * 2 ^ 4224 * (M * p * (r - 1))) * 2 ^ 100)
       (2 ^ 4352 * M * p * (r - 1)) = true := by decide +kernel
@@ -724,7 +724,7 @@ theorem chainConstant_room :
     Nat.ble
       ((3 * (padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968) * (M * p * (r - 1))
         + (1284 * (p - 1) ^ 2 + 273 * p) * (2 ^ 4352 * p * (r - 1))
-        + 945076 * (2 ^ 4352 * M * (r - 1))
+        + 1759967 * (2 ^ 4352 * M * (r - 1))
         + (364 + 455) * (2 ^ 4352 * M * p)
         + (185 + 1) * 2 ^ 4224 * (M * p * (r - 1))) * 2 ^ 100 * 16)
       (2 ^ 4352 * M * p * (r - 1)) = true := by decide +kernel
