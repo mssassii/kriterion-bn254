@@ -353,7 +353,7 @@ theorem planB_oracleAdaptivePrivacy (simulator : BoundedMachine.Simulator) (hybr
       letI := @Fintype.ofFinite EncPRF.PermutationIndex inferInstance
       letI := Classical.decEq PlanB.FixedIndex
       letI := Classical.decEq EncPRF.PermutationIndex
-      GarbledCircuit.OracleAdaptivePrivacy (@Scheme.scheme field group) PlanB.Wire.encoding 2606820
+      GarbledCircuit.OracleAdaptivePrivacy (@Scheme.scheme field group) PlanB.Wire.encoding 2605819
         (@uniformRandomTape Scheme.Coins (@Fintype.ofFinite Scheme.Coins inferInstance)
           Scheme.witness)
         (fun parameter scalar coins =>

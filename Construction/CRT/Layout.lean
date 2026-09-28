@@ -142,7 +142,7 @@ instance rowGammaFinite : Finite RowGamma :=
     simp_all)
 
 instance entryFinite : Finite Exception.Entry :=
-  Finite.of_injective (fun entry : Exception.Entry => fun index : Fin 12 => entry[index]) (by
+  Finite.of_injective (fun entry : Exception.Entry => fun index : Fin 2 => entry[index]) (by
     intro first second equal
     apply Vector.ext
     intro index bound

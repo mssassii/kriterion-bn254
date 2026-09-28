@@ -5,12 +5,12 @@ The public value of configuration E and its byte codec.
 |-------------|----------------------------------|------------------|---------|
 | `curve`     | `3 * field`                      | `3 * 32`         | 96      |
 | `rows`      | `Vector rowGamma 91`             | `91 * 96`        | 8,736   |
-| `exception` | `Vector entry 91`                | `91 * 12`        | 1,092   |
+| `exception` | `Vector entry 91`                | `91 * 1`        | 91   |
 | `crtX`      | `Vector label 3412`              | `3412 * 13`      | 44,356  |
 | `crtY`      | `Vector label 3412`              | `3412 * 13`      | 44,356  |
 | `recX`      | `Vector (natural 78) 367`        | `367 * 78`       | 28,626  |
 | `recY`      | `Vector (natural 78) 275`        | `275 * 78`       | 21,450  |
-| **total**   |                                  |                  | **148,712** |
+| **total**   |                                  |                  | **147,711** |
 
 Every field has a fixed width and there is no tag, so every inhabitant encodes to exactly
 `ciphertextBytes` bytes and the size theorem does not mention the garbler (xinshu's `SizedBy`
@@ -24,7 +24,7 @@ A record is stored as a 78-byte natural (`2 M < 2 ^ 624 = 256 ^ 78`); that hones
 import Construction.CRT.Coord
 import Construction.CRT.LabelEncoding
 import Construction.ArgoMAC.Public
-import Encoding
+import Construction.ArgoMAC.ExceptionEncoding
 
 namespace Kriterion.CRT.Entry
 
@@ -63,7 +63,7 @@ structure Public where
   curve : BaseField × BaseField × BaseField
   /-- Lane R1's three row constants per digit (X.c0, S.c4, Z.c0). -/
   rows : Vector RowGamma digitCount
-  /-- The 12-byte exception entry per digit. -/
+  /-- The one-byte exception entry per digit. -/
   exception : Vector Exception.Entry digitCount
   /-- The flat conversion blocks of `x` (`ConvPublic.flatten`). -/
   crtX : Vector Label convCount
@@ -74,8 +74,8 @@ structure Public where
   /-- The records of `y`. -/
   recY : Vector Record yCount
 
-/-- The ciphertext size: `96 + 91 * 96 + 91 * 12 + 2 * 3412 * 13 + 642 * 78`. -/
-def ciphertextBytes : Nat := 148712
+/-- The ciphertext size: `96 + 91 * 96 + 91 * 1 + 2 * 3412 * 13 + 642 * 78`. -/
+def ciphertextBytes : Nat := 147711
 
 /-- The flat blocks of one coordinate read back as the evaluator's conversion material. -/
 def convOf (blocks : Vector Label convCount) : ConvPublic := ConvPublic.unflatten table blocks.toArray
@@ -106,15 +106,8 @@ private def block : Kriterion.Encoding Block :=
       apply BitVec.eq_of_toNat_eq
       rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt value.isLt])
 
-/-- One gadget byte. -/
-private def gadgetByte : Kriterion.Encoding (BitVec 8) :=
-  Kriterion.Encoding.byte.map
-    (fun value : BitVec 8 => ⟨value.toNat, value.isLt⟩)
-    (fun value => BitVec.ofNat 8 value.val)
-    (fun value => by simp)
-
-/-- One digit's exception entry, `12` bytes. -/
-private def entry : Kriterion.Encoding Exception.Entry := gadgetByte.vector 12
+/-- One digit's exception entry, packed into one byte. -/
+private def entry : Kriterion.Encoding Exception.Entry := Exception.entryEncoding
 
 /-- One digit's three published row constants, `3 * 32 = 96` bytes. -/
 private def rowGamma : Kriterion.Encoding RowGamma :=
@@ -176,9 +169,7 @@ private theorem block_sized : SizedBy block 16 := sizedBy_map (sizedBy_natural 1
 private theorem label_sized : SizedBy Narrow.labelEncoding 13 :=
   Narrow.labelEncoding_length
 
-private theorem gadgetByte_sized : SizedBy gadgetByte 1 := sizedBy_map sizedBy_byte _ _ _
-
-private theorem entry_sized : SizedBy entry 12 := sizedBy_vector gadgetByte_sized 12
+private theorem entry_sized : SizedBy entry 1 := Exception.entryEncoding_length
 
 private theorem rowGamma_sized : SizedBy rowGamma 96 :=
   sizedBy_map (sizedBy_pair field_sized (sizedBy_pair field_sized field_sized)) _ _ _
@@ -189,7 +180,7 @@ private theorem curveTriple_sized : SizedBy curveTriple 96 :=
 private theorem record_sized : SizedBy record 78 := sizedBy_natural recordBytes
 
 private theorem encoding_sized :
-    SizedBy encoding (96 + (digitCount * 96 + (digitCount * 12 + (convCount * 13 +
+    SizedBy encoding (96 + (digitCount * 96 + (digitCount * 1 + (convCount * 13 +
       (convCount * 13 + (xCount * 78 + yCount * 78)))))) :=
   sizedBy_map (sizedBy_pair curveTriple_sized
     (sizedBy_pair (sizedBy_vector rowGamma_sized digitCount)
@@ -201,11 +192,11 @@ private theorem encoding_sized :
 
 /-- The byte table as an arithmetic identity. -/
 theorem byteArithmetic :
-    96 + (digitCount * 96 + (digitCount * 12 + (convCount * 13 +
+    96 + (digitCount * 96 + (digitCount * 1 + (convCount * 13 +
       (convCount * 13 + (xCount * 78 + yCount * 78))))) = ciphertextBytes := by
   simp only [digitCount, convCount, xCount, yCount, ciphertextBytes]
 
-/-- **Every** public value encodes to exactly `ciphertextBytes = 148,712` bytes. -/
+/-- **Every** public value encodes to exactly `ciphertextBytes = 147,711` bytes. -/
 theorem encoding_length (value : Public) : (encoding.encode value).length = ciphertextBytes := by
   rw [encoding_sized value, byteArithmetic]
 

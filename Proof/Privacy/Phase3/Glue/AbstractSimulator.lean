@@ -510,7 +510,7 @@ def idealHybrid : HybridGame := fun adversary parameter scalar =>
 /-- `M`: the library's ideal game with a closed machine, as a chain game. -/
 def machineHybrid (simulator : BoundedMachine.Simulator) : HybridGame :=
   fun adversary parameter scalar =>
-    LazySimulatorProtocol.idealGame Scheme.scheme Wire.encoding 2606820 simulator adversary
+    LazySimulatorProtocol.idealGame Scheme.scheme Wire.encoding 2605819 simulator adversary
       parameter scalar ()
 
 /-! ### The interface P2's machine must match -/

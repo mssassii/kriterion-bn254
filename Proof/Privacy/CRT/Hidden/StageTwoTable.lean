@@ -704,7 +704,7 @@ theorem digestTable_table (T : TagTable) (zero : Fin 2 → Fin coordinateBitCoun
 /-- On the table oracle a final's mask reads only the final's position. -/
 theorem finalMask_table (T : TagTable) (key : Block) (o : ℕ) (ho : o < 65536) :
     finalMask (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)) key o =
-      Exception.lowByte (T ⟨digestFinalTag o, finalTag_lt o ho⟩).1 := by
+      Exception.lowNibble (T ⟨digestFinalTag o, finalTag_lt o ho⟩).1 := by
   unfold finalMask h128
   rw [tableHash_hashInput T key (finalTag_lt o ho)]
 

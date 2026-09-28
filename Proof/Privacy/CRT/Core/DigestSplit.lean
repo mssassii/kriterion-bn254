@@ -7,9 +7,9 @@ coins up to the exception pads.
 
 * On the table oracle a final is answered by its tag alone (`finalMask_table`: the input is a labelled input
   below `2^168`, so the key does not matter). So entry `o` is `entryOf`: the pad for a zero digit, the pad with the
-  bytes at the two exceptional inputs' slots replaced by `lowByte (A (final (2 o + k))).1 ⊕ digitCode` otherwise
+  nibbles at the two exceptional kinds' slots replaced by `lowNibble (A (final (2 o + k))).1 ⊕ digitCode` otherwise
   (`realGarbled_exception`).
-* `entryOf` pushes a uniform pad and a uniform answer to a uniform entry (`lowByte_uniform`, `update_uniform`,
+* `entryOf` pushes a uniform pad and a uniform answer to a uniform entry (`lowNibble_uniform`, `update_uniform`,
   `entryOf_uniform`), digit by digit (`pi_map_uniform`).
 * The swapped tape is its own refill at the pads (`coins_refill`) and at the finals (`swappedTableLaw_fill`; the finals are family 9, away from the sites). Refilling changes neither `g` nor the doubling
   event (both read the coins off the pads and the table off the finals), so the entries are uniform and independent
@@ -36,22 +36,22 @@ noncomputable section
 
 attribute [local instance] entryFintype
 
-/-! ### Uniform bytes and entries -/
+/-! ### Uniform nibbles and entries -/
 
-theorem lowByte_eq (b : Block) : Exception.lowByte b = b.setWidth 8 := BitVec.ofNat_toNat 8 b
+theorem lowNibble_eq (b : Block) : Exception.lowNibble b = b.setWidth 4 := BitVec.ofNat_toNat 4 b
 
-theorem lowByte_shift (b : Block) (z : BitVec 8) : Exception.lowByte (b ^^^ z.setWidth 128) = Exception.lowByte b ^^^ z := by
-  rw [lowByte_eq, lowByte_eq, BitVec.setWidth_xor, BitVec.setWidth_setWidth_of_le _ (by decide), BitVec.setWidth_eq]
+theorem lowNibble_shift (b : Block) (z : BitVec 4) : Exception.lowNibble (b ^^^ z.setWidth 128) = Exception.lowNibble b ^^^ z := by
+  rw [lowNibble_eq, lowNibble_eq, BitVec.setWidth_xor, BitVec.setWidth_setWidth_of_le _ (by decide), BitVec.setWidth_eq]
 
-/-- **The low byte of a uniform block is uniform.** -/
-theorem lowByte_uniform : (PMF.uniformOfFintype Block).map Exception.lowByte = PMF.uniformOfFintype (BitVec 8) := by
+/-- **The low nibble of a uniform block is uniform.** -/
+theorem lowNibble_uniform : (PMF.uniformOfFintype Block).map Exception.lowNibble = PMF.uniformOfFintype (BitVec 4) := by
   classical
   refine Kriterion.ArgoMAC.Security.Phase3.uniform_map_of_fibre_equiv _ fun x y => ?_
   exact {
     toFun := fun b => ⟨b.1 ^^^ (x ^^^ y).setWidth 128, by
-      rw [lowByte_shift, b.2, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]⟩
+      rw [lowNibble_shift, b.2, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]⟩
     invFun := fun b => ⟨b.1 ^^^ (x ^^^ y).setWidth 128, by
-      rw [lowByte_shift, b.2, BitVec.xor_comm x y, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]⟩
+      rw [lowNibble_shift, b.2, BitVec.xor_comm x y, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]⟩
     left_inv := fun b => Subtype.ext (by
       show b.1 ^^^ (x ^^^ y).setWidth 128 ^^^ (x ^^^ y).setWidth 128 = b.1
       rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero])
@@ -59,8 +59,8 @@ theorem lowByte_uniform : (PMF.uniformOfFintype Block).map Exception.lowByte = P
       show b.1 ^^^ (x ^^^ y).setWidth 128 ^^^ (x ^^^ y).setWidth 128 = b.1
       rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]) }
 
-/-- An entry as a function of its twelve slots. -/
-abbrev EntryF : Type := Fin 12 → BitVec 8
+/-- An entry as a function of its two slots. -/
+abbrev EntryF : Type := Fin 2 → BitVec 4
 
 def entryEquiv : Exception.Entry ≃ EntryF where
   toFun v := fun i => v[i]
@@ -73,9 +73,9 @@ def entryEquiv : Exception.Entry ≃ EntryF where
     funext i
     simp
 
-/-- **Overwriting one slot with a uniform byte keeps a uniform entry uniform.** -/
-theorem update_uniform (idx : Fin 12) :
-    (PMF.uniformOfFintype (EntryF × BitVec 8)).map (fun p => Function.update p.1 idx p.2) =
+/-- **Overwriting one slot with a uniform nibble keeps a uniform entry uniform.** -/
+theorem update_uniform (idx : Fin 2) :
+    (PMF.uniformOfFintype (EntryF × BitVec 4)).map (fun p => Function.update p.1 idx p.2) =
       PMF.uniformOfFintype EntryF := by
   classical
   refine Kriterion.ArgoMAC.Security.Phase3.uniform_map_of_fibre_equiv _ fun e e' => ?_
@@ -95,13 +95,13 @@ theorem update_uniform (idx : Fin 12) :
       subst h
       simp }
 
-theorem writeEntry_eq (pad : Exception.Entry) (idx : Fin 12) (v : BitVec 8) :
+theorem writeEntry_eq (pad : Exception.Entry) (idx : Fin 2) (v : BitVec 4) :
     Exception.writeEntry pad idx v = entryEquiv.symm (Function.update (entryEquiv pad) idx v) := by
   apply Vector.ext
   intro j hj
   simp only [Exception.writeEntry, entryEquiv, Equiv.coe_fn_symm_mk, Equiv.coe_fn_mk, Vector.getElem_ofFn,
     Vector.getElem_set, Function.update_apply]
-  by_cases h : (⟨j, hj⟩ : Fin 12) = idx
+  by_cases h : (⟨j, hj⟩ : Fin 2) = idx
   · subst h
     simp
   · rw [if_neg h, if_neg (fun e => h (Fin.ext e.symm))]
@@ -115,53 +115,53 @@ def entryOf (digit : Digit) (offset : AffineInput) :
   | none => fun p => p.1
   | some phi => fun p => Exception.writeEntry
       (Exception.writeEntry p.1 (Exception.slotOf false (Exception.exceptionalInput phi offset))
-        (Exception.lowByte p.2.1.1 ^^^ Exception.digitCode digit))
+        (Exception.lowNibble p.2.1.1 ^^^ Exception.digitCode digit))
       (Exception.slotOf true (Exception.tripleInput phi offset))
-      (Exception.lowByte p.2.2.1 ^^^ Exception.digitCode digit)
+      (Exception.lowNibble p.2.2.1 ^^^ Exception.digitCode digit)
 
-theorem masked_uniform (code : BitVec 8) :
-    (PMF.uniformOfFintype (Block × Block)).map (fun a => Exception.lowByte a.1 ^^^ code) =
-      PMF.uniformOfFintype (BitVec 8) := by
-  have factor : (fun a : Block × Block => Exception.lowByte a.1 ^^^ code) =
-      (fun z => z ^^^ code) ∘ Exception.lowByte ∘ Prod.fst := rfl
-  rw [factor, ← PMF.map_comp, ← PMF.map_comp, Conv.fst_uniform, lowByte_uniform]
+theorem masked_uniform (code : BitVec 4) :
+    (PMF.uniformOfFintype (Block × Block)).map (fun a => Exception.lowNibble a.1 ^^^ code) =
+      PMF.uniformOfFintype (BitVec 4) := by
+  have factor : (fun a : Block × Block => Exception.lowNibble a.1 ^^^ code) =
+      (fun z => z ^^^ code) ∘ Exception.lowNibble ∘ Prod.fst := rfl
+  rw [factor, ← PMF.map_comp, ← PMF.map_comp, Conv.fst_uniform, lowNibble_uniform]
   refine map_uniform_of_bijective ⟨fun a b h => ?_, fun z => ⟨z ^^^ code, ?_⟩⟩
   · have := congrArg (· ^^^ code) h
     simpa [BitVec.xor_assoc] using this
   · simp [BitVec.xor_assoc]
 
-/-- **One slot written with a masked uniform byte keeps a uniform entry uniform.** -/
-theorem writeEntry_uniform (i : Fin 12) (code : BitVec 8) :
+/-- **One slot written with a masked uniform nibble keeps a uniform entry uniform.** -/
+theorem writeEntry_uniform (i : Fin 2) (code : BitVec 4) :
     (PMF.uniformOfFintype (Exception.Entry × (Block × Block))).map
-      (fun p => Exception.writeEntry p.1 i (Exception.lowByte p.2.1 ^^^ code)) =
+      (fun p => Exception.writeEntry p.1 i (Exception.lowNibble p.2.1 ^^^ code)) =
       PMF.uniformOfFintype Exception.Entry := by
   classical
   have factor : (fun p : Exception.Entry × (Block × Block) => Exception.writeEntry p.1 i
-      (Exception.lowByte p.2.1 ^^^ code)) =
-      entryEquiv.symm ∘ (fun q : EntryF × BitVec 8 => Function.update q.1 i q.2) ∘
-        (fun p : Exception.Entry × (Block × Block) => (entryEquiv p.1, Exception.lowByte p.2.1 ^^^ code)) := by
+      (Exception.lowNibble p.2.1 ^^^ code)) =
+      entryEquiv.symm ∘ (fun q : EntryF × BitVec 4 => Function.update q.1 i q.2) ∘
+        (fun p : Exception.Entry × (Block × Block) => (entryEquiv p.1, Exception.lowNibble p.2.1 ^^^ code)) := by
     funext p
     exact writeEntry_eq _ _ _
   rw [factor, ← PMF.map_comp, ← PMF.map_comp,
     prod_map_uniform entryEquiv _ (Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv entryEquiv)
       (masked_uniform _), update_uniform, Kriterion.ArgoMAC.Security.PGS.uniformOfFintype_map_equiv]
 
-/-- **Two slots written with masked uniform bytes keep a uniform entry uniform.** -/
-theorem writeEntry2_uniform (i0 i1 : Fin 12) (code : BitVec 8) :
+/-- **Two slots written with masked uniform nibbles keep a uniform entry uniform.** -/
+theorem writeEntry2_uniform (i0 i1 : Fin 2) (code : BitVec 4) :
     (PMF.uniformOfFintype (Exception.Entry × ((Block × Block) × (Block × Block)))).map
-      (fun p => Exception.writeEntry (Exception.writeEntry p.1 i0 (Exception.lowByte p.2.1.1 ^^^ code)) i1
-        (Exception.lowByte p.2.2.1 ^^^ code)) = PMF.uniformOfFintype Exception.Entry := by
+      (fun p => Exception.writeEntry (Exception.writeEntry p.1 i0 (Exception.lowNibble p.2.1.1 ^^^ code)) i1
+        (Exception.lowNibble p.2.2.1 ^^^ code)) = PMF.uniformOfFintype Exception.Entry := by
   classical
   let first : Exception.Entry × (Block × Block) → Exception.Entry := fun q =>
-    Exception.writeEntry q.1 i0 (Exception.lowByte q.2.1 ^^^ code)
+    Exception.writeEntry q.1 i0 (Exception.lowNibble q.2.1 ^^^ code)
   let second : Exception.Entry × (Block × Block) → Exception.Entry := fun q =>
-    Exception.writeEntry q.1 i1 (Exception.lowByte q.2.1 ^^^ code)
+    Exception.writeEntry q.1 i1 (Exception.lowNibble q.2.1 ^^^ code)
   have inner : (PMF.uniformOfFintype ((Exception.Entry × (Block × Block)) × (Block × Block))).map
       (fun q => (first q.1, id q.2)) = PMF.uniformOfFintype (Exception.Entry × (Block × Block)) :=
     prod_map_uniform first id (writeEntry_uniform i0 code) (PMF.map_id _)
   have factor : (fun p : Exception.Entry × ((Block × Block) × (Block × Block)) =>
-      Exception.writeEntry (Exception.writeEntry p.1 i0 (Exception.lowByte p.2.1.1 ^^^ code)) i1
-        (Exception.lowByte p.2.2.1 ^^^ code)) =
+      Exception.writeEntry (Exception.writeEntry p.1 i0 (Exception.lowNibble p.2.1.1 ^^^ code)) i1
+        (Exception.lowNibble p.2.2.1 ^^^ code)) =
       second ∘ (fun q : (Exception.Entry × (Block × Block)) × (Block × Block) => (first q.1, id q.2)) ∘
         (Equiv.prodAssoc _ _ _).symm := by
     funext p
@@ -194,10 +194,10 @@ theorem finalPos_val (o : ℕ) (ho : o < 65536) : (finalPos o).val = digestFinal
 /-- **On the table oracle a final is answered by its tag alone.** -/
 theorem finalMask_table (A : TagTable) (key : Block) (o : ℕ) (ho : o < 65536) :
     finalMask (schemeHash (tableOracle (FI := Empty) (EI := Empty) A)) key o =
-      Exception.lowByte (A (finalPos o)).1 := by
+      Exception.lowNibble (A (finalPos o)).1 := by
   unfold finalMask h128
   rw [Asks.schemeHash_small A _ (Asks.hashInput_small key _ (digestFinalTag_lt o ho))]
-  show Exception.lowByte (tagRead A (hashInput key (digestFinalTag o) / 2 ^ 128)).1 = _
+  show Exception.lowNibble (tagRead A (hashInput key (digestFinalTag o) / 2 ^ 128)).1 = _
   rw [hashInput_tag]
   rfl
 
