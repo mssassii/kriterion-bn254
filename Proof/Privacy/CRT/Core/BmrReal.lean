@@ -148,6 +148,7 @@ theorem bmrPart_realView (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineI
       bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar tape.1) u (BmrEntry.bmrCoinsOf tape.1 tape.2))
         (restrictBmr u tape.2) := by
   obtain ⟨coins, table⟩ := tape
+  dsimp only
   exact bmrPart_realView_pair parameter scalar u coins table
 
 /-! ### 3. The swapped tape through the kernel -/
