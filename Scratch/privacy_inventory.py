@@ -19,7 +19,11 @@ for path in root.glob("*.lean"):
 
 @lru_cache(None)
 def simulator_path(module):
-    if module.startswith(("Construction.Simulator.CRT", "Proof.Simulator.CRT")):
+    # LawShape contains generic interface predicates, not the concrete CRT
+    # implementation. Follow its imports instead of excluding its consumers.
+    if module != "Proof.Simulator.CRT.LawShape" and module.startswith(
+        ("Construction.Simulator.CRT", "Proof.Simulator.CRT")
+    ):
         return (module,)
     for dependency in modules.get(module, []):
         path = simulator_path(dependency)

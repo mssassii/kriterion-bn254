@@ -96,7 +96,7 @@ theorem tagHash_hashInput (table : TagTable) (G : Block) (tag : ℕ) :
   simp only [ExtractStage.hashInput_div]
 
 /-- The pad digits of a body site on a tag table do not depend on the label. -/
-theorem padVectorM_tagHash (table : TagTable) (m S q : ℕ) [NeZero m] (label : Block) (κ i ρ : ℕ) :
+theorem padVectorM_tagHash (table : TagTable) (m S q : ℕ) [NeZero m] (label : Label) (κ i ρ : ℕ) :
     (fun e => (((padVectorM m S q label (bodyTag κ i ρ)).eval (H8.tagHash table) e : ℕ) : ZMod m)) =
       padVector m S q (fun j => table ⟨bodyTag κ i ρ j.val % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩) := by
   rw [padVectorM_eq_padVector]
@@ -113,14 +113,14 @@ theorem sum_fin_cast {m : ℕ} [NeZero m] {M : Type*} [AddCommMonoid M] (f : ZMo
   exact Fintype.sum_equiv e _ _ fun _ => rfl
 
 /-- **The garbler's body on a tag table does not depend on the final labels.** -/
-theorem bodyGarbleM_tagHash (table : TagTable) (m S q coord i : ℕ) (final : Fin m → Block) :
+theorem bodyGarbleM_tagHash (table : TagTable) (m S q coord i : ℕ) (final : Fin m → Label) :
     (bodyGarbleM m S q coord i final).eval (H8.tagHash table) =
       (bodyGarbleM m S q coord i fun _ => 0).eval (H8.tagHash table) := by
   simp only [bodyGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, SliceC.eval_padVectorM, hlong,
     tagHash_hashInput]
 
 /-- The body of a modulus on a tag table is the body at zero labels (either kind of modulus). -/
-theorem modGarbleM_body (table : TagTable) (S coord : ℕ) (delta : Block) (chunks : ℕ → ChunkGarbled Entry.table.castWidth)
+theorem modGarbleM_body (table : TagTable) (S coord : ℕ) (delta : Label) (chunks : ℕ → ChunkGarbled Entry.table.castWidth)
     (i : Fin Entry.table.count) :
     ((modGarbleM Entry.table S coord delta chunks i).eval (H8.tagHash table)).body =
       (bodyGarbleM (Entry.table.modulus i) S (Entry.table.padAnswers S i) coord i.val fun _ => 0).eval
@@ -157,7 +157,7 @@ theorem padValues_eq (table : TagTable) (κ : ℕ) (i : Fin Entry.table.count) (
   rfl
 
 /-- **The garbler's CRT offsets on a tag table** are the CRT of its body residues. -/
-theorem coordGarbleM_offset (table : TagTable) (S coord : ℕ) (delta : Block) (zero : ℕ → Block) (e : Fin S) :
+theorem coordGarbleM_offset (table : TagTable) (S coord : ℕ) (delta : Label) (zero : ℕ → Label) (e : Fin S) :
     ((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).offset e =
       Entry.table.crt fun i => ((bodyGarbleM (Entry.table.modulus i) S (Entry.table.padAnswers S i) coord i.val
         fun _ => 0).eval (H8.tagHash table)).residue e := by
@@ -179,7 +179,7 @@ theorem bodyGarbleM_residue (table : TagTable) (m S q coord i : ℕ) (e : Fin S)
     tagHash_hashInput, stored_eq]
 
 /-- **The garbler's `x` offsets on a tag table are P45's.** -/
-theorem gx_offset (table : TagTable) (delta : Block) (zero : ℕ → Block) (x : BMR.XEnc) (c : BMR.Coins Entry.table)
+theorem gx_offset (table : TagTable) (delta : Label) (zero : ℕ → Label) (x : BMR.XEnc) (c : BMR.Coins Entry.table)
     (pads : c.pads = bmrPadsOf table) :
     ((coordGarbleM Entry.table Entry.xCount 0 delta zero).eval (H8.tagHash table)).offset (BMR.xFlat x) =
       BMR.offset c (.inl x) := by
@@ -196,7 +196,7 @@ theorem gx_offset (table : TagTable) (delta : Block) (zero : ℕ → Block) (x :
   rfl
 
 /-- **The garbler's `y` offsets on a tag table are P45's.** -/
-theorem gy_offset (table : TagTable) (delta : Block) (zero : ℕ → Block) (y : BMR.YEnc) (c : BMR.Coins Entry.table)
+theorem gy_offset (table : TagTable) (delta : Label) (zero : ℕ → Label) (y : BMR.YEnc) (c : BMR.Coins Entry.table)
     (pads : c.pads = bmrPadsOf table) :
     ((coordGarbleM Entry.table Entry.yCount 1 delta zero).eval (H8.tagHash table)).offset (BMR.yFlat y) =
       BMR.offset c (.inr y) := by
@@ -231,7 +231,7 @@ structure Reads (table : TagTable) (c : BMR.Coins Entry.table) : Prop where
   mask : c.mask = bmrMasksOf table
 
 /-- **The garbler's `x` element offsets are P45's** (row encodings: `(O : F_p) − π`; curve encodings: `(O : F_p)`). -/
-theorem offsetsX_eq (table : TagTable) (delta : Block) (zero : ℕ → Block) (K : Block) (c : BMR.Coins Entry.table)
+theorem offsetsX_eq (table : TagTable) (delta : Label) (zero : ℕ → Label) (K : Block) (c : BMR.Coins Entry.table)
     (reads : Reads table c) (x : BMR.XEnc) :
     Entry.offsetsX ((coordGarbleM Entry.table Entry.xCount 0 delta zero).eval (H8.tagHash table)).offset
         (maskValues (H8.tagHash table) K digitCount) (BMR.xFlat x) =
@@ -247,7 +247,7 @@ theorem offsetsX_eq (table : TagTable) (delta : Block) (zero : ℕ → Block) (K
     simp only [BMR.offsetF, BMR.curveEnc, Entry.toField, BMR.xFlat, maskOf, if_pos, past, if_false, sub_zero]
 
 /-- **The garbler's `y` element offsets are P45's.** -/
-theorem offsetsY_eq (table : TagTable) (delta : Block) (zero : ℕ → Block) (K : Block) (c : BMR.Coins Entry.table)
+theorem offsetsY_eq (table : TagTable) (delta : Label) (zero : ℕ → Label) (K : Block) (c : BMR.Coins Entry.table)
     (reads : Reads table c) (y : BMR.YEnc) :
     Entry.offsetsY ((coordGarbleM Entry.table Entry.yCount 1 delta zero).eval (H8.tagHash table)).offset
         (maskValues (H8.tagHash table) K digitCount) (BMR.yFlat y) =
@@ -418,7 +418,7 @@ theorem bodyGarbleM_padSum (table : TagTable) (m S q coord i : ℕ) (e : Fin S) 
     tagHash_hashInput, stored_eq]
 
 /-- The garbler's pad sums on a tag table are its bodies' at zero labels. -/
-theorem coordGarbleM_padSum (table : TagTable) (S coord : ℕ) (delta : Block) (zero : ℕ → Block)
+theorem coordGarbleM_padSum (table : TagTable) (S coord : ℕ) (delta : Label) (zero : ℕ → Label)
     (i : Fin Entry.table.count) (e : Fin S) :
     ((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).padSum i e =
       ((bodyGarbleM (Entry.table.modulus i) S (Entry.table.padAnswers S i) coord i.val
@@ -426,14 +426,14 @@ theorem coordGarbleM_padSum (table : TagTable) (S coord : ℕ) (delta : Block) (
   simp only [coordGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, stored_eq, modGarbleM_body]
 
 /-- The garbler's hints on a tag table are the wrap hints of its offsets. -/
-theorem coordGarbleM_hint (table : TagTable) (S coord : ℕ) (delta : Block) (zero : ℕ → Block) (e : Fin S) :
+theorem coordGarbleM_hint (table : TagTable) (S coord : ℕ) (delta : Label) (zero : ℕ → Label) (e : Fin S) :
     ((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).hint e =
       wrapHint Entry.table.product Entry.table.wrapBound
         (((coordGarbleM Entry.table S coord delta zero).eval (H8.tagHash table)).offset e) := by
   simp only [coordGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, stored_eq]
 
 /-- **The garbler's `x` pad sums are P45's.** -/
-theorem gx_padSum (table : TagTable) (delta : Block) (zero : ℕ → Block) (x : BMR.XEnc) (c : BMR.Coins Entry.table)
+theorem gx_padSum (table : TagTable) (delta : Label) (zero : ℕ → Label) (x : BMR.XEnc) (c : BMR.Coins Entry.table)
     (pads : c.pads = bmrPadsOf table) (i : Fin Entry.table.count) :
     ((coordGarbleM Entry.table Entry.xCount 0 delta zero).eval (H8.tagHash table)).padSum i (BMR.xFlat x) =
       (∑ ρ : ZMod (Entry.table.modulus i), c.pads i ρ (.inl x)).val := by
@@ -444,7 +444,7 @@ theorem gx_padSum (table : TagTable) (delta : Block) (zero : ℕ → Block) (x :
   rfl
 
 /-- **The garbler's `y` pad sums are P45's.** -/
-theorem gy_padSum (table : TagTable) (delta : Block) (zero : ℕ → Block) (y : BMR.YEnc) (c : BMR.Coins Entry.table)
+theorem gy_padSum (table : TagTable) (delta : Label) (zero : ℕ → Label) (y : BMR.YEnc) (c : BMR.Coins Entry.table)
     (pads : c.pads = bmrPadsOf table) (i : Fin Entry.table.count) :
     ((coordGarbleM Entry.table Entry.yCount 1 delta zero).eval (H8.tagHash table)).padSum i (BMR.yFlat y) =
       (∑ ρ : ZMod (Entry.table.modulus i), c.pads i ρ (.inr y)).val := by
@@ -461,7 +461,7 @@ theorem join_val (a : ZMod m) (slope : BaseField) [NeZero m] :
 
 theorem gxOf_unfold_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
     (EntryCorrect.gxOf (H8.tagHash table) coins).offset (BMR.xFlat x) =
-      ((coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval
+      ((coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval
         (H8.tagHash table)).offset (BMR.xFlat x) := by
   rw [EntryCorrect.gxOf]
 
@@ -473,14 +473,14 @@ theorem gxOf_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) 
 
 theorem gxOf_unfold_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
     (EntryCorrect.gxOf (H8.tagHash table) coins).hint (BMR.xFlat x) =
-      ((coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval
+      ((coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval
         (H8.tagHash table)).hint (BMR.xFlat x) := by
   rw [EntryCorrect.gxOf]
 
 /-- The `x` hints through the names. -/
 theorem gxOf_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc) :
     (EntryCorrect.gxOf (H8.tagHash table) coins).hint (BMR.xFlat x) = BMR.hint (bmrCoinsOf coins table) (.inl x) := by
-  have step := coordGarbleM_hint table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0) (BMR.xFlat x)
+  have step := coordGarbleM_hint table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j)) (BMR.xFlat x)
   rw [gx_offset table _ _ x (bmrCoinsOf coins table) rfl] at step
   rw [gxOf_unfold_hint, step]
   rfl
@@ -488,7 +488,7 @@ theorem gxOf_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x
 theorem gxOf_unfold_padSum (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (x : BMR.XEnc)
     (i : Fin Entry.table.count) :
     (EntryCorrect.gxOf (H8.tagHash table) coins).padSum i (BMR.xFlat x) =
-      ((coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval
+      ((coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval
         (H8.tagHash table)).padSum i (BMR.xFlat x) := by
   rw [EntryCorrect.gxOf]
 
@@ -519,20 +519,20 @@ theorem recX_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins
 
 theorem gyOf_unfold_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
     (EntryCorrect.gyOf (H8.tagHash table) coins).offset (BMR.yFlat y) =
-      ((coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval
+      ((coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval
         (H8.tagHash table)).offset (BMR.yFlat y) := by
   rw [EntryCorrect.gyOf]
 
 theorem gyOf_unfold_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
     (EntryCorrect.gyOf (H8.tagHash table) coins).hint (BMR.yFlat y) =
-      ((coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval
+      ((coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval
         (H8.tagHash table)).hint (BMR.yFlat y) := by
   rw [EntryCorrect.gyOf]
 
 theorem gyOf_unfold_padSum (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc)
     (i : Fin Entry.table.count) :
     (EntryCorrect.gyOf (H8.tagHash table) coins).padSum i (BMR.yFlat y) =
-      ((coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval
+      ((coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval
         (H8.tagHash table)).padSum i (BMR.yFlat y) := by
   rw [EntryCorrect.gyOf]
 
@@ -545,7 +545,7 @@ theorem gyOf_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) 
 /-- The `y` hints through the names. -/
 theorem gyOf_hint (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
     (EntryCorrect.gyOf (H8.tagHash table) coins).hint (BMR.yFlat y) = BMR.hint (bmrCoinsOf coins table) (.inr y) := by
-  have step := coordGarbleM_hint table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0) (BMR.yFlat y)
+  have step := coordGarbleM_hint table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j)) (BMR.yFlat y)
   rw [gy_offset table _ _ y (bmrCoinsOf coins table) rfl] at step
   rw [gyOf_unfold_hint, step]
   rfl

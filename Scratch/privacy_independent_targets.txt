@@ -7,6 +7,7 @@ Proof.Privacy.CRT.Flags.OffFinalFresh
 Proof.Privacy.CRT.Flags.OnFinalFresh
 Proof.Privacy.CRT.Flags.Touch
 Proof.Privacy.CRT.Glue.Instance
+Proof.Privacy.CRT.Glue.Machine
 Proof.Privacy.CRT.Hidden.CaseDigest
 Proof.Privacy.CRT.Hidden.CaseKeyOff
 Proof.Privacy.CRT.Hidden.Reach

@@ -239,12 +239,12 @@ theorem digestKeys_fam : ∀ k ∈ Paths.digestLabelKeys coordinateBitCount ∪ 
 
 theorem coordX_tagged (coins : Entry.Coins) :
     Paths.Tagged (Paths.coordKeys 0)
-      (coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)) :=
+      (coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))) :=
   Paths.coordGarbleM_tagged Entry.table Entry.xCount 0 (Paths.bn254_ranges _ (by decide)) (by norm_num) _ _
 
 theorem coordY_tagged (coins : Entry.Coins) :
     Paths.Tagged (Paths.coordKeys 1)
-      (coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)) :=
+      (coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))) :=
   Paths.coordGarbleM_tagged Entry.table Entry.yCount 1 (Paths.bn254_ranges _ (by decide)) (by norm_num) _ _
 
 theorem digest_tagged (scalar : NonZeroScalar) (coins : Entry.Coins) :
@@ -301,9 +301,9 @@ theorem designedEntries_eq [FieldCertificate] [GroupCertificate] (parameter : �
 theorem gAsked_eq (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagTable) :
     gAsked scalar (coins, T) =
       asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))
-          (coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)) ++
+          (coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))) ++
         (asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))
-            (coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)) ++
+            (coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))) ++
           (asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)) (keyM coins.bridgeKey) ++
             (asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))
                 (maskAnswersM ((keyM coins.bridgeKey).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)))
@@ -408,9 +408,9 @@ theorem stageTwoView_keyFree [FieldCertificate] [GroupCertificate] (parameter : 
       keyGone, keyGone, List.nil_append, List.nil_append]
     refine List.map_congr_left fun n inside => ?_
     have member : n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T'))
-          (coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)) ∨
+          (coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))) ∨
         n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T'))
-          (coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)) ∨
+          (coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))) ∨
         n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T'))
           (digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
             (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)

@@ -77,10 +77,11 @@ theorem fst_uniform : (PMF.uniformOfFintype (Block × Block)).map Prod.fst = PMF
 theorem clip_fst_uniform : (PMF.uniformOfFintype (Block × Block)).map (fun a => clip a.1) =
     PMF.uniformOfFintype Label := Narrow.uniform_answer_clip
 
+set_option maxRecDepth 4096 in
 /-- The clipped first blocks of uniform answers are uniform active labels. -/
 theorem fsts_uniform (n : ℕ) :
     (PMF.uniformOfFintype (Fin n → Block × Block)).map (fun g k => (clip (g k).1)) = PMF.uniformOfFintype (Fin n → Label) :=
-  pi_map_uniform (fun _ a => clip a.1) fun _ => clip_fst_uniform
+  pi_map_uniform (fun (_ : Fin n) (a : Block × Block) => clip a.1) fun _ => clip_fst_uniform
 
 theorem lanes_subsingleton_zero (a b : Lanes 0) : a = b := lanes_zero_eq a b
 

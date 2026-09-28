@@ -204,7 +204,7 @@ theorem coord_part (rel : CoordRelational) (u : AffineInput) (κ : Fin 2) {c c' 
           (if (coordValue u i.val).testBit j then clip (c'.inputDelta (coordOf i)) else 0) := by
       intro j hj
       have h := congrArg clip (hE j hj)
-      simpa only [Narrow.clip_xor, apply_ite clip, Narrow.clip_zero] using h
+      simpa only [Narrow.clip_xor, apply_ite clip, show clip (0 : Block) = 0 from Narrow.clip_zero] using h
     obtain ⟨relHot, _, hpad, hoff, hhint⟩ := rel (hashOf t) (hashOf t') S i.val hS i.isLt u _ _ _ _ hEclip
       (convAgree_of_convVector_eq vec) hagree
     have mixed : RelAsked (fun τ => hotTag Entry.table u τ = true)

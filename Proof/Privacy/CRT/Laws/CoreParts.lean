@@ -45,7 +45,7 @@ def restOf (T : CrtTable) (u : AffineInput) (v : CoreView crtEntry T u) : RestPa
 
 /-- **The five parts of a view.** -/
 def viewParts (T : CrtTable) (u : AffineInput) (v : CoreView crtEntry T u) :
-    Vector Block Kriterion.CRT.Entry.convCount × Vector Block Kriterion.CRT.Entry.convCount ×
+    Vector Label Kriterion.CRT.Entry.convCount × Vector Label Kriterion.CRT.Entry.convCount ×
       Vector Exception.Entry digitCount × RestPart T u × BmrPartT T u :=
   (v.1.crtX, v.1.crtY, v.1.exception, restOf T u v, bmrPart T u v)
 

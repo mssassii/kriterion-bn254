@@ -123,7 +123,7 @@ theorem delta_unique (rel : CoordRelational) (tail : TailRel) (parameter : ℕ) 
   have zero := RelAsked.shift_zero relG (garbler_tags_nodup scalar tape'.1 _) hN h1 h2
   have zeroClip : clip (res κ tape) ^^^ clip (res κ tape') = 0 := by
     have z := congrArg clip zero
-    simpa only [queryShift, if_pos conversion, Narrow.clip_embed, Narrow.clip_xor, Narrow.clip_zero] using z
+    simpa only [queryShift, if_pos conversion, Narrow.clip_embed, Narrow.clip_xor, show clip (0 : Block) = 0 from Narrow.clip_zero] using z
   calc clip (res κ tape) = clip (res κ tape) ^^^ 0 := BitVec.xor_zero.symm
     _ = clip (res κ tape) ^^^ (clip (res κ tape) ^^^ clip (res κ tape')) := by rw [zeroClip]
     _ = clip (res κ tape') := by rw [← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
