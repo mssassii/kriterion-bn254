@@ -39,13 +39,11 @@ theorem halfLanes_uniform (width : Nat) :
     left_inv := fun p => by
       apply Subtype.ext
       simp only [laneBit_parityLift_zero]
-      rw [← p.property]
-      exact parityLift_halfLanes_laneBit p.val
+      simpa only [p.property] using parityLift_halfLanes_laneBit p.val
     right_inv := fun p => by
       apply Subtype.ext
       simp only [laneBit_parityLift_zero]
-      rw [← p.property]
-      exact parityLift_halfLanes_laneBit p.val }
+      simpa only [p.property] using parityLift_halfLanes_laneBit p.val }
 
 /-- Total-width version used by the generic conversion core, including its
 empty-row singleton convention. -/

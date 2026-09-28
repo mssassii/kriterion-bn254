@@ -38,6 +38,7 @@ end Kriterion.CRT.Parity.HalfPin
 namespace Kriterion.CRT.SliceC
 
 open scoped BigOperators
+open Kriterion.ArgoMAC
 
 /-- Prefix XOR, used to prove tree parity without assumptions on its materials. -/
 def parityXorRange (f : Nat → Label) : Nat → Label
@@ -110,7 +111,9 @@ theorem xorFold_extendLevel (n : Nat) (parent right : Fin (2 ^ n) → Label) :
 /-- Every complete garbled tree has leaf XOR equal to its root offset. -/
 theorem treeGarbleM_xor (H : HashN) (tagOf : Nat → Nat → Nat) (delta bit0 : Label) :
     ∀ levels, xorFold ((treeGarbleM tagOf delta bit0 levels).eval H).1 = delta
-  | 0 => by simp [treeGarbleM, xorFold, Fin.foldl_succ_last]
+  | 0 => by
+      change (0 : Label) ^^^ delta = delta
+      exact BitVec.zero_xor delta
   | n + 1 => by
       simp only [treeGarbleM, FreeQuery.eval_bind]
       by_cases hn : n = 0
@@ -137,9 +140,31 @@ theorem pin_even_of_leaf_xor {width count : Nat} (casts : Fin count → Lanes (w
     (leaves : Fin count → Label) (delta : Label)
     (low : ∀ i, laneBit (casts i) 0 = leaves i) (tree : xorFold leaves = delta) :
     Parity.EvenLanes ((∑ i, casts i) + deltaLanes (width + 1) delta) := by
-  apply Parity.evenLanes_iff_laneBit_zero.mpr
+  apply (Parity.evenLanes_iff_laneBit_zero _).mpr
   rw [Parity.laneBit_add_zero, laneBit_sum_zero, Parity.laneBit_deltaLanes_zero]
   have castBits : (fun i => laneBit (casts i) 0) = leaves := funext low
   rw [castBits, tree, BitVec.xor_self]
+
+/-- The zero-width lane ring is the singleton zero pin. -/
+theorem evenLanes_width_zero (pin : Lanes 0) : Parity.EvenLanes pin := by
+  intro i
+  have h : (pin i).val < 1 := ZMod.val_lt (pin i)
+  have hz : (pin i).val = 0 := by omega
+  rw [hz, Nat.zero_mod]
+
+/-- Total-width version; width-zero pins are automatically even. -/
+theorem pin_even_of_leaf_xor_total {width count : Nat} (casts : Fin count → Lanes width)
+    (leaves : Fin count → Label) (delta : Label)
+    (low : 0 < width → ∀ i, laneBit (casts i) 0 = leaves i) (tree : xorFold leaves = delta) :
+    Parity.EvenLanes ((∑ i, casts i) + deltaLanes width delta) := by
+  cases width with
+  | zero => exact evenLanes_width_zero _
+  | succ width => exact pin_even_of_leaf_xor casts leaves delta (low (by omega)) tree
+
+theorem parityCastLanes_low {width : Nat} (positive : 0 < width) (label : Label) (value : Nat) :
+    laneBit (Parity.parityCastLanes width label value) 0 = label := by
+  cases width with
+  | zero => omega
+  | succ width => exact Parity.laneBit_parityCastLanes_zero width label value
 
 end Kriterion.CRT.SliceC
