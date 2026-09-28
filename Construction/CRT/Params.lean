@@ -119,7 +119,7 @@ one-hot, every other modulus gets `t9Row 32 m`. -/
 def t9Kind (m : Nat) : Kind := if m = 256 then .chunkZero else .odd (t9Row 32 m)
 
 /-- A T9 BN254 table on the given moduli, retained for reduced tests and the original
-schedule's lemmas. The real table below uses `width8TableOf`. -/
+schedule's lemmas. The real table below uses `selectiveTableOf`. -/
 def bn254TableOf (moduli : Array Nat) : CrtTable :=
   CrtTable.ofModuli 254 8 14 moduli t9Kind padSlack (wrapBound BN254.baseFieldModulus)
 
@@ -173,8 +173,39 @@ def width8Kind (m : Nat) : Kind :=
 def width8TableOf (moduli : Array Nat) : CrtTable :=
   CrtTable.ofModuli 254 8 14 moduli width8Kind padSlack (wrapBound BN254.baseFieldModulus)
 
-/-- **The real table**: 85 moduli, all 84 odd rows at width 8, slack 120. -/
-def bn254Table : CrtTable := width8TableOf bn254Moduli
+/-- First-stage width 9 on the 25 rows selected by the exact cost experiment;
+all other odd rows retain width 8. The power-of-two modulus bypasses this selector. -/
+def selectiveWidth0 (m : Nat) : Nat :=
+  if m ∈ ([59, 61, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317,
+    331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389] : List Nat) then 9 else 8
+
+theorem selectiveWidth0_lower (m : Nat) : 8 ≤ selectiveWidth0 m := by
+  unfold selectiveWidth0
+  split <;> decide
+
+theorem selectiveWidth0_upper (m : Nat) : selectiveWidth0 m ≤ 9 := by
+  unfold selectiveWidth0
+  split <;> decide
+
+/-- The selected schedule preserves the word width, with a smaller second stage. -/
+def selectiveRow (chunks m : Nat) : OddRow :=
+  let ell := bitLength (chunks * (m - 1))
+  let width0 := selectiveWidth0 m
+  { ell, width0, width1 := ell - width0 - 1, keep := max width0 (ell - 5) }
+
+@[simp] theorem selectiveRow_ell (chunks m : Nat) :
+    (selectiveRow chunks m).ell = (t9Row chunks m).ell := rfl
+
+/-- Modulus 256 reuses chunk 0; odd moduli use the selected schedule. -/
+def selectiveKind (m : Nat) : Kind :=
+  if m = 256 then .chunkZero else .odd (selectiveRow 32 m)
+
+/-- BN254 conversion with the selected width-8/9 schedule. -/
+def selectiveTableOf (moduli : Array Nat) : CrtTable :=
+  CrtTable.ofModuli 254 8 14 moduli selectiveKind padSlack (wrapBound BN254.baseFieldModulus)
+
+/-- **The real table**: 85 moduli, 25 odd rows at width 9 and 59 at width 8, slack 120. -/
+def bn254Table : CrtTable := selectiveTableOf bn254Moduli
 
 /-- The reduced table of the differential test: growth 0, 1 and 2 and
 the power of two. -/

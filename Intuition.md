@@ -1,3 +1,25 @@
+# Selective width-9 extraction: delta and inherited background
+
+This fork of dnctse's `e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05` changes only the first extraction
+width for 25 odd CRT moduli, from 8 to 9. The locally proved candidate is 128,822 bytes,
+1,062,022 garbling queries and 1,055,144 evaluation queries. The full build and both audits passed;
+see `README.md` and `evidence/verification.md` for evidence. Hosted verification has not been run.
+
+For an odd modulus, the published conversion size is `4ℓ − 2w0 − 5` labels. Increasing `w0` by one
+therefore saves two 13-byte labels in each coordinate. The selected 25 rows save `25 × 2 × 2 × 13 = 1,300`
+bytes and spend 73,638 additional evaluation queries, leaving 735 below the fixed gate.
+
+The word width, modulus product, pads, label width, external Lamport labels, records and privacy errors
+are unchanged. The proof update checks the new rows and establishes that the wider first-stage targets
+lie within the existing reachability certificates; all later conversion and simulator obligations remain
+part of the complete solution build. This is an optimization of the executable garbled construction.
+
+The note below is preserved from the upstream commit and describes its **130,122-byte baseline**.
+Its historical metric and schedule statements apply to that baseline; current candidate values and the
+exact source changes are documented above and in `README.md`.
+
+---
+
 # Intuition: narrow labels, parity pins, absorbed joins and normalized rows on the CRT-residue ArgoMAC entry
 
 This entry garbles BN254 scalar multiplication with **130,122 bytes** of public ciphertext.

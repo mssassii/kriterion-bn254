@@ -1,0 +1,540 @@
+{
+  "status": "exact integer cost model; this script does not run Lean or hosted verification",
+  "implementation_schedule_checked": true,
+  "baseline": {
+    "ciphertext_bytes": 130122,
+    "garble_queries": 988438,
+    "evaluate_queries": 981506,
+    "conversion_labels_per_coordinate": 2956,
+    "coordinate_garble": [
+      518727,
+      467420
+    ],
+    "coordinate_evaluate": [
+      515402,
+      464321
+    ]
+  },
+  "record_product_bits": 623,
+  "unchanged_reach_certificates_checked": 84,
+  "reach_certificate_min_slack": 112,
+  "width9_candidate": {
+    "selected_moduli": [
+      59,
+      61,
+      257,
+      263,
+      269,
+      271,
+      277,
+      281,
+      283,
+      293,
+      307,
+      311,
+      313,
+      317,
+      331,
+      337,
+      347,
+      349,
+      353,
+      359,
+      367,
+      373,
+      379,
+      383,
+      389
+    ],
+    "rows": 25,
+    "ciphertext_bytes": 128822,
+    "garble_queries": 1062022,
+    "evaluate_queries": 1055144,
+    "conversion_labels_per_coordinate": 2906,
+    "coordinate_garble": [
+      555519,
+      504212
+    ],
+    "coordinate_evaluate": [
+      552221,
+      501140
+    ],
+    "evaluate_headroom": 735
+  },
+  "ranked_row_deltas": [
+    {
+      "modulus": 61,
+      "garble_delta": 2934,
+      "evaluate_delta": 2938,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 59,
+      "garble_delta": 2938,
+      "evaluate_delta": 2942,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 257,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 263,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 269,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 271,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 277,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 281,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 283,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 293,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 307,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 311,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 313,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 317,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 331,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 337,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 347,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 349,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 353,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 359,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 367,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 373,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 379,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 383,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 389,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 397,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 401,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 409,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 419,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 421,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 431,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 433,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 439,
+      "garble_delta": 2944,
+      "evaluate_delta": 2946,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 53,
+      "garble_delta": 2950,
+      "evaluate_delta": 2954,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 49,
+      "garble_delta": 2958,
+      "evaluate_delta": 2962,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 47,
+      "garble_delta": 2962,
+      "evaluate_delta": 2966,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 43,
+      "garble_delta": 2970,
+      "evaluate_delta": 2974,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 41,
+      "garble_delta": 2974,
+      "evaluate_delta": 2978,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 37,
+      "garble_delta": 2982,
+      "evaluate_delta": 2986,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 251,
+      "garble_delta": 3002,
+      "evaluate_delta": 3006,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 241,
+      "garble_delta": 3022,
+      "evaluate_delta": 3026,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 239,
+      "garble_delta": 3026,
+      "evaluate_delta": 3030,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 233,
+      "garble_delta": 3038,
+      "evaluate_delta": 3042,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 229,
+      "garble_delta": 3046,
+      "evaluate_delta": 3050,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 227,
+      "garble_delta": 3050,
+      "evaluate_delta": 3054,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 223,
+      "garble_delta": 3058,
+      "evaluate_delta": 3062,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 211,
+      "garble_delta": 3082,
+      "evaluate_delta": 3086,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 199,
+      "garble_delta": 3106,
+      "evaluate_delta": 3110,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 197,
+      "garble_delta": 3110,
+      "evaluate_delta": 3114,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 193,
+      "garble_delta": 3118,
+      "evaluate_delta": 3122,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 191,
+      "garble_delta": 3122,
+      "evaluate_delta": 3126,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 181,
+      "garble_delta": 3142,
+      "evaluate_delta": 3146,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 179,
+      "garble_delta": 3146,
+      "evaluate_delta": 3150,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 173,
+      "garble_delta": 3158,
+      "evaluate_delta": 3162,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 169,
+      "garble_delta": 3166,
+      "evaluate_delta": 3170,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 167,
+      "garble_delta": 3170,
+      "evaluate_delta": 3174,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 163,
+      "garble_delta": 3178,
+      "evaluate_delta": 3182,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 157,
+      "garble_delta": 3190,
+      "evaluate_delta": 3194,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 151,
+      "garble_delta": 3202,
+      "evaluate_delta": 3206,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 149,
+      "garble_delta": 3206,
+      "evaluate_delta": 3210,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 139,
+      "garble_delta": 3226,
+      "evaluate_delta": 3230,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 137,
+      "garble_delta": 3230,
+      "evaluate_delta": 3234,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 131,
+      "garble_delta": 3242,
+      "evaluate_delta": 3246,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 127,
+      "garble_delta": 3306,
+      "evaluate_delta": 3308,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 125,
+      "garble_delta": 3310,
+      "evaluate_delta": 3312,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 121,
+      "garble_delta": 3318,
+      "evaluate_delta": 3320,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 113,
+      "garble_delta": 3334,
+      "evaluate_delta": 3336,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 109,
+      "garble_delta": 3342,
+      "evaluate_delta": 3344,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 107,
+      "garble_delta": 3346,
+      "evaluate_delta": 3348,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 103,
+      "garble_delta": 3354,
+      "evaluate_delta": 3356,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 101,
+      "garble_delta": 3358,
+      "evaluate_delta": 3360,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 97,
+      "garble_delta": 3366,
+      "evaluate_delta": 3368,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 89,
+      "garble_delta": 3382,
+      "evaluate_delta": 3384,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 83,
+      "garble_delta": 3394,
+      "evaluate_delta": 3396,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 81,
+      "garble_delta": 3398,
+      "evaluate_delta": 3400,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 79,
+      "garble_delta": 3402,
+      "evaluate_delta": 3404,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 73,
+      "garble_delta": 3414,
+      "evaluate_delta": 3416,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 71,
+      "garble_delta": 3418,
+      "evaluate_delta": 3420,
+      "bytes_saved": 52
+    },
+    {
+      "modulus": 67,
+      "garble_delta": 3426,
+      "evaluate_delta": 3428,
+      "bytes_saved": 52
+    }
+  ]
+}

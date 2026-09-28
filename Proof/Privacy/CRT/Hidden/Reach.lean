@@ -476,11 +476,11 @@ theorem wordValue_valueOf (m : ℕ) (α : ℕ → ℕ) (adm : Admissible α 32) 
 
 /-! ### The rows -/
 
-/-- An odd row of the real table uses the width-8 schedule. -/
+/-- An odd row of the real table uses the selected width-8/9 schedule. -/
 theorem row_eq (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind i = .odd row) :
-    row = width8Row 32 (Entry.table.modulus i) ∧ Entry.table.modulus i ≠ 256 := by
-  change width8Kind (bn254Table.modulus i) = .odd row at hk
-  unfold width8Kind at hk
+    row = selectiveRow 32 (Entry.table.modulus i) ∧ Entry.table.modulus i ≠ 256 := by
+  change selectiveKind (bn254Table.modulus i) = .odd row at hk
+  unfold selectiveKind at hk
   split at hk
   · cases hk
   · rename_i notPow
@@ -489,7 +489,7 @@ theorem row_eq (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind
 
 /-- The shape of an odd row of the real table. -/
 theorem row_shape (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind i = .odd row) :
-    7 ≤ row.width0 ∧ row.width0 ≤ 8 ∧ row.width1 = row.ell - row.width0 - 1 ∧
+    7 ≤ row.width0 ∧ row.width0 ≤ 9 ∧ row.width1 = row.ell - row.width0 - 1 ∧
       row.keep = max row.width0 (row.ell - 5) ∧ 9 ≤ row.ell ∧ row.ell ≤ 14 ∧
       32 * (Entry.table.modulus i - 1) < 2 ^ row.ell := by
   have facts := SliceC.bn254_odd i row hk
@@ -497,14 +497,23 @@ theorem row_shape (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.k
   obtain ⟨rfl, _⟩ := row_eq i row hk
   have castW : bn254Table.castWidth = 14 := rfl
   rw [table_chunkCount] at lt
-  have w0lo : 7 ≤ (width8Row 32 (Entry.table.modulus i)).width0 := by
-    change 7 ≤ 8
-    decide
-  have w0hi : (width8Row 32 (Entry.table.modulus i)).width0 ≤ 8 := by
-    change 8 ≤ 8
-    decide
+  have w0lo : 7 ≤ (selectiveRow 32 (Entry.table.modulus i)).width0 :=
+    le_trans (by decide : 7 ≤ 8) (selectiveWidth0_lower _)
+  have w0hi : (selectiveRow 32 (Entry.table.modulus i)).width0 ≤ 9 :=
+    selectiveWidth0_upper _
   refine ⟨w0lo, w0hi, rfl, rfl, ?_, by rw [castW] at cast; exact cast, lt⟩
   omega
+
+/-- Every selected first-stage target lies within the unchanged reachability certificate. -/
+theorem stageZero_bound (i : Fin Entry.table.count) (row : OddRow)
+    (hk : Entry.table.kind i = .odd row) :
+    2 ^ row.width0 - 1 ≤ need (Entry.table.modulus i) row.ell := by
+  have facts : ∀ i : Fin Entry.table.count,
+      2 ^ (selectiveRow 32 (Entry.table.modulus i)).width0 - 1 ≤
+        need (Entry.table.modulus i) (selectiveRow 32 (Entry.table.modulus i)).ell := by
+    decide +kernel
+  rw [(row_eq i row hk).1]
+  exact facts i
 
 /-- **The many-chunk decomposition**: every target up to `need` is the word value of a coordinate value below
 `p`. -/
@@ -643,21 +652,19 @@ theorem reach_mod (S κ : ℕ) (hκ : κ < 2) (i : Fin Entry.table.count) (k : T
     rw [hotTag_body Entry.table _ i trange, coordValue_inputAt hκ hv, Nat.mod_eq_of_lt h1]
     exact beq_self_eq_true slot
   · obtain ⟨w0lo, w0hi, w1, keep, ell9, ell14, big⟩ := row_shape i row hk
-    -- CHECK: Elaborate the generalized Nat-subtraction/power identity and the omega
-    -- side goals below; they previously specialized width0 to the numeral 7.
+    have widthSum : row.width0 + row.width1 + 1 = row.ell :=
+      (SliceC.bn254_odd i row hk).2.2.1
     have p1 : 2 ^ (row.ell - 1) = 2 ^ row.width0 * 2 ^ row.width1 := by
       rw [← pow_add]; congr 1; omega
     have powLo : 128 ≤ 2 ^ row.width0 := by
       calc 128 = 2 ^ 7 := by norm_num
         _ ≤ 2 ^ row.width0 := Nat.pow_le_pow_right (by norm_num) w0lo
-    have powHi : 2 ^ row.width0 ≤ 256 := by
-      calc 2 ^ row.width0 ≤ 2 ^ 8 := Nat.pow_le_pow_right (by norm_num) w0hi
-        _ = 256 := by norm_num
+    have stageZeroBound := stageZero_bound i row hk
     have keepLe : row.keep ≤ 9 := by rw [keep]; omega
     have widthLeKeep : row.width0 ≤ row.keep := by rw [keep]; exact le_max_left _ _
     have ellKeep : row.ell ≤ 5 + row.keep := by rw [keep]; omega
     -- Multiplying the successor inequality retains the gap of at least 128 needed by
-    -- the original certificate, for both width0 = 7 and width0 = 8.
+    -- the original certificate, for every selected first-stage width.
     have stageOneBound : ∀ s < 2 ^ row.width1,
         2 ^ row.width0 * s ≤ 2 ^ (row.ell - 1) - 128 := by
       intro s small
@@ -675,11 +682,11 @@ theorem reach_mod (S κ : ℕ) (hκ : κ < 2) (i : Fin Entry.table.count) (k : T
     · -- stage 0 tree: `t = slot`
       have small : slot < 2 ^ row.width0 :=
         lt_of_lt_of_le h3 (Nat.pow_le_pow_right (by norm_num) (by omega))
-      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) slot (le_need_255 (by omega)) (by
+      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) slot (le_trans (by omega) stageZeroBound) (by
         simp only [stageValue, if_true, Nat.mod_eq_of_lt small, Nat.mod_eq_of_lt h3]
         exact beq_self_eq_true slot)
     · -- stage 0 cast: `t = slot`
-      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) slot (le_need_255 (by omega)) (by
+      exact hot_of_word hκ i row hk trange (by norm_num) (by norm_num) slot (le_trans (by omega) stageZeroBound) (by
         simp only [stageValue, if_true, Nat.mod_eq_of_lt h1]
         exact beq_self_eq_true slot)
     · -- stage 1 tree: `t = 2^width0 · slot`

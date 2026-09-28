@@ -13,7 +13,7 @@ from its joins and pins (`Construction/CRT/Layout.lean`). This file connects the
   `phi` (the `readPub` reading of the source's material) reads only the read part (`phi_eq_phiR`), on which it is a
   bijection `phiR` onto `ConvVals table`: the modulus join and pin positions are enumerated by sums and sigmas whose
   `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_mod`, `pIdx_mod`), so `phiR` is injective; the two sides
-  have `2 ^ (labelBits · 2956)` elements. So `phi` pushes the uniform law to the uniform law.
+  have `2 ^ (labelBits · 2906)` elements. So `phi` pushes the uniform law to the uniform law.
 * `source_joins_pins_uniform`, `source_crt_law`: under a uniform source the joins and pins of coordinate `κ` are
   uniform, so the source's flat vector is `flatOf` of uniform conversion values.
 -/

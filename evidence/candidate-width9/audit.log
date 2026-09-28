@@ -1,0 +1,17 @@
+'Submission.solution' depends on axioms: [propext, Classical.choice, Quot.sound]
+axiom check passed: only propext, Classical.choice, Quot.sound
+'Kriterion.CRT.EntryCorrect.perfectCorrectness' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Assembly.crtPrivacy' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.SimMachine.CrtTop.crtSimulator' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Entry.Wire.encoding_length' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Entry.garbleBudget_eq' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Entry.evaluateBudget_eq' depends on axioms: [propext, Classical.choice, Quot.sound]
+128822
+1062022
+1055144
+1062022
+1055144
+128822
+'Kriterion.CRT.SliceC.bn254_selectiveFacts' depends on axioms: [propext, Quot.sound]
+'Kriterion.CRT.Privacy.ConvReach.stageZero_bound' depends on axioms: [propext, Quot.sound]

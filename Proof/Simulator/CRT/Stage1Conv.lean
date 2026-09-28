@@ -6,7 +6,7 @@ conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatte
 block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
-`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2956` for every `ConvPublic` (no chunk
+`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2906` for every `ConvPublic` (no chunk
 joins: a chunk contributes its half-pin only; the source's chunk-join cells are drawn but not serialized).
 -/
 

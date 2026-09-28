@@ -1,0 +1,64 @@
+{
+  "status": "exact integer cost model; this script does not run Lean or hosted verification",
+  "implementation_schedule_checked": true,
+  "baseline": {
+    "ciphertext_bytes": 130122,
+    "garble_queries": 988438,
+    "evaluate_queries": 981506,
+    "conversion_labels_per_coordinate": 2956,
+    "coordinate_garble": [
+      518727,
+      467420
+    ],
+    "coordinate_evaluate": [
+      515402,
+      464321
+    ]
+  },
+  "record_product_bits": 623,
+  "unchanged_reach_certificates_checked": 84,
+  "reach_certificate_min_slack": 112,
+  "width9_candidate": {
+    "selected_moduli": [
+      59,
+      61,
+      257,
+      263,
+      269,
+      271,
+      277,
+      281,
+      283,
+      293,
+      307,
+      311,
+      313,
+      317,
+      331,
+      337,
+      347,
+      349,
+      353,
+      359,
+      367,
+      373,
+      379,
+      383,
+      389
+    ],
+    "rows": 25,
+    "ciphertext_bytes": 128822,
+    "garble_queries": 1062022,
+    "evaluate_queries": 1055144,
+    "conversion_labels_per_coordinate": 2906,
+    "coordinate_garble": [
+      555519,
+      504212
+    ],
+    "coordinate_evaluate": [
+      552221,
+      501140
+    ],
+    "evaluate_headroom": 735
+  }
+}

@@ -1,14 +1,14 @@
 /-
-The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, sign rows, 135,855 bytes).
-Every field has a proof term; every odd CRT row uses first extraction width 8, and the
+The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, sign rows, 128,822 bytes).
+Every field has a proof term; 25 odd CRT rows use first extraction width 9 and the other 59 use width 8. The
 conversion casts carry their control label in the low plane so every pin is even and is published halved;
 the chunk-tree joins are absorbed into the Lamport labels and not published.
 
 * `FixedIndex` and `EncIndex` are `Empty` (the entry is hash-only);
 * `Randomness` is the switch-system entry's `Scheme.Coins` (the CRT layer draws no coins of its own);
-* `Public` is `Kriterion.CRT.Entry.Public`, 135,855 bytes (`Wire.encoding_length`);
+* `Public` is `Kriterion.CRT.Entry.Public`, 128,822 bytes (`Wire.encoding_length`);
 * `garbleProgram` / `evaluateProgram` are `Entry.garbleProgram` / `Entry.evaluateProgram` at the
-  term-by-term budgets `garbleBudget` (988,438) and `evaluateBudget` (981,506);
+  term-by-term budgets `garbleBudget` (1,062,022) and `evaluateBudget` (1,055,144);
 * `perfectCorrectness` is `Kriterion.CRT.EntryCorrect.perfectCorrectness`
   (`Proof/Correctness/CRT/EntryCorrect.lean`);
 * `adaptivePrivacy` is `Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy`
@@ -53,7 +53,7 @@ theorem evaluateProgramCorrect (field : FieldCertificate) (group : @GroupCertifi
   rw [Entry.evaluateProgram, FreeQuery.eval_toProgram, Entry.evaluateM, eval_liftHash]
   simp only [Entry.scheme]
 
-/-- `Solution.ciphertextSize`: every public value is 135,855 bytes. -/
+/-- `Solution.ciphertextSize`: every public value is 128,822 bytes. -/
 theorem ciphertextSize (field : FieldCertificate) (group : @GroupCertificate field) (parameter : Nat)
     (scalar : NonZeroScalar) (tape : Entry.Coins × Entry.Oracle) :
     (Wire.encoding.encode ((@Entry.scheme field group).garble parameter scalar tape).1).length =
@@ -68,7 +68,7 @@ theorem perfectCorrectness (field : FieldCertificate) (group : @GroupCertificate
     GarbledCircuit.PerfectCorrectness (@Entry.scheme field group) Prod.snd :=
   Kriterion.CRT.EntryCorrect.perfectCorrectness field group
 
-/-- The configuration-E submission with sign rows, at 135,855 bytes. -/
+/-- The configuration-E submission with sign rows, at 128,822 bytes. -/
 def solution : Kriterion.Solution := {
   FixedIndex := Empty
   EncIndex := Empty

@@ -20,7 +20,7 @@ noncomputable section
 
 /-! ### Counts -/
 
-theorem joinCount_eq : joinCount = 1450 := by decide +kernel
+theorem joinCount_eq : joinCount = 1425 := by decide +kernel
 
 theorem pinCount_eq : pinCount = 200 := CrtConv.pinCount_eq
 

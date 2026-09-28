@@ -446,8 +446,18 @@ theorem stagesNonempty_width8TableOf (moduli : Array Nat)
     simp only [width8Row, bitLength]
     constructor <;> omega
 
-theorem stagesNonempty_table : table.StagesNonempty :=
-  stagesNonempty_width8TableOf bn254Moduli (by decide)
+/-- Both extraction stages of every selected real row are nonempty. -/
+theorem stagesNonempty_table : table.StagesNonempty := by
+  have facts : ∀ i : Fin table.count,
+      1 ≤ (selectiveRow 32 (table.modulus i)).width0 ∧
+        1 ≤ (selectiveRow 32 (table.modulus i)).width1 := by decide +kernel
+  intro i row kind
+  change selectiveKind (table.modulus i) = .odd row at kind
+  unfold selectiveKind at kind
+  split at kind
+  · cases kind
+  · cases kind
+    exact facts i
 
 theorem bounded_garbleCM (scalar : NonZeroScalar) (coins : Coins) :
     (garbleCM scalar coins).Bounded garbleBudget := by

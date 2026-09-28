@@ -1,0 +1,3 @@
+info: bn254-scalar-multiplication: cloning https://github.com/Kriterion-cc/kriterion-challenge
+info: bn254-scalar-multiplication: checking out revision 'aaf278948a4127f99ee6752c7cec4b9f9bd43615'
+info: mathlib: cloning https://github.com/leanprover-community/mathlib4

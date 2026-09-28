@@ -1,0 +1,15 @@
+'Submission.solution' depends on axioms: [propext, Classical.choice, Quot.sound]
+axiom check passed: only propext, Classical.choice, Quot.sound
+'Kriterion.CRT.EntryCorrect.perfectCorrectness' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Assembly.crtPrivacy' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.SimMachine.CrtTop.crtSimulator' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Entry.Wire.encoding_length' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Entry.garbleBudget_eq' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Entry.evaluateBudget_eq' depends on axioms: [propext, Classical.choice, Quot.sound]
+130122
+988438
+981506
+988438
+981506
+130122

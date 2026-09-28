@@ -1,0 +1,56 @@
+Source: e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05
+Working directory: /Users/souhail/Desktop/Projects/Babylon/kriterion-lab/codex
+
+lean --version
+git rev-parse HEAD
+git diff --exit-code -- Construction Proof Submission.lean lean-toolchain lakefile.toml lake-manifest.json
+lake exe cache get
+
+The initial cache command began a full-history Mathlib clone. It was intentionally
+terminated before any entry build, to avoid downloading irrelevant history.
+Its partial generated checkout was preserved as .lake/mathlib-incomplete-full-clone.
+Acquisition then used the exact unchanged lockfile commit:
+
+git init .lake/packages/mathlib
+git -C .lake/packages/mathlib remote add origin https://github.com/leanprover-community/mathlib4
+git -C .lake/packages/mathlib fetch --depth 1 origin 0df444a360eaa60ab8c11dca51a86af692955474
+git -C .lake/packages/mathlib checkout --detach FETCH_HEAD
+lake exe cache get
+
+Build and audits pending.
+
+Dependency source confirmation after acquisition:
+mathlib: 0df444a360eaa60ab8c11dca51a86af692955474
+challenge: aaf278948a4127f99ee6752c7cec4b9f9bd43615
+Pinned lakefile, manifest and toolchain have no changes.
+
+The first cache transfer stalled at 8,668 successful downloads / 8,686 completed
+attempts out of 8,690 for several minutes. Its curl child was terminated; the
+cache command exited 1 and reported 18 failed downloads, with 8,668 decompressed.
+No proof build had begun. Raw output is cache.log.
+
+A local acquisition-only curl wrapper adds --connect-timeout 20 --max-time 90;
+the cache retry reuses all previously downloaded artifacts. No dependency source,
+compiler flag, pinned configuration or verifier rule is changed.
+
+env PATH="$PWD/evidence/runtime-bin:$PATH" lake exe cache get
+
+Cache retry completed successfully (exit 0): all 8,690 artifacts decompressed.
+Full unchanged entry build started:
+env LEAN_NUM_THREADS=6 lake build
+
+Unchanged full build completed successfully: 3,845 jobs, exit 0.
+The audit imports Benchmark, which default entry targets do not build:
+lake build Benchmark
+This audit dependency built successfully, exit 0.
+
+lake env lean Scratch/Audit.lean
+Passed, exit 0. Metrics: 130122 / 988438 / 981506. Concrete encoded length:
+130122. Decoder guard passed. All named axiom checks passed.
+
+lake env lean Scratch/ProofAudit.lean
+Whole-tree audit running.
+
+Whole-tree audit completed successfully, exit 0:
+audited 23735 declarations; union [Quot.sound, Classical.choice, propext].
+All baseline checks passed before applying the candidate patch.
