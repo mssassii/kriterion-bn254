@@ -113,13 +113,13 @@ theorem treeGarbleM_xor (H : HashN) (tagOf : Nat → Nat → Nat) (delta bit0 : 
     ∀ levels, xorFold ((treeGarbleM tagOf delta bit0 levels).eval H).1 = delta
   | 0 => by
       change (0 : Label) ^^^ delta = delta
-      exact BitVec.zero_xor delta
+      exact BitVec.zero_xor
   | n + 1 => by
       simp only [treeGarbleM, FreeQuery.eval_bind]
       by_cases hn : n = 0
       · simp only [if_pos hn, FreeQuery.eval_pure, stored_eq, xorFold_extendLevel]
         exact treeGarbleM_xor H tagOf delta bit0 n
-      · simp only [if_neg hn, eval_garbleStepM, FreeQuery.eval_pure, xorFold_extendLevel]
+      · simp only [if_neg hn, FreeQuery.eval_bind, eval_garbleStepM, FreeQuery.eval_pure, xorFold_extendLevel]
         exact treeGarbleM_xor H tagOf delta bit0 n
 
 /-- The low plane of a finite arithmetic sum is the XOR of the low planes. -/
@@ -144,6 +144,7 @@ theorem pin_even_of_leaf_xor {width count : Nat} (casts : Fin count → Lanes (w
   rw [Parity.laneBit_add_zero, laneBit_sum_zero, Parity.laneBit_deltaLanes_zero]
   have castBits : (fun i => laneBit (casts i) 0) = leaves := funext low
   rw [castBits, tree, BitVec.xor_self]
+  rfl
 
 /-- The zero-width lane ring is the singleton zero pin. -/
 theorem evenLanes_width_zero (pin : Lanes 0) : Parity.EvenLanes pin := by

@@ -332,4 +332,97 @@ theorem upper_spec_publish_injective {rb : ℕ} (sp : StageParams rb) (hw : 1 �
   | zero => have bound := sp.hw; omega
   | succ r => exact parity_spec_publish_injective sp hw cold R Δ s hs
 
+/-- Reconstruct a full cast from its upper planes and its proved low plane. -/
+theorem liftUpper_pinHalf_of_low {rb : ℕ} (A : Kriterion.CRT.Lanes rb) (G : Label)
+    (low : Kriterion.CRT.laneBit A 0 = G) :
+    Parity.liftUpper rb (Parity.pinHalf rb A) G = A := by
+  cases rb with
+  | zero => rfl
+  | succ rb =>
+      simpa only [low] using Parity.parityLift_halfLanes_laneBit A
+
+/-- Only the tree-material component influences tree nodes. -/
+theorem gNode_upperOverrideHot {rb : ℕ} (sp : StageParams rb) (b0 Δ : Label) (s : ℕ)
+    (h : UpperHidden sp.w rb) (full : Kriterion.CRT.Lanes rb) :
+    ∀ n x, gNode (upperOverrideHot sp s h) b0 Δ n x =
+      gNode (overrideHot sp s (h.1, full)) b0 Δ n x
+  | 0, _ => rfl
+  | n + 1, x => by
+      simp only [gNode, gNode_upperOverrideHot sp b0 Δ s h full n]
+      cases n <;> rfl
+
+/-- The independent upper data of the stage's own hot answers. -/
+def upperHiddenOfSpec {rb : ℕ} (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb)
+    (Δ : Label) (s : ℕ) : UpperHidden sp.w rb :=
+  ((hiddenOfSpec sp R Δ s).1, Parity.pinHalf rb (gCast sp R Δ s))
+
+/-- At its own hot upper data, every cast is restored exactly. -/
+theorem gCast_upper_override_self {rb : ℕ} (sp : StageParams rb)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s α : ℕ) :
+    gCast (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R Δ α = gCast sp R Δ α := by
+  unfold gCast gLeaf
+  show (if α = s then _ else sp.castF α _) = _
+  rw [show (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)).w = sp.w from rfl,
+    show gBit0 (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R = gBit0 sp R from rfl,
+    gNode_upperOverrideHot sp (gBit0 sp R) Δ s _ (gCast sp R Δ s)]
+  change (if α = s then _ else sp.castF α
+    (gNode (overrideHot sp s (hiddenOfSpec sp R Δ s)) (gBit0 sp R) Δ sp.w α)) = _
+  rw [gNode_override_self sp R Δ s sp.w le_rfl α]
+  split_ifs with hα
+  · subst α
+    exact liftUpper_pinHalf_of_low (gCast sp R Δ s) _ (cold s _)
+  · rfl
+
+/-- The stage's class sums are unchanged at its own hot upper data. -/
+theorem gRes_upper_override_self {rb : ℕ} (sp : StageParams rb)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s n : ℕ) :
+    gRes (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R Δ n = gRes sp R Δ n :=
+  Finset.sum_congr rfl fun α _ => by rw [gCast_upper_override_self sp cold R Δ s α]
+
+theorem gNext_upper_override_self {rb : ℕ} (sp : StageParams rb)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ) :
+    (Kriterion.CRT.ExtractSpec.gNext (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R Δ :
+      Kriterion.CRT.Lanes (rb - sp.w)) = Kriterion.CRT.ExtractSpec.gNext sp R Δ := by
+  show Kriterion.CRT.peelDiv R
+    (gRes (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R Δ sp.w) sp.w = _
+  rw [gRes_upper_override_self sp cold R Δ s sp.w]
+
+theorem gBit_upper_override_self {rb : ℕ} (sp : StageParams rb)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s n : ℕ) :
+    gBit (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R Δ n = gBit sp R Δ n := by
+  unfold gBit
+  rw [gRes_upper_override_self sp cold R Δ s n]
+  rfl
+
+/-- At its own upper readings the stage publishes its actual joins and half-pin. -/
+theorem upperSpecPublish_self {rb : ℕ} (sp : StageParams rb) (hw : 1 ≤ sp.w)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ) (hs : s < 2 ^ sp.w) :
+    upperSpecPublish sp R Δ s (upperHiddenOfSpec sp R Δ s) =
+      ((fun k => gJoin sp R Δ (k.val + 1)), Parity.pinHalf rb (gPin sp R Δ)) := by
+  cases rb with
+  | zero => have bound := sp.hw; omega
+  | succ rb =>
+      rw [upperSpecPublish_succ, parity_spec_publish_eq sp hw R Δ s]
+      have leaf : level (specFrame sp R Δ) s (hiddenOfSpec sp R Δ s).1 (sp.w - 1) s =
+          gLeaf sp R Δ s := by
+        have nodes := gNode_override sp R Δ s (hiddenOfSpec sp R Δ s) (sp.w - 1) s
+          (by simpa only [Nat.sub_add_cancel hw] using hs)
+        rw [Nat.sub_add_cancel hw, gNode_override_self sp R Δ s sp.w le_rfl s] at nodes
+        exact nodes.symm
+      have hidden : embedParityHidden (specFrame sp R Δ) s (upperHiddenOfSpec sp R Δ s) =
+          hiddenOfSpec sp R Δ s := by
+        apply Prod.ext rfl
+        change Parity.parityLift (Parity.halfLanes (gCast sp R Δ s))
+          (level (specFrame sp R Δ) s (hiddenOfSpec sp R Δ s).1 (sp.w - 1) s) = gCast sp R Δ s
+        rw [leaf]
+        exact liftUpper_pinHalf_of_low (gCast sp R Δ s) _ (cold s _)
+      unfold parityPublish
+      rw [hidden, ← spec_garbler_eq_publish sp R Δ s hw]
+      rfl
+
 end Kriterion.CRT.Privacy.ExtractStage

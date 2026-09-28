@@ -800,20 +800,20 @@ theorem conv_rel (hot cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m : �
   have hJ1₂ : pub₂.stageJoin i 1 = ((extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ₂
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₂ W₂).eval H₂).next).eval H₂).joins := by
     rw [hpJ₂]; rfl
-  have hP0₁ : (pinOfBlocks row.ell fun k => pub₁.stagePin i 0 k.val) =
+  have hP0₁ : (Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub₁.stagePin i 0 k.val)) =
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₁ W₁).eval H₁).pin := by
-    rw [hpP₁]; exact pinOfBlocks_atNat (by omega) _
-  have hP0₂ : (pinOfBlocks row.ell fun k => pub₂.stagePin i 0 k.val) =
+    rw [hpP₁]; exact expand_pinOfBlocks_atNat _ _ (extStageGarbleM_pin_even _ _ _ _ _ _)
+  have hP0₂ : (Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub₂.stagePin i 0 k.val)) =
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₂ W₂).eval H₂).pin := by
-    rw [hpP₂]; exact pinOfBlocks_atNat (by omega) _
-  have hP1₁ : (pinOfBlocks (row.ell - row.width0) fun k => pub₁.stagePin i 1 k.val) =
+    rw [hpP₂]; exact expand_pinOfBlocks_atNat _ _ (extStageGarbleM_pin_even _ _ _ _ _ _)
+  have hP1₁ : (Parity.pinExpand (row.ell - row.width0) (pinOfBlocks (row.ell - row.width0 - 1) fun k => pub₁.stagePin i 1 k.val)) =
       ((extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ₁
         ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₁ W₁).eval H₁).next).eval H₁).pin := by
-    rw [hpP₁]; exact pinOfBlocks_atNat (by omega) _
-  have hP1₂ : (pinOfBlocks (row.ell - row.width0) fun k => pub₂.stagePin i 1 k.val) =
+    rw [hpP₁]; exact expand_pinOfBlocks_atNat _ _ (extStageGarbleM_pin_even _ _ _ _ _ _)
+  have hP1₂ : (Parity.pinExpand (row.ell - row.width0) (pinOfBlocks (row.ell - row.width0 - 1) fun k => pub₂.stagePin i 1 k.val)) =
       ((extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ₂
         ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₂ W₂).eval H₂).next).eval H₂).pin := by
-    rw [hpP₂]; exact pinOfBlocks_atNat (by omega) _
+    rw [hpP₂]; exact expand_pinOfBlocks_atNat _ _ (extStageGarbleM_pin_even _ _ _ _ _ _)
   set g0₁ := (extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₁ W₁).eval H₁ with hg0₁
   set g0₂ := (extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ₂ W₂).eval H₂ with hg0₂
   set g1₁ := (extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ₁ g0₁.next).eval H₁ with hg1₁
@@ -837,7 +837,7 @@ theorem conv_rel (hot cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m : �
   obtain ⟨rel0, e0Eq⟩ := stage_rel H₁ H₂ row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0) h0 hot cold Δ₁ Δ₂
     W₁ W₂ σ hW
     (fun n h1' h2' => by rw [← hJ0₁, ← hJ0₂]; exact j0 n h1' h2')
-    (by rw [← hP0₁, ← hP0₂]; exact FlatLayout.pinOfBlocks_congr _ _ _ fun k => p0 k.val k.isLt)
+    (by rw [← hP0₁, ← hP0₂]; exact congrArg (Parity.pinExpand _) (FlatLayout.pinOfBlocks_congr _ _ _ fun k => p0 k.val k.isLt))
     agree0
     (fun ℓ h1' h2' y hy => not_iff_not.mp (hotTags.tree0 ℓ h1' h2' y hy))
     (fun α hα j hj => not_iff_not.mp (hotTags.cast0 α hα j hj))
@@ -861,7 +861,7 @@ theorem conv_rel (hot cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m : �
   obtain ⟨rel1, e1Eq⟩ := stage_rel H₁ H₂ row.width1 hw1' (extTreeTag coord i 1) (extCastTag coord i 1) h1 hot cold
     Δ₁ Δ₂ g0₁.next g0₂.next (σ / 2 ^ row.width0) hR1
     (fun n h1' h2' => by rw [← hJ1₁, ← hJ1₂]; exact j1 n h1' h2')
-    (by rw [← hP1₁, ← hP1₂]; exact FlatLayout.pinOfBlocks_congr _ _ _ fun k => p1 k.val k.isLt)
+    (by rw [← hP1₁, ← hP1₂]; exact congrArg (Parity.pinExpand _) (FlatLayout.pinOfBlocks_congr _ _ _ fun k => p1 k.val k.isLt))
     agree1
     (fun ℓ h1' h2' y hy => not_iff_not.mp (hotTags.tree1 ℓ h1' h2' y hy))
     (fun α hα j hj => not_iff_not.mp (hotTags.cast1 α hα j hj))
@@ -1144,12 +1144,14 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
   obtain ⟨cJ, cP, mA⟩ := hpub
   -- the chunks
   have chunkPin : ∀ (Δ : Label) (Z : ℕ → Label) (H : HashN) c (hc : c < T.chunkCount),
-      (fun k : Fin T.castWidth => ((coordGarbleM T S coord Δ Z).eval H).pub.chunkPin c k.val) =
-        pinBlocks ((chunkGarbleM T coord Δ Z c).eval H).pin →
+      (fun k : Fin (T.castWidth - 1) => ((coordGarbleM T S coord Δ Z).eval H).pub.chunkPin c k.val) =
+        pinBlocks (Parity.pinHalf T.castWidth ((chunkGarbleM T coord Δ Z c).eval H).pin) →
       ((chunkGarbleM T coord Δ Z c).eval H).pin =
-        pinOfBlocks T.castWidth fun k => ((coordGarbleM T S coord Δ Z).eval H).pub.chunkPin c k.val := by
+        Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1)
+          fun k => ((coordGarbleM T S coord Δ Z).eval H).pub.chunkPin c k.val) := by
     intro Δ Z H c hc same
-    rw [same, pinOfBlocks_pinBlocks hT.castWidth_pos]
+    rw [same, pinOfBlocks_pinBlocks_all,
+      Parity.pinExpand_pinHalf _ _ (chunkGarbleM_pin_even H T coord Δ Z c)]
   have chunkFacts : ∀ c (hc : c < T.chunkCount),
       RelAsked (fun τ => hotTag T u τ = true) (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (chunkGarbleM T coord Δ₁ Z₁ c))
           (asked H₂ (chunkGarbleM T coord Δ₂ Z₂ c)) ∧
@@ -1167,7 +1169,7 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
       rw [fJ₁ c, fJ₂ c, atNat_of_lt _ _ hc, atNat_of_lt _ _ hc] at this
       exact this
     · rw [chunkPin Δ₁ Z₁ H₁ c hc (fP₁ c hc), chunkPin Δ₂ Z₂ H₂ c hc (fP₂ c hc)]
-      exact FlatLayout.pinOfBlocks_congr _ _ _ fun k => cP c hc k.val k.isLt
+      exact congrArg (Parity.pinExpand _) (FlatLayout.pinOfBlocks_congr _ _ _ fun k => cP c hc k.val k.isLt)
   set chunks₁ := atNat (fun c : Fin T.chunkCount => (chunkGarbleM T coord Δ₁ Z₁ c.val).eval H₁)
     (ChunkGarbled.empty T.castWidth) with hchunks₁
   set chunks₂ := atNat (fun c : Fin T.chunkCount => (chunkGarbleM T coord Δ₂ Z₂ c.val).eval H₂)

@@ -14,7 +14,7 @@ CRT slice, conversion chain part B: the fused extraction stage as the query prog
   `R' + ⌊σ / 2^w⌋•Δ⃗`.
 -/
 
-import Proof.Correctness.CRT.TreeSteps
+import Proof.Correctness.CRT.ParityCast
 
 namespace Kriterion.CRT.SliceC
 
@@ -156,7 +156,7 @@ theorem stepMat_pos {rb : Nat} (sp : StageParams rb) (b0 : Label) {n : Nat} (hn 
   rfl
 
 theorem eval_castM (H : HashN) (l : Nat) (label : Label) (tagOf : Nat → Nat) :
-    (castM l label tagOf).eval H = castLanes l (hlong H (embed label) tagOf (castAnswers l)) := by
+    (castM l label tagOf).eval H = Parity.parityCastLanes l label (hlong H (embed label) tagOf (castAnswers l)) := by
   simp [castM, materialize_eq]
 
 theorem scaleLanes_eq {l : Nat} (k : Nat) (A : Lanes l) : scaleLanes k A = (k : ZMod (2 ^ l)) • A := by
@@ -231,7 +231,7 @@ theorem extStageGarbleM_eval (Δ : Label) (R : Lanes rb) :
     intro α hα
     rw [ht1]; rfl
   have hres : ∀ n, (∑ leaf : Fin (2 ^ w), scaleLanes (leaf.val % 2 ^ n)
-      (castLanes rb (hlong H (embed (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf))
+      (Parity.parityCastLanes rb (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf) (hlong H (embed (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf))
         (castTag leaf.val) (castAnswers rb)))) = gRes sp R Δ n := by
     intro n
     unfold gRes
@@ -241,7 +241,7 @@ theorem extStageGarbleM_eval (Δ : Label) (R : Lanes rb) :
     rw [scaleLanes_eq, ← hcast leaf.val leaf.isLt]
     rfl
   have hpinsum : (∑ leaf : Fin (2 ^ w),
-      castLanes rb (hlong H (embed (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf))
+      Parity.parityCastLanes rb (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf) (hlong H (embed (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf))
         (castTag leaf.val) (castAnswers rb))) = ∑ α ∈ Finset.range (2 ^ w), gCast sp R Δ α := by
     rw [← Fin.sum_univ_eq_sum_range (fun α => gCast sp R Δ α)]
     apply Finset.sum_congr rfl
@@ -268,6 +268,18 @@ theorem extStageGarbleM_eval (Δ : Label) (R : Lanes rb) :
     simp only
     rw [hres]
     rfl
+
+/-- Every extraction pin is even, for every hash and offset (including zero). -/
+theorem extStageGarbleM_pin_even (Δ : Label) (R : Lanes rb) :
+    Parity.EvenLanes ((extStageGarbleM w treeTag castTag Δ R).eval H).pin := by
+  let tree := (treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H
+  have even := pin_even_of_leaf_xor_total
+    (fun leaf : Fin (2 ^ w) => Parity.parityCastLanes rb (tree.1 leaf)
+      (hlong H (embed (tree.1 leaf)) (castTag leaf.val) (castAnswers rb))) tree.1 Δ
+    (fun positive leaf => parityCastLanes_low positive _ _)
+    (treeGarbleM_xor H treeTag Δ (laneBit (reduceTo w R) 0) w)
+  simpa only [extStageGarbleM, FreeQuery.eval_bind, eval_tableM, eval_castM,
+    FreeQuery.eval_pure, materialize_eq, sumLanes_eq] using even
 
 end Garbler
 
@@ -438,7 +450,8 @@ theorem expandM_sums (R : Lanes rb) (Δ : Label) (s n : Nat) (hn : n < w) (c : N
     rfl
   have hcastsum : ∀ (V : Nat → ZMod (2 ^ rb)),
       (∑ t : Fin (2 ^ (w - (n + 1))), V (c + 2 ^ (n + 1) * t.val) •
-        castLanes rb (hlong H (embed (((subtreeM treeTag (n + 1) c (gNode sp (gBit0 sp R) Δ (n + 1) c)
+        Parity.parityCastLanes rb (((subtreeM treeTag (n + 1) c (gNode sp (gBit0 sp R) Δ (n + 1) c)
+          (w - (n + 1))).eval H).1 t) (hlong H (embed (((subtreeM treeTag (n + 1) c (gNode sp (gBit0 sp R) Δ (n + 1) c)
           (w - (n + 1))).eval H).1 t)) (castTag (c + 2 ^ (n + 1) * t.val)) (castAnswers rb))) =
       ∑ α ∈ Finset.range (2 ^ w), (if α % 2 ^ (n + 1) = c then V α • gCast sp R Δ α else 0) := by
     intro V
@@ -446,7 +459,7 @@ theorem expandM_sums (R : Lanes rb) (Δ : Label) (s n : Nat) (hn : n < w) (c : N
       ← Fin.sum_univ_eq_sum_range (fun t => V (c + 2 ^ (n + 1) * t) • gCast sp R Δ (c + 2 ^ (n + 1) * t))]
     apply Finset.sum_congr rfl
     intro t _
-    rw [hleaf]
+    simp only [hleaf]
     rfl
   have hbr := fun x => branch_succ_iff (x := x) hc hcs hcb
   have hdj := fun x => branch_disjoint (x := x) (c := c) hcs

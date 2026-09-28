@@ -20,6 +20,24 @@ theorem pinOfBlocks_atNat {width : Nat} (hw : 0 < width) (P : Lanes width) :
     rw [atNat_of_lt _ _ k.isLt, stored_eq]
   rw [this, pinOfBlocks_pinBlocks hw]
 
+/-- The dense pin codec also round-trips the zero-width singleton. -/
+theorem pinOfBlocks_pinBlocks_all {width : Nat} (P : Lanes width) :
+    pinOfBlocks width (pinBlocks P) = P := Narrow.pinOfBlocks_pinBlocks P
+
+/-- The total-indexed public wire round-trips at every stored width. -/
+theorem pinOfBlocks_atNat_all {width : Nat} (P : Lanes width) :
+    (pinOfBlocks width fun k => atNat (stored (pinBlocks P)) 0 k.val) = P := by
+  have same : (fun k : Fin width => atNat (stored (pinBlocks P)) 0 k.val) = pinBlocks P := by
+    funext k
+    rw [atNat_of_lt _ _ k.isLt, stored_eq]
+  rw [same, pinOfBlocks_pinBlocks_all]
+
+/-- The compressed public wire restores every even internal pin. -/
+theorem expand_pinOfBlocks_atNat (width : Nat) (P : Lanes width) (even : Parity.EvenLanes P) :
+    Parity.pinExpand width (pinOfBlocks (width - 1) fun k =>
+      atNat (stored (pinBlocks (Parity.pinHalf width P))) 0 k.val) = P := by
+  rw [pinOfBlocks_atNat_all, Parity.pinExpand_pinHalf width P even]
+
 /-- The conversion after the two fused stages: the free stage-2 bit, growth, reindex and folds,
 from any stage results that satisfy the stage invariant (L10) against the garbler's. -/
 theorem after_stages_correct (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Label)
@@ -127,15 +145,18 @@ theorem conversion_final (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (�
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H).next).eval H).joins := by
     rw [hpJ]
     rfl
-  have hP0 : (pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) =
+  have hP0 : Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub.stagePin i 0 k.val) =
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H).pin := by
     rw [hpP]
-    exact pinOfBlocks_atNat (by omega) _
-  have hP1 : (pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) =
+    exact expand_pinOfBlocks_atNat _ _
+      (extStageGarbleM_pin_even H row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W)
+  have hP1 : Parity.pinExpand (row.ell - row.width0)
+      (pinOfBlocks (row.ell - row.width0 - 1) fun k => pub.stagePin i 1 k.val) =
       ((extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ
         ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H).next).eval H).pin := by
     rw [hpP]
-    exact pinOfBlocks_atNat (by omega) _
+    exact expand_pinOfBlocks_atNat _ _
+      (extStageGarbleM_pin_even H row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ _)
   simp only [conversionEvalM, FreeQuery.eval_bind]
   rw [hJ0, hP0, hn0, hJ1, hP1, hpG, hpF]
   exact after_stages_correct H coord i row m Δ σ h0 h1 hell hk0 hk1 hm hσ hl0 hb0 hb1 hn1

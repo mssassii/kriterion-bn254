@@ -91,12 +91,12 @@ theorem pin_readback (w L : Nat) (P : Lanes w) (same : w = L) (positive : 0 < L)
   rw [atNat_pinBlocks, SliceC.pinOfBlocks_pinBlocks positive]
 
 theorem pinWidth_chunk (c : Nat) (hc : c < table.chunkCount) (hk : c < pinCount) :
-    pinWidth ⟨c, hk⟩ = table.castWidth := by
+    pinWidth ⟨c, hk⟩ = table.castWidth - 1 := by
   have h : c < pinWidths.length := hk
-  show pinWidths[c]'h = table.castWidth
-  have key : ∀ (l : List Nat), l = List.replicate table.chunkCount table.castWidth ++
+  show pinWidths[c]'h = table.castWidth - 1
+  have key : ∀ (l : List Nat), l = List.replicate table.chunkCount (table.castWidth - 1) ++
       (List.finRange table.count).flatMap (fun i => modPinWidths (table.kind i)) →
-      ∀ (h : c < l.length), l[c]'h = table.castWidth := by
+      ∀ (h : c < l.length), l[c]'h = table.castWidth - 1 := by
     intro l hl h
     subst hl
     rw [List.getElem_append_left (by simpa using hc)]
@@ -105,9 +105,9 @@ theorem pinWidth_chunk (c : Nat) (hc : c < table.chunkCount) (hk : c < pinCount)
 
 theorem chunkPin_lanes (κ : Fin 2) (c : Nat) (hc : c < table.chunkCount) (hk : c < pinCount)
     (lane : Fin laneCount) :
-    ((pinOfBlocks table.castWidth fun k => (convPub s κ).chunkPin c k.val) lane).val =
+    ((pinOfBlocks (table.castWidth - 1) fun k => (convPub s κ).chunkPin c k.val) lane).val =
       ((s.pins κ ⟨c, hk⟩) lane).val := by
-  have reads : (fun k : Fin table.castWidth => (convPub s κ).chunkPin c k.val) =
+  have reads : (fun k : Fin (table.castWidth - 1) => (convPub s κ).chunkPin c k.val) =
       fun k => atNat (pinBlocks (s.pins κ ⟨c, hk⟩)) 0 k.val := by
     funext k
     rw [(convAgree_publish s κ).2.1 c hc k.val k.isLt]
@@ -115,9 +115,9 @@ theorem chunkPin_lanes (κ : Fin 2) (c : Nat) (hc : c < table.chunkCount) (hk : 
   rw [reads]
   exact pin_readback _ _ _ (pinWidth_chunk c hc hk) (by decide) lane
 
-/-- A stage pin read back, given the width of its pin index (`ell` for stage 0, `ell - width0` for stage 1). -/
+/-- A stage pin read back, given the width of its pin index (`ell - 1` for stage 0, `ell - width0 - 1` for stage 1). -/
 theorem stagePin_lanes (κ : Fin 2) (i : Fin table.count) (row : OddRow) (kind : table.kind i = .odd row)
-    (stage : Nat) (width : Nat) (widthEq : width = if stage = 0 then row.ell else row.ell - row.width0)
+    (stage : Nat) (width : Nat) (widthEq : width = if stage = 0 then row.ell - 1 else row.ell - row.width0 - 1)
     (hk : modPinBase i + stage < pinCount) (sameWidth : pinWidth ⟨modPinBase i + stage, hk⟩ = width)
     (positive : 0 < width) (stageLe : stage ≤ 1) (lane : Fin laneCount) :
     ((pinOfBlocks width fun k => (convPub s κ).stagePin i stage k.val) lane).val =
@@ -129,14 +129,14 @@ theorem stagePin_lanes (κ : Fin 2) (i : Fin table.count) (row : OddRow) (kind :
     obtain ⟨kv, kLt⟩ := k
     rcases Nat.le_one_iff_eq_zero_or_eq_one.mp stageLe with zero | one
     · subst zero
-      have kLt' : kv < row.ell := by
+      have kLt' : kv < row.ell - 1 := by
         have h := kLt
         rw [widthEq, if_pos rfl] at h
         exact h
       rw [agree.2.2.1 kv kLt']
       simp only [Source.conv, Source.pinBlockAt, dif_pos hk]
     · subst one
-      have kLt' : kv < row.ell - row.width0 := by
+      have kLt' : kv < row.ell - row.width0 - 1 := by
         have h := kLt
         rw [widthEq, if_neg (by decide)] at h
         exact h
@@ -196,7 +196,7 @@ theorem modPinsNat_length (i : Nat) :
   unfold modPinsNat CrtTable.kindAt
   split <;> rfl
 
-theorem pinWidths_eq : pinWidths = List.replicate table.chunkCount table.castWidth ++
+theorem pinWidths_eq : pinWidths = List.replicate table.chunkCount (table.castWidth - 1) ++
     (List.range table.count).flatMap modPinsNat := by
   unfold pinWidths
   rw [flatMap_finRange_eq]

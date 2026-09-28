@@ -25,6 +25,7 @@ upcast `U^E = res_w + s•Δ⃗`, and the peeled remainder `R'^E = R' + ⌊σ/2^
 
 import Proof.Correctness.CRT.Arith
 import Construction.CRT.ExtractSpec
+import Construction.CRT.ParityCast
 
 namespace Kriterion.CRT.SliceC
 
@@ -393,7 +394,7 @@ end Stage
 /-! ### The per-wire form over the layer's hash -/
 
 /-- One fused stage over the hash of the layer: tree material `hLabel H label (treeTag level slot)`
-and leaf casts `castLanes rb (hlong H (embed label) (castTag leaf) (castAnswers rb))` (D11). At the frozen
+and leaf casts `Parity.parityCastLanes rb label (hlong H (embed label) (castTag leaf) (castAnswers rb))`. At the frozen
 tags, `treeTag = fun n x => tagCode Family.extTree κ i st n x 0` and
 `castTag = fun α j => tagCode Family.extCast κ i st 0 α j`. -/
 def hashStage (H : HashN) {rb : Nat} (w : Nat) (hw : w ≤ rb) (treeTag castTag : Nat → Nat → Nat) :
@@ -401,7 +402,7 @@ def hashStage (H : HashN) {rb : Nat} (w : Nat) (hw : w ≤ rb) (treeTag castTag 
   w := w
   hw := hw
   mat := fun n x lab => hLabel H lab (treeTag n x)
-  castF := fun α lab => castLanes rb (hlong H (embed lab) (castTag α) (castAnswers rb))
+  castF := fun α lab => Parity.parityCastLanes rb lab (hlong H (embed lab) (castTag α) (castAnswers rb))
 
 /-- **C3, per-wire form**: `stage_invariant` for every hash `H : HashN` and every tag assignment;
 with `H = tableHash T` it is the statement on an answer table `T`, with hot positions overridden

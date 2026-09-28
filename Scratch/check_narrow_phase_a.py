@@ -82,13 +82,13 @@ def main():
         growth_e = growth_g - (keep - w0)
         row_g += g0 + g1 + growth_g + (ell - keep) * m
         row_e += e0 + e1 + growth_e + (ell - keep) * (m - 1)
-        row_pins += ell + ell - w0
+        row_pins += ell - 1 + ell - w0 - 1
         row_joins += w0 - 1 + w1 - 1 + keep - w0 + ell - keep
 
     chunks = [8] * 31 + [6]
     chunk_g = sum(extract(width, 14)[0] for width in chunks)
     chunk_e = sum(extract(width, 14)[1] for width in chunks)
-    pins = 32 * 14 + row_pins
+    pins = 32 * (14 - 1) + row_pins
     joins = sum(width - 1 for width in chunks) + row_joins
     blocks = pins + joins
     coord_g, coord_e = [], []
@@ -105,10 +105,10 @@ def main():
     evaluate = sum(coord_e) + 1 + 1092 + 690
     record_bytes = ceildiv((2 * math.prod(moduli) - 1).bit_length(), 8)
     ciphertext = 96 + 91 * 96 + 91 * 1 + 2 * blocks * (LABEL_BITS // 8) + 642 * record_bytes
-    assert (blocks, joins, pins, record_bytes) == (3378, 1450, 1928, 78)
+    assert (blocks, joins, pins, record_bytes) == (3178, 1450, 1728, 78)
     assert coord_g == [518727, 467420]
     assert coord_e == [515402, 464321]
-    assert (ciphertext, garble, evaluate) == (146827, 988438, 981506)
+    assert (ciphertext, garble, evaluate) == (141627, 988438, 981506)
     assert garble + 500 <= 1759967 and evaluate + 500 <= 1055879
 
     for name, value in [('convCount', blocks), ('ciphertextBytes', ciphertext)]:

@@ -34,7 +34,7 @@ run_cmd do
 
 /- Recompute from the construction definitions, not a copied score record. -/
 set_option maxRecDepth 100000 in
-example : ciphertextBytes = 146827 ∧ garbleBudget = 988438 ∧ evaluateBudget = 981506 := by
+example : ciphertextBytes = 141627 ∧ garbleBudget = 988438 ∧ evaluateBudget = 981506 := by
   decide +kernel
 
 /- Both query gates have at least 500 queries of headroom. -/
@@ -42,5 +42,5 @@ example : garbleBudget + 500 ≤ 1759967 ∧ evaluateBudget + 500 ≤ 1055879 :=
   rw [garbleBudget_eq, evaluateBudget_eq]
   decide +kernel
 
-example : Entry.table.convBlocks = 3378 := by
+example : Entry.table.convBlocks = 3178 := by
   simpa only [convCount] using convBlocks_table

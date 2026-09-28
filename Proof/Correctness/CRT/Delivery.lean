@@ -40,7 +40,8 @@ theorem coordGarbleM_fields (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Lab
     let g := (coordGarbleM T S coord Δ Z).eval H
     (∀ c, g.pub.chunkJoin c = (chunksG c).joins) ∧
       (∀ c (hc : c < T.chunkCount),
-        (fun k : Fin T.castWidth => g.pub.chunkPin c k.val) = pinBlocks (chunkTableG ⟨c, hc⟩).pin) ∧
+        (fun k : Fin (T.castWidth - 1) => g.pub.chunkPin c k.val) =
+          pinBlocks (Parity.pinHalf T.castWidth (chunkTableG ⟨c, hc⟩).pin)) ∧
       (∀ i : Fin T.count, g.pub.stageJoin i.val = (modsG i).stageJoins ∧
         g.pub.stagePin i.val = (modsG i).stagePins ∧ g.pub.growJoin i.val = (modsG i).growJoins ∧
         g.pub.foldJoin i.val = (modsG i).foldJoins) ∧
@@ -152,16 +153,17 @@ theorem coord_delivery (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Label) (
   -- the chunk step, with the published chunk material
   have hchunk : ∀ c (hc : c < T.chunkCount),
       (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v (g.pub.chunkJoin c)
-        (pinOfBlocks T.castWidth fun k => g.pub.chunkPin c k.val) c).eval H =
+        (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => g.pub.chunkPin c k.val)) c).eval H =
       (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v
         ((chunkGarbleM T coord Δ Z c).eval H).joins ((chunkGarbleM T coord Δ Z c).eval H).pin c).eval H := by
     intro c hc
-    rw [fJ c, fP c hc, pinOfBlocks_pinBlocks hT.castWidth_pos, atNat_of_lt _ _ hc]
+    rw [fJ c, fP c hc, pinOfBlocks_pinBlocks_all,
+      Parity.pinExpand_pinHalf _ _ (chunkGarbleM_pin_even H T coord Δ Z c), atNat_of_lt _ _ hc]
   set chunksG := atNat (fun c : Fin T.chunkCount => (chunkGarbleM T coord Δ Z c.val).eval H)
     (ChunkGarbled.empty T.castWidth) with hchunksG
   set chunksE := atNat (fun index : Fin T.chunkCount =>
     (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v (g.pub.chunkJoin index.val)
-      (pinOfBlocks T.castWidth fun k => g.pub.chunkPin index.val k.val) index.val).eval H)
+      (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => g.pub.chunkPin index.val k.val)) index.val).eval H)
     (ChunkEval.empty T.castWidth) with hchunksE
   have hL : ∀ c < T.chunkCount, ∀ α < 2 ^ T.chunkWidth c,
       (chunksE c).leaves α = (chunksG c).leaves α ^^^ (if α = T.chunkValue v c then Δ else 0) := by

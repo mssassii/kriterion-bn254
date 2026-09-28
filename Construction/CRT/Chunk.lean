@@ -15,6 +15,7 @@ per-chunk records have one type for every chunk width.
 -/
 
 import Construction.CRT.Tree
+import Construction.CRT.ParityCast
 
 namespace Kriterion.CRT
 
@@ -24,7 +25,7 @@ open Cryptography Kriterion.ArgoMAC
 
 /-- A cast of width `l`: `castAnswers l` answers at `tagOf part`, read block-aligned (D11). -/
 def castM (l : Nat) (label : Label) (tagOf : Nat → Nat) : CM (Lanes l) :=
-  hlongM (embed label) tagOf (castAnswers l) >>= fun value => pure (materialize (castLanes l value))
+  hlongM (embed label) tagOf (castAnswers l) >>= fun value => pure (materialize (Parity.parityCastLanes l label value))
 
 /-- The sum of a finite family of lanes, lane by lane, stored. -/
 def sumLanes {l count : Nat} (family : Fin count → Lanes l) : Lanes l :=

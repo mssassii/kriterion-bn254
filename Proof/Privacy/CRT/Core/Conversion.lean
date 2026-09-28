@@ -31,7 +31,7 @@ namespace Kriterion.CRT.Privacy.Conv
 
 open Cryptography Kriterion.ArgoMAC Kriterion.CRT
 open Kriterion.CRT.ExtractSpec (StageParams gJoin gPin gBit gNext gCast gLeaf gRes gNode gBit0 gLevelSum)
-open Kriterion.CRT.Privacy.ExtractStage (Hidden overrideHot specPublish spec_publish_injective)
+open Kriterion.CRT.Privacy.ExtractStage (Hidden overrideHot specPublish spec_publish_injective UpperHidden upperOverrideHot upperSpecPublish upper_spec_publish_injective)
 
 noncomputable section
 
@@ -87,12 +87,12 @@ theorem rowOf_hw1 (k : Kind) (m : ℕ) : (rowOf k m).width1 ≤ (rowOf k m).ell 
 /-- The values of one modulus: stage 0's and stage 1's tuples (joins of the hashed levels and the pin), the growth
 joins and the fold joins. -/
 abbrev StageVals (row : OddRow) : Type :=
-  Hidden labelBits row.width0 row.ell × Hidden labelBits row.width1 (row.ell - row.width0) ×
+  UpperHidden row.width0 row.ell × UpperHidden row.width1 (row.ell - row.width0) ×
     (Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label)
 
 /-- The values of the chunks: the joins of the hashed tree levels `1 .. w_c − 1` and the pins. -/
 abbrev ChunkVals (tbl : CrtTable) : Type :=
-  ((c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) × (Fin tbl.chunkCount → Lanes tbl.castWidth)
+  ((c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) × (Fin tbl.chunkCount → Lanes (tbl.castWidth - 1))
 
 /-- **The conversion values of one coordinate**: the hidden values at the hot slots, and equally the published
 conversion material (one join per hashed level, one pin per cast family). -/
@@ -100,7 +100,7 @@ abbrev ConvVals (tbl : CrtTable) : Type :=
   ChunkVals tbl × ((i : Fin tbl.count) → StageVals (rowOf (tbl.kind i) (tbl.modulus i)))
 
 instance stageValsFintype (row : OddRow) : Fintype (StageVals row) := by
-  unfold StageVals Hidden
+  unfold StageVals UpperHidden Hidden
   infer_instance
 
 instance stageValsNonempty (row : OddRow) : Nonempty (StageVals row) :=
@@ -126,10 +126,22 @@ section Publish
 
 variable (tbl : CrtTable) (coord v : ℕ) (r : ConvRest)
 
-/-- The cast of leaf `leaf` of chunk `c`: the hidden cast at the hot leaf, the table's reading elsewhere. -/
-def chunkCastH (pins : Fin tbl.chunkCount → Lanes tbl.castWidth) (c : Fin tbl.chunkCount) (leaf : ℕ) :
-    Lanes tbl.castWidth :=
-  if leaf = tbl.chunkValue v c.val then pins c else castRd r.table tbl.castWidth (chunkCastTag coord c.val leaf)
+/-- The material at a tree slot, with its hot entry replaced by the hidden label. -/
+def chunkMatH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label)
+    (c : Fin tbl.chunkCount) (n slot : ℕ) : Label :=
+  if slot = tbl.chunkValue v c.val % 2 ^ n then ExtractStage.hot (joins c) (n - 1)
+  else clip (r.table (chunkTreeTag coord c.val n slot)).1
+
+/-- Leaf labels reconstructed from hidden hot tree materials and cold table data. -/
+def chunkTreeH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label)
+    (c : Fin tbl.chunkCount) : Fin (2 ^ tbl.chunkWidth c.val) → Label :=
+  materialTree (chunkMatH tbl coord v r joins c) r.delta (r.zero (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val)
+
+/-- Each cast retains the reconstructed leaf label in its low plane. -/
+def chunkCastH (h : ChunkVals tbl) (c : Fin tbl.chunkCount) (leaf : ℕ) : Lanes tbl.castWidth :=
+  let label := atNat (chunkTreeH tbl coord v r h.1 c) 0 leaf
+  if leaf = tbl.chunkValue v c.val then Parity.liftUpper tbl.castWidth (h.2 c) label
+  else parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf) label
 
 /-- The join of hashed level `k + 1` of chunk `c`. -/
 def chunkJoinH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) (c : Fin tbl.chunkCount)
@@ -139,15 +151,19 @@ def chunkJoinH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val -
       else (clip (r.table (chunkTreeTag coord c.val (k.val + 1) slot.val)).1)) ^^^
     r.zero (tbl.chunkOffset c.val + (k.val + 1))
 
-/-- The pin of chunk `c`. -/
-def chunkPinH (pins : Fin tbl.chunkCount → Lanes tbl.castWidth) (c : Fin tbl.chunkCount) : Lanes tbl.castWidth :=
-  (∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r pins c leaf.val) +
+/-- The full even pin, before its zero low plane is omitted. -/
+def chunkFullPinH (h : ChunkVals tbl) (c : Fin tbl.chunkCount) : Lanes tbl.castWidth :=
+  (∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r h c leaf.val) +
     deltaLanes tbl.castWidth r.delta
 
-/-- The word of modulus `m` of width `ell` from the chunks' casts (`truthWord`). -/
-def wordH (pins : Fin tbl.chunkCount → Lanes tbl.castWidth) (m ell : ℕ) : Lanes ell :=
+/-- The actual public chunk pin stores only its upper planes. -/
+def chunkPinH (h : ChunkVals tbl) (c : Fin tbl.chunkCount) : Lanes (tbl.castWidth - 1) :=
+  Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r h c)
+
+/-- The word depends on the reconstructed labels as well as the independent upper casts. -/
+def wordH (h : ChunkVals tbl) (m ell : ℕ) : Lanes ell :=
   reduceTo ell fun lane => ∑ c : Fin tbl.chunkCount, ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val),
-    ((tbl.truth m c.val leaf.val : ℕ) : ZMod (2 ^ tbl.castWidth)) * chunkCastH tbl coord v r pins c leaf.val lane
+    ((tbl.truth m c.val leaf.val : ℕ) : ZMod (2 ^ tbl.castWidth)) * chunkCastH tbl coord v r h c leaf.val lane
 
 end Publish
 
@@ -161,11 +177,11 @@ def modPublish (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ
   let st1 := tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1)
   let s0 := σ % 2 ^ row.width0
   let s1 := σ / 2 ^ row.width0 % 2 ^ row.width1
-  let R1 : Lanes (row.ell - row.width0) := gNext (overrideHot st0 s0 h.1) W Δ
+  let R1 : Lanes (row.ell - row.width0) := gNext (upperOverrideHot st0 s0 h.1) W Δ
   let bitMask : ℕ → Label := fun p =>
-    if p < row.width0 + row.width1 then gBit (overrideHot st1 s1 h.2.1) R1 Δ (p - row.width0)
-    else laneBit (gNext (overrideHot st1 s1 h.2.1) R1 Δ) 0
-  (specPublish st0 W Δ s0 h.1, specPublish st1 R1 Δ s1 h.2.1,
+    if p < row.width0 + row.width1 then gBit (upperOverrideHot st1 s1 h.2.1) R1 Δ (p - row.width0)
+    else laneBit (gNext (upperOverrideHot st1 s1 h.2.1) R1 Δ) 0
+  (upperSpecPublish st0 W Δ s0 h.1, upperSpecPublish st1 R1 Δ s1 h.2.1,
     fun k => xorFold (fun slot : Fin (2 ^ (row.width0 + k.val)) =>
         if slot.val = σ % 2 ^ (row.width0 + k.val) then h.2.2.1 k
         else (clip (T (growTag coord i (row.width0 + k.val) slot.val)).1)) ^^^ bitMask (row.width0 + k.val),
@@ -175,10 +191,10 @@ def modPublish (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ
 
 /-- **The published conversion material of one coordinate** from the rest and the hidden values. -/
 def convPublish (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) (h : ConvVals tbl) : ConvVals tbl :=
-  ((fun c k => chunkJoinH tbl coord v r h.1.1 c k, fun c => chunkPinH tbl coord v r h.1.2 c),
+  ((fun c k => chunkJoinH tbl coord v r h.1.1 c k, fun c => chunkPinH tbl coord v r h.1 c),
     fun i => modPublish r.table coord i.val (rowOf (tbl.kind i) (tbl.modulus i)) (tbl.modulus i)
       (tbl.wordValue (tbl.modulus i) v) r.delta (rowOf_hw0 _ _) (rowOf_hw1 _ _)
-      (wordH tbl coord v r h.1.2 (tbl.modulus i) (rowOf (tbl.kind i) (tbl.modulus i)).ell) (h.2 i))
+      (wordH tbl coord v r h.1 (tbl.modulus i) (rowOf (tbl.kind i) (tbl.modulus i)).ell) (h.2 i))
 
 /-! ### Injectivity -/
 
@@ -234,6 +250,19 @@ theorem stageVals_empty_eq (a b : StageVals emptyRow) : a = b := by
   have f3 : a3 = b3 := funext fun k => absurd k.isLt (by simp [emptyRow])
   rw [f0, f1, f2, f3, lanes_zero_eq a0' b0', lanes_zero_eq a1' b1']
 
+/-- The reconstructed tree supplies every cast's low plane, so the full pin is even. -/
+theorem chunkFullPinH_even (tbl : CrtTable) (coord v : ℕ) (r : ConvRest)
+    (h : ChunkVals tbl) (c : Fin tbl.chunkCount) :
+    Parity.EvenLanes (chunkFullPinH tbl coord v r h c) := by
+  apply SliceC.pin_even_of_leaf_xor_total _ (chunkTreeH tbl coord v r h.1 c) r.delta
+  · intro positive leaf
+    unfold chunkCastH
+    rw [SliceC.atNat_of_lt _ _ leaf.isLt]
+    split_ifs
+    · exact Parity.laneBit_liftUpper_zero _ _ _ positive
+    · exact parityRd_low _ _ _ _ positive
+  · exact materialTree_xor _ _ _ _
+
 /-- **One modulus is injective in its hidden values.** -/
 theorem modPublish_injective (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Label)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell)
@@ -244,20 +273,22 @@ theorem modPublish_injective (T : ℕ → Block × Block) (coord i : ℕ) (row :
   · exact stageVals_empty_eq a b
   obtain ⟨a0, a1, a2, a3⟩ := a
   obtain ⟨b0, b1, b2, b3⟩ := b
-  have e0 : specPublish (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
+  have e0 : upperSpecPublish (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
       (σ % 2 ^ row.width0) a0 =
-      specPublish (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
+      upperSpecPublish (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
       (σ % 2 ^ row.width0) b0 := congrArg (fun x => x.1) e
-  have h0 : a0 = b0 := spec_publish_injective _ w0pos W Δ _ (Nat.mod_lt _ (Nat.two_pow_pos _)) e0
+  have h0 : a0 = b0 := upper_spec_publish_injective _ w0pos
+    (tableStage_low T _ hw0 _ _ (by omega)) W Δ _ (Nat.mod_lt _ (Nat.two_pow_pos _)) e0
   subst h0
-  have e1 : specPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
-      (gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
+  have e1 : upperSpecPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+      (gNext (upperOverrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
         (σ % 2 ^ row.width0) a0) W Δ) Δ (σ / 2 ^ row.width0 % 2 ^ row.width1) a1 =
-      specPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
-      (gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
+      upperSpecPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+      (gNext (upperOverrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
         (σ % 2 ^ row.width0) a0) W Δ) Δ (σ / 2 ^ row.width0 % 2 ^ row.width1) b1 :=
     congrArg (fun x => x.2.1) e
-  have h1 : a1 = b1 := spec_publish_injective _ w1pos _ Δ _ (Nat.mod_lt _ (Nat.two_pow_pos _)) e1
+  have h1 : a1 = b1 := upper_spec_publish_injective _ w1pos
+    (tableStage_low T _ hw1 _ _ (by omega)) _ Δ _ (Nat.mod_lt _ (Nat.two_pow_pos _)) e1
   subst h1
   have h2 : a2 = b2 := funext fun k => by
     have ek := congrFun (congrArg (fun x => x.2.2.1) e) k
@@ -277,20 +308,43 @@ bijection of `ConvVals tbl`), for every table, coordinate, value and rest. -/
 theorem convPublish_injective (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) :
     Function.Injective (convPublish tbl coord v r) := by
   rintro ⟨⟨hJ, hP⟩, hM⟩ ⟨⟨hJ', hP'⟩, hM'⟩ same
-  have pins : hP = hP' := funext fun c => by
-    have e := congrArg (fun x => x.1.2 c) same
-    simp only [convPublish, chunkPinH, chunkCastH] at e
-    have e' := add_right_cancel e
-    have hot : tbl.chunkValue v c.val < 2 ^ tbl.chunkWidth c.val := Nat.mod_lt _ (Nat.two_pow_pos _)
-    exact sum_hot_cancel _ hot (hP c) (hP' c)
-      (fun leaf => castRd r.table tbl.castWidth (chunkCastTag coord c.val leaf)) e'
-  subst pins
   have joins : hJ = hJ' := funext fun c => funext fun k => by
     have e := congrArg (fun x => x.1.1 c k) same
     simp only [convPublish, chunkJoinH] at e
     rw [xorFold_hot _ (Nat.mod_lt _ (Nat.two_pow_pos _)), xorFold_hot _ (Nat.mod_lt _ (Nat.two_pow_pos _))] at e
     exact xor_cancel_mid _ _ _ _ e
   subst joins
+  have pins : hP = hP' := funext fun c => by
+    have halves := congrArg (fun x => x.1.2 c) same
+    change Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r (hJ, hP) c) =
+      Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r (hJ, hP') c) at halves
+    have full := Parity.pinHalf_injective_on_even tbl.castWidth
+      (chunkFullPinH_even tbl coord v r (hJ, hP) c)
+      (chunkFullPinH_even tbl coord v r (hJ, hP') c) halves
+    have sums := add_right_cancel full
+    change ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r (hJ, hP) c leaf.val =
+      ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r (hJ, hP') c leaf.val at sums
+    have hot : tbl.chunkValue v c.val < 2 ^ tbl.chunkWidth c.val := Nat.mod_lt _ (Nat.two_pow_pos _)
+    have fixed : ∀ (pins : Fin tbl.chunkCount → Lanes (tbl.castWidth - 1))
+        (leaf : Fin (2 ^ tbl.chunkWidth c.val)),
+        chunkCastH tbl coord v r (hJ, pins) c leaf.val =
+          if leaf.val = tbl.chunkValue v c.val then
+            Parity.liftUpper tbl.castWidth (pins c)
+              (atNat (chunkTreeH tbl coord v r hJ c) 0 (tbl.chunkValue v c.val))
+          else parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf.val)
+            (atNat (chunkTreeH tbl coord v r hJ c) 0 leaf.val) := by
+      intro pins leaf
+      unfold chunkCastH
+      split_ifs with hit
+      · rw [hit]
+      · rfl
+    simp only [fixed] at sums
+    apply Parity.liftUpper_injective tbl.castWidth
+      (atNat (chunkTreeH tbl coord v r hJ c) 0 (tbl.chunkValue v c.val))
+    exact sum_hot_cancel _ hot _ _
+      (fun leaf => parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf)
+        (atNat (chunkTreeH tbl coord v r hJ c) 0 leaf)) sums
+  subst pins
   have mods : hM = hM' := funext fun i =>
     modPublish_injective _ _ _ _ _ _ _ _ _ _ (rowOf_cases _ _) (congrArg (fun x => x.2 i) same)
   rw [mods]
@@ -349,21 +403,21 @@ end Link
 
 /-- The in-range published material of one modulus of row `row`. -/
 def readMod (pub : ConvPublic) (i : ℕ) (row : OddRow) : StageVals row :=
-  ((fun k => pub.stageJoin i 0 (k.val + 1), pinOfBlocks row.ell fun j => pub.stagePin i 0 j.val),
-    (fun k => pub.stageJoin i 1 (k.val + 1), pinOfBlocks (row.ell - row.width0) fun j => pub.stagePin i 1 j.val),
+  ((fun k => pub.stageJoin i 0 (k.val + 1), pinOfBlocks (row.ell - 1) fun j => pub.stagePin i 0 j.val),
+    (fun k => pub.stageJoin i 1 (k.val + 1), pinOfBlocks (row.ell - row.width0 - 1) fun j => pub.stagePin i 1 j.val),
     fun k => pub.growJoin i (row.width0 + k.val), fun k => pub.foldJoin i (row.keep + k.val))
 
 /-- **The published conversion material read in range** (pins through the dense codec). -/
 def readPub (tbl : CrtTable) (pub : ConvPublic) : ConvVals tbl :=
-  ((fun c k => pub.chunkJoin c.val (k.val + 1), fun c => pinOfBlocks tbl.castWidth fun j => pub.chunkPin c.val j.val),
+  ((fun c k => pub.chunkJoin c.val (k.val + 1), fun c => pinOfBlocks (tbl.castWidth - 1) fun j => pub.chunkPin c.val j.val),
     fun i => readMod pub i.val (rowOf (tbl.kind i) (tbl.modulus i)))
 
 /-- A table's readings at the hot slots of one modulus of row `row` and word value `σ`. -/
 def readHotMod (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) : StageVals row :=
   ((fun k => (clip (T (extTreeTag coord i 0 (k.val + 1) (σ % 2 ^ row.width0 % 2 ^ (k.val + 1)))).1),
-      castRd T row.ell (extCastTag coord i 0 (σ % 2 ^ row.width0))),
+      upperRd T row.ell (extCastTag coord i 0 (σ % 2 ^ row.width0))),
     (fun k => (clip (T (extTreeTag coord i 1 (k.val + 1) (σ / 2 ^ row.width0 % 2 ^ row.width1 % 2 ^ (k.val + 1)))).1),
-      castRd T (row.ell - row.width0) (extCastTag coord i 1 (σ / 2 ^ row.width0 % 2 ^ row.width1))),
+      upperRd T (row.ell - row.width0) (extCastTag coord i 1 (σ / 2 ^ row.width0 % 2 ^ row.width1))),
     fun k => (clip (T (growTag coord i (row.width0 + k.val) (σ % 2 ^ (row.width0 + k.val)))).1),
     fun k => (clip (T (foldTag coord i (row.keep + k.val) (σ % 2 ^ (row.keep + k.val) % m))).1))
 
@@ -371,9 +425,38 @@ def readHotMod (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ
 gives. -/
 def readHot (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) : ConvVals tbl :=
   ((fun c k => (clip (T (chunkTreeTag coord c.val (k.val + 1) (tbl.chunkValue v c.val % 2 ^ (k.val + 1)))).1),
-      fun c => castRd T tbl.castWidth (chunkCastTag coord c.val (tbl.chunkValue v c.val))),
+      fun c => upperRd T tbl.castWidth (chunkCastTag coord c.val (tbl.chunkValue v c.val))),
     fun i => readHotMod T coord i.val (rowOf (tbl.kind i) (tbl.modulus i)) (tbl.modulus i)
       (tbl.wordValue (tbl.modulus i) v))
+
+/-- Replacing hot tree materials by their actual readings preserves the complete tree. -/
+theorem chunkTreeH_self (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block)
+    (Z : ℕ → Label) (Δ : Label) (c : Fin tbl.chunkCount) :
+    chunkTreeH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.1 c =
+      materialTree (fun n slot => clip (T (chunkTreeTag coord c.val n slot)).1)
+        Δ (Z (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val) := by
+  apply materialTree_congr
+  intro n hn1 hn2 slot hslot
+  unfold chunkMatH
+  split_ifs with hit
+  · rw [hit]
+    simp only [ExtractStage.hot, dif_pos (show n - 1 < tbl.chunkWidth c.val - 1 by omega),
+      readHot, Nat.sub_add_cancel hn1]
+  · rfl
+
+/-- At its own hot data every chunk cast is its actual label-dependent table reading. -/
+theorem chunkCastH_self (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block)
+    (Z : ℕ → Label) (Δ : Label) (c : Fin tbl.chunkCount) (leaf : ℕ) :
+    chunkCastH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 c leaf =
+      parityRd T tbl.castWidth (chunkCastTag coord c.val leaf)
+        (atNat (materialTree (fun n slot => clip (T (chunkTreeTag coord c.val n slot)).1)
+          Δ (Z (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val)) 0 leaf) := by
+  unfold chunkCastH
+  rw [chunkTreeH_self]
+  split_ifs with hit
+  · rw [hit]
+    rfl
+  · rfl
 
 /-- A table the conversion's link needs: a positive cast width and well-formed odd rows with positive moduli. -/
 structure ConvTableWF (tbl : CrtTable) : Prop where
@@ -385,7 +468,7 @@ theorem word_eq (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) (Z
     truthWord tbl m ell (fun c leaf =>
         (atNat (fun c : Fin tbl.chunkCount => (chunkGarbleM tbl coord Δ Z c.val).eval (tableHash T))
           (ChunkGarbled.empty _) c).casts leaf) =
-      wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 m ell := by
+      wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 m ell := by
   unfold truthWord wordH
   rw [materialize_eq]
   congr 1
@@ -394,11 +477,7 @@ theorem word_eq (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) (Z
   congr 1
   beta_reduce
   rw [SliceC.atNat_of_lt _ _ c.isLt, (chunk_table T tbl coord Δ Z c.val).2.1 leaf.val leaf.isLt]
-  unfold chunkCastH
-  split_ifs with h
-  · rw [h]
-    rfl
-  · rfl
+  rw [chunkCastH_self]
 
 /-- The published material of one odd modulus as the garbler computes it on a table (`conversion_table`). -/
 def modGarbled (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label)
@@ -408,8 +487,8 @@ def modGarbled (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m : 
   let R1 : Lanes (row.ell - row.width0) := gNext sp0 W Δ
   let bitMask : ℕ → Label := fun p =>
     if p < row.width0 + row.width1 then gBit sp1 R1 Δ (p - row.width0) else laneBit (gNext sp1 R1 Δ) 0
-  (((fun k : Fin (row.width0 - 1) => gJoin sp0 W Δ (k.val + 1)), gPin sp0 W Δ),
-    ((fun k : Fin (row.width1 - 1) => gJoin sp1 R1 Δ (k.val + 1)), gPin sp1 R1 Δ),
+  (((fun k : Fin (row.width0 - 1) => gJoin sp0 W Δ (k.val + 1)), Parity.pinHalf row.ell (gPin sp0 W Δ)),
+    ((fun k : Fin (row.width1 - 1) => gJoin sp1 R1 Δ (k.val + 1)), Parity.pinHalf (row.ell - row.width0) (gPin sp1 R1 Δ)),
     fun k => xorFold (fun slot : Fin (2 ^ (row.width0 + k.val)) =>
         (clip (T (growTag coord i (row.width0 + k.val) slot.val)).1)) ^^^ bitMask (row.width0 + k.val),
     fun k => xorFold (fun ρ : Fin m => (clip (T (foldTag coord i (row.keep + k.val) ρ.val)).1)) ^^^
@@ -421,35 +500,35 @@ theorem modPublish_self (T : ℕ → Block × Block) (coord i : ℕ) (row : OddR
     (w0pos : 1 ≤ row.width0) (w1pos : 1 ≤ row.width1) :
     modPublish T coord i row m σ Δ hw0 hw1 W (readHotMod T coord i row m σ) =
       modGarbled T coord i row m Δ hw0 hw1 W := by
-  have eR : (gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
+  have eR : (gNext (upperOverrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
       (σ % 2 ^ row.width0) (readHotMod T coord i row m σ).1) W Δ : Lanes (row.ell - row.width0)) =
       gNext (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ :=
-    gNext_override_self _ W Δ _
-  have eB : ∀ n, gBit (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+    gNext_upper_table_self T _ hw0 _ _ (by omega) W Δ _
+  have eB : ∀ n, gBit (upperOverrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
       (σ / 2 ^ row.width0 % 2 ^ row.width1) (readHotMod T coord i row m σ).2.1)
-      (gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
+      (gNext (upperOverrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
         (σ % 2 ^ row.width0) (readHotMod T coord i row m σ).1) W Δ) Δ n =
       gBit (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
         (gNext (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ) Δ n := fun n =>
-    (congrArg (fun R => gBit (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1)
+    (congrArg (fun R => gBit (upperOverrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1)
       (extCastTag coord i 1)) (σ / 2 ^ row.width0 % 2 ^ row.width1) (readHotMod T coord i row m σ).2.1) R Δ n)
-      eR).trans (gBit_override_self _ _ Δ _ n)
-  have eN : (gNext (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+      eR).trans (gBit_upper_table_self T _ hw1 _ _ (by omega) _ Δ _ n)
+  have eN : (gNext (upperOverrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
       (σ / 2 ^ row.width0 % 2 ^ row.width1) (readHotMod T coord i row m σ).2.1)
-      (gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
+      (gNext (upperOverrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
         (σ % 2 ^ row.width0) (readHotMod T coord i row m σ).1) W Δ) Δ :
         Lanes (row.ell - row.width0 - row.width1)) =
       gNext (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
         (gNext (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ) Δ :=
-    (congrArg (fun R => (gNext (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1)
+    (congrArg (fun R => (gNext (upperOverrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1)
       (extCastTag coord i 1)) (σ / 2 ^ row.width0 % 2 ^ row.width1) (readHotMod T coord i row m σ).2.1) R Δ :
-        Lanes (row.ell - row.width0 - row.width1))) eR).trans (gNext_override_self _ _ Δ _)
+        Lanes (row.ell - row.width0 - row.width1))) eR).trans (gNext_upper_table_self T _ hw1 _ _ (by omega) _ Δ _)
   refine Prod.ext ?_ (Prod.ext ?_ (Prod.ext ?_ ?_))
-  · exact specPublish_self (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
-      (σ % 2 ^ row.width0) w0pos
-  · exact (congrArg (fun R => specPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1)
+  · exact upperSpecPublish_table_self T row.width0 hw0 _ _ w0pos W Δ
+      (σ % 2 ^ row.width0) (Nat.mod_lt _ (Nat.two_pow_pos _))
+  · exact (congrArg (fun R => upperSpecPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1)
       (extCastTag coord i 1)) R Δ (σ / 2 ^ row.width0 % 2 ^ row.width1) (readHotMod T coord i row m σ).2.1)
-      eR).trans (specPublish_self _ _ Δ _ w1pos)
+      eR).trans (upperSpecPublish_table_self T row.width1 hw1 _ _ w1pos _ Δ _ (Nat.mod_lt _ (Nat.two_pow_pos _)))
   · funext k
     show xorFold _ ^^^ (if row.width0 + k.val < row.width0 + row.width1 then _ else _) =
       xorFold _ ^^^ (if row.width0 + k.val < row.width0 + row.width1 then _ else _)
@@ -483,7 +562,7 @@ theorem mod_link (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Block)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) :
     readMod ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub i.val row =
       modGarbled T coord i.val row (tbl.modulus i) Δ hw0 hw1
-        (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 (tbl.modulus i) row.ell) := by
+        (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 (tbl.modulus i) row.ell) := by
   obtain ⟨w0pos, w1pos, hell, hk0, hk1⟩ := wf
   obtain ⟨-, -, sj, sp, gj, fj⟩ := coord_pub (tableHash T) tbl S coord Δ Z
   obtain ⟨mj, mp, mg, mf⟩ := modGarbleM_odd (tableHash T) tbl S coord Δ
@@ -491,30 +570,30 @@ theorem mod_link (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Block)
       (ChunkGarbled.empty _)) i row hk
   rw [word_eq tbl coord v T Z Δ] at mj mp mg mf
   obtain ⟨cj0, cp0, cj1, cp1, cg, cf⟩ := conversion_table T coord i.val row (tbl.modulus i) Δ
-    (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 (tbl.modulus i) row.ell) hw0 hw1 hk0
+    (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 (tbl.modulus i) row.ell) hw0 hw1 hk0
   refine Prod.ext (Prod.ext (funext fun k => ?_) ?_) (Prod.ext (Prod.ext (funext fun k => ?_) ?_)
     (Prod.ext (funext fun k => ?_) (funext fun k => ?_)))
   · exact (sj i.val i.isLt 0 (k.val + 1)).trans ((congrFun (congrFun mj 0) (k.val + 1)).trans
       (cj0 (k.val + 1) (by omega) (by omega)))
-  · have e : (fun j : Fin row.ell => ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub.stagePin i.val 0
-        j.val) = fun j => atNat (stored (pinBlocks (gPin (tableStage T row.width0 hw0 (extTreeTag coord i.val 0)
-          (extCastTag coord i.val 0)) (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 (tbl.modulus i)
-            row.ell) Δ))) 0 j.val :=
+  · have e : (fun j : Fin (row.ell - 1) => ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub.stagePin i.val 0
+        j.val) = fun j => atNat (stored (pinBlocks (Parity.pinHalf row.ell (gPin (tableStage T row.width0 hw0 (extTreeTag coord i.val 0)
+          (extCastTag coord i.val 0)) (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 (tbl.modulus i)
+            row.ell) Δ)))) 0 j.val :=
       funext fun j => (sp i.val i.isLt 0 j.val).trans ((congrFun (congrFun mp 0) j.val).trans (cp0 j.val))
-    show pinOfBlocks row.ell _ = _
-    rw [e, SliceC.pinOfBlocks_atNat (by omega)]
+    show pinOfBlocks (row.ell - 1) _ = _
+    rw [e, SliceC.pinOfBlocks_atNat_all]
     rfl
   · exact (sj i.val i.isLt 1 (k.val + 1)).trans ((congrFun (congrFun mj 1) (k.val + 1)).trans
       (cj1 (k.val + 1) (by omega) (by omega)))
-  · have e : (fun j : Fin (row.ell - row.width0) =>
+  · have e : (fun j : Fin (row.ell - row.width0 - 1) =>
         ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub.stagePin i.val 1 j.val) =
-        fun j => atNat (stored (pinBlocks (gPin (tableStage T row.width1 hw1 (extTreeTag coord i.val 1)
+        fun j => atNat (stored (pinBlocks (Parity.pinHalf (row.ell - row.width0) (gPin (tableStage T row.width1 hw1 (extTreeTag coord i.val 1)
           (extCastTag coord i.val 1)) (gNext (tableStage T row.width0 hw0 (extTreeTag coord i.val 0)
-            (extCastTag coord i.val 0)) (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 (tbl.modulus i)
-              row.ell) Δ) Δ))) 0 j.val :=
+            (extCastTag coord i.val 0)) (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 (tbl.modulus i)
+              row.ell) Δ) Δ)))) 0 j.val :=
       funext fun j => (sp i.val i.isLt 1 j.val).trans ((congrFun (congrFun mp 1) j.val).trans (cp1 j.val))
-    show pinOfBlocks (row.ell - row.width0) _ = _
-    rw [e, SliceC.pinOfBlocks_atNat (by omega)]
+    show pinOfBlocks (row.ell - row.width0 - 1) _ = _
+    rw [e, SliceC.pinOfBlocks_atNat_all]
     rfl
   · exact (gj i.val i.isLt (row.width0 + k.val)).trans ((congrFun mg (row.width0 + k.val)).trans
       (cg k.val k.isLt))
@@ -530,7 +609,7 @@ theorem mod_eq_gen (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Bloc
     (hw0 : r.width0 ≤ r.ell) (hw1 : r.width1 ≤ r.ell - r.width0) :
     readMod ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub i.val r =
       modPublish T coord i.val r (tbl.modulus i) (tbl.wordValue (tbl.modulus i) v) Δ hw0 hw1
-        (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 (tbl.modulus i) r.ell)
+        (wordH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 (tbl.modulus i) r.ell)
         (readHotMod T coord i.val r (tbl.modulus i) (tbl.wordValue (tbl.modulus i) v)) := by
   subst hr
   rw [modPublish_self _ _ _ _ _ _ _ _ _ _ wf.1 wf.2.1]
@@ -571,20 +650,17 @@ theorem garbler_conv_eq (tbl : CrtTable) (wf : ConvTableWF tbl) (S coord v : ℕ
       rfl
     · rfl
   · obtain ⟨-, -, cpin⟩ := chunk_table T tbl coord Δ Z c.val
-    have e : (fun j : Fin tbl.castWidth => ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub.chunkPin c.val
-        j.val) = fun j => atNat (stored (pinBlocks ((chunkGarbleM tbl coord Δ Z c.val).eval (tableHash T)).pin))
+    have e : (fun j : Fin (tbl.castWidth - 1) => ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub.chunkPin c.val
+        j.val) = fun j => atNat (stored (pinBlocks (Parity.pinHalf tbl.castWidth ((chunkGarbleM tbl coord Δ Z c.val).eval (tableHash T)).pin)))
           0 j.val :=
       funext fun j => jp c.val c.isLt j.val
-    show pinOfBlocks tbl.castWidth _ = _
-    rw [e, SliceC.pinOfBlocks_atNat wf.cast, cpin]
-    show _ = chunkPinH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.2 c
-    unfold chunkPinH chunkCastH
-    congr 1
+    show pinOfBlocks (tbl.castWidth - 1) _ = _
+    rw [e, SliceC.pinOfBlocks_atNat_all, cpin]
+    show _ = chunkPinH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1 c
+    unfold chunkPinH chunkFullPinH
+    congr 2
     refine Finset.sum_congr rfl fun leaf _ => ?_
-    split_ifs with h
-    · rw [h]
-      rfl
-    · rfl
+    rw [chunkCastH_self, SliceC.atNat_of_lt _ _ leaf.isLt]
   · rcases rowOf_cases (tbl.kind i) (tbl.modulus i) with e | ⟨rwf, _⟩
     · exact stageVals_eq_of_empty _ e _ _
     · obtain ⟨row, hk, hrow, rowWF⟩ := rowOf_wf_odd _ _ rwf

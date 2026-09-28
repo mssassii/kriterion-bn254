@@ -26,7 +26,8 @@ theorem uniform_prod_eq_bind {A B : Type} [Fintype A] [Nonempty A] [Fintype B] [
 /-- The Lamport key of a source. -/
 abbrev LabelKey := (Fin 2 → Fin coordinateBitCount → Block) × (Fin 2 → Block)
 
-/-- The published cells of a source. -/
+/-- The published cells of a source. Pin widths are the reduced stored widths;
+the source contains no redundant zero parity plane. -/
 abbrev Cells := (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) ×
   (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Entry.joinCount → Label) ×
   (Fin 2 → (k : Fin Entry.pinCount) → Lanes (Entry.pinWidth k)) × (Fin Entry.xCount → Fin Entry.table.product) ×

@@ -11,7 +11,7 @@ from its joins and pins (`Construction/CRT/Layout.lean`). This file connects the
 * **B2** (`phi_bijective`, `phi_uniform`): the source's joins and pins of one coordinate are read back by `readPub` as
   a bijection `phi` onto `ConvVals table`. The join and pin positions of `ConvVals` are enumerated by sums and sigmas
   whose `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_chunk`, `jIdx_mod`, `pIdx_mod`), so `phi` is
-  injective; the two sides have `2 ^ (labelBits · 3378)` elements.
+  injective; the two sides have `2 ^ (labelBits · 3178)` elements.
 * `source_joins_pins_uniform`, `source_crt_law`: under a uniform source the joins and pins of coordinate `κ` are
   uniform, so the source's flat vector is `flatOf` of uniform conversion values.
 -/
@@ -126,9 +126,9 @@ theorem flatMap_congr' {α β : Type} {l : List α} {f g : α → List β} (h : 
 
 theorem readMod_parts {p q : ConvPublic} {i : ℕ} {row : OddRow} (h : readMod p i row = readMod q i row) :
     (∀ n, n < row.width0 - 1 → p.stageJoin i 0 (n + 1) = q.stageJoin i 0 (n + 1)) ∧
-    (∀ k, k < row.ell → p.stagePin i 0 k = q.stagePin i 0 k) ∧
+    (∀ k, k < row.ell - 1 → p.stagePin i 0 k = q.stagePin i 0 k) ∧
     (∀ n, n < row.width1 - 1 → p.stageJoin i 1 (n + 1) = q.stageJoin i 1 (n + 1)) ∧
-    (∀ k, k < row.ell - row.width0 → p.stagePin i 1 k = q.stagePin i 1 k) ∧
+    (∀ k, k < row.ell - row.width0 - 1 → p.stagePin i 1 k = q.stagePin i 1 k) ∧
     (∀ n, n < row.keep - row.width0 → p.growJoin i (row.width0 + n) = q.growJoin i (row.width0 + n)) ∧
     (∀ n, n < row.ell - row.keep → p.foldJoin i (row.keep + n) = q.foldJoin i (row.keep + n)) := by
   simp only [readMod, Prod.mk.injEq] at h
@@ -153,7 +153,7 @@ theorem flatten_congr (p q : ConvPublic) (h : readPub table p = readPub table q)
     have e1 : (List.range (table.chunkWidth c - 1)).map (fun n => p.chunkJoin c (n + 1)) =
         (List.range (table.chunkWidth c - 1)).map (fun n => q.chunkJoin c (n + 1)) :=
       List.map_congr_left fun n hn => congrFun (congrFun hj ⟨c, hc⟩) ⟨n, List.mem_range.mp hn⟩
-    have e2 : (List.range table.castWidth).map (p.chunkPin c) = (List.range table.castWidth).map (q.chunkPin c) :=
+    have e2 : (List.range (table.castWidth - 1)).map (p.chunkPin c) = (List.range (table.castWidth - 1)).map (q.chunkPin c) :=
       List.map_congr_left fun k hk => congrFun pins ⟨k, List.mem_range.mp hk⟩
     rw [e1, e2]
   · apply flatMap_congr'
@@ -167,13 +167,13 @@ theorem flatten_congr (p q : ConvPublic) (h : readPub table p = readPub table q)
       have e1 : (List.range (row.width0 - 1)).map (fun n => p.stageJoin i 0 (n + 1)) =
           (List.range (row.width0 - 1)).map (fun n => q.stageJoin i 0 (n + 1)) :=
         List.map_congr_left fun n hn => a n (List.mem_range.mp hn)
-      have e2 : (List.range row.ell).map (p.stagePin i 0) = (List.range row.ell).map (q.stagePin i 0) :=
+      have e2 : (List.range (row.ell - 1)).map (p.stagePin i 0) = (List.range (row.ell - 1)).map (q.stagePin i 0) :=
         List.map_congr_left fun n hn => b n (List.mem_range.mp hn)
       have e3 : (List.range (row.width1 - 1)).map (fun n => p.stageJoin i 1 (n + 1)) =
           (List.range (row.width1 - 1)).map (fun n => q.stageJoin i 1 (n + 1)) :=
         List.map_congr_left fun n hn => c n (List.mem_range.mp hn)
-      have e4 : (List.range (row.ell - row.width0)).map (p.stagePin i 1) =
-          (List.range (row.ell - row.width0)).map (q.stagePin i 1) :=
+      have e4 : (List.range (row.ell - row.width0 - 1)).map (p.stagePin i 1) =
+          (List.range (row.ell - row.width0 - 1)).map (q.stagePin i 1) :=
         List.map_congr_left fun n hn => d n (List.mem_range.mp hn)
       have e5 : (List.range (row.keep - row.width0)).map (fun n => p.growJoin i (row.width0 + n)) =
           (List.range (row.keep - row.width0)).map (fun n => q.growJoin i (row.width0 + n)) :=
@@ -379,13 +379,13 @@ theorem pIdx_mod (i : Fin table.count) (s : Fin (modPins i)) :
   omega
 
 /-- The chunk pins have the cast width. -/
-theorem pinWidth_chunk : ∀ k : Fin pinCount, k.val < table.chunkCount → pinWidth k = table.castWidth := by
+theorem pinWidth_chunk : ∀ k : Fin pinCount, k.val < table.chunkCount → pinWidth k = table.castWidth - 1 := by
   decide +kernel
 
 /-- The two pins of an odd modulus have the widths of its two stages. -/
 theorem pinWidth_mod : ∀ (i : Fin table.count) (s : Fin (modPins i)),
     pinWidths.getD (modPinBase i.val + s.val) 0 =
-      if s.val = 0 then (rowI i).ell else (rowI i).ell - (rowI i).width0 := by
+      if s.val = 0 then (rowI i).ell - 1 else (rowI i).ell - (rowI i).width0 - 1 := by
   decide +kernel
 
 theorem pinWidth_eq_getD (k : Fin pinCount) : pinWidth k = pinWidths.getD k.val 0 := by
@@ -417,7 +417,7 @@ theorem pin_eq_of_read {x y : JP} (k : ℕ) (hk : k < pinCount) (w : ℕ) (hw : 
   exact lanes_eq_of_read hw (hw ▸ hpos) _ _ h
 
 theorem rowI_pos (i : Fin table.count) (row : OddRow) (hk : table.kind i = .odd row) :
-    0 < (rowI i).ell ∧ 0 < (rowI i).ell - (rowI i).width0 := by
+    0 < (rowI i).ell - 1 ∧ 0 < (rowI i).ell - (rowI i).width0 - 1 := by
   obtain ⟨⟨h1, h2, h3, _, _⟩, _⟩ := bn254Table_wf.rows i row hk
   rw [show rowI i = row from rowOf_table i row hk]
   omega
@@ -440,10 +440,10 @@ theorem pins_eq_of_phi {x y : JP} (h : phi x = phi y) : x.2 = y.2 := by
   rcases p with c | ⟨i, ⟨sv, hsv⟩⟩
   · rw [pIdx_chunk] at hp
     subst hp
-    have e : pinOfBlocks table.castWidth (fun j : Fin table.castWidth => (srcOf x).pinBlockAt 0 c.val j.val) =
-        pinOfBlocks table.castWidth (fun j : Fin table.castWidth => (srcOf y).pinBlockAt 0 c.val j.val) :=
+    have e : pinOfBlocks (table.castWidth - 1) (fun j : Fin (table.castWidth - 1) => (srcOf x).pinBlockAt 0 c.val j.val) =
+        pinOfBlocks (table.castWidth - 1) (fun j : Fin (table.castWidth - 1) => (srcOf y).pinBlockAt 0 c.val j.val) :=
       congrFun hpins c
-    exact pin_eq_of_read c.val kh table.castWidth (pinWidth_chunk ⟨c.val, kh⟩ c.isLt) (by decide) e
+    exact pin_eq_of_read c.val kh (table.castWidth - 1) (pinWidth_chunk ⟨c.val, kh⟩ c.isLt) (by decide) e
   · rw [pIdx_mod] at hp
     subst hp
     obtain ⟨row, hk, hs⟩ := modPins_odd i sv hsv
@@ -467,7 +467,7 @@ theorem phi_injective : Function.Injective phi := fun _ _ h =>
 
 /-- The blocks of a modulus's values. -/
 def stageBlocks (row : OddRow) : ℕ :=
-  ((row.width0 - 1) + row.ell) + (((row.width1 - 1) + (row.ell - row.width0)) +
+  ((row.width0 - 1) + (row.ell - 1)) + (((row.width1 - 1) + (row.ell - row.width0 - 1)) +
     ((row.keep - row.width0) + (row.ell - row.keep)))
 
 theorem natCard_stageVals (row : OddRow) : Nat.card (StageVals row) = 2 ^ (labelBits * stageBlocks row) :=
@@ -477,7 +477,7 @@ theorem natCard_stageVals (row : OddRow) : Nat.card (StageVals row) = 2 ^ (label
 
 theorem natCard_convVals : Nat.card (ConvVals table) =
     2 ^ (labelBits * (((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +
-      ∑ _c : Fin table.chunkCount, table.castWidth) + ∑ i : Fin table.count, stageBlocks (rowI i))) :=
+      ∑ _c : Fin table.chunkCount, (table.castWidth - 1)) + ∑ i : Fin table.count, stageBlocks (rowI i))) :=
   natCard_prod (natCard_prod (natCard_pi _ fun _ => natCard_blocks _) (natCard_pi _ fun _ => natCard_lanes _))
     (natCard_pi _ fun _ => natCard_stageVals _)
 
@@ -485,7 +485,7 @@ theorem natCard_JP : Nat.card JP = 2 ^ (labelBits * (joinCount + ∑ k : Fin pin
   natCard_prod (natCard_blocks _) (natCard_pi _ fun _ => natCard_lanes _)
 
 theorem blocks_eq : ((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +
-      ∑ _c : Fin table.chunkCount, table.castWidth) + ∑ i : Fin table.count, stageBlocks (rowI i) =
+      ∑ _c : Fin table.chunkCount, (table.castWidth - 1)) + ∑ i : Fin table.count, stageBlocks (rowI i) =
     joinCount + ∑ k : Fin pinCount, pinWidth k := by
   decide +kernel
 
