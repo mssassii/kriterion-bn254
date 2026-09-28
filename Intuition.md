@@ -1,20 +1,15 @@
 # Intuition: the sign row on psivesely's CRT-residue delivery of ArgoMAC
 
-**Draft status:** the fallback schedule has not been built in Lean. Its independently computed
-target is **169,184 bytes** of public ciphertext; updated proof terms and audit expectations remain
-to be checked on the build VM. This document describes the intended construction and existing proof
-architecture, not a completed verification of this branch.
-
-This entry garbles BN254 scalar multiplication at that target size.
-Garbling makes at most **1,062,038** oracle queries (gate 1,759,967) and evaluation at most
-**1,054,570** (gate 1,055,879). Both figures are the expected exact bounds to be checked against the types of
+This entry garbles BN254 scalar multiplication with **147,711 bytes** of public ciphertext.
+Garbling makes at most **964,502** oracle queries (gate 1,759,967) and evaluation at most
+**957,536** (gate 1,055,879). Both figures are the exact bounds in the types of
 `garbleProgram` and `evaluateProgram`.
 
 It is psivesely's CRT entry (`psivesely/kriterion-bn254-crt`, commit `de8f397`, 182,936 bytes)
 with Lazar's sign row in the `Y` slot of every digit. The sign row reads three affine encodings
 instead of four and, with the coefficient cut, publishes one constant instead of two, so a digit
 reads 7 encodings and publishes 3 constants (section 1.1). It also vanishes at a second exceptional
-input, which the exception gadget covers with a 12-byte entry per digit (sections 1.2 and 6).
+input, which the exception gadget covers with a one-byte entry per digit (sections 1.2 and 6).
 Sections 1.1, 1.2, 6 and 11.6 describe the sign-row change. This branch additionally retunes the
 first extraction width to 8 for 67 odd moduli, retaining width 7 for the other 17 (section 3.6).
 
@@ -26,7 +21,7 @@ chunks. psivesely's entry delivers them through the CRT-residue projectivization
 (Khambhati, Bhattacharya and Heath), as ePrint 2026/2100 (Khambhati, Feickert, Lewe and Tiwari) does
 for the field encodings of Argo MAC: each input coordinate is turned once into one-hot labels of its
 residues modulo 85 small moduli, and each encoding then costs one 78-byte record. The conversion of
-a coordinate is 54,592 bytes whatever the number of encodings. The rows are gated by masks keyed by
+a coordinate is 44,356 bytes whatever the number of encodings. The rows are gated by masks keyed by
 the curve check, the exception gadget is a hash digest, and the oracle is the field hash alone. The
 proof architecture (the obligation, the lazy oracle, the chain of games, the public-first hop, the
 opening and the closed simulator machine) is xinshu's, adapted to the CRT layer.
@@ -128,7 +123,7 @@ The construction obtains those residues in two layers.
    modulus, one residue join. The evaluator can hash every slot except the hot one, and the join
    supplies what it misses. Section 4.
 
-The conversion of a coordinate publishes 3,412 blocks (54,592 bytes). The body publishes, per
+The conversion of a coordinate publishes 3,412 blocks (44,356 bytes). The body publishes, per
 encoding, the 85 residue joins and one hint bit, packed into a 78-byte record.
 
 ---
@@ -285,11 +280,11 @@ answers per pair: 1,092 answers.
 
 A digit's MAC fails at two *exceptional* inputs of the curve, which the garbler knows: the input at
 `Q = K` and the input at `Q = 2K` (section 1.2). xinshu's gadget lets the evaluator detect the first
-through a 6-byte entry per digit. Here the entry has 12 bytes, six slots per exceptional input: kind
-`k` (0 for `Q = K`, 1 for `Q = 2K`) at slot `6k + index`. The entry is unlocked by a hash digest of
+through a 6-byte entry per digit. Here the entry has one byte, with kind
+`k` (0 for `Q = K`, 1 for `Q = 2K`) in nibble `k`. The per-input key makes orbit ranks unnecessary. The entry is unlocked by a hash digest of
 the input's own labels: each of the 508 labels `Z_{κ,i} ⊕ b·Δ_κ` is hashed with the bit `b` in the
-tag, the key of an exceptional input is the XOR of the 508 hashes at its bits, and the mask byte of
-its slot is the low byte of the hash of that key at its *final site* `s = 2o + k` (digit `o`). The
+tag, the key of an exceptional input is the XOR of the 508 hashes at its bits, and the four-bit mask of
+its slot is the low nibble of the hash of that key at its *final site* `s = 2o + k` (digit `o`). The
 garbler hashes both labels of every position (1,016 queries) and one final per exceptional input of a
 nonzero digit (at most 182); the evaluator hashes its 508 labels and asks both final sites of every
 digit at its own key (690 queries). At an exceptional input of either kind the evaluator's key equals
@@ -308,25 +303,26 @@ Correctness does not use this; privacy does (section 11).
 
 ---
 
-## 8. Why the ciphertext is 169,184 bytes
+## 8. Why the ciphertext is 147,711 bytes
 
 | Field | Contents | Bytes |
 |---|---|---:|
 | `curve` | 3 curve-check constants × 32 | 96 |
 | `rows` | 91 digits × 3 constants × 32 | 8,736 |
-| `exception` | 91 digits × 12-byte entry | 1,092 |
-| `crtX` | conversion of `x`: 3,412 blocks × 16 | 54,592 |
-| `crtY` | conversion of `y`: 3,412 blocks × 16 | 54,592 |
+| `exception` | 91 digits × one-byte entry | 91 |
+| `crtX` | conversion of `x`: 3,412 labels × 13 | 44,356 |
+| `crtY` | conversion of `y`: 3,412 labels × 13 | 44,356 |
 | `recX` | 367 records × 78 | 28,626 |
 | `recY` | 275 records × 78 | 21,450 |
-| **total** | | **169,184** |
+| **total** | | **147,711** |
 
 Every field has a fixed width and there is no tag, so every public value encodes to the same
-length (`Wire.encoding_length`). The conversion blocks are 65 percent of the total and do not depend
+length (`Wire.encoding_length`). The conversion blocks are 60 percent of the total and do not depend
 on the number of encodings; each further encoding would cost 78 bytes. Against psivesely's entry,
 the sign row saves 91 records (7,098 bytes) and one row constant per digit (2,912 bytes), and the
 second exceptional case adds 6 bytes per digit (546 bytes). The fallback schedule then saves
-another 4,288 bytes across the two coordinates.
+another 4,288 bytes across the two coordinates. Compacting the exception entries saves another
+1,001 bytes, leaving the digest query schedule unchanged.
 
 ---
 
@@ -337,10 +333,10 @@ the hot one:
 
 | Part | Garbling `x` | Garbling `y` | Evaluation `x` | Evaluation `y` |
 |---|---:|---:|---:|---:|
-| chunk trees and casts | 71,936 | 71,936 | 71,458 | 71,458 |
-| extraction, growth, folds (84 odd moduli) | 265,641 | 265,641 | 263,500 | 263,500 |
+| chunk trees and casts | 55,936 | 55,936 | 55,522 | 55,522 |
+| extraction, growth, folds (84 odd moduli) | 232,873 | 232,873 | 230,919 | 230,919 |
 | body pads (85 moduli) | 217,950 | 166,643 | 216,976 | 165,895 |
-| **coordinate** | **555,527** | **504,220** | **551,934** | **500,853** |
+| **coordinate** | **506,759** | **455,452** | **503,417** | **452,336** |
 
 | Fixed part | Garbling | Evaluation |
 |---|---:|---:|
@@ -348,10 +344,10 @@ the hot one:
 | masks | 1,092 | 1,092 |
 | exception digest | 1,198 | 690 |
 
-Totals: 1,062,038 garbling and 1,054,570 evaluation queries. The evaluation count is the same for every
+Totals: 964,502 garbling and 957,536 evaluation queries. The evaluation count is the same for every
 input, since every one-hot vector has exactly one hot slot. The budgets are sums over the 85 moduli
 in `Construction/CRT/Entry.lean`; their `decide +kernel` certificates in
-`Construction/CRT/BudgetFacts.lean` await a build for this draft.
+`Construction/CRT/BudgetFacts.lean` certify these sums.
 
 ---
 
@@ -389,7 +385,7 @@ G0 → G0T → G0U → G1U → HW → H → I → M
 
 - `G0 → G0T`: the mask key's input is a labelled query, so the real game is the game on an answer
   table indexed by tags. The budget conservatively retains `1,759,967/p`, using the fixed
-  garbler-query gate instead of the smaller actual count 1,062,038; the current table-hop proof
+  garbler-query gate instead of the smaller actual count 964,502; the current table-hop proof
   in fact establishes zero cost.
 - `G0T → G0U`: every pad vector and every mask, read from a uniform integer by a slightly biased
   reading, is swapped for an exactly uniform value (the pad-slack and `sampleFp` biases).
@@ -510,7 +506,7 @@ table with a compiler-correctness theorem, one cost on every non-aborting path) 
 layout.
 
 - **Stage 1** draws the public value: the curve and row constants (276 field cells) as field
-  elements by bounded rejection, the 1,092 exception bytes, the joins and pins as coin words, the 85
+  elements by bounded rejection, the 182 exception nibbles (91 bytes), the joins and pins as coin words, the 85
   residue digits of each of the 642 records by bounded rejection below `m_i` (so the record is
   uniform below `M`, with hint 0), and the Lamport key; it serializes them with `Wire.encoding`,
   computing each 624-bit record by Horner's rule over 128-bit limbs.

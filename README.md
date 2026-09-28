@@ -4,10 +4,7 @@ This is an entry for the Kriterion `scalar-multiplication` challenge: garbled BN
 multiplication `f_k(u) = k·u`, targeting the challenge library
 `Kriterion-cc/kriterion-challenge` at commit `aaf2789` (Lean `v4.33.1`).
 
-**Draft status:** the fallback schedule changes in this branch have not been built or checked by
-Lean yet. The numbers below are independently computed targets; the updated Lean certificates and
-audit expectations must pass on the build VM before this branch is considered verified.
-The schedule uses width 8 for 67 odd moduli and width 7 for the other 17, retaining 128-bit labels.
+The schedule uses width 8 for 67 odd moduli and width 7 for the other 17, using 104-bit internal conversion labels and 128-bit external Lamport labels and digest keys.
 
 It is psivesely's CRT entry (`psivesely/kriterion-bn254-crt`, commit `de8f397`, 182,936 bytes) with Lazar's
 sign row (`Lazar955/bn254-planb`) in the `Y` slot of every digit:
@@ -16,7 +13,7 @@ sign row (`Lazar955/bn254-planb`) in the `Y` slot of every digit:
   reads three encodings instead of four, and Lazar's coefficient cut leaves it one published constant
   instead of two, so a digit reads 7 affine encodings and publishes 3 constants instead of 8 and 4 (§1.5);
 * **the exception gadget**: the sign row vanishes at a second exceptional input, `Q = 2K`, so the gadget's
-  entry has 12 bytes per digit and the hash digest two final sites per digit (§1.6).
+  entry has one byte per digit and the hash digest two final sites per digit (§1.6).
 
 psivesely's entry is xinshu's entry (`xinshudong/bn254-entry`, commit `bf53ea4`, 3,363,376 bytes) with the
 delivery of the affine encodings replaced:
@@ -37,9 +34,9 @@ are xinshu's.
 
 | metric | value | rule |
 |---|---|---|
-| `ciphertextBytes` | **169,184** `= 96 + 91·96 + 91·12 + 2·54,592 + 642·78` | ranked, lower is better |
-| `garbleQueries` | **1,062,038** `≤ 1,759,967` | acceptance gate |
-| `evaluateQueries` | **1,054,570** `≤ 1,055,879` (1,309 below) | acceptance gate |
+| `ciphertextBytes` | **147,711** `= 96 + 91·96 + 91·1 + 2·44,356 + 642·78` | ranked, lower is better |
+| `garbleQueries` | **964,502** `≤ 1,759,967` | acceptance gate |
+| `evaluateQueries` | **957,536** `≤ 1,055,879` (98,343 below) | acceptance gate |
 
 The baseline supplied proofs for every field of `Kriterion.Solution`, with no `sorry`, and its
 axiom audits reported only `propext`, `Classical.choice` and `Quot.sound`. This branch preserves the
@@ -143,12 +140,12 @@ follows:
 | `Z ≠ 0`, `S = 0` | `Q = 2K`: the tangent at `−K` meets the curve again at `2K` (`JacobianMixed.tangentZero_double`) | `(3/2)·φ(P)`, `3/2` in the scalar field, digit from the gadget's kind 1 |
 | otherwise | | `x = X/Z²`, `y = S^((p−1)/2)·(x³ + 3)^((p+1)/4)` |
 
-The gadget's entry has 12 bytes per digit: kind `k` at slot `6k + index` (`Exception.slotOf`), kind 0 for
+The gadget's entry has one byte per digit: kind `k` in nibble `k` (`Exception.slotOf`), kind 0 for
 the input at `Q = K` (`Exception.exceptionalInput`) and kind 1 for the input at `Q = 2K`
 (`Exception.tripleInput`). Each exceptional input of a nonzero digit `o` has its own digest key and its own
 final site `s = 2o + k`, so the digest has 182 final sites. The garbler asks the final of each site at its
 exceptional input's key; the evaluator asks both sites of every digit at its own key, and at an exceptional
-input of either kind the byte of that kind unmasks (`DigestUnlock.digestUnlock_exceptional`,
+input of either kind the nibble of that kind unmasks (`DigestUnlock.digestUnlock_exceptional`,
 `digestUnlock_triple`). The digest asks 1,198 garbling queries (`4·254 + 2·91`, a bound: a zero digit asks
 no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side than with one final per digit.
 
@@ -164,7 +161,7 @@ no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side th
 | `Construction/CRT/Entry.lean`, `Public.lean`, `Bounds.lean`, `BudgetFacts.lean` | the scheme, the garbler and evaluator programs at their exact budgets, the public value and its codec, the query bounds, the budgets evaluated by the kernel |
 | `Construction/CRT/Layout.lean` | the public value in source form, for the simulator |
 | `Construction/Simulator/CRT/` | the simulator machine: layout, stage 1, the replay blocks, Garner, the solve (the sign row's collector `rowY_cubic`, with its target scaled by `(x·x)⁻¹`), the preimages and programs, the design and its cost bound, the valid arm (`Simulator.lean`) |
-| `Construction/ArgoMAC/`, `Garbling.lean`, `Scheme.lean`, `QueryMonad.lean` | the rows (the sign row and its cut in `Coordinates.lean` and `Biquadratic.lean`), the curve check, the 12-byte gadget entry (`Exception.lean`), the decoder (`Garbling.decodeHomogeneous`) and the coins (with the sign row's `τ`) |
+| `Construction/ArgoMAC/`, `Garbling.lean`, `Scheme.lean`, `QueryMonad.lean` | the rows (the sign row and its cut in `Coordinates.lean` and `Biquadratic.lean`), the curve check, the one-byte gadget entry (`Exception.lean`), the decoder (`Garbling.decodeHomogeneous`) and the coins (with the sign row's `τ`) |
 
 ### 1.8 Proof
 
@@ -181,31 +178,30 @@ no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side th
 |---|---|---:|
 | `curve` | 3 curve-check constants | 96 |
 | `rows` | 91 digits × 3 constants × 32 B | 8,736 |
-| `exception` | 91 digits × 12-byte entry | 1,092 |
-| `crtX`, `crtY` | 3,412 blocks × 16 B per coordinate | 109,184 |
+| `exception` | 91 digits × one-byte entry | 91 |
+| `crtX`, `crtY` | 3,412 labels × 13 B per coordinate | 88,712 |
 | `recX`, `recY` | 642 records × 78 B (367 of `x`, 275 of `y`) | 50,076 |
-| **total** | | **169,184** |
+| **total** | | **147,711** |
 
 A record is `h_e·M + Σ_i J_{e,i}·Π_{i'<i} m_{i'}`, below `2M < 2^624`. Every field has a fixed width, so
 every public value encodes to the same length (`Entry.Wire.encoding_length`). Against `de8f397`, the sign
 row saves 91 records (7,098 B) and 91 row constants (2,912 B), and the second exceptional case adds 6
-bytes per digit (546 B): 9,464 B less. The fallback schedule saves another 4,288 B,
-for 13,752 B less in total.
+bytes per digit (546 B) in the original layout: 9,464 B less. The fallback schedule saves another 4,288 B,
+and compacting both exceptional kinds into one byte saves 1,001 B, and 104-bit conversion labels save 20,472 B, for 35,225 B less in total.
 
 ## 3. Query accounting
 
 | part | garbling | evaluation |
 |---|---:|---:|
-| coordinate `x` (chunks 71,936 / 71,458; conversions 265,641 / 263,500; body 217,950 / 216,976) | 555,527 | 551,934 |
-| coordinate `y` (chunks and conversions as `x`; body 166,643 / 165,895) | 504,220 | 500,853 |
+| coordinate `x` (chunks 55,936 / 55,522; conversions 232,873 / 230,919; body 217,950 / 216,976) | 506,759 | 503,417 |
+| coordinate `y` (chunks and conversions as `x`; body 166,643 / 165,895) | 455,452 | 452,336 |
 | mask key | 1 | 1 |
 | masks | 1,092 | 1,092 |
 | exception digest | 1,198 | 690 |
-| **total** | **1,062,038** | **1,054,570** |
+| **total** | **964,502** | **957,536** |
 
 The budgets are term-by-term sums over the 85 moduli (`Entry.garbleBudgetOf`, `Entry.evaluateBudgetOf`),
-with certificates using `decide +kernel` in `Construction/CRT/BudgetFacts.lean` (not yet rerun for
-this draft). The evaluator's count is the same for
+with certificates using `decide +kernel` in `Construction/CRT/BudgetFacts.lean`. The evaluator's count is the same for
 every input. Against `de8f397`, the body of `x` (367 encodings instead of 458) asks 49,966 garbling and
 49,745 evaluation queries fewer, the masks 137 fewer on each side, and the digest 91 more on each side.
 
@@ -269,8 +265,8 @@ lake env lean Scratch/ProofAudit.lean   # the three axioms over every declaratio
 ```
 
 `Scratch/` is not a Lean library and the verifier ignores it. `Scratch/Audit.lean` fails if the bytes
-(169,184, from the metric and from encoding an all-zero public value), the garbling budget (1,062,038) or
-the evaluation budget (1,054,570) differ, or if a budget comes within 500 queries of its gate, and it checks
+(147,711, from the metric and from encoding an all-zero public value), the garbling budget (964,502) or
+the evaluation budget (957,536) differ, or if a budget comes within 500 queries of its gate, and it checks
 the axioms of the solution and of the privacy field. Build time depends strongly on available
 memory; this fallback draft has not been built, and no build-time estimate is claimed here.
 

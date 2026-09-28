@@ -103,11 +103,11 @@ def main():
     garble = sum(coord_g) + 1 + 1092 + 1198
     evaluate = sum(coord_e) + 1 + 1092 + 690
     record_bytes = ceildiv((2 * math.prod(moduli) - 1).bit_length(), 8)
-    ciphertext = 96 + 91 * 96 + 91 * 12 + 2 * blocks * (LABEL_BITS // 8) + 642 * record_bytes
+    ciphertext = 96 + 91 * 96 + 91 * 1 + 2 * blocks * (LABEL_BITS // 8) + 642 * record_bytes
     assert (blocks, joins, pins, record_bytes) == (3412, 1467, 1945, 78)
     assert coord_g == [506759, 455452]
     assert coord_e == [503417, 452336]
-    assert (ciphertext, garble, evaluate) == (148712, 964502, 957536)
+    assert (ciphertext, garble, evaluate) == (147711, 964502, 957536)
     assert garble + 500 <= 1759967 and evaluate + 500 <= 1055879
 
     for name, value in [('convCount', blocks), ('ciphertextBytes', ciphertext)]:

@@ -16,9 +16,9 @@ This branch introduces no admitted proof, but the updated tree must be rebuilt a
 
 | field | proved by | where |
 |---|---|---|
-| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (1,062,038); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
-| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (1,054,570); `Submission.evaluateProgramCorrect` | the same |
-| `ciphertextSize` | `Entry.Wire.encoding_length` (169,184) | `Construction/CRT/Public.lean` |
+| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (964,502); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
+| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (957,536); `Submission.evaluateProgramCorrect` | the same |
+| `ciphertextSize` | `Entry.Wire.encoding_length` (147,711) | `Construction/CRT/Public.lean` |
 | `lamportCompatible` | `Lamport.selectedLabels_eq` | `Proof/LamportCompatibility/Labels.lean` |
 | `functionCorrect` | `rfl` | `Submission.lean` |
 | `perfectCorrectness` | `EntryCorrect.perfectCorrectness` | `Proof/Correctness/CRT/EntryCorrect.lean` |
@@ -84,7 +84,7 @@ The sign row and the second exceptional case enter the chain in these modules:
 | `Core/BodyMaskRowJoint.lean`, `Core/BodyMaskRowOff.lean` | the rows' bijection with the pads, masks and coins, on the curve (`bmrEquiv`) and off it (`bmrEquivOff`, whose residual holds the offsets of the four encodings that no constant absorbs) |
 | `Core/BmrEntry.lean` | the doubling event of either kind shows in the true rows; the sign row vanishes at `2K` (`sign_double`) |
 | `Flags/RowsDoubling.lean` | the flag of a target row with `Z = 0` or `S = 0`: three targets per digit, `364/#Point ≤ 364/(r − 1)` (`threeTargets_real_le`) |
-| `Core/DigestSplit.lean` | off the doubling event the 12-byte entries are uniform, with the finals at the two sites `2o + k` of each digit |
+| `Core/DigestSplit.lean` | off the doubling event the one-byte entries are uniform, with the finals at the two sites `2o + k` of each digit |
 | `Core/FinalCoincide.lean`, `Flags/CoincidenceSplit.lean` | a hidden final that the evaluator's path reaches: `182/2^128` over the 182 final sites (`crtEntry_finalCoincide`); with the two `Δ = 0` events, `184/2^128 ≤ 185/2^128` (`crtCoincidenceGuess_of`) |
 | `Proof/Privacy/Phase3/Opening.lean`, `OpeningBound.lean` | the lift `(λ²x, t²y, λ)` (`lift`); the real rows are lifts at uniform `(λ, t)` off `Q = K` and `Q = 2K` (`lifts_law`), whose mass is at most `273/#Point` (`bn254_doubling_real_le`); the kernel bound `455/#Point` (`rows_etvDist_le`) |
 

@@ -34,7 +34,7 @@ run_cmd do
 
 /- Recompute from the construction definitions, not a copied score record. -/
 set_option maxRecDepth 100000 in
-example : ciphertextBytes = 148712 ∧ garbleBudget = 964502 ∧ evaluateBudget = 957536 := by
+example : ciphertextBytes = 147711 ∧ garbleBudget = 964502 ∧ evaluateBudget = 957536 := by
   decide +kernel
 
 /- Both query gates have at least 500 queries of headroom. -/

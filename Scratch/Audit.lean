@@ -50,12 +50,12 @@ run_cmd do
 #eval Entry.garbleBudget
 #eval Entry.evaluateBudget
 
-/-- The expected numbers of this entry (85 moduli, fallback 7/8-bit table, pad slack 120, block-aligned cast
+/-- The expected numbers of this entry (85 moduli, fallback 7/8-bit table, pad slack 120, 104-bit internal conversion labels, block-aligned cast
 lanes, per-encoding 78-byte records with the wrap hint, sign rows with three published constants
-per digit, the hash digest with two exceptional kinds). -/
-def expectedBytes : Nat := 169184
-def expectedGarble : Nat := 1062038
-def expectedEvaluate : Nat := 1054570
+per digit, the hash digest with two packed exceptional nibbles). -/
+def expectedBytes : Nat := 147711
+def expectedGarble : Nat := 964502
+def expectedEvaluate : Nat := 957536
 
 #guard Kriterion.Benchmark.ciphertextBytes Submission.solution == expectedBytes
 #guard Kriterion.Benchmark.garbleQueries Submission.solution == expectedGarble
@@ -71,7 +71,7 @@ def expectedEvaluate : Nat := 1054570
 def zeroPublic : Entry.Public where
   curve := (0, 0, 0)
   rows := Vector.replicate PlanB.digitCount ⟨0, 0, 0⟩
-  exception := Vector.replicate PlanB.digitCount (Vector.replicate 12 0)
+  exception := Vector.replicate PlanB.digitCount (Vector.replicate 2 0)
   crtX := Vector.replicate convCount 0
   crtY := Vector.replicate convCount 0
   recX := Vector.replicate xCount 0
