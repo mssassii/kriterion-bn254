@@ -597,14 +597,22 @@ def signJoin (q : NonZeroBase × Bool) : NonZeroBase × Bool :=
       signedRoot_ne_zero _ _ (signed_ne_zero _ _ q.1.nonzero)⟩, negBit q.1.value)
 
 theorem signSplit_fst (p : NonZeroBase × Bool) :
-    (signSplit p).1.value = Rows.signed p.2 (p.1.value ^ 2) := rfl
+    (signSplit p).1.value = Rows.signed p.2 (p.1.value ^ 2) := by
+  unfold signSplit
+  rfl
 
-theorem signSplit_snd (p : NonZeroBase × Bool) : (signSplit p).2 = sqBit p.1.value := rfl
+theorem signSplit_snd (p : NonZeroBase × Bool) : (signSplit p).2 = sqBit p.1.value := by
+  unfold signSplit
+  rfl
 
 theorem signJoin_fst (q : NonZeroBase × Bool) :
-    (signJoin q).1.value = signedRoot q.2 (Rows.signed (negBit q.1.value) q.1.value) := rfl
+    (signJoin q).1.value = signedRoot q.2 (Rows.signed (negBit q.1.value) q.1.value) := by
+  unfold signJoin
+  rfl
 
-theorem signJoin_snd (q : NonZeroBase × Bool) : (signJoin q).2 = negBit q.1.value := rfl
+theorem signJoin_snd (q : NonZeroBase × Bool) : (signJoin q).2 = negBit q.1.value := by
+  unfold signJoin
+  rfl
 
 theorem signJoin_signSplit (p : NonZeroBase × Bool) : signJoin (signSplit p) = p := by
   obtain ⟨⟨tau, ne⟩, sign⟩ := p
@@ -629,12 +637,14 @@ theorem signSplit_signJoin (q : NonZeroBase × Bool) : signSplit (signJoin q) = 
     · rw [negBit_true kappa minus, minus, signed_true, neg_neg]
   refine Prod.ext (nz_ext ?_) ?_
   · rw [signSplit_fst, signJoin_fst, signJoin_snd, signedRoot_sq _ _ square, signed_signed]
-  · rw [signSplit_snd, signJoin_fst, chi_signedRoot _ _ square] at *
+  · rw [signSplit_snd, signJoin_fst]
+    dsimp only
+    have chiRoot := chi_signedRoot b _ square
     cases b
-    · rw [signSplit_snd, signJoin_fst]
-      exact sqBit_false _ (by rw [chi_signedRoot _ _ square, Bool.not_false, signed_true]; exact one_ne_neg_one.symm)
-    · rw [signSplit_snd, signJoin_fst]
-      exact sqBit_true _ (by rw [chi_signedRoot _ _ square, Bool.not_true, signed_false])
+    · rw [Bool.not_false, signed_true] at chiRoot
+      exact sqBit_false _ (by rw [chiRoot]; exact one_ne_neg_one.symm)
+    · rw [Bool.not_true, signed_false] at chiRoot
+      exact sqBit_true _ chiRoot
 
 theorem signBit_eq_negBit (x : BaseField) : Rows.signBit x = negBit x := by
   unfold Rows.signBit negBit chi
