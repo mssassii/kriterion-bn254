@@ -476,15 +476,15 @@ theorem phi_eq_of_agree {x y : JP}
     (joins : ∀ p : ModPos, atNat x.1 0 (jIdx (.inr p)) = atNat y.1 0 (jIdx (.inr p))) (pins : x.2 = y.2) :
     phi x = phi y := by
   refine Prod.ext (funext fun c => ?_) (funext fun i => stageVals_ext (fun r => ?_) ?_ ?_)
-  · show pinOfBlocks table.castWidth (fun j => (srcConv x).chunkPin c.val j.val) =
-      pinOfBlocks table.castWidth (fun j => (srcConv y).chunkPin c.val j.val)
+  · show pinOfBlocks (table.castWidth - 1) (fun j => (srcConv x).chunkPin c.val j.val) =
+      pinOfBlocks (table.castWidth - 1) (fun j => (srcConv y).chunkPin c.val j.val)
     simp only [chunkPin_eq, pinBlockAt_congr pins]
   · exact (jRead_phi x ⟨i, r⟩).trans ((joins ⟨i, r⟩).trans (jRead_phi y ⟨i, r⟩).symm)
-  · show pinOfBlocks (rowI i).ell (fun j => (srcConv x).stagePin i.val 0 j.val) =
-      pinOfBlocks (rowI i).ell (fun j => (srcConv y).stagePin i.val 0 j.val)
+  · show pinOfBlocks ((rowI i).ell - 1) (fun j => (srcConv x).stagePin i.val 0 j.val) =
+      pinOfBlocks ((rowI i).ell - 1) (fun j => (srcConv y).stagePin i.val 0 j.val)
     simp only [stagePin_eq, pinBlockAt_congr pins]
-  · show pinOfBlocks ((rowI i).ell - (rowI i).width0) (fun j => (srcConv x).stagePin i.val 1 j.val) =
-      pinOfBlocks ((rowI i).ell - (rowI i).width0) (fun j => (srcConv y).stagePin i.val 1 j.val)
+  · show pinOfBlocks ((rowI i).ell - (rowI i).width0 - 1) (fun j => (srcConv x).stagePin i.val 1 j.val) =
+      pinOfBlocks ((rowI i).ell - (rowI i).width0 - 1) (fun j => (srcConv y).stagePin i.val 1 j.val)
     simp only [stagePin_eq, pinBlockAt_congr pins]
 
 /-! #### The read part of the joins and pins -/
