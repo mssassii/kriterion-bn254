@@ -535,20 +535,14 @@ theorem viewed_touches (parameter : ℕ) (scalar : NonZeroScalar) (tape : TableT
   exact congrArg PublicQuery.hash same
 
 omit [FieldCertificate] [GroupCertificate] in
-/-- The touch charge `4/2^128 + 1/(p − 1)` is at least `1/2^128`. -/
+/-- The touch charge `4/2^104 + 1/(p − 1)` covers the full-width tail guess `1/2^128`. -/
 theorem inv_le_touchCharge : (1 : ℝ) / 2 ^ 128 ≤ stageOneTouchCharge := by
-  unfold stageOneTouchCharge crtHiddenCharge frac
-  have p1 : 1 < BudgetData.p := one_lt_p
-  generalize hq : BudgetData.p - 1 = q
-  have q0 : 0 < q := by omega
-  have qr : (0 : ℝ) < (q : ℝ) := by exact_mod_cast q0
-  have cast : ((2 ^ 128 : ℕ) : ℝ) = (2 : ℝ) ^ 128 := by rw [Nat.cast_pow, Nat.cast_ofNat]
-  rw [Nat.cast_add, Nat.cast_mul, Nat.cast_mul, cast]
-  have hK : (0 : ℝ) < 2 ^ 128 := by positivity
-  generalize (2 : ℝ) ^ 128 = K at hK ⊢
-  rw [show ((4 : ℕ) : ℝ) = 4 by norm_num]
-  rw [div_le_div_iff₀ hK (mul_pos hK qr)]
-  nlinarith [mul_pos hK qr, mul_pos hK hK]
+  rw [stageOneTouchCharge_eq]
+  have four : (1 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ 104 := by norm_num
+  have nonneg : 0 ≤ 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
+    unfold BN254.baseFieldModulus
+    norm_num
+  linarith
 
 /-- **The common tail**: the ideal law against `weight * Fx` is below the charge times the swapped tape's weight. -/
 theorem tail_le (core : CrtCoreBelow crtEntry Entry.table crtRevealOn crtRevealOff)

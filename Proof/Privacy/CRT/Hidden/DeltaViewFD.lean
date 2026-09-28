@@ -509,6 +509,7 @@ theorem delta_guess_le (rel : CoordRelational) (tail : TailRel) (parameter : ℕ
   refine le_trans bound (le_of_eq ?_)
   rw [Kriterion.ArgoMAC.Security.PGS.card_block, Nat.cast_one, one_div, Nat.cast_pow, Nat.cast_ofNat]
 
+set_option maxRecDepth 4096 in
 open Classical in
 /-- A projected delta guess retains exactly `2^24` raw preimages; no high bits of the raw residual are exposed. -/
 theorem delta_guess_clip_le (rel : CoordRelational) (tail : TailRel) (parameter : ℕ) (scalar : NonZeroScalar)
@@ -530,7 +531,11 @@ theorem delta_guess_clip_le (rel : CoordRelational) (tail : TailRel) (parameter 
   have bound := HiddenGuess.outer_fine_le (swappedTableTape crtEntry)
     (stageTwoView crtEntry Entry.table parameter scalar u) (fine parameter scalar u κ) coarse hview (res κ)
     (fine_split parameter scalar u κ) (fun tape => tape ∈ S) (fun w r => clip r = X w ^^^ ℓ) (2 ^ (128 - labelBits))
-    (fun w => le_of_eq (Narrow.clip_fiber_filter_card (X w ^^^ ℓ)))
+    (fun w => by
+      have card := Narrow.card_clip_fibre (X w ^^^ ℓ)
+      rw [← Nat.card_eq_fintype_card] at card
+      rw [← Fintype.card_subtype, ← Nat.card_eq_fintype_card]
+      exact le_of_eq card)
     (fun tape inside => hS tape inside) view
   refine le_trans bound (le_of_eq ?_)
   have ratio : ((2 ^ (128 - labelBits) : ℕ) : ℝ≥0∞) / (Fintype.card Block : ℝ≥0∞) =
