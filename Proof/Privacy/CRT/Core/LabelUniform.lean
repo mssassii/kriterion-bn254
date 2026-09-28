@@ -187,8 +187,8 @@ theorem clip_fibre_ratio :
 theorem bind_map_uniform_clip {View : Type*} (view : PMF View) :
     (view.bind fun v => (PMF.uniformOfFintype RawBlock).map fun delta => (v, clip delta))
       = view.bind fun v => (PMF.uniformOfFintype Label).map fun label => (v, label) := by
-  have inner : (fun v => (PMF.uniformOfFintype RawBlock).map fun delta => (v, clip delta))
-      = fun v => (PMF.uniformOfFintype Label).map fun label => (v, label) := by
+  have inner : (fun (v : View) => (PMF.uniformOfFintype RawBlock).map fun delta => (v, clip delta))
+      = fun (v : View) => (PMF.uniformOfFintype Label).map fun label => (v, label) := by
     funext v
     change (PMF.uniformOfFintype RawBlock).map ((Prod.mk v) ∘ clip) = _
     rw [← PMF.map_comp, uniform_clip]
