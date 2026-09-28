@@ -7,6 +7,7 @@ abstract route-M stage 2.
 -/
 
 import Proof.Simulator.CRT.ReplayEntry
+import Proof.Privacy.CRT.EntryInstance
 
 namespace Kriterion.CRT.SimMachine
 
@@ -81,7 +82,8 @@ theorem runT_replayRouteM (pub : Entry.Public) (u : AffineInput) (labels : Garbl
   simp only [Instance.view, EntryReading.nonCollectorReplay, TreeLaws.monad_bind, TreeLaws.monad_pure,
     runReader_bind, runReader_pure, PMF.bind_bind, PMF.pure_bind, PMF.map_bind, PMF.pure_map]
   refine congrArg (PMF.bind _) (funext fun masked => ?_)
-  simp only [routeView]
+  simp only [routeView, ReplayView.toDelivered, ReplayView.toMasks, ReplayView.nonCollectorValues,
+    Instance.toDelivered, Instance.toMasks, EntryReading.nonCollectorValues]
 
 end Lazy
 
