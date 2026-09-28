@@ -96,8 +96,9 @@ theorem normTrueRows_eq (scalar : NonZeroScalar) (coins : Coins) (input : Affine
   · rw [if_pos (decide_eq_true hz), hz]
     rw [show clampOffsets radixMap (tailRho coins).1.1 d = (coins.offsets.values.get d).point from pointEq.symm,
       JacobianMixed.affineOffsetPoint_eq]
-    simp only [digitEndomorphismBase, Rows.unscaledRows, Rows.zeroSign, Coordinates.scale, Coordinates.evaluate, lift]
-    congr 1 <;> ring
+    simp only [digitEndomorphismBase, Rows.unscaledRows, Rows.zeroSign, Coordinates.scale, Coordinates.evaluate,
+      JacobianMixed.affinePoint, lift, tailRho, rhoOf, FieldMacToECMac.HomogeneousValue.mk.injEq]
+    refine ⟨by ring, by ring, by ring⟩
   · rw [if_neg (fun same => hz (of_decide_eq_true same))]
     have trow := trueRow_eq { digit := (digitsOf scalar).get d, offset := coins.offsets.values.get d }
       (coins.pointRandomness.get d).rho (coins.pointRandomness.get d).tau input point decoded
