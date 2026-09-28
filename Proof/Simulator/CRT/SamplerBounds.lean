@@ -352,6 +352,7 @@ theorem pinCoord_lt (n : Fin (2 * (Entry.pinCount * laneCount))) : pinCoord n.va
 theorem pinOf_lt (n : Fin (2 * (Entry.pinCount * laneCount))) : pinOf n.val < Entry.pinCount := by
   show n.val / laneCount % Entry.pinCount < Entry.pinCount
   have small : n.val < 2 * (Entry.pinCount * laneCount) := n.isLt
+  simp only [laneCount, Narrow.labelBits] at small
   exact Nat.mod_lt _ (by omega)
 
 instance twoPowNeZero (w : Nat) : NeZero (2 ^ w) := ⟨pow_ne_zero _ two_ne_zero⟩
@@ -500,7 +501,7 @@ theorem read_pins (s : Entry.Source) : (readSource (exOf s)).pins = s.pins := by
   have le : κ.val * Entry.pinCount ≤ 1 * Entry.pinCount := Nat.mul_le_mul_right _ (by omega)
   have ks := k.isLt
   have ls : lane.val < laneCount := lane.isLt
-  rw [total_apply _ _ _ (by omega)]
+  rw [total_apply _ _ _ (by simp only [laneCount, Narrow.labelBits] at *; omega)]
   unfold exPins
   simp only
   have c1 : pinCoord ((κ.val * Entry.pinCount + k.val) * laneCount + lane.val) = κ.val := by

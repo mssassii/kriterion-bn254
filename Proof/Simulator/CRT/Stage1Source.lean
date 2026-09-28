@@ -115,13 +115,14 @@ theorem convHolds_extract (ram : Word → Word) (valid : CellsValid ram) (κ : F
     have kSmall := κ.isLt
     have pins200 : pinCount = 200 := CrtConv.pinCount_eq
     have n_in : (κ.val * pinCount + k) * laneCount + lane < 2 * (pinCount * laneCount) := by
-      rw [pins200] at inside ⊢; omega
+      rw [pins200] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
     have pinIs : pinOf ((κ.val * pinCount + k) * laneCount + lane) = k := by
-      unfold pinOf; rw [pins200] at inside ⊢; omega
+      unfold pinOf; rw [pins200] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
     have addr : pinAddr ((κ.val * pinCount + k) * laneCount + lane) = Layout.sourcePin κ k lane := by
       unfold pinAddr pinCoord
       rw [pinIs]
       rw [pins200] at inside ⊢
+      simp only [laneCount, Narrow.labelBits] at *
       congr 1 <;> omega
     have bound := valid.pins _ n_in
     rw [pinIs, pinWidthAt_eq k inside, addr] at bound
