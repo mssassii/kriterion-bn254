@@ -162,7 +162,7 @@ theorem clip_labelX_honest (key : InputMacKey) (Z : Fin coordinateBitCount → B
     clip (labelX (Lamport.selectedLabels (key.encode (BitInput.ofAffine input))) j) =
       clip (atNat Z 0 j) ^^^ (if input.x.val.testBit j then clip Δ else 0) := by
   rw [labelX_honest key Z Δ hkey input j low, Narrow.clip_xor]
-  split <;> simp
+  split <;> simp only [show clip (0 : Block) = 0 from Narrow.clip_zero, BitVec.xor_zero]
 
 /-- Conversion sees only the low label bits; digest consumers retain `labelY_honest`. -/
 theorem clip_labelY_honest (key : InputMacKey) (Z : Fin coordinateBitCount → Block) (Δ : Block)
@@ -171,7 +171,7 @@ theorem clip_labelY_honest (key : InputMacKey) (Z : Fin coordinateBitCount → B
     clip (labelY (Lamport.selectedLabels (key.encode (BitInput.ofAffine input))) j) =
       clip (atNat Z 0 j) ^^^ (if input.y.val.testBit j then clip Δ else 0) := by
   rw [labelY_honest key Z Δ hkey input j low, Narrow.clip_xor]
-  split <;> simp
+  split <;> simp only [show clip (0 : Block) = 0 from Narrow.clip_zero, BitVec.xor_zero]
 
 theorem coins_key_x (coins : Coins) (j : Fin coordinateBitCount) :
     coins.inputMacKey.x[j.val] = ⟨coins.inputZero .x j, coins.inputZero .x j ^^^ coins.inputDelta .x⟩ := by
