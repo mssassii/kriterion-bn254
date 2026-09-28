@@ -52,7 +52,7 @@ theorem joinAt_cell (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
     (inside : index < joinCount) :
     ram (word (Layout.sourceJoin κ index)) = labelWord (s.joinAt ⟨κ, hκ⟩ index) := by
   rw [holds.joins index inside]
-  simp only [Source.joinAt, atNat, dif_pos inside]
+  simp only [Source.joinAt, atNat, dif_pos inside, labelWord_eq_word]
 
 theorem chunkJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ c, c < 32 → ∀ n, 1 ≤ n → n < Entry.table.chunkWidth c →
