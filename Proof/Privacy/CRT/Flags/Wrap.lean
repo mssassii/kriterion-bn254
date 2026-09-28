@@ -156,7 +156,8 @@ theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.vi
       ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0) := by
   by_cases bad : H8.normBadSrc source
   · rw [if_pos bad]
-    exact le_trans (PMF.toOuterMeasure_apply_le_one _ _) le_add_self
+    refine le_trans (le_trans (MeasureTheory.measure_mono (Set.subset_univ _))
+      (le_of_eq ((PMF.toOuterMeasure_apply_eq_one_iff _ _).mpr (Set.subset_univ _)))) le_add_self
   · rw [if_neg bad, add_zero]
     have same : {T | H8.replayWraps source u T} = {T | H8.replayWindow source u T} := by
       ext T
@@ -182,18 +183,21 @@ theorem crtWrapTable_le [FieldCertificate] [GroupCertificate] (u : AffineInput)
   haveI := (PublicFirst.viewHere Instance.crtEntry).sourceNonempty
   have smudgeNonneg : 0 ≤ smudgeError := frac_nonneg _ _
   rw [ENNReal.ofReal_add smudgeNonneg normError_nonneg, add_mul]
-  calc _ ≤ ∑' source, PMF.uniformOfFintype Kriterion.CRT.Entry.Source source *
-          (weight (Kriterion.CRT.Entry.publish source) *
+  calc _ ≤ ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source source *
+          (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) *
             (ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0))) :=
         ENNReal.tsum_le_tsum fun source => by gcongr; exact wrap_source source u
-    _ = ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype Kriterion.CRT.Entry.Source source *
-            weight (Kriterion.CRT.Entry.publish source) +
-          ∑' source, PMF.uniformOfFintype Kriterion.CRT.Entry.Source source *
-            (weight (Kriterion.CRT.Entry.publish source) * (if H8.normBadSrc source then 1 else 0)) := by
+    _ = ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source
+            source * weight ((PublicFirst.viewHere Instance.crtEntry).publish source) +
+          ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source source *
+            (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) *
+              (if H8.normBadSrc source then 1 else 0)) := by
         rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_add]
         refine tsum_congr fun source => ?_
         ring
-    _ ≤ _ := add_le_add le_rfl (NormFlag.normFlag_le weight)
+    _ ≤ _ := add_le_add le_rfl
+        (@NormFlag.normFlag_le _ _ weight (PublicFirst.viewHere Instance.crtEntry).sourceFintype
+          (PublicFirst.viewHere Instance.crtEntry).sourceNonempty)
 
 end
 
