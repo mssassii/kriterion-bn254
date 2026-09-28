@@ -55,8 +55,8 @@ theorem asked_bind (program : CM α) (next : α → CM β) :
 @[simp] theorem asked_hLabelM (label : Label) (tag : ℕ) :
     asked H (hLabelM label tag) = [hashInput (embed label) tag] := by
   unfold hLabelM
-  rw [asked_bind, asked_h128M]
-  simp only [asked_pure, List.append_nil]
+  rw [asked_bind]
+  simp only [asked_askN, asked_pure, List.append_nil]
 
 theorem asked_vector (count : ℕ) (program : Fin count → CM α) :
     asked H (FreeQuery.vector count program) = (List.finRange count).flatMap fun i => asked H (program i) := by
