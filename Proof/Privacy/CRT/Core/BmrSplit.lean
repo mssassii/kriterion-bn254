@@ -137,16 +137,15 @@ def RealReading (K : TableKernel) : Prop :=
 
 /-- The P45 reveal at kernel scales: doubling of the corrected targets, a CRT value in the two-sided window, or the
 normalization flag of the source's hidden cells. -/
-def revealAt (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins)
-    (scales : Fin 91 → NonZeroBase × NonZeroBase) (u : AffineInput) (cells : BMR.NSource Tb × BMR.Visible Tb u) :
-    Prop :=
-  H8.rowsDoubling (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u scales) ∨
+def revealAt (ctx : BMR.NContext) (scales : Fin 91 → NonZeroBase × NonZeroBase) (u : AffineInput)
+    (cells : BMR.NSource Tb × BMR.Visible Tb u) : Prop :=
+  H8.rowsDoubling (BMR.nTargets ctx u scales) ∨
     (∃ e, BMR.InWindow Tb (BMR.evalInt u cells.1.1 cells.2.1 e)) ∨ BMR.normBad cells.1
 
 /-- The P45 reveal at the coins' own kernel scales. -/
 abbrev revealP45 (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
     (cells : BMR.NSource Tb × BMR.Visible Tb u) : Prop :=
-  revealAt scalar coins (NormRows.scalesOf coins) u cells
+  revealAt (BmrEntry.bmrContextOf scalar coins) (NormRows.scalesOf coins) u cells
 
 open Classical in
 /-- **`M'`'s P45 part**. -/
@@ -295,7 +294,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
   -- the ideal side, likewise
   let h : Kriterion.ArgoMAC.Scheme.Coins → Layer → ℝ≥0∞ := fun coins layer =>
     ∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Visible Tb u) cells *
-      (if revealAt scalar coins layer.1 u cells then PMF.pure none
+      (if revealAt (BmrEntry.bmrContextOf scalar coins) layer.1 u cells then PMF.pure none
         else (bmrLaw K u (BMR.nIdealOut (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u layer.1) u cells)).map
           some) (some w)
   have rhs : ∀ coins, (∑' τ, PMF.uniformOfFintype Targets τ *
@@ -335,7 +334,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
     simp only [g, doubling_congr scalar u (fun _ => (0, 0)) (fun _ => (0, 0)) same, bmrContextOf_congr scalar same]
   have invariantH : ∀ coins coins' layer, ctxPart coins = ctxPart coins' → h coins layer = h coins' layer := by
     intro coins coins' layer same
-    simp only [h, revealAt, bmrContextOf_congr scalar same]
+    simp only [h, bmrContextOf_congr scalar same]
   rw [L, R, split g invariantG, split h invariantH]
   refine ENNReal.tsum_le_tsum fun coins => ?_
   gcongr coinLaw coins * ?_
@@ -348,7 +347,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
       intro s old
       refine ENNReal.tsum_eq_zero.mpr fun cells => ?_
       have flagged := BmrEntry.rowsDoubling_nTargets scalar coins u ((doubling_iff scalar u _ _).mp dbl) s
-      rw [if_pos (show revealAt scalar coins s u cells from Or.inl flagged),
+      rw [if_pos (show revealAt (BmrEntry.bmrContextOf scalar coins) s u cells from Or.inl flagged),
         PMF.pure_apply_of_ne _ _ (Option.some_ne_none w), mul_zero]
     simp only [zero, mul_zero, tsum_zero]
     exact zero_le
@@ -363,7 +362,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
       simp only [gval]
       exact uniform_sum_equiv coinsEquiv fun c => bmrLaw K u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u c) w
     have hval : ∀ s old, h coins (s, old) = ∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Visible Tb u) cells *
-        (if revealAt scalar coins s u cells then 0
+        (if revealAt (BmrEntry.bmrContextOf scalar coins) s u cells then 0
           else bmrLaw K u (BMR.nIdealOut (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u s) u cells) w) := by
       intro s old
       refine tsum_congr fun cells => ?_
@@ -373,7 +372,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
     simp only [gconst, hval, BMR.tsum_uniform_const]
     exact BMR.nCore_weighted Flags.Wrap.entryTableFacts (BmrEntry.bmrContextOf scalar coins) (valid_ctx scalar coins)
       (sparse_ctx scalar coins) u onCurve
-      (fun s cells => revealAt scalar coins s u cells)
+      (fun s cells => revealAt (BmrEntry.bmrContextOf scalar coins) s u cells)
       (fun s cells flagged window => flagged (Or.inr (Or.inl window)))
       (fun s cells flagged bad => flagged (Or.inr (Or.inr bad)))
       (fun o => bmrLaw K u o w)
