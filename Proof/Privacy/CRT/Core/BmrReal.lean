@@ -87,25 +87,25 @@ theorem vector_eq_ofFn {α : Type} {n : ℕ} (v : Vector α n) (f : Fin n → α
 theorem toRecord_val (r : Kriterion.CRT.Entry.Record) : Kriterion.CRT.Entry.toRecord r.val = r :=
   Fin.ext (Nat.mod_eq_of_lt r.isLt)
 
-theorem realOut_join (ctx : BMR.Context) (u : AffineInput) (c : BMR.Coins Tb) :
-    (BMR.realOut ctx u c).1.1.1 = BMR.join ctx c := by
-  simp only [BMR.realOut]
+theorem realOut_join (ctx : BMR.NContext) (u : AffineInput) (c : BMR.Coins Tb) :
+    (BMR.nRealOut ctx u c).1.1.1 = BMR.nJoin ctx c := by
+  simp only [BMR.nRealOut]
 
-theorem realOut_gamma (ctx : BMR.Context) (u : AffineInput) (c : BMR.Coins Tb) :
-    (BMR.realOut ctx u c).1.1.2.1 = BMR.gamma ctx c := by
-  simp only [BMR.realOut]
+theorem realOut_gamma (ctx : BMR.NContext) (u : AffineInput) (c : BMR.Coins Tb) :
+    (BMR.nRealOut ctx u c).1.1.2.1 = BMR.nGamma ctx c := by
+  simp only [BMR.nRealOut]
 
-theorem realOut_curve (ctx : BMR.Context) (u : AffineInput) (c : BMR.Coins Tb) :
-    (BMR.realOut ctx u c).1.1.2.2 = BMR.curveTable c := by
-  simp only [BMR.realOut]
+theorem realOut_curve (ctx : BMR.NContext) (u : AffineInput) (c : BMR.Coins Tb) :
+    (BMR.nRealOut ctx u c).1.1.2.2 = BMR.curveTable c := by
+  simp only [BMR.nRealOut]
 
-theorem realOut_hint (ctx : BMR.Context) (u : AffineInput) (c : BMR.Coins Tb) :
-    (BMR.realOut ctx u c).1.2 = BMR.hint c := by
-  simp only [BMR.realOut]
+theorem realOut_hint (ctx : BMR.NContext) (u : AffineInput) (c : BMR.Coins Tb) :
+    (BMR.nRealOut ctx u c).1.2 = BMR.hint c := by
+  simp only [BMR.nRealOut]
 
 theorem recX_vec (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
     (EntryCorrect.pubOf (H8.tagHash table) scalar coins).recX = Vector.ofFn fun e =>
-      Kriterion.CRT.Entry.toRecord (recordOf (BMR.join (BmrEntry.bmrContextOf scalar coins)
+      Kriterion.CRT.Entry.toRecord (recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar coins)
         (BmrEntry.bmrCoinsOf coins table)) (BMR.hint (BmrEntry.bmrCoinsOf coins table)) (.inl (BMR.xEncEquiv.symm e))) := by
   refine vector_eq_ofFn _ _ fun e => ?_
   have value := BmrEntry.recX_eq scalar coins table (BMR.xEncEquiv.symm e)
@@ -116,7 +116,7 @@ theorem recX_vec (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
 
 theorem recY_vec (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
     (EntryCorrect.pubOf (H8.tagHash table) scalar coins).recY = Vector.ofFn fun e =>
-      Kriterion.CRT.Entry.toRecord (recordOf (BMR.join (BmrEntry.bmrContextOf scalar coins)
+      Kriterion.CRT.Entry.toRecord (recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar coins)
         (BmrEntry.bmrCoinsOf coins table)) (BMR.hint (BmrEntry.bmrCoinsOf coins table)) (.inr (BMR.yEncEquiv.symm e))) := by
   refine vector_eq_ofFn _ _ fun e => ?_
   have value := BmrEntry.recY_eq scalar coins table (BMR.yEncEquiv.symm e)
@@ -129,7 +129,7 @@ theorem recY_vec (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
 theorem bmrPart_realView_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput)
     (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
     H8.bmrPart Tb u (H8.realView crtEntry Tb parameter scalar u (coins, table)) =
-      bmrOf u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u (BmrEntry.bmrCoinsOf coins table))
+      bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u (BmrEntry.bmrCoinsOf coins table))
         (restrictBmr u table) := by
   unfold H8.bmrPart H8.realView
   rw [realGarbled_pair]
@@ -137,7 +137,7 @@ theorem bmrPart_realView_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : Af
   dsimp only
   rw [realOut_join, realOut_gamma, realOut_curve, realOut_hint, BmrEntry.curve_eq, recX_vec, recY_vec]
   have rows : (EntryCorrect.pubOf (H8.tagHash table) scalar coins).rows =
-      Vector.ofFn fun d => BMR.gamma (BmrEntry.bmrContextOf scalar coins) (BmrEntry.bmrCoinsOf coins table) d :=
+      Vector.ofFn fun d => BMR.nGamma (BmrEntry.bmrContextOf scalar coins) (BmrEntry.bmrCoinsOf coins table) d :=
     vector_eq_ofFn _ _ fun d => BmrEntry.rows_eq scalar coins table d
   rw [rows]
   rfl
@@ -145,7 +145,7 @@ theorem bmrPart_realView_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : Af
 /-- **The P45 part of the real view, pointwise** (every tape, every `u`). -/
 theorem bmrPart_realView (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (tape : TableTape crtEntry) :
     H8.bmrPart Tb u (H8.realView crtEntry Tb parameter scalar u tape) =
-      bmrOf u (BMR.realOut (BmrEntry.bmrContextOf scalar tape.1) u (BmrEntry.bmrCoinsOf tape.1 tape.2))
+      bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar tape.1) u (BmrEntry.bmrCoinsOf tape.1 tape.2))
         (restrictBmr u tape.2) := by
   obtain ⟨coins, table⟩ := tape
   exact bmrPart_realView_pair parameter scalar u coins table
@@ -187,7 +187,7 @@ theorem bmrCoinsOf_of_reads (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : Ta
 theorem bmrPart_realView_support (K : TableKernel) (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput)
     (coins : Kriterion.ArgoMAC.Scheme.Coins) (τ : Targets) (table : TagTable) (member : table ∈ (K.given τ).support) :
     H8.bmrPart Tb u (H8.realView crtEntry Tb parameter scalar u (coins, table)) =
-      bmrOf u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u (coinsOf τ (layerOf coins))) (restrictBmr u table) := by
+      bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u (coinsOf τ (layerOf coins))) (restrictBmr u table) := by
   obtain ⟨pads, masks⟩ := K.reads τ table member
   rw [bmrPart_realView_pair, bmrCoinsOf_of_reads coins table τ pads masks]
 
@@ -197,9 +197,9 @@ theorem coldOfPads_padsOfCold (u : AffineInput) (cold : BMR.Cold Tb u) : coldOfP
   rw [dif_neg ρ.2]
 
 /-- The visible targets of P45's real output at `coinsOf τ layer`. -/
-theorem visTargets_realOut (ctx : BMR.Context) (u : AffineInput) (τ : Targets) (layer : Layer) :
-    coldOfPads u τ.1 = coldOfPads u (padsOfCold u (visTargets u (BMR.realOut ctx u (coinsOf τ layer))).1) ∧
-      τ.2 = (visTargets u (BMR.realOut ctx u (coinsOf τ layer))).2 := by
+theorem visTargets_realOut (ctx : BMR.NContext) (u : AffineInput) (τ : Targets) (layer : Layer) :
+    coldOfPads u τ.1 = coldOfPads u (padsOfCold u (visTargets u (BMR.nRealOut ctx u (coinsOf τ layer))).1) ∧
+      τ.2 = (visTargets u (BMR.nRealOut ctx u (coinsOf τ layer))).2 := by
   refine ⟨?_, ?_⟩
   · rw [coldOfPads_padsOfCold]
     rfl
@@ -226,7 +226,7 @@ theorem realReading (K : TableKernel) : RealReading K := by
     rfl
   · rw [if_neg dbl]
     have vis := visTargets_realOut (BmrEntry.bmrContextOf scalar coins) u τ (layerOf coins)
-    calc _ = (K.given τ).map fun table => some (bmrOf u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u
+    calc _ = (K.given τ).map fun table => some (bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u
             (coinsOf τ (layerOf coins))) (restrictBmr u table)) := by
           refine map_congr_support _ _ _ fun table member => ?_
           simp only [Function.comp_apply]
@@ -234,13 +234,13 @@ theorem realReading (K : TableKernel) : RealReading K := by
             bmrPart_realView_pair]
           obtain ⟨pads, masks⟩ := K.reads τ table member
           rw [bmrCoinsOf_of_reads coins table τ pads masks]
-      _ = ((K.given τ).map (restrictBmr u)).map (some ∘ bmrOf u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u
+      _ = ((K.given τ).map (restrictBmr u)).map (some ∘ bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u
             (coinsOf τ (layerOf coins)))) := by
           rw [PMF.map_comp]
           rfl
       _ = _ := by
-          rw [K.visible u τ (padsOfCold u (visTargets u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u
-            (coinsOf τ (layerOf coins)))).1, (visTargets u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u
+          rw [K.visible u τ (padsOfCold u (visTargets u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u
+            (coinsOf τ (layerOf coins)))).1, (visTargets u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u
             (coinsOf τ (layerOf coins)))).2) vis.1 vis.2]
           unfold bmrLaw bmrKernel
           rw [PMF.map_comp, PMF.map_comp, PMF.map_comp]
