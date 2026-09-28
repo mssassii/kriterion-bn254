@@ -442,7 +442,6 @@ theorem nRealOutOff_eq_nGOff (facts : TableFacts T) (u : AffineInput) (c : Coins
 
 end Relations
 
-end
 
 /-! ### 5. The quadratic character and the sign split -/
 
@@ -759,10 +758,7 @@ theorem tsum_uniform_equiv {A B : Type*} [Fintype A] [Nonempty A] [Fintype B] [N
     (f : B → ℝ≥0∞) :
     ∑' a, PMF.uniformOfFintype A a * f (e a) = ∑' b, PMF.uniformOfFintype B b * f b := by
   rw [← e.tsum_eq]
-  simp only [PMF.uniformOfFintype_apply, Fintype.card_congr e, Equiv.apply_symm_apply]
-  exact (e.symm.tsum_eq fun b => ((Fintype.card B : ℝ≥0∞))⁻¹ * f b).symm.trans (by
-    refine tsum_congr fun a => ?_
-    rw [Equiv.symm_symm])
+  simp only [PMF.uniformOfFintype_apply, Fintype.card_congr e]
 
 theorem tsum_uniform_const {A : Type*} [Fintype A] [Nonempty A] (c : ℝ≥0∞) :
     ∑' a, PMF.uniformOfFintype A a * c = c := by
@@ -799,12 +795,12 @@ theorem tsum_uniform_restrict {A : Type*} [Fintype A] [Nonempty A] (p : A → Pr
   have cardPos : (Fintype.card {a // p a} : ℝ≥0∞) ≠ 0 := Nat.cast_ne_zero.mpr Fintype.card_ne_zero
   have cardFin : (Fintype.card {a // p a} : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
   simp only [PMF.uniformOfFintype_apply, mul_ite, mul_one, mul_zero]
-  rw [← ENNReal.tsum_mul_left, split fun a => (Fintype.card A : ℝ≥0∞)⁻¹ * f a,
-    split fun _ => (Fintype.card A : ℝ≥0∞)⁻¹, tsum_fintype (fun _ : {a // p a} => (Fintype.card A : ℝ≥0∞)⁻¹),
-    Finset.sum_const, Finset.card_univ, nsmul_eq_mul, ← ENNReal.tsum_mul_left]
+  rw [split (fun a => (Fintype.card A : ℝ≥0∞)⁻¹ * f a), split (fun _ => (Fintype.card A : ℝ≥0∞)⁻¹),
+    tsum_fintype (fun _ : {a // p a} => (Fintype.card A : ℝ≥0∞)⁻¹), Finset.sum_const, Finset.card_univ,
+    nsmul_eq_mul, ← ENNReal.tsum_mul_left]
   refine tsum_congr fun a => ?_
-  rw [← mul_assoc, ← mul_assoc, mul_comm (Fintype.card {a // p a} : ℝ≥0∞), mul_assoc _ _ (_⁻¹),
-    ENNReal.mul_inv_cancel cardPos cardFin, mul_one]
+  rw [mul_comm (Fintype.card {a // p a} : ℝ≥0∞) _, mul_assoc, ← mul_assoc (Fintype.card {a // p a} : ℝ≥0∞),
+    ENNReal.mul_inv_cancel cardPos cardFin, one_mul]
 
 end Sums
 
@@ -823,46 +819,35 @@ section Kernel
 
 variable [FieldCertificate]
 
-/-- The digit-wise sign split of kernel scales and signs. -/
-def kSplit (x : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) :
-    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) :=
-  (fun d => ((x.1 d).1, (signSplit ((x.1 d).2, x.2 d)).1), fun d => (signSplit ((x.1 d).2, x.2 d)).2)
+/-- One digit's sign split: `((ρ, τ), ν) ↦ ((ρ, (−1)^ν τ²), [χ(τ) = 1])`. -/
+def digitEquiv : (NonZeroBase × NonZeroBase) × Bool ≃ (NonZeroBase × NonZeroBase) × Bool :=
+  (Equiv.prodAssoc _ _ _).trans (((Equiv.refl NonZeroBase).prodCongr signEquiv).trans (Equiv.prodAssoc _ _ _).symm)
 
-/-- Its inverse. -/
-def kJoin (y : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) :
-    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) :=
-  (fun d => ((y.1 d).1, (signJoin ((y.1 d).2, y.2 d)).1), fun d => (signJoin ((y.1 d).2, y.2 d)).2)
-
-/-- **The kernel split is a bijection.** -/
+/-- **The kernel split**: every digit's sign split. -/
 def kEquiv : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) ≃
-    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) where
-  toFun := kSplit
-  invFun := kJoin
-  left_inv x := by
-    have each : ∀ d, signJoin (signSplit ((x.1 d).2, x.2 d)) = ((x.1 d).2, x.2 d) := fun d => signJoin_signSplit _
-    refine Prod.ext (funext fun d => Prod.ext rfl ?_) (funext fun d => ?_)
-    · exact congrArg Prod.fst (each d)
-    · exact congrArg Prod.snd (each d)
-  right_inv y := by
-    have each : ∀ d, signSplit (signJoin ((y.1 d).2, y.2 d)) = ((y.1 d).2, y.2 d) := fun d => signSplit_signJoin _
-    refine Prod.ext (funext fun d => Prod.ext rfl ?_) (funext fun d => ?_)
-    · exact congrArg Prod.fst (each d)
-    · exact congrArg Prod.snd (each d)
+    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) :=
+  (Equiv.arrowProdEquivProdArrow _ _ _).symm.trans
+    ((Equiv.piCongrRight fun _ => digitEquiv).trans (Equiv.arrowProdEquivProdArrow _ _ _))
 
 /-- **Uniform kernel scales and uniform signs give uniform field scales.** -/
 theorem kScales_law :
     (PMF.uniformOfFintype ((Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool))).map
-        (fun x => (kSplit x).1) = PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) := by
-  have factor : (fun x => (kSplit x).1) = Prod.fst ∘ kEquiv := rfl
+        (fun x => (kEquiv x).1) = PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) := by
+  have factor : (fun x => (kEquiv x).1) = Prod.fst ∘ kEquiv := rfl
   rw [factor, ← PMF.map_comp, uniform_map_equiv, uniform_map_fst]
 
+theorem kEquiv_fst (x : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) (d : Fin 91) :
+    (kEquiv x).1 d = ((x.1 d).1, (signSplit ((x.1 d).2, x.2 d)).1) := rfl
+
 theorem kScales_eq (x : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) :
-    kScales x.1 x.2 = (goodEquiv (kSplit x).1).1 := by
+    kScales x.1 x.2 = (goodEquiv (kEquiv x).1).1 := by
   funext d
   show ((x.1 d).1.value, Rows.signed (x.2 d) ((x.1 d).2.value ^ 2)) =
-    ((x.1 d).1.value, (signSplit ((x.1 d).2, x.2 d)).1.value)
-  rw [signSplit_fst]
+    (((kEquiv x).1 d).1.value, ((kEquiv x).1 d).2.value)
+  rw [kEquiv_fst, signSplit_fst]
 
 end Kernel
+
+end
 
 end Kriterion.CRT.Privacy.BMR
