@@ -245,21 +245,17 @@ theorem nGamma_eq (c : Coins T) (good : GoodScales (fsScales nctx c)) (d : Fin 9
 /-- **On the good event the normalized real outputs are the converted fixed-context ones.** -/
 theorem nRealOut_eq_conv (u : AffineInput) (c : Coins T) (good : GoodScales (fsScales nctx c)) :
     nRealOut nctx u c = conv (fsScales nctx c) (realOut (fsContext nctx (fsScales nctx c)) u c) := by
+  have gammas : nGamma nctx c = fun d => convRow (fsScales nctx c d).2 (gamma (fsContext nctx (fsScales nctx c)) c d) :=
+    funext (nGamma_eq nctx valid c good)
   unfold nRealOut conv realOut
-  simp only
-  rw [nJoin_eq nctx valid c good]
-  congr 3
-  funext d
-  exact nGamma_eq nctx valid c good d
+  rw [nJoin_eq nctx valid c good, gammas]
 
 theorem nRealOutOff_eq_conv (u : AffineInput) (c : Coins T) (good : GoodScales (fsScales nctx c)) :
     nRealOutOff nctx u c = convOff (fsScales nctx c) (realOutOff (fsContext nctx (fsScales nctx c)) u c) := by
+  have gammas : nGamma nctx c = fun d => convRow (fsScales nctx c d).2 (gamma (fsContext nctx (fsScales nctx c)) c d) :=
+    funext (nGamma_eq nctx valid c good)
   unfold nRealOutOff convOff realOutOff
-  simp only
-  rw [nJoin_eq nctx valid c good]
-  congr 3
-  funext d
-  exact nGamma_eq nctx valid c good d
+  rw [nJoin_eq nctx valid c good, gammas]
 
 end Real
 
