@@ -292,5 +292,44 @@ theorem parity_spec_stage_uniform {r w : ℕ} {Rest : Type*} (rest : PMF Rest)
     (fun x => parity_spec_publish_injective (stageOf w hw (matOf x) (castOf x)) hw1
       (cold x) (remOf x) (deltaOf x) s hs) rfl
 
-end Kriterion.CRT.Privacy.ExtractStage
+/-! Total-width adapters for the empty-row convention of the conversion core.
+These keep the actual lane width `rb` in the stage and store only `rb - 1` bits.
+The zero-width type is a singleton, and every nonempty stage reduces to the
+successor-width restricted theorem above. -/
 
+abbrev UpperHidden (w rb : ℕ) := Hidden labelBits w (rb - 1)
+
+/-- Replace the hot cast's upper planes while deriving its low plane from
+its actual leaf label. This also has a total zero-width convention. -/
+def upperOverrideHot {rb : ℕ} (sp : StageParams rb) (s : ℕ)
+    (h : UpperHidden sp.w rb) : StageParams rb where
+  w := sp.w
+  hw := sp.hw
+  mat n x lab := if x = s % 2 ^ n then hot (w := sp.w) h.1 (n - 1) else sp.mat n x lab
+  castF α lab := if α = s then Parity.liftUpper rb h.2 lab else sp.castF α lab
+
+/-- The public tuple at the reduced lane width. -/
+def upperSpecPublish {rb : ℕ} (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb)
+    (Δ : Label) (s : ℕ) (h : UpperHidden sp.w rb) : UpperHidden sp.w rb :=
+  ((fun k => gJoin (upperOverrideHot sp s h) R Δ (k.val + 1)),
+    Parity.pinHalf rb (gPin (upperOverrideHot sp s h) R Δ))
+
+@[simp] theorem upperOverrideHot_succ {r : ℕ} (sp : StageParams (r + 1))
+    (s : ℕ) (h : UpperHidden sp.w (r + 1)) :
+    upperOverrideHot sp s h = parityOverrideHot sp s h := rfl
+
+@[simp] theorem upperSpecPublish_succ {r : ℕ} (sp : StageParams (r + 1))
+    (R : Kriterion.CRT.Lanes (r + 1)) (Δ : Label) (s : ℕ)
+    (h : UpperHidden sp.w (r + 1)) :
+    upperSpecPublish sp R Δ s h = paritySpecPublish sp R Δ s h := rfl
+
+/-- The total-width interface to restricted publication injectivity. -/
+theorem upper_spec_publish_injective {rb : ℕ} (sp : StageParams rb) (hw : 1 ≤ sp.w)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ) (hs : s < 2 ^ sp.w) :
+    Function.Injective (upperSpecPublish sp R Δ s) := by
+  cases rb with
+  | zero => have bound := sp.hw; omega
+  | succ r => exact parity_spec_publish_injective sp hw cold R Δ s hs
+
+end Kriterion.CRT.Privacy.ExtractStage

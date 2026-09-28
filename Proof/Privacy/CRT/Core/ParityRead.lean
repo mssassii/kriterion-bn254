@@ -47,6 +47,15 @@ theorem halfLanes_uniform (width : Nat) :
       rw [← p.property]
       exact parityLift_halfLanes_laneBit p.val }
 
+/-- Total-width version used by the generic conversion core, including its
+empty-row singleton convention. -/
+theorem pinHalf_uniform (width : Nat) :
+    (PMF.uniformOfFintype (Lanes width)).map (pinHalf width) =
+      PMF.uniformOfFintype (Lanes (width - 1)) := by
+  cases width with
+  | zero => exact PMF.map_id _
+  | succ width => exact halfLanes_uniform width
+
 /-- Independent upper planes retain the original full-width answer count and
 packing. The old low random plane is discarded. -/
 def readUpper (width : Nat)
