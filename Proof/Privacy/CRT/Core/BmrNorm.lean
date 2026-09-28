@@ -848,6 +848,285 @@ theorem kScales_eq (x : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → B
 
 end Kernel
 
+/-! ### 9. The cores -/
+
+instance normBadDecidable (src : NSource T) : Decidable (normBad src) := by
+  unfold normBad
+  infer_instance
+
+/-- The ideal cells as compact cells, hidden cells and signs. -/
+def cellsEquiv (u : AffineInput) :
+    NSource T × Visible T u ≃ ((CSource T × Visible T u) × Scales) × (Fin 91 → Bool) where
+  toFun c := (((compactOf c.1, c.2), hiddenCells c.1), c.1.2.2.1)
+  invFun x := ((x.1.1.1.1, fun d => ⟨x.1.1.1.2.1 d, (x.1.2 d).2, (x.1.2 d).1⟩, x.2, x.1.1.1.2.2), x.1.1.2)
+  left_inv _ := rfl
+  right_inv _ := rfl
+
+/-- The ideal cells off the curve as compact cells, hidden cells and signs. -/
+def cellsEquivOff (u : AffineInput) :
+    NSource T × Cold T u ≃ ((CSource T × Cold T u) × Scales) × (Fin 91 → Bool) where
+  toFun c := (((compactOf c.1, c.2), hiddenCells c.1), c.1.2.2.1)
+  invFun x := ((x.1.1.1.1, fun d => ⟨x.1.1.1.2.1 d, (x.1.2 d).2, (x.1.2 d).1⟩, x.2, x.1.1.1.2.2), x.1.1.2)
+  left_inv _ := rfl
+  right_inv _ := rfl
+
+instance nSourceFintype : Fintype (NSource T) := instFintypeProd _ _
+
+instance nSourceNonempty : Nonempty (NSource T) :=
+  ⟨(fun _ _ => 0, fun _ => ⟨0, 0, 0⟩, fun _ => false, (0, 0, 0))⟩
+
+section Core
+
+open scoped ENNReal
+open Classical
+
+/-- The two-sided window of the compact cells on the curve. -/
+def CWindowOn {u : AffineInput} (y : CSource T × Visible T u) : Prop := CWindow (y.1, y.2.1)
+
+/-- The weight of field scales on the curve: the compact cells off the window through `nG`. -/
+def qOn (nctx : NContext) (u : AffineInput) (F : NOut T u → ℝ≥0∞) (s : Scales) : ℝ≥0∞ :=
+  ∑' y : CSource T × Visible T u, PMF.uniformOfFintype (CSource T × Visible T u) y *
+    (if CWindowOn y then 0 else F (nG nctx u s y))
+
+/-- The same off the curve. -/
+def qOff (u : AffineInput) (F : NOutOff T u → ℝ≥0∞) (s : Scales) : ℝ≥0∞ :=
+  ∑' y : CSource T × Cold T u, PMF.uniformOfFintype (CSource T × Cold T u) y *
+    (if CWindow y then 0 else F (nGOff s y))
+
+/-- The mass of good field scales. -/
+def goodMass : ℝ≥0∞ := ∑' s : Scales, PMF.uniformOfFintype Scales s * (if GoodScales s then 1 else 0)
+
+theorem tsum_uniform_ite {A : Type*} [Fintype A] [Nonempty A] (P : Prop) (f : A → ℝ≥0∞) :
+    ∑' a, PMF.uniformOfFintype A a * (if P then f a else 0) = if P then ∑' a, PMF.uniformOfFintype A a * f a else 0 := by
+  split_ifs <;> simp
+
+/-- **A sum over images whose weight reads only the scales and the compact cells.** -/
+theorem image_sum {Y R : Type*} [Fintype Y] [Nonempty Y] [Fintype R] [Nonempty R] (w : Scales → Y → ℝ≥0∞) :
+    ∑' x : Scales × (Y × R), PMF.uniformOfFintype (Scales × (Y × R)) x *
+        (if GoodScales x.1 then w x.1 x.2.1 else 0) =
+      goodMass * ∑' g : {s // GoodScales s}, PMF.uniformOfFintype {s // GoodScales s} g *
+        ∑' y, PMF.uniformOfFintype Y y * w g.1 y := by
+  rw [tsum_uniform_prod]
+  have inner : ∀ s : Scales, ∑' b : Y × R, PMF.uniformOfFintype (Y × R) b * (if GoodScales s then w s b.1 else 0) =
+      if GoodScales s then ∑' y, PMF.uniformOfFintype Y y * w s y else 0 := by
+    intro s
+    rw [tsum_uniform_ite, tsum_uniform_prod]
+    congr 1
+    refine tsum_congr fun y => ?_
+    rw [tsum_uniform_const]
+  simp only [inner]
+  exact tsum_uniform_restrict GoodScales _
+
+/-- The kernel's and the signs' average of a weight of field scales is the good scales' average. -/
+theorem kernel_sum [FieldCertificate] (q : Scales → ℝ≥0∞) :
+    ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
+        ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * q (kScales rt sign) =
+      ∑' g : {s // GoodScales s}, PMF.uniformOfFintype {s // GoodScales s} g * q g.1 := by
+  rw [← tsum_uniform_prod (fun x => q (kScales x.1 x.2))]
+  simp only [kScales_eq]
+  rw [tsum_uniform_map (fun x => (kEquiv x).1) kScales_law (fun g => q (goodEquiv g).1)]
+  exact tsum_uniform_equiv goodEquiv (fun g => q g.1)
+
+section Weighted
+
+variable [FieldCertificate] (facts : TableFacts T) (nctx : NContext) (valid : nctx.Valid)
+
+include facts valid in
+/-- The real side on the curve is at least the good scales' average. -/
+theorem real_ge (u : AffineInput) (onCurve : OnCurve u) (F : NOut T u → ℝ≥0∞) :
+    goodMass * ∑' g : {s // GoodScales s}, PMF.uniformOfFintype {s // GoodScales s} g * qOn nctx u F g.1 ≤
+      ∑' c, PMF.uniformOfFintype (Coins T) c * F (nRealOut nctx u c) := by
+  have good : u.x ≠ 0 ∧ u.y ≠ 0 :=
+    ⟨Security.Phase3.onCurve_x_ne_zero u onCurve, Security.Phase3.onCurve_y_ne_zero u onCurve⟩
+  have step : ∑' c, PMF.uniformOfFintype (Coins T) c *
+      (if GoodScales (nForward nctx u c).1 then
+        (if CWindowOn (nForward nctx u c).2.1 then 0 else F (nG nctx u (nForward nctx u c).1 (nForward nctx u c).2.1))
+        else 0) ≤ ∑' c, PMF.uniformOfFintype (Coins T) c * F (nRealOut nctx u c) := by
+    refine ENNReal.tsum_le_tsum fun c => mul_le_mul' le_rfl ?_
+    split_ifs with g w
+    · exact zero_le
+    · rw [nRealOut_eq_nG nctx valid facts u onCurve c g w]
+    · exact zero_le
+  refine le_trans (le_of_eq ?_) step
+  rw [show (fun c => PMF.uniformOfFintype (Coins T) c *
+      (if GoodScales (nForward nctx u c).1 then
+        (if CWindowOn (nForward nctx u c).2.1 then 0 else F (nG nctx u (nForward nctx u c).1 (nForward nctx u c).2.1))
+        else 0)) = fun c => PMF.uniformOfFintype (Coins T) c *
+      (fun x : NImage T u => if GoodScales x.1 then
+        (if CWindowOn x.2.1 then 0 else F (nG nctx u x.1 x.2.1)) else 0) (nEquiv T nctx valid u good c) from rfl,
+    tsum_uniform_equiv (nEquiv T nctx valid u good)]
+  exact (image_sum (fun s y => if CWindowOn y then 0 else F (nG nctx u s y))).symm
+
+include facts valid in
+/-- The real side off the curve is at least the good scales' average. -/
+theorem real_ge_off (u : AffineInput) (F : NOutOff T u → ℝ≥0∞) :
+    goodMass * ∑' g : {s // GoodScales s}, PMF.uniformOfFintype {s // GoodScales s} g * qOff u F g.1 ≤
+      ∑' c, PMF.uniformOfFintype (Coins T) c * F (nRealOutOff nctx u c) := by
+  have step : ∑' c, PMF.uniformOfFintype (Coins T) c *
+      (if GoodScales (nForwardOff nctx u c).1 then
+        (if CWindow (nForwardOff nctx u c).2.1 then 0 else F (nGOff (nForwardOff nctx u c).1 (nForwardOff nctx u c).2.1))
+        else 0) ≤ ∑' c, PMF.uniformOfFintype (Coins T) c * F (nRealOutOff nctx u c) := by
+    refine ENNReal.tsum_le_tsum fun c => mul_le_mul' le_rfl ?_
+    split_ifs with g w
+    · exact zero_le
+    · rw [nRealOutOff_eq_nGOff nctx valid facts u c g w]
+    · exact zero_le
+  refine le_trans (le_of_eq ?_) step
+  rw [show (fun c => PMF.uniformOfFintype (Coins T) c *
+      (if GoodScales (nForwardOff nctx u c).1 then
+        (if CWindow (nForwardOff nctx u c).2.1 then 0 else F (nGOff (nForwardOff nctx u c).1 (nForwardOff nctx u c).2.1))
+        else 0)) = fun c => PMF.uniformOfFintype (Coins T) c *
+      (fun x : NImageOff T u => if GoodScales x.1 then
+        (if CWindow x.2.1 then 0 else F (nGOff x.1 x.2.1)) else 0) (nEquivOff T nctx valid u c) from rfl,
+    tsum_uniform_equiv (nEquivOff T nctx valid u)]
+  exact (image_sum (fun s y => if CWindow y then 0 else F (nGOff s y))).symm
+
+end Weighted
+
+/-- A weight of ideal cells that reads the hidden cells only through their zero event. -/
+theorem cells_sum {Y : Type*} [Fintype Y] [Nonempty Y] (w : Y → (Fin 91 → Bool) → ℝ≥0∞) :
+    ∑' x : (Y × Scales) × (Fin 91 → Bool), PMF.uniformOfFintype ((Y × Scales) × (Fin 91 → Bool)) x *
+        (if GoodScales x.1.2 then w x.1.1 x.2 else 0) =
+      goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign *
+        ∑' y, PMF.uniformOfFintype Y y * w y sign := by
+  rw [tsum_uniform_prod, tsum_uniform_prod]
+  have inner : ∀ y : Y, ∑' σ : Scales, PMF.uniformOfFintype Scales σ *
+      ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * (if GoodScales σ then w y sign else 0) =
+      goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign := by
+    intro y
+    unfold goodMass
+    rw [← ENNReal.tsum_mul_right]
+    refine tsum_congr fun σ => ?_
+    rw [tsum_uniform_ite]
+    split_ifs <;> simp
+  simp only [inner]
+  rw [ENNReal.tsum_mul_left, ENNReal.tsum_comm]
+  congr 1
+  refine tsum_congr fun sign => ?_
+  rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_mul_left]
+  refine tsum_congr fun y => ?_
+  ring
+
+section Weighted
+
+variable [FieldCertificate] (facts : TableFacts T) (nctx : NContext) (valid : nctx.Valid) (sparse : nctx.Sparse)
+
+include facts valid sparse in
+/-- **The normalized core on the curve** (weighted): the ideal outputs at uniform kernel scales and uniform cells,
+flagged on the window and on the hidden cells' zero event, weigh at most the real outputs at uniform coins. -/
+theorem nCore_weighted (u : AffineInput) (onCurve : OnCurve u)
+    (flag : (Fin 91 → NonZeroBase × NonZeroBase) → NSource T × Visible T u → Prop)
+    (outside : ∀ rt cells, ¬ flag rt cells → ¬ CWindow (compactOf cells.1, cells.2.1))
+    (norm : ∀ rt cells, ¬ flag rt cells → ¬ normBad cells.1)
+    (F : NOut T u → ℝ≥0∞) :
+    ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
+        ∑' cells, PMF.uniformOfFintype (NSource T × Visible T u) cells *
+          (if flag rt cells then 0 else F (nIdealOut (nTargets nctx u rt) u cells)) ≤
+      ∑' c, PMF.uniformOfFintype (Coins T) c * F (nRealOut nctx u c) := by
+  refine le_trans ?_ (real_ge facts nctx valid u onCurve F)
+  have each : ∀ rt, ∑' cells, PMF.uniformOfFintype (NSource T × Visible T u) cells *
+      (if flag rt cells then 0 else F (nIdealOut (nTargets nctx u rt) u cells)) ≤
+      goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOn nctx u F (kScales rt sign) := by
+    intro rt
+    calc _ ≤ ∑' cells, PMF.uniformOfFintype (NSource T × Visible T u) cells *
+          (fun x : ((CSource T × Visible T u) × Scales) × (Fin 91 → Bool) =>
+            if GoodScales x.1.2 then (if CWindowOn x.1.1 then 0 else F (nG nctx u (kScales rt x.2) x.1.1)) else 0)
+            (cellsEquiv u cells) := by
+          refine ENNReal.tsum_le_tsum fun cells => mul_le_mul' le_rfl ?_
+          by_cases flagged : flag rt cells
+          · rw [if_pos flagged]
+            exact zero_le
+          · rw [if_neg flagged]
+            have g : GoodScales (hiddenCells cells.1) := not_not.mp (norm rt cells flagged)
+            have w : ¬ CWindowOn ((compactOf cells.1, cells.2) : CSource T × Visible T u) := outside rt cells flagged
+            show _ ≤ if GoodScales (hiddenCells cells.1) then
+              (if CWindowOn ((compactOf cells.1, cells.2) : CSource T × Visible T u) then 0 else
+                F (nG nctx u (kScales rt cells.1.2.2.1) (compactOf cells.1, cells.2))) else 0
+            rw [if_pos g, if_neg w, nIdealOut_eq_nG nctx sparse u rt cells]
+      _ = ∑' x, PMF.uniformOfFintype (((CSource T × Visible T u) × Scales) × (Fin 91 → Bool)) x *
+            (if GoodScales x.1.2 then (if CWindowOn x.1.1 then 0 else F (nG nctx u (kScales rt x.2) x.1.1)) else 0) :=
+          tsum_uniform_equiv (cellsEquiv u) _
+      _ = _ := cells_sum fun y sign => if CWindowOn y then 0 else F (nG nctx u (kScales rt sign) y)
+  calc _ ≤ ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
+        (goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOn nctx u F (kScales rt sign)) :=
+        ENNReal.tsum_le_tsum fun rt => mul_le_mul' le_rfl (each rt)
+    _ = goodMass * ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
+        ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOn nctx u F (kScales rt sign) := by
+        rw [← ENNReal.tsum_mul_left]
+        refine tsum_congr fun rt => ?_
+        ring
+    _ = _ := by rw [kernel_sum]
+
+/-- `nGOff` reads the scales only through the signs of the `κ̂`s. -/
+theorem nGOff_congr {u : AffineInput} (s s' : Scales) (same : ∀ d, Rows.signBit (s d).2 = Rows.signBit (s' d).2)
+    (y : CSource T × Cold T u) : nGOff s y = nGOff s' y := by
+  unfold nGOff convOff convRow
+  simp only [same]
+
+omit sparse in
+include facts valid in
+/-- **The normalized core off the curve** (weighted). -/
+theorem nCoreOff_weighted (u : AffineInput) (flag : NSource T × Cold T u → Prop)
+    (outside : ∀ cells, ¬ flag cells → ¬ CWindow (compactOf cells.1, cells.2))
+    (norm : ∀ cells, ¬ flag cells → ¬ normBad cells.1)
+    (F : NOutOff T u → ℝ≥0∞) :
+    ∑' cells, PMF.uniformOfFintype (NSource T × Cold T u) cells *
+        (if flag cells then 0 else F (nIdealOutOff u cells)) ≤
+      ∑' c, PMF.uniformOfFintype (Coins T) c * F (nRealOutOff nctx u c) := by
+  refine le_trans ?_ (real_ge_off facts nctx valid u F)
+  let one : Fin 91 → NonZeroBase × NonZeroBase := fun _ => (⟨1, one_ne_zero_base⟩, ⟨1, one_ne_zero_base⟩)
+  have ideal : ∀ cells : NSource T × Cold T u,
+      nIdealOutOff u cells = nGOff (kScales one cells.1.2.2.1) (compactOf cells.1, cells.2) := by
+    intro cells
+    obtain ⟨⟨J, rows, signs, cur⟩, cold⟩ := cells
+    unfold nIdealOutOff nGOff convOff idealOutOff nPublish
+    simp only
+    have pub : (fun d => srcRow (rows d) (signs d)) =
+        fun d => convRow (kScales one signs d).2 (⟨(rows d).xC0, 0, 0⟩ : RowGamma) := by
+      funext d
+      unfold srcRow convRow kScales
+      rw [signBit_signed_sq (signs d) (one d).2.value (one d).2.nonzero]
+    rw [pub]
+  have signs : ∀ rt sign, qOff u F (kScales one sign) = qOff u F (kScales rt sign) := by
+    intro rt sign
+    unfold qOff
+    refine tsum_congr fun y => ?_
+    rw [nGOff_congr (kScales one sign) (kScales rt sign) (fun d => by
+      unfold kScales
+      rw [signBit_signed_sq _ _ (one d).2.nonzero, signBit_signed_sq _ _ (rt d).2.nonzero]) y]
+  calc _ ≤ ∑' cells, PMF.uniformOfFintype (NSource T × Cold T u) cells *
+        (fun x : ((CSource T × Cold T u) × Scales) × (Fin 91 → Bool) =>
+          if GoodScales x.1.2 then (if CWindow x.1.1 then 0 else F (nGOff (kScales one x.2) x.1.1)) else 0)
+          (cellsEquivOff u cells) := by
+        refine ENNReal.tsum_le_tsum fun cells => mul_le_mul' le_rfl ?_
+        by_cases flagged : flag cells
+        · rw [if_pos flagged]
+          exact zero_le
+        · rw [if_neg flagged]
+          have g : GoodScales (hiddenCells cells.1) := not_not.mp (norm cells flagged)
+          have w : ¬ CWindow ((compactOf cells.1, cells.2) : CSource T × Cold T u) := outside cells flagged
+          show _ ≤ if GoodScales (hiddenCells cells.1) then
+            (if CWindow ((compactOf cells.1, cells.2) : CSource T × Cold T u) then 0 else
+              F (nGOff (kScales one cells.1.2.2.1) (compactOf cells.1, cells.2))) else 0
+          rw [if_pos g, if_neg w, ideal]
+    _ = ∑' x, PMF.uniformOfFintype (((CSource T × Cold T u) × Scales) × (Fin 91 → Bool)) x *
+          (if GoodScales x.1.2 then (if CWindow x.1.1 then 0 else F (nGOff (kScales one x.2) x.1.1)) else 0) :=
+        tsum_uniform_equiv (cellsEquivOff u) _
+    _ = goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOff u F (kScales one sign) :=
+        cells_sum fun y sign => if CWindow y then 0 else F (nGOff (kScales one sign) y)
+    _ = goodMass * ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
+          ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOff u F (kScales rt sign) := by
+        congr 1
+        rw [← tsum_uniform_const (A := Fin 91 → NonZeroBase × NonZeroBase)
+          (∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOff u F (kScales one sign))]
+        refine tsum_congr fun rt => ?_
+        simp only [signs rt]
+    _ = _ := by rw [kernel_sum]
+
+end Weighted
+
+end Core
+
 end
 
 end Kriterion.CRT.Privacy.BMR
