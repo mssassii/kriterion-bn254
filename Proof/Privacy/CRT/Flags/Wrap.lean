@@ -186,7 +186,7 @@ theorem crtWrapTable_le [FieldCertificate] [GroupCertificate] (u : AffineInput)
   calc _ ≤ ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source source *
           (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) *
             (ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0))) :=
-        ENNReal.tsum_le_tsum fun source => by gcongr; exact wrap_source source u
+        ENNReal.tsum_le_tsum fun source => mul_le_mul' le_rfl (mul_le_mul' le_rfl (wrap_source source u))
     _ = ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source
             source * weight ((PublicFirst.viewHere Instance.crtEntry).publish source) +
           ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source source *
