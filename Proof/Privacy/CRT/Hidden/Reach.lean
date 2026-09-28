@@ -476,11 +476,11 @@ theorem wordValue_valueOf (m : ℕ) (α : ℕ → ℕ) (adm : Admissible α 32) 
 
 /-! ### The rows -/
 
-/-- An odd row of the real table uses the selected fallback schedule. -/
+/-- An odd row of the real table uses the width-8 schedule. -/
 theorem row_eq (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.kind i = .odd row) :
-    row = fallbackRow 32 (Entry.table.modulus i) ∧ Entry.table.modulus i ≠ 256 := by
-  change fallbackKind (bn254Table.modulus i) = .odd row at hk
-  unfold fallbackKind at hk
+    row = width8Row 32 (Entry.table.modulus i) ∧ Entry.table.modulus i ≠ 256 := by
+  change width8Kind (bn254Table.modulus i) = .odd row at hk
+  unfold width8Kind at hk
   split at hk
   · cases hk
   · rename_i notPow
@@ -497,8 +497,8 @@ theorem row_shape (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.k
   obtain ⟨rfl, _⟩ := row_eq i row hk
   have castW : bn254Table.castWidth = 14 := rfl
   rw [table_chunkCount] at lt
-  have w0lo : 7 ≤ (fallbackRow 32 (Entry.table.modulus i)).width0 := fallbackWidth0_lower _
-  have w0hi : (fallbackRow 32 (Entry.table.modulus i)).width0 ≤ 8 := fallbackWidth0_upper _
+  have w0lo : 7 ≤ (width8Row 32 (Entry.table.modulus i)).width0 := by decide
+  have w0hi : (width8Row 32 (Entry.table.modulus i)).width0 ≤ 8 := by decide
   refine ⟨w0lo, w0hi, rfl, rfl, ?_, by rw [castW] at cast; exact cast, lt⟩
   omega
 

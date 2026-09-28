@@ -46,6 +46,6 @@ example (label : Label) :
   simpa only [Narrow.labelBits] using Narrow.clip_fiber_filter_card label
 
 /- Recheck the unchanged Phase-A metric certificates. -/
-example : ciphertextBytes = 147711 ∧ garbleBudget = 964502 ∧ evaluateBudget = 957536 := by
+example : ciphertextBytes = 146827 ∧ garbleBudget = 988438 ∧ evaluateBudget = 981506 := by
   rw [garbleBudget_eq, evaluateBudget_eq]
   decide +kernel

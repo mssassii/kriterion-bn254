@@ -166,6 +166,17 @@ theorem fallbackRow_conditions (m : Nat) (hm : 17 ≤ m) :
   simp only [fallbackRow, bitLength]
   omega
 
+/-- Width-8 rows meet the side conditions of `conversion_final` for every modulus at least 17. -/
+theorem width8Row_conditions (m : Nat) (hm : 17 ≤ m) :
+    1 ≤ (width8Row 32 m).width0 ∧ 1 ≤ (width8Row 32 m).width1 ∧
+      (width8Row 32 m).width0 + (width8Row 32 m).width1 + 1 = (width8Row 32 m).ell ∧
+      (width8Row 32 m).width0 ≤ (width8Row 32 m).keep ∧
+      (width8Row 32 m).keep ≤ (width8Row 32 m).ell := by
+  have hne : 32 * (m - 1) ≠ 0 := by omega
+  have hlog : 9 ≤ (32 * (m - 1)).log2 := (Nat.le_log2 hne).mpr (by omega)
+  simp only [width8Row, bitLength]
+  omega
+
 /-- **L14 with L5**: when the word value is congruent to the coordinate value `v` modulo `m` (L5),
 the evaluator's final one-hot is the garbler's XOR `Δ` exactly at `v mod m`. -/
 theorem conversion_final_value (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Label)

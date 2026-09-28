@@ -595,19 +595,19 @@ theorem garbler_conv_eq (tbl : CrtTable) (wf : ConvTableWF tbl) (S coord v : ℕ
 theorem bn254Moduli_ge : ∀ i : Fin bn254Table.count, 17 ≤ bn254Table.modulus i := by
   decide +kernel
 
-/-- **The real table is well formed** (`fallbackRow_conditions` at every odd modulus, all `≥ 17`). -/
+/-- **The real table is well formed** (`width8Row_conditions` at every odd modulus, all `≥ 17`). -/
 theorem bn254Table_wf : ConvTableWF bn254Table where
   cast := by decide
   rows := by
     intro i row hk
     have hm := bn254Moduli_ge i
     refine ⟨?_, by omega⟩
-    have hkind : bn254Table.kind i = fallbackKind (bn254Table.modulus i) := rfl
+    have hkind : bn254Table.kind i = width8Kind (bn254Table.modulus i) := rfl
     rw [hkind] at hk
-    unfold fallbackKind at hk
+    unfold width8Kind at hk
     split_ifs at hk
     cases hk
-    exact SliceC.fallbackRow_conditions _ hm
+    exact SliceC.width8Row_conditions _ hm
 
 end
 

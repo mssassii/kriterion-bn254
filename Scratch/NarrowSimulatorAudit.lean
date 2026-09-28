@@ -35,12 +35,12 @@ run_cmd do
       Lean.throwError m!"disallowed axioms in {name}: {illegal}"
   Lean.logInfo "Narrow simulator axiom check passed: only propext, Classical.choice, Quot.sound"
 
-example : Kriterion.CRT.SimMachine.CrtStage1.pieces.length = 45634 := CrtSize.pieces_length
+example : Kriterion.CRT.SimMachine.CrtStage1.pieces.length = 45600 := CrtSize.pieces_length
 example : Kriterion.CRT.labelBits = 104 := rfl
 example : Kriterion.CRT.laneCount = 104 := rfl
 example : Kriterion.CRT.castAnswers 14 = 6 := by decide +kernel
 
 -- Recompute only this small arithmetic expression, never the program.
-example : 276 + 182 + 2 * 1467 + 400 * 104 + 642 = 45634 := by decide +kernel
-example : 2 * (1467 + 1945) * 104 = 709696 := by decide +kernel
+example : 276 + 182 + 2 * 1450 + 400 * 104 + 642 = 45600 := by decide +kernel
+example : 2 * (1450 + 1928) * 104 = 702624 := by decide +kernel
 example : (508 + 2) * 128 = 65280 := by decide +kernel

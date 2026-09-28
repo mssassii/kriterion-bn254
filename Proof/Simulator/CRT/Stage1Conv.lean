@@ -6,7 +6,7 @@ conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatte
 block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
-`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `3412` for every `ConvPublic`.
+`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `3378` for every `ConvPublic`.
 -/
 
 import Proof.Simulator.CRT.Stage1Wire
