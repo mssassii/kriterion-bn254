@@ -103,7 +103,7 @@ theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayo
   rw [tree_seq_exec _ _ (show (cst rB (2 ^ 128 * index.val)).OpsSatisfy Op.Det from trivial) memory m2 rfl,
     tree_seq_exec _ _ (show (ar .add rInput rD rB).OpsSatisfy Op.Det from trivial) m2 m3 run3,
     tree_query_hash _ m3 _ hashSmall (by rw [m3Def, reg_setReg, if_pos rfl])]
-  refine .node _ fun (answer : Label × Block) => ?_
+  refine .node _ fun (answer : Block × Block) => ?_
   rw [tree_eq_exec _ (show (Prog.seq (storeAt (cells.ansBase + 2 * index.val) rFirst)
       (storeAt (cells.ansBase + (2 * index.val + 1)) rSecond)).OpsSatisfy Op.Det from
     ⟨⟨trivial, trivial⟩, ⟨trivial, trivial⟩⟩)]

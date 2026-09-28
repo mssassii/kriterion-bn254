@@ -33,12 +33,12 @@ theorem sw_levelSum {L : Nat} (bound : L < w) :
 theorem sw_class {j i : Nat} (jb : j ≤ w) (ib : i < laneCount) :
     stageWrites cells w rb (word (cells.classBase + 128 * j + i)) :=
   Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl
-    ⟨128 * j + i, by unfold laneCount at ib; nlinarith, by rw [Nat.add_assoc]⟩
+    ⟨128 * j + i, by change i < 104 at ib; omega, by rw [Nat.add_assoc]⟩
 
 theorem sw_cast {j i : Nat} (jb : j ≤ w) (ib : i < laneCount) :
     stageWrites cells w rb (word (cells.castSumBase + 128 * j + i)) :=
   Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl
-    ⟨128 * j + i, by unfold laneCount at ib; nlinarith, by rw [Nat.add_assoc]⟩
+    ⟨128 * j + i, by change i < 104 at ib; omega, by rw [Nat.add_assoc]⟩
 
 theorem sw_ans {b : Nat} (bound : b < 2 * castAnswers rb) :
     stageWrites cells w rb (word (cells.ansBase + b)) :=
