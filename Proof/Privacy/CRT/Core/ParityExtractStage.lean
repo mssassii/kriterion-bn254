@@ -397,6 +397,17 @@ theorem gNext_upper_override_self {rb : ℕ} (sp : StageParams rb)
   rw [gRes_upper_override_self sp cold R Δ s sp.w]
   rfl
 
+/-- `gNext_upper_override_self` at any hidden tuple equal to the stage's own upper data (the stage's hidden tuple
+appears in the type of `gNext`, so a rewrite of it is done by substitution). -/
+theorem gNext_upper_override_of_eq {rb : ℕ} (sp : StageParams rb)
+    (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
+    (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ) (h : UpperHidden sp.w rb)
+    (e : h = upperHiddenOfSpec sp R Δ s) :
+    (Kriterion.CRT.ExtractSpec.gNext (upperOverrideHot sp s h) R Δ :
+      Kriterion.CRT.Lanes (rb - sp.w)) = Kriterion.CRT.ExtractSpec.gNext sp R Δ := by
+  subst e
+  exact gNext_upper_override_self sp cold R Δ s
+
 theorem gBit_upper_override_self {rb : ℕ} (sp : StageParams rb)
     (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
     (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s n : ℕ) :

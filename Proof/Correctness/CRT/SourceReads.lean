@@ -209,12 +209,13 @@ theorem modPinBase_eq (i : Nat) :
   rw [← Fin.sum_univ_eq_sum_range (fun i' => (modPinsNat i').length) i]
   exact Finset.sum_congr rfl fun i' _ => (modPinsNat_length i'.val).symm
 
-/-- **The width of stage `q`'s pin of an odd modulus**: `ell` for stage 0, `ell - width0` for stage 1. -/
+/-- **The stored width of stage `q`'s half-pin of an odd modulus**: `ell - 1` for stage 0, `ell - width0 - 1` for
+stage 1. -/
 theorem pinWidth_stage (i : Fin table.count) (row : OddRow) (kind : table.kind i = .odd row) (stage : Nat)
     (stageLe : stage ≤ 1) :
     ∃ hk : modPinBase i + stage < pinCount,
-      pinWidth ⟨modPinBase i + stage, hk⟩ = if stage = 0 then row.ell else row.ell - row.width0 := by
-  have section_ : modPinsNat i.val = [row.ell, row.ell - row.width0] := by
+      pinWidth ⟨modPinBase i + stage, hk⟩ = if stage = 0 then row.ell - 1 else row.ell - row.width0 - 1 := by
+  have section_ : modPinsNat i.val = [row.ell - 1, row.ell - row.width0 - 1] := by
     simp [modPinsNat, i.isLt, kind, modPinWidths]
   have lengths : ∀ c, (modPinsNat c).length = (modPinsNat c).length := fun _ => rfl
   have total : pinCount = table.chunkCount + ∑ c ∈ Finset.range table.count, (modPinsNat c).length := by

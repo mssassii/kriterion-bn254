@@ -52,7 +52,7 @@ theorem hLabel_table (A : ℕ → Block × Block) (G : Label) (tag : ℕ) : hLab
 theorem castM_table (A : ℕ → Block × Block) (l : ℕ) (G : Label) (tagOf : ℕ → ℕ) :
     (castM l G tagOf).eval (tableHash A) = parityRd A l tagOf G := by
   rw [SliceC.eval_castM, ExtractStage.hlong_tableHash]
-  cases l <;> rfl
+  rfl
 
 /-! ### Trees, growth and folds -/
 
@@ -106,9 +106,9 @@ theorem treeGarbleM_table_leaves (A : ℕ → Block × Block) (tagOf : ℕ → �
       simp only [treeGarbleM, FreeQuery.eval_bind]
       by_cases hn : n = 0
       · simp only [if_pos hn, FreeQuery.eval_pure, stored_eq, materialTree,
-          if_pos hn, treeGarbleM_table_leaves A tagOf Δ b0 n]
-      · simp only [if_neg hn, SliceC.eval_garbleStepM, FreeQuery.eval_pure,
-          hLabel_table, materialTree, if_neg hn, treeGarbleM_table_leaves A tagOf Δ b0 n]
+          treeGarbleM_table_leaves A tagOf Δ b0 n]
+      · simp only [if_neg hn, FreeQuery.eval_bind, SliceC.eval_garbleStepM, FreeQuery.eval_pure,
+          hLabel_table, materialTree, treeGarbleM_table_leaves A tagOf Δ b0 n]
 
 /-- Only the materials of the in-range hashed levels influence a material tree. -/
 theorem materialTree_congr (mat mat' : ℕ → ℕ → Label) (Δ b0 : Label) :
@@ -128,7 +128,9 @@ theorem materialTree_congr (mat mat' : ℕ → ℕ → Label) (Δ b0 : Label) :
 /-- Every material tree preserves the XOR of its root. -/
 theorem materialTree_xor (mat : ℕ → ℕ → Label) (Δ b0 : Label) :
     ∀ n, xorFold (materialTree mat Δ b0 n) = Δ
-  | 0 => by simp [materialTree, xorFold, Fin.foldl_succ_last]
+  | 0 => by
+      change (0 : Label) ^^^ Δ = Δ
+      exact BitVec.zero_xor
   | n + 1 => by rw [materialTree, SliceC.xorFold_extendLevel, materialTree_xor mat Δ b0 n]
 
 /-- **A chunk on a table**: casts keep the actual leaf parity. -/
@@ -146,9 +148,10 @@ theorem chunk_table (A : ℕ → Block × Block) (tbl : CrtTable) (coord : ℕ) 
   intro g leaves
   simp only [g, chunkGarbleM, FreeQuery.eval_bind, eval_tableM, castM_table, FreeQuery.eval_pure,
     materialize_eq, SliceC.sumLanes_eq, treeGarbleM_table_leaves]
-  refine ⟨fun n h1 h2 => ?_, fun leaf hl => ?_, trivial⟩
+  refine ⟨fun n h1 h2 => ?_, fun leaf hl => ?_, rfl⟩
   · rw [treeGarbleM_levelSum_table A _ _ _ _ n h1 h2]
   · rw [SliceC.atNat_of_lt _ _ hl, SliceC.atNat_of_lt _ _ hl]
+    rfl
 
 /-! ### An extraction stage -/
 
@@ -178,8 +181,8 @@ theorem gNext_upper_table_self (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ)
       ((fun k => clip (A (treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1),
         upperRd A rb (castTag s))) R Δ : Lanes (rb - w)) =
       gNext (tableStage A w hw treeTag castTag) R Δ := by
-  simpa only [upperHidden_table] using ExtractStage.gNext_upper_override_self
-    (tableStage A w hw treeTag castTag) (tableStage_low A w hw treeTag castTag positive) R Δ s
+  exact ExtractStage.gNext_upper_override_of_eq (tableStage A w hw treeTag castTag)
+    (tableStage_low A w hw treeTag castTag positive) R Δ s _ (upperHidden_table A w hw treeTag castTag R Δ s).symm
 
 theorem gBit_upper_table_self (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb)
     (treeTag castTag : ℕ → ℕ → ℕ) (positive : 1 ≤ rb) (R : Lanes rb) (Δ : Label) (s n : ℕ) :
@@ -209,7 +212,7 @@ theorem hashStage_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : 
     exact hLabel_table A lab (treeTag n x)
   · funext α lab
     simp only [parityRd, upperRd, castRd, ExtractStage.hlong_tableHash]
-    cases rb <;> rfl
+    rfl
 
 /-- `gNext` of the hashed stage on a table (the stage appears in its type, so `hashStage_table` does not rewrite
 it directly). -/

@@ -14,32 +14,28 @@ open Cryptography Kriterion.ArgoMAC
 /-- Preserve the original full-width hash reading; its low plane is discarded. -/
 def parityCastAnswers (width : Nat) : Nat := castAnswers width
 
-/-- A total cast reading: at width zero the unique lane vector needs no data. -/
-def parityCastLanes : (width : Nat) → Label → Nat → Lanes width
-  | 0, _, _ => 0
-  | width + 1, label, value => parityLift (halfLanes (castLanes (width + 1) value)) label
+/-- A total cast reading: the original block-aligned reading of `width` bits per lane, with the
+low plane of every lane replaced by the corresponding bit of the control label. At width zero
+(`liftUpper 0`, `pinHalf 0` are the identity) it is the old reading of the singleton type. -/
+def parityCastLanes (width : Nat) (label : Label) (value : Nat) : Lanes width :=
+  liftUpper width (pinHalf width (castLanes width value)) label
 
 /-- The computable parity cast keeps the original raw hash reads and block alignment.
 Only the low bit of each parsed lane changes, to the corresponding control-label bit. -/
-def parityCastM : (width : Nat) → Label → (Nat → Nat) → CM (Lanes width)
-  | 0, _, _ => pure 0
-  | width + 1, label, tagOf =>
-      hlongM (embed label) tagOf (castAnswers (width + 1)) >>= fun value =>
-        pure (materialize (parityLift (halfLanes (castLanes (width + 1) value)) label))
+def parityCastM (width : Nat) (label : Label) (tagOf : Nat → Nat) : CM (Lanes width) :=
+  hlongM (embed label) tagOf (castAnswers width) >>= fun value =>
+    pure (materialize (parityCastLanes width label value))
 
 @[simp] theorem eval_parityCastM (H : HashN) (width : Nat) (label : Label)
     (tagOf : Nat → Nat) :
     (parityCastM width label tagOf).eval H =
       parityCastLanes width label (hlong H (embed label) tagOf (parityCastAnswers width)) := by
-  cases width <;> simp [parityCastM, parityCastLanes, parityCastAnswers, materialize_eq]
+  simp [parityCastM, parityCastAnswers, materialize_eq]
 
 theorem bounded_parityCastM (width : Nat) (label : Label) (tagOf : Nat → Nat) :
-    (parityCastM width label tagOf).Bounded (parityCastAnswers width) := by
-  cases width with
-  | zero => exact FreeQuery.Bounded.pure' _ _
-  | succ width =>
-    exact (FreeQuery.Bounded.bind (bounded_hlongM (embed label) tagOf (castAnswers (width + 1)))
-      fun _ => FreeQuery.Bounded.pure' _ 0).of_eq (by simp [parityCastAnswers])
+    (parityCastM width label tagOf).Bounded (parityCastAnswers width) :=
+  (FreeQuery.Bounded.bind (bounded_hlongM (embed label) tagOf (castAnswers width))
+    fun _ => FreeQuery.Bounded.pure' _ 0).of_eq (by simp [parityCastAnswers])
 
 /-- Every nonempty arithmetic cast has the control label as its low plane. -/
 @[simp] theorem laneBit_parityCastLanes_zero (width : Nat) (label : Label) (value : Nat) :

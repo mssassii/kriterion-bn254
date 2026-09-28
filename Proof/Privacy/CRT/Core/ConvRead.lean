@@ -475,6 +475,7 @@ theorem stage_congr (T T' : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w
     · rfl
     · unfold parityRd
       rw [castEq α (Finset.mem_range.mp hα) hit]
+      rfl
   have res : ∀ n, gRes (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ n =
       gRes (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ n := fun n =>
     Finset.sum_congr rfl fun α hα => by rw [casts α hα]
