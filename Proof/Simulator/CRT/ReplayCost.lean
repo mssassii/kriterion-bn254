@@ -3,7 +3,8 @@
 size of every block of `Machine.replay`, composed to one bound.
 -/
 
-import Proof.Simulator.CRT.ReplayMachine
+import Proof.Simulator.CRT.ReplayIndexFacts
+import Construction.Simulator.CRT.ReplayMachine
 import Construction.Simulator.CRT.ReplayConversionSize
 
 namespace Kriterion.CRT.SimMachine
