@@ -33,7 +33,7 @@ theorem exec_castInputBase (cells : StageCells) (start t base stride : Nat) (mem
     calc x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
       _ < 2 ^ 128 * 2 ^ 127 := Nat.mul_lt_mul_of_pos_left this (by positivity)
       _ < 2 ^ 256 := by norm_num
-  have labelSmall := label.isLt
+  have labelSmall : label.toNat < 2 ^ 104 := label.isLt
   have sum1 : label.toNat + x * (2 ^ 128 * stride) < 2 ^ 256 := by
     have : stride * x < 2 ^ 127 := by omega
     have : x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
@@ -75,7 +75,7 @@ theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayo
     (index : Fin (castAnswers rb)) (values : Vector (Block × Block) index.val) (memory : Memory)
     (holds : CastInv cells.castCells (castAnswers rb) start index.val values memory) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-      (fun (result : Label × Block) after =>
+      (fun (result : Block × Block) after =>
         CastInv cells.castCells (castAnswers rb) start (index.val + 1) (values.push result) after)
       ((castQueryDyn cells index.val).tree memory)
       (liftHash (askN (hashInput (embed label) (tag0 + index.val)))) := by
@@ -89,7 +89,7 @@ theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayo
   have hashSmall : hashInput (embed label) (tag0 + index.val) < 2 ^ 256 := by
     unfold hashInput
     simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-    have := label.isLt
+    have : label.toNat < 2 ^ 104 := label.isLt
     omega
   have eq : hashInput (embed label) tag0 + 2 ^ 128 * index.val = hashInput (embed label) (tag0 + index.val) := by
     unfold hashInput; ring

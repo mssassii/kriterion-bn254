@@ -276,7 +276,7 @@ theorem agree_foldEntry (cells : FoldCells) (m j : Nat) (layout : FoldLayout cel
     have hashSmall : hashInput (embed (labels index)) (tagOf index.val) < 2 ^ 256 := by
       unfold hashInput
       simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-      have := (labels index).isLt
+      have : (labels index).toNat < 2 ^ 104 := (labels index).isLt
       have := tagSmall _ index.isLt
       omega
     unfold entryHash

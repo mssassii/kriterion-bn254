@@ -274,7 +274,7 @@ theorem exec_entryInput (cells : TreeCells) (tag s : Nat) (memory : Memory) (lab
       ∀ register, register ≠ rInput → register ≠ rB → register ≠ rAddr →
         after.registers register = memory.registers register := by
   have sum : label.toNat + 2 ^ 128 * tag < 2 ^ 256 := by
-    have := label.isLt
+    have : label.toNat < 2 ^ 104 := label.isLt
     omega
   refine ⟨_, rfl, rfl, rfl, ?_, fun register notI notB notAddr => ?_⟩
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, labelCell]
@@ -301,6 +301,7 @@ theorem exec_entryStore (cells : TreeCells) (s : Nat) (memory : Memory) :
 theorem det_entryStore (cells : TreeCells) (s : Nat) : (entryStore cells s).OpsSatisfy Op.Det :=
   ⟨⟨trivial, trivial⟩, trivial⟩
 
+set_option maxHeartbeats 800000 in
 theorem exec_treeRecover (cells : TreeCells) (n : Nat) (memory : Memory) (alpha : Nat) (X J : Label) (L : Block)
     (nSmall : n < 256) (alphaSmall : alpha < 2 ^ 256) (matSmall : cells.matBase + 2 ^ n < 2 ^ 256)
     (xorReg : memory.registers rD = labelWord X)
@@ -502,7 +503,7 @@ theorem agree_treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) (nSm
     have hashSmall : hashInput (embed (parent index)) (tagOf index.val) < 2 ^ 256 := by
       unfold hashInput
       simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-      have := (parent index).isLt
+      have : (parent index).toNat < 2 ^ 104 := (parent index).isLt
       have := tagSmall _ index.isLt
       omega
     unfold entryHash
@@ -791,7 +792,7 @@ theorem agree_treeEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (levels
       · rcases inside with inside | inside <;> exact inside
 
 /-- **The block `treeEval`** against `treeEvalM` for any `1 ≤ levels ≤ 20`. -/
-theorem agree_treeEvalLabel (cells : TreeCells) (tagOf : Nat → Nat → Nat) (levels : Nat)
+theorem agree_treeEvalBlock (cells : TreeCells) (tagOf : Nat → Nat → Nat) (levels : Nat)
     (levelsPos : 1 ≤ levels) (levelsSmall : levels ≤ 20) (value : Nat) (valueSmall : value < 2 ^ 256)
     (bitLabel : Nat → Block) (join : Nat → Label) (memory : Memory)
     (layouts : ∀ k, k < levels → TreeLayout cells k)
@@ -810,14 +811,14 @@ theorem agree_treeEvalLabel (cells : TreeCells) (tagOf : Nat → Nat → Nat) (l
 the machine agrees with `liftHash (growEvalM tagOf α L J start labels count)`, with the frame of
 `treeEvalWrites cells (start + count)`, composed level by level. -/
 theorem agree_growEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (start : Nat)
-    (value : Nat) (valueSmall : value < 2 ^ 256) (bitLabel : Nat → Block) (join : Nat → Label)
+    (value : Nat) (valueSmall : value < 2 ^ 256) (bitLabel join : Nat → Label)
     (labels : Fin (2 ^ start) → Label) (memory : Memory) (total : Nat) (totalSmall : start + total ≤ 20)
     (layouts : ∀ k, k < total → TreeLayout cells (start + k))
     (alphaCell : memory.ram (word cells.alpha) = word value)
     (joinCells : ∀ k, k < total →
       memory.ram (word (cells.join (start + k))) = labelWord (join (start + k)))
     (bitCells : ∀ k, k < total →
-      memory.ram (word (cells.bit (start + k))) = blockWord (bitLabel (start + k)))
+      memory.ram (word (cells.bit (start + k))) = labelWord (bitLabel (start + k)))
     (startCells : ∀ j : Fin (2 ^ start),
       memory.ram (word (cells.levelBase + j.val)) = labelWord (labels j))
     (tagSmall : ∀ k s, k < total → s < 2 ^ (start + k) → tagOf (start + k) s < 2 ^ 127) :
@@ -827,7 +828,7 @@ theorem agree_growEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (start 
             after.ram (word (cells.levelBase + j.val)) = labelWord (level j)) ∧
           Frame (treeEvalWrites cells (start + count)) treeStepClobbers memory after)
         ((growEval cells tagOf start count).tree memory)
-        (liftHash (growEvalM tagOf value (fun k => clip (bitLabel k)) join start labels count))
+        (liftHash (growEvalM tagOf value bitLabel join start labels count))
   | 0, _ => by
       unfold growEval
       rw [Prog.rep]
@@ -836,10 +837,10 @@ theorem agree_growEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (start 
       have layout := layouts count (by omega)
       unfold growEval
       rw [Prog.rep, tree_seq]
-      rw [show growEvalM tagOf value (fun k => clip (bitLabel k)) join start labels (count + 1) =
-          (growEvalM tagOf value (fun k => clip (bitLabel k)) join start labels count >>= fun previous =>
+      rw [show growEvalM tagOf value bitLabel join start labels (count + 1) =
+          (growEvalM tagOf value bitLabel join start labels count >>= fun previous =>
             evalStepM (start + count) (tagOf (start + count)) (activeAt value (start + count))
-              (clip (bitLabel (start + count))) (join (start + count)) previous) from rfl,
+              (bitLabel (start + count)) (join (start + count)) previous) from rfl,
         TreeLaws.monad_bind, liftHash_bind]
       refine Agree.bindOpt (fun previous after post => ?_)
         (agree_growEval cells tagOf start value valueSmall bitLabel join labels memory total totalSmall
@@ -855,9 +856,13 @@ theorem agree_growEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (start 
           labelWord (bitLabel (start + count)) := by
         rw [frame.ram _ (not_treeEvalWrites cells (start + count) _ layout layout.bitOut)]
         exact bitCells count (by omega)
-      refine (agree_treeStep cells (tagOf (start + count)) (start + count) (by omega) value valueSmall
-        (bitLabel (start + count)) (join (start + count)) previous after layout alphaNow levelCells
-        joinNow bitNow (fun s sb => tagSmall count s (by omega) sb)).mono fun level final post => ?_
+      have bitNowRaw : after.ram (word (cells.bit (start + count))) =
+          blockWord (embed (bitLabel (start + count))) := by rw [blockWord_embed]; exact bitNow
+      have stepAgree := agree_treeStep cells (tagOf (start + count)) (start + count) (by omega) value valueSmall
+        (embed (bitLabel (start + count))) (join (start + count)) previous after layout alphaNow levelCells
+        joinNow bitNowRaw (fun s sb => tagSmall count s (by omega) sb)
+      simp only [show ∀ l : Label, clip (embed l) = l from Narrow.clip_embed] at stepAgree
+      refine stepAgree.mono fun level final post => ?_
       obtain ⟨cells', frame'⟩ := post
       refine ⟨cells', (frame.trans frame').mono ?_ fun register inside => ?_⟩
       · have powLe : 2 ^ (start + count) ≤ 2 ^ (start + (count + 1)) :=

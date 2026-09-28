@@ -50,7 +50,7 @@ theorem exec_nodeInput (cells : StageCells) (base stride : Nat) (memory : Memory
     calc x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
       _ < 2 ^ 128 * 2 ^ 127 := Nat.mul_lt_mul_of_pos_left this (by positivity)
       _ < 2 ^ 256 := by norm_num
-  have labelSmall := label.isLt
+  have labelSmall : label.toNat < 2 ^ 104 := label.isLt
   have sum1 : label.toNat + x * (2 ^ 128 * stride) < 2 ^ 256 := by
     have : stride * x < 2 ^ 127 := by omega
     have : x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
@@ -262,7 +262,7 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
       2 ^ 256 := by
     unfold hashInput
     simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-    have := (parent index).isLt
+    have : (parent index).toNat < 2 ^ 104 := (parent index).isLt
     have := tagSmall _ tLt
     omega
   unfold hashEntry
@@ -270,11 +270,14 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
     tree_seq_exec _ _ (det_nodeInput cells base stride) m1 m2 run2,
     tree_query_hash _ m2 _ hashSmall input2, liftHash_hLabelM]
   refine .node _ fun answer => ?_
-  rw [tree_eq_exec _ (det_matStore cells (start + d) index.val)]
   set m3 := writePair m2 rFirst rSecond (blockWord answer.1, blockWord answer.2) with m3Def
-  have first3 : m3.registers rFirst = blockWord answer.1 := by
+  have rawFirst3 : m3.registers rFirst = blockWord answer.1 := by
     rw [m3Def, writePair_reg, if_neg (by decide), if_pos rfl]
-  obtain ⟨m4, run4, ram4, bits4, regs4⟩ := exec_matStore cells (start + d) index.val m3
+  obtain ⟨mClip, runClip, ramClip, bitsClip, first3, regsClip⟩ :=
+    exec_clipReg rFirst (by decide) m3 answer.1 rawFirst3
+  rw [tree_seq_exec _ _ (det_clipReg rFirst) _ mClip runClip,
+    tree_eq_exec _ (det_matStore cells (start + d) index.val)]
+  obtain ⟨m4, run4, ram4, bits4, regs4⟩ := exec_matStore cells (start + d) index.val mClip
     (word_ne (by omega) (by omega) (by omega))
   rw [run4]
   have matSmall : cells.matBase + index.val < 2 ^ 256 := by omega
@@ -284,17 +287,19 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
     · subst last
       rw [Function.update_self, Vector.getElem_push_eq]
     · have tSmall : t < index.val := by omega
-      rw [Function.update_of_ne (word_ne (by omega) matSmall (by omega)), m3Def, writePair_ram, ram2,
+      rw [Function.update_of_ne (word_ne (by omega) matSmall (by omega)), ramClip, m3Def, writePair_ram, ram2,
         ram1, Vector.getElem_push_lt tSmall]
       exact mats t tSmall
-  · rw [ram4, Function.update_self, first3, m3Def, writePair_ram, ram2, ram1, sumCell,
+  · rw [ram4, Function.update_self, first3, ramClip, m3Def, writePair_ram, ram2, ram1, sumCell,
       xorOf_push, BitVec.xor_assoc, labelWord_xor]
-  · rw [ram4, Function.update_of_ne offSum, Function.update_of_ne (offMat index.val tLtw), m3Def,
+  · rw [ram4, Function.update_of_ne offSum, Function.update_of_ne (offMat index.val tLtw), ramClip, m3Def,
       writePair_ram, ram2, ram1]
     exact frame address offSum offMat
-  · rw [bits4, m3Def, writePair_bits, bits2, bits1]
+  · rw [bits4, bitsClip, m3Def, writePair_bits, bits2, bits1]
     exact bitsSame
   · rw [regs4 register (ne_of_not_stage outside rE (by simp)) (ne_of_not_stage outside rAddr (by simp)),
+      regsClip register (ne_of_not_stage outside rFirst (by simp))
+        (ne_of_not_stage outside rB (by simp)),
       m3Def, writePair_reg, if_neg (ne_of_not_stage outside rSecond (by simp)),
       if_neg (ne_of_not_stage outside rFirst (by simp)),
       regs2 register (ne_of_not_stage outside rInput (by simp)) (ne_of_not_stage outside rB (by simp))
