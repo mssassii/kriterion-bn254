@@ -57,6 +57,7 @@ theorem normBadSrc_withHidden [FieldCertificate] [GroupCertificate] (s : Entry.S
     H8.normBadSrc (withHidden s h) ↔ ¬ BMR.GoodScales h := by
   unfold H8.normBadSrc BMR.GoodScales withHidden
   simp only [not_forall, not_and_or, ne_eq, not_not]
+  exact Iff.rfl
 
 instance restFintype : Fintype Rest := Fintype.ofFinite _
 
@@ -80,7 +81,6 @@ theorem badMass_le [FieldCertificate] :
       ⟨fun _ => (target, target), by show (if k = 0 then target else target) = target; split <;> rfl⟩
     have law := BMR.WrapMass.uniform_map_addHom projection surj
     have mass := congrArg (fun μ : PMF BaseField => μ.toOuterMeasure {0}) law
-    simp only at mass
     rw [PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_singleton, PMF.uniformOfFintype_apply,
       ZMod.card] at mass
     convert mass using 2
@@ -104,7 +104,6 @@ theorem badMass_le [FieldCertificate] :
   unfold normError frac
   rw [ENNReal.ofReal_div_of_pos (by exact_mod_cast p_pos), ENNReal.ofReal_natCast, ENNReal.ofReal_natCast,
     baseFieldModulus_eq, div_eq_mul_inv]
-  norm_num
 
 /-- **The normalization flag against a weight on the published value**: at most `182/p` times the weight. -/
 theorem normFlag_le [FieldCertificate] [GroupCertificate] (weight : Entry.Public → ℝ≥0∞)
@@ -128,9 +127,11 @@ theorem normFlag_le [FieldCertificate] [GroupCertificate] (weight : Entry.Public
     refine tsum_congr fun h => ?_
     by_cases good : BMR.GoodScales h
     · have notBad : ¬ H8.normBadSrc (withHidden r.1 h) := fun bad => (normBadSrc_withHidden r.1 h).mp bad good
-      simp [good, notBad]
+      rw [if_neg notBad, if_pos good]
+      ring
     · have bad : H8.normBadSrc (withHidden r.1 h) := (normBadSrc_withHidden r.1 h).mpr good
-      simp [good, bad]
+      rw [if_pos bad, if_neg good]
+      ring
   rw [inner, BMR.tsum_uniform_const]
   calc PMF.uniformOfFintype Rest r * (weight (Entry.publish r.1) *
         ∑' h, PMF.uniformOfFintype BMR.Scales h * (if BMR.GoodScales h then 0 else 1))

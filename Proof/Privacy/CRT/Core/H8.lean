@@ -301,6 +301,10 @@ is zero. It pays for the bad event of the row normalization (a zero collector of
 the real side publishes with a set flag (`Core/BmrNorm.lean`). -/
 def normBadSrc (source : (view).Source) : Prop := ∃ d, (source.rows d).zC0 = 0 ∨ (source.rows d).yC4 = 0
 
+instance normBadSrcDecidable (source : (view).Source) : Decidable (normBadSrc source) := by
+  unfold normBadSrc
+  infer_instance
+
 /-- **The wrap reveal**: the window event, or the source's normalization flag. -/
 def replayWraps (source : (view).Source) (u : AffineInput) (table : TagTable) : Prop :=
   replayWindow source u table ∨ normBadSrc source
