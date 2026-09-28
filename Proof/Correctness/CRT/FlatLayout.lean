@@ -427,6 +427,12 @@ theorem convAgree_unflatten (T : CrtTable) (pub : ConvPublic) :
       chunkSection, getD_map_range _ _ _ _ hk]
   · exact modAgree_unflatten T pub i row kind
 
+/-- Agreement with the material with its chunk joins zeroed is agreement with the material itself
+when its chunk joins are `0`. -/
+theorem ConvAgree.of_dropChunkJoins {T : CrtTable} {p q : ConvPublic} (agree : ConvAgree T p q.dropChunkJoins)
+    (zero : ∀ c n, q.chunkJoin c n = 0) : ConvAgree T p q :=
+  ⟨fun c hc n lower upper => (agree.1 c hc n lower upper).trans (zero c n).symm, agree.2.1, agree.2.2⟩
+
 /-- Zeroing the chunk joins changes no modulus cell. -/
 theorem modAgree_dropChunkJoins (row : OddRow) (i : Nat) (pub : ConvPublic) :
     ModAgree row i pub.dropChunkJoins pub :=

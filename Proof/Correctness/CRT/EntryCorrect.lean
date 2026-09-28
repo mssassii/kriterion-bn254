@@ -148,30 +148,30 @@ theorem deliveredX_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (inpu
     ((replayConv (pubOf H scalar coins) input (labelsFor H coins input)).eval H).deliveredX e =
       slXOf H scalar coins e * input.x + toField ((gxOf H coins).offset e) := by
   have delivery := published_delivery H xCount 0 (clip (coins.inputDelta .x))
-    (fun j => clip (atNat (coins.inputZero .x) 0 j))
+    (fun j => clip (atNat (coins.inputZero .x) 0 j)) (gxOf H coins) rfl
     (fun e => (slXOf H scalar coins e).val) input.x.val (val_lt_two_pow _)
     (fun e => val_mul_val_lt _ _) (fun j => clip (labelX (labelsFor H coins input) j))
     (fun j low => clip_labelX_absorbed _ (coins.inputZero .x)
       (table.chunkShift (gxOf H coins).pub.chunkJoin) (coins.inputDelta .x) (keyOf_x H coins) input j low)
     (fun e => ((pubOf H scalar coins).recX.get e).val) (pubOf_recX H scalar coins) e
-  rw [← toField_delivery, gxOf, ← delivery]
+  rw [← toField_delivery, ← delivery]
   simp only [replayConv, FreeQuery.eval_bind, FreeQuery.eval_pure]
-  rw [pubOf_crtX, gxOf]
+  rw [pubOf_crtX]
 
 theorem deliveredY_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (input : AffineInput)
     (e : Fin yCount) :
     ((replayConv (pubOf H scalar coins) input (labelsFor H coins input)).eval H).deliveredY e =
       slYOf H scalar coins e * input.y + toField ((gyOf H coins).offset e) := by
   have delivery := published_delivery H yCount 1 (clip (coins.inputDelta .y))
-    (fun j => clip (atNat (coins.inputZero .y) 0 j))
+    (fun j => clip (atNat (coins.inputZero .y) 0 j)) (gyOf H coins) rfl
     (fun e => (slYOf H scalar coins e).val) input.y.val (val_lt_two_pow _)
     (fun e => val_mul_val_lt _ _) (fun j => clip (labelY (labelsFor H coins input) j))
     (fun j low => clip_labelY_absorbed _ (coins.inputZero .y)
       (table.chunkShift (gyOf H coins).pub.chunkJoin) (coins.inputDelta .y) (keyOf_y H coins) input j low)
     (fun e => ((pubOf H scalar coins).recY.get e).val) (pubOf_recY H scalar coins) e
-  rw [← toField_delivery, gyOf, ← delivery]
+  rw [← toField_delivery, ← delivery]
   simp only [replayConv, FreeQuery.eval_bind, FreeQuery.eval_pure]
-  rw [pubOf_crtY, gyOf]
+  rw [pubOf_crtY]
 
 /-! ### Index facts -/
 
@@ -335,13 +335,13 @@ theorem labelsOf_honest (H : HashN) (coins : Coins) (input : AffineInput) :
   have low : position.val < 254 := position.isLt
   fin_cases coord
   · simp only [labelsOf, coordBit, coordNat, labelsFor, Fin.zero_eta, Fin.isValue, ↓reduceIte]
-    rw [labelX_honest _ (keyZero H coins 0) (deltaOf coins 0) (fun j => keyOfZeros_x _ _ j) input
-      position.val low]
+    rw [labelX_honest (keyOf H coins) (keyZero H coins 0) (deltaOf coins 0) (fun j => keyOfZeros_x _ _ j)
+      input position.val low]
     simp only [atNat, dif_pos (show position.val < coordinateBitCount from low)]
     split <;> simp_all
   · simp only [labelsOf, coordBit, coordNat, labelsFor, Fin.mk_one, Fin.isValue, one_ne_zero, ↓reduceIte]
-    rw [labelY_honest _ (keyZero H coins 1) (deltaOf coins 1) (fun j => keyOfZeros_y _ _ j) input
-      position.val low]
+    rw [labelY_honest (keyOf H coins) (keyZero H coins 1) (deltaOf coins 1) (fun j => keyOfZeros_y _ _ j)
+      input position.val low]
     simp only [atNat, dif_pos (show position.val < coordinateBitCount from low)]
     split <;> simp_all
 

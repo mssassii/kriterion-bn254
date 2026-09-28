@@ -113,15 +113,15 @@ theorem records_small {S : Nat} (g : CoordGarbled table S) (slopes : Fin S → N
 chunk joins) and the records as published, and any labels that agree on the coordinate's bits with
 the honest labels XOR the absorbed chunk joins (`chunkShift`). -/
 theorem published_delivery (H : HashN) (S coord : Nat) (Δ : Label) (Z : Nat → Label)
+    (g : CoordGarbled table S) (hg : (coordGarbleM table S coord Δ Z).eval H = g)
     (slopes : Fin S → Nat) (v : Nat) (hv : v < 2 ^ 254) (hav : ∀ e, slopes e * v < table.wrapBound)
     (labels : Nat → Label)
     (hlabels : ∀ j < 254, labels j = (Z j ^^^ (if v.testBit j then Δ else 0)) ^^^
-      table.chunkShift ((coordGarbleM table S coord Δ Z).eval H).pub.chunkJoin j)
-    (records : Fin S → Nat)
-    (hrecords : ∀ e, records e = ((coordGarbleM table S coord Δ Z).eval H).records slopes e) (e : Fin S) :
-    ((coordEvalM table S coord (convOf (convVector ((coordGarbleM table S coord Δ Z).eval H).pub))
-        records v labels).eval H).decoded e =
-      slopes e * v + ((coordGarbleM table S coord Δ Z).eval H).offset e := by
+      table.chunkShift g.pub.chunkJoin j)
+    (records : Fin S → Nat) (hrecords : ∀ e, records e = g.records slopes e) (e : Fin S) :
+    ((coordEvalM table S coord (convOf (convVector g.pub)) records v labels).eval H).decoded e =
+      slopes e * v + g.offset e := by
+  subst hg
   have recordsEq : records = ((coordGarbleM table S coord Δ Z).eval H).records slopes := funext hrecords
   rw [recordsEq, coordEvalM_congr table S coord _ _ _ v _ (convAgree_convOf _),
     Absorb.coordEvalM_absorb table SliceC.bn254_correctTable.chunkBits_pos S coord _ _ v

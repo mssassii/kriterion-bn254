@@ -29,15 +29,13 @@ variable (s : Source)
 /-! ### (i) Joins -/
 
 /-- The source's conversion material has no chunk joins. -/
-theorem conv_dropChunkJoins (κ : Fin 2) : (s.conv κ).dropChunkJoins = s.conv κ := rfl
+theorem conv_chunkJoin (κ : Fin 2) (c n : Nat) : (s.conv κ).chunkJoin c n = 0 := rfl
 
-theorem convAgree_publishX : ConvAgree table (convOf (publish s).crtX) (s.conv 0) := by
-  have agree := convAgree_convOf (s.conv 0)
-  rwa [conv_dropChunkJoins] at agree
+theorem convAgree_publishX : ConvAgree table (convOf (publish s).crtX) (s.conv 0) :=
+  (convAgree_convOf (s.conv 0)).of_dropChunkJoins (conv_chunkJoin s 0)
 
-theorem convAgree_publishY : ConvAgree table (convOf (publish s).crtY) (s.conv 1) := by
-  have agree := convAgree_convOf (s.conv 1)
-  rwa [conv_dropChunkJoins] at agree
+theorem convAgree_publishY : ConvAgree table (convOf (publish s).crtY) (s.conv 1) :=
+  (convAgree_convOf (s.conv 1)).of_dropChunkJoins (conv_chunkJoin s 1)
 
 /-- The published conversion material of coordinate `κ`. -/
 def convPub (κ : Fin 2) : ConvPublic :=
