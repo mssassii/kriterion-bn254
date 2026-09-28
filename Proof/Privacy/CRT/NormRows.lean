@@ -13,7 +13,6 @@ the opening's kernel bound carries over digit by digit with the sign multiplier 
 import Proof.Privacy.Phase3.OpeningBound
 import Proof.Privacy.CRT.Core.BmrNorm
 import Construction.CRT.Entry
-import Proof.Privacy.CRT.Flags.RowsDoubling
 
 set_option maxRecDepth 8000
 
@@ -254,6 +253,28 @@ theorem normRows_etvDist_le (scalar : NonZeroScalar) (input : AffineInput) (poin
 
 /-! ### 4. The doubling flag of the normalized kernel -/
 
+/-- A true row with `z = 0` or `y = 0` is exceptional (`realRowOf_exceptional`, restated here
+below the privacy chain's entry reading). -/
+theorem realRowOf_exceptional {T K : Point} {rho tau : BaseField} (rhoNe : rho ≠ 0) (tauNe : tau ≠ 0)
+    (finiteK : K ≠ 0) (zero : (realRowOf T K rho tau).z = 0 ∨ (realRowOf T K rho tau).y = 0) :
+    T = K ∨ T + K = 0 ∨ T = K + K := by
+  by_cases same : T = K
+  · exact Or.inl same
+  by_cases triple : T = K + K
+  · exact Or.inr (Or.inr triple)
+  refine Or.inr (Or.inl ?_)
+  rw [realRowOf_lift T K rho tau finiteK same triple] at zero
+  have scaleNe := mul_ne_zero rhoNe (pointMultiplier_ne_zero T K same)
+  have signNe := mul_ne_zero tauNe (signMultiplier_ne_zero T K triple)
+  cases sum : T + K with
+  | zero => rfl
+  | some x y valid =>
+    rw [sum] at zero
+    exfalso
+    rcases zero with z | y0
+    · exact scaleNe z
+    · exact Security.Phase3.lift_not_triple _ _ signNe ⟨y0, scaleNe⟩
+
 /-- A flagged normalized row (`z = 0` or `y = 0`) is at a nonzero digit with an exceptional digit point. -/
 theorem normDoubling_points (multiples : Fin 91 → Point) (zero : Fin 91 → Bool) (x : BaseField) (xNe : x ≠ 0)
     (sample : GoodTails × (Fin 91 → NonZeroBase × NonZeroBase))
@@ -276,7 +297,7 @@ theorem normDoubling_points (multiples : Fin 91 → Point) (zero : Fin 91 → Bo
       · exact Security.Phase3.lift_not_triple _ _ signNe ⟨yy, (sample.2 digit).1.nonzero⟩
   · simp only [z, if_false, Bool.false_eq_true] at zeroRow
     refine ⟨digit, ?_⟩
-    rcases Flags.RowsDoubling.realRowOf_exceptional (sample.2 digit).1.nonzero (sample.2 digit).2.nonzero
+    rcases realRowOf_exceptional (sample.2 digit).1.nonzero (sample.2 digit).2.nonzero
         (clampOffsets_ne_zero sample.1 digit) zeroRow with same | sum | triple
     · left; left
       show multiples digit + clampOffsets radixMap sample.1.1 digit = _
