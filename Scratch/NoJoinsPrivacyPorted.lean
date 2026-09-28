@@ -3,14 +3,14 @@ No-joins (branch nojoins-p, parity base): axiom audit of the privacy leaves port
 (the chunk-tree joins absorbed into the labels). Every theorem below compiles on `nojoins-p` without `sorry`.
 The five declarations that need the new joint label law / fine view (LabelsSplit.tapeLabels_eq,
 CoreReads.realRest_congr, DeltaViewFD.garbleCM_asked/garbleCM_eval/convAgree_of_convVector_eq) and the modules
-behind them are not imported here. Run with `lake env lean Scratch/NoJoinsPrivacyPorted.lean` after building
+behind them are not imported here. On the parity base `Hidden/StageOneCast` (the never-hot cast case) imports
+`Laws/CoreReads` and is therefore behind `LabelsSplit` too; it is not audited here. Run with `lake env lean Scratch/NoJoinsPrivacyPorted.lean` after building
 its imports.
 -/
 import Proof.Privacy.CRT.Core.ConvSplit
 import Proof.Privacy.CRT.Core.SourceSplit
 import Proof.Privacy.CRT.Core.KeyZeroCongr
 import Proof.Privacy.CRT.Hidden.Reached
-import Proof.Privacy.CRT.Hidden.StageOneCast
 import Proof.Privacy.CRT.Hidden.StageOneKey
 import Proof.Privacy.CRT.Hidden.CaseDigest
 import Proof.Privacy.CRT.Hidden.CaseKeyOff
@@ -38,7 +38,6 @@ open Kriterion Kriterion.CRT Kriterion.CRT.Entry
 #check @Kriterion.CRT.Privacy.StageTwo.final_case
 #check @Kriterion.CRT.Privacy.StageTwo.keyOff_case
 #check @Kriterion.CRT.Privacy.StageOneProof.finalCase
-#check @Kriterion.CRT.Privacy.StageOneProof.neverCase
 #check @Kriterion.CRT.Privacy.StageOneProof.keyCase
 
 run_cmd do
@@ -59,7 +58,6 @@ run_cmd do
       `Kriterion.CRT.Privacy.StageTwo.final_case,
       `Kriterion.CRT.Privacy.StageTwo.keyOff_case,
       `Kriterion.CRT.Privacy.StageOneProof.finalCase,
-      `Kriterion.CRT.Privacy.StageOneProof.neverCase,
       `Kriterion.CRT.Privacy.StageOneProof.keyCase] do
     let illegal := (← Lean.collectAxioms name).filter fun axiomName =>
       !#[`propext, `Classical.choice, `Quot.sound].contains axiomName
