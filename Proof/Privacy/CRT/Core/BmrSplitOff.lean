@@ -38,7 +38,7 @@ def KernelOff (K : TableKernel) : Prop :=
     (K.given τ).map (restrictBmr u) = (K.given τ').map (restrictBmr u)
 
 /-- An off-curve P45 output as an output with zero masks and key. -/
-def offOut (u : AffineInput) (o : BMR.OutOff Tb u) : BMR.Out Tb u := (o.1, (o.2, fun _ => 0), fun _ => 0, 0)
+def offOut (u : AffineInput) (o : BMR.NOutOff Tb u) : BMR.NOut Tb u := (o.1, (o.2, fun _ => 0), fun _ => 0, 0)
 
 /-- The cold pads of the pads with a given cold part. -/
 theorem coldOfPads_padsOfCold (u : AffineInput) (cold : BMR.Cold Tb u) : coldOfPads u (padsOfCold u cold) = cold := by
@@ -60,11 +60,11 @@ theorem given_restrict (K : TableKernel) (off : KernelOff K) (u : AffineInput) (
 
 /-- **Off the curve the real P45 part reads only the off-curve output.** -/
 theorem bmrLaw_realOut_off (K : TableKernel) (off : KernelOff K) (u : AffineInput) (hv : validate u = false)
-    [FieldCertificate] (ctx : BMR.Context) (c : BMR.Coins Tb) :
-    bmrLaw K u (BMR.realOut ctx u c) = bmrLaw K u (offOut u (BMR.realOutOff ctx u c)) := by
+    [FieldCertificate] (ctx : BMR.NContext) (c : BMR.Coins Tb) :
+    bmrLaw K u (BMR.nRealOut ctx u c) = bmrLaw K u (offOut u (BMR.nRealOutOff ctx u c)) := by
   unfold bmrLaw
-  rw [bmrKernel_masks K off u hv (visTargets u (BMR.realOut ctx u c)).1 (visTargets u (BMR.realOut ctx u c)).2
-    (visTargets u (offOut u (BMR.realOutOff ctx u c))).2]
+  rw [bmrKernel_masks K off u hv (visTargets u (BMR.nRealOut ctx u c)).1 (visTargets u (BMR.nRealOut ctx u c)).2
+    (visTargets u (offOut u (BMR.nRealOutOff ctx u c))).2]
   rfl
 
 /-! ### 2. The ideal reading off the curve -/
@@ -101,11 +101,11 @@ source and the table's cold pads, with the table's answers. -/
 theorem bmrPart_middle (u : AffineInput) (s : Kriterion.CRT.Entry.Source) (labels : LamportSignature)
     (table : TagTable) (cold : BMR.Cold Tb u) :
     H8.bmrPart Tb u ((Kriterion.CRT.Entry.publish s, labels, fun tag => table tag.1) : H8.CoreView crtEntry Tb u) =
-      bmrOf u (offOut u (BMR.idealOutOff u (srcOf s, cold))) (restrictBmr u table) := by
-  unfold H8.bmrPart bmrOf offOut BMR.idealOutOff
+      bmrOf u (offOut u (BMR.nIdealOutOff u (srcOf s, cold))) (restrictBmr u table) := by
+  unfold H8.bmrPart bmrOf offOut BMR.nIdealOutOff
   dsimp only
   refine Prod.ext rfl (Prod.ext ?_ (Prod.ext ?_ (Prod.ext ?_ rfl)))
-  · show Vector.ofFn s.rows = Vector.ofFn fun d => s.rows d
+  · show Vector.ofFn s.normRow = Vector.ofFn fun d => BMR.srcRow (s.rows d) (s.signs d)
     rfl
   · refine Vector.ext fun e he => ?_
     have := publish_recX s ⟨e, he⟩
@@ -117,17 +117,23 @@ theorem bmrPart_middle (u : AffineInput) (s : Kriterion.CRT.Entry.Source) (label
     exact this
 
 open Classical in
-/-- The off-curve ideal P45 law of cells: flagged by the window, else the published part and the kernel's answers. -/
-def idealCellLaw (K : TableKernel) (u : AffineInput) (cells : BMR.Source Tb × BMR.Cold Tb u) :
+/-- The off-curve flag of P45's cells: the window, or the hidden cells' zero event. -/
+def offFlag (u : AffineInput) (cells : BMR.NSource Tb × BMR.Cold Tb u) : Prop :=
+  windowFlag u cells ∨ BMR.normBad cells.1
+
+open Classical in
+/-- The off-curve ideal P45 law of cells: flagged by the window or the hidden cells, else the published part and the
+kernel's answers. -/
+def idealCellLaw (K : TableKernel) (u : AffineInput) (cells : BMR.NSource Tb × BMR.Cold Tb u) :
     PMF (Option (BmrPart u)) :=
-  if windowFlag u cells then PMF.pure none else (bmrLaw K u (offOut u (BMR.idealOutOff u cells))).map some
+  if offFlag u cells then PMF.pure none else (bmrLaw K u (offOut u (BMR.nIdealOutOff u cells))).map some
 
 open Classical in
 /-- **The ideal reading off the curve** (proved): `M'`'s off-curve P45 part is, under uniform P45 cells and cold pads,
 the published part of `BMR.idealOutOff` with the kernel's answers, flagged by the window. -/
 theorem idealReadingOff (K : TableKernel) (off : KernelOff K) (u : AffineInput) (hv : validate u = false) :
     (H8.idealCoreOff crtEntry Tb H8.crtRevealOff u).map (Option.map (H8.bmrPart Tb u)) =
-      (PMF.uniformOfFintype (BMR.Source Tb × BMR.Cold Tb u)).bind (idealCellLaw K u) := by
+      (PMF.uniformOfFintype (BMR.NSource Tb × BMR.Cold Tb u)).bind (idealCellLaw K u) := by
   -- the middle view of a source, table by table
   have perTable : ∀ (s : (PublicFirst.viewHere crtEntry).Source) (τ : Targets),
       (K.given τ).map (fun table => Option.map (H8.bmrPart Tb u)
@@ -137,23 +143,23 @@ theorem idealReadingOff (K : TableKernel) (off : KernelOff K) (u : AffineInput) 
         idealCellLaw K u (srcOf s, coldOfPads u τ.1) := by
     intro s τ
     rw [map_congr_support (K.given τ) _
-      (fun table => if windowFlag u (srcOf s, coldOfPads u τ.1) then none
-        else some (bmrOf u (offOut u (BMR.idealOutOff u (srcOf s, coldOfPads u τ.1))) (restrictBmr u table)))]
+      (fun table => if offFlag u (srcOf s, coldOfPads u τ.1) then none
+        else some (bmrOf u (offOut u (BMR.nIdealOutOff u (srcOf s, coldOfPads u τ.1))) (restrictBmr u table)))]
     · rw [map_ite_const]
       unfold idealCellLaw bmrLaw
-      by_cases flag : windowFlag u (srcOf s, coldOfPads u τ.1)
+      by_cases flag : offFlag u (srcOf s, coldOfPads u τ.1)
       · rw [if_pos flag, if_pos flag]
       · rw [if_neg flag, if_neg flag, given_restrict K off u hv τ
-          (visTargets u (offOut u (BMR.idealOutOff u (srcOf s, coldOfPads u τ.1)))).2, PMF.map_comp]
+          (visTargets u (offOut u (BMR.nIdealOutOff u (srcOf s, coldOfPads u τ.1)))).2, PMF.map_comp]
         rfl
     · intro table member
       have cold : H8.bmrColdOf table u = coldOfPads u τ.1 := by
         rw [Flags.Wrap.bmrColdOf_eq, ← (K.reads τ table member).1]
         rfl
-      have reveal : H8.crtRevealOff s u table ↔ windowFlag u (srcOf s, coldOfPads u τ.1) := by
+      have reveal : H8.crtRevealOff s u table ↔ offFlag u (srcOf s, coldOfPads u τ.1) := by
         rw [← cold]
         exact replayWraps_iff s u table
-      by_cases flag : windowFlag u (srcOf s, coldOfPads u τ.1)
+      by_cases flag : offFlag u (srcOf s, coldOfPads u τ.1)
       · rw [if_pos flag, if_pos (reveal.mpr flag)]
         rfl
       · rw [if_neg flag, if_neg (fun hit => flag (reveal.mp hit))]
@@ -171,8 +177,8 @@ theorem idealReadingOff (K : TableKernel) (off : KernelOff K) (u : AffineInput) 
   rw [PMF.map_bind]
   simp only [PMF.map_comp, Function.comp_def]
   simp only [perSource]
-  have prodLaw : (PMF.uniformOfFintype (BMR.Source Tb × BMR.Cold Tb u)).bind (idealCellLaw K u) =
-      (PMF.uniformOfFintype (BMR.Source Tb)).bind fun src =>
+  have prodLaw : (PMF.uniformOfFintype (BMR.NSource Tb × BMR.Cold Tb u)).bind (idealCellLaw K u) =
+      (PMF.uniformOfFintype (BMR.NSource Tb)).bind fun src =>
         (PMF.uniformOfFintype (BMR.Cold Tb u)).bind fun cold => idealCellLaw K u (src, cold) := by
     rw [EntrySplit.uniform_prod_eq_bind, PMF.bind_bind]
     refine congrArg _ (funext fun src => ?_)
@@ -201,17 +207,14 @@ theorem map_some_apply' {β : Type} (X : PMF β) (w : β) : X.map some (some w) 
 
 open Classical in
 /-- The ideal cell law at `some w`, as the weight of the flagged ideal output. -/
-theorem idealCellLaw_some (K : TableKernel) (u : AffineInput) (cells : BMR.Source Tb × BMR.Cold Tb u)
+theorem idealCellLaw_some (K : TableKernel) (u : AffineInput) (cells : BMR.NSource Tb × BMR.Cold Tb u)
     (w : BmrPart u) :
     idealCellLaw K u cells (some w) =
-      (if windowFlag u cells then none else some (BMR.idealOutOff u cells)).elim 0
-        fun o => bmrLaw K u (offOut u o) w := by
+      if offFlag u cells then 0 else bmrLaw K u (offOut u (BMR.nIdealOutOff u cells)) w := by
   unfold idealCellLaw
-  by_cases flag : windowFlag u cells
+  by_cases flag : offFlag u cells
   · rw [if_pos flag, if_pos flag, PMF.pure_apply_of_ne _ _ (Option.some_ne_none w)]
-    rfl
   · rw [if_neg flag, if_neg flag, map_some_apply']
-    rfl
 
 open Classical in
 /-- **`CrtBmrSplitOff` from the kernel (with its off-curve fact), the real reading and the coin split.** -/
@@ -223,48 +226,50 @@ theorem crtBmrSplitOff_of (K : TableKernel) (off : KernelOff K)
   have offCurve := not_onCurve_of_function undefined
   rw [idealReadingOff K off u hv, real parameter scalar u]
   simp only [PMF.bind_apply]
-  let F : BMR.OutOff Tb u → ℝ≥0∞ := fun o => bmrLaw K u (offOut u o) w
+  let F : BMR.NOutOff Tb u → ℝ≥0∞ := fun o => bmrLaw K u (offOut u o) w
   let g : Kriterion.ArgoMAC.Scheme.Coins → Layer → ℝ≥0∞ := fun coins layer =>
     ∑' τ, PMF.uniformOfFintype Targets τ *
-      F (BMR.realOutOff (BmrEntry.bmrContextOf scalar coins) u (coinsOf τ layer))
+      F (BMR.nRealOutOff (BmrEntry.bmrContextOf scalar coins) u (coinsOf τ layer))
   have rhs : ∀ coins, (∑' τ, PMF.uniformOfFintype Targets τ *
       (if H8.Doubling crtEntry scalar (coins, fun _ => (0, 0)) u then PMF.pure none
-        else (bmrLaw K u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u
+        else (bmrLaw K u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u
           (coinsOf τ (layerOf coins)))).map some) (some w)) = g coins (layerOf coins) := by
     intro coins
     have noDouble := not_doubling_of_off scalar (coins, fun _ => (0, 0)) offCurve
     refine tsum_congr fun τ => ?_
     rw [if_neg noDouble, map_some_apply', bmrLaw_realOut_off K off u hv]
-  have R : (∑' coins, coinLaw coins * ∑' τ, PMF.uniformOfFintype Targets τ *
+  have R : (∑' coins, BmrSplit.coinLaw coins * ∑' τ, PMF.uniformOfFintype Targets τ *
       (if H8.Doubling crtEntry scalar (coins, fun _ => (0, 0)) u then PMF.pure none
-        else (bmrLaw K u (BMR.realOut (BmrEntry.bmrContextOf scalar coins) u
+        else (bmrLaw K u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u
           (coinsOf τ (layerOf coins)))).map some) (some w)) =
-      ∑' coins, coinLaw coins * g coins (layerOf coins) :=
+      ∑' coins, BmrSplit.coinLaw coins * g coins (layerOf coins) :=
     tsum_congr fun coins => by rw [rhs coins]
   have invariant : ∀ coins coins' layer, ctxPart coins = ctxPart coins' → g coins layer = g coins' layer := by
     intro coins coins' layer same
     simp only [g, BmrSplit.bmrContextOf_congr scalar same]
-  have perCoins : ∀ coins, (∑' cells, PMF.uniformOfFintype (BMR.Source Tb × BMR.Cold Tb u) cells *
+  have perCoins : ∀ coins, (∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Cold Tb u) cells *
         idealCellLaw K u cells (some w)) ≤
       ∑' layer, PMF.uniformOfFintype Layer layer * g coins layer := by
     intro coins
-    have equiv : (∑' layer, PMF.uniformOfFintype Layer layer * g coins layer) =
+    have gconst : ∀ s, ∑' old, PMF.uniformOfFintype BmrSplit.BmrLayer old * g coins (s, old) =
         ∑' c, PMF.uniformOfFintype (BMR.Coins Tb) c *
-          (some (BMR.realOutOff (BmrEntry.bmrContextOf scalar coins) u c)).elim 0 F :=
+          F (BMR.nRealOutOff (BmrEntry.bmrContextOf scalar coins) u c) := fun s =>
       BmrSplit.uniform_sum_equiv BmrSplit.coinsEquiv
-        (fun c => (some (BMR.realOutOff (BmrEntry.bmrContextOf scalar coins) u c)).elim 0 F)
-    rw [equiv]
-    simp only [idealCellLaw_some]
-    exact BmrSplit.weighted_le _ _ _ _ (fun o => core_below_off Flags.Wrap.entryTableFacts
-      (BmrEntry.bmrContextOf scalar coins) u (windowFlag u) (not_window u) o) F
+        (fun c => F (BMR.nRealOutOff (BmrEntry.bmrContextOf scalar coins) u c))
+    rw [BMR.tsum_uniform_prod (fun layer : Layer => g coins layer)]
+    simp only [gconst, BMR.tsum_uniform_const, idealCellLaw_some]
+    exact BMR.nCoreOff_weighted Flags.Wrap.entryTableFacts (BmrEntry.bmrContextOf scalar coins)
+      (BmrSplit.valid_ctx scalar coins) u (offFlag u)
+      (fun cells flagged window => flagged (Or.inl window))
+      (fun cells flagged bad => flagged (Or.inr bad)) F
   refine le_of_le_of_eq ?_ (R.trans (split g invariant)).symm
-  have one : ∑' coins, coinLaw coins = 1 := PMF.tsum_coe _
-  calc (∑' cells, PMF.uniformOfFintype (BMR.Source Tb × BMR.Cold Tb u) cells * idealCellLaw K u cells (some w))
-      = ∑' coins, coinLaw coins *
-          ∑' cells, PMF.uniformOfFintype (BMR.Source Tb × BMR.Cold Tb u) cells *
+  have one : ∑' coins, BmrSplit.coinLaw coins = 1 := PMF.tsum_coe _
+  calc (∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Cold Tb u) cells * idealCellLaw K u cells (some w))
+      = ∑' coins, BmrSplit.coinLaw coins *
+          ∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Cold Tb u) cells *
             idealCellLaw K u cells (some w) := by
         rw [ENNReal.tsum_mul_right, one, one_mul]
-    _ ≤ ∑' coins, coinLaw coins * ∑' layer, PMF.uniformOfFintype Layer layer * g coins layer :=
+    _ ≤ ∑' coins, BmrSplit.coinLaw coins * ∑' layer, PMF.uniformOfFintype Layer layer * g coins layer :=
         ENNReal.tsum_le_tsum fun coins => by gcongr; exact perCoins coins
 
 end Composition

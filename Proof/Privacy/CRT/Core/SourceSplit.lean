@@ -2,7 +2,7 @@
 **The source's labels are independent of its published value** (H8's
 `CrtFlagMass`).
 
-`Entry.Source` is a product: `publish` reads the curve, rows, exception entries, joins, pins and records,
+`Entry.Source` is a product: `publish` reads the curve, rows, signs, exception entries, joins, pins and records,
 and `labels` reads only the Lamport key (`zeros`, `deltas`). So under the uniform source the pair
 `(publish s, labels s u)` is the product of the published law and the label law (`publish_labels_split`), and every
 label position is uniform on `Block` (`labelLaw_position`).
@@ -28,15 +28,16 @@ abbrev LabelKey := (Fin 2 → Fin coordinateBitCount → Block) × (Fin 2 → Bl
 
 /-- The published cells of a source. Pin widths are the reduced stored widths;
 the source contains no redundant zero parity plane. -/
-abbrev Cells := (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) ×
+abbrev Cells := (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) × (Fin digitCount → Bool) ×
   (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Entry.joinCount → Label) ×
   (Fin 2 → (k : Fin Entry.pinCount) → Lanes (Entry.pinWidth k)) × (Fin Entry.xCount → Fin Entry.table.product) ×
   (Fin Entry.yCount → Fin Entry.table.product)
 
 /-- A source is its published cells and its Lamport key. -/
 def split : Entry.Source ≃ Cells × LabelKey where
-  toFun s := ((s.curve, s.rows, s.exception, s.joins, s.pins, s.recX, s.recY), (s.zeros, s.deltas))
-  invFun p := ⟨p.1.1, p.1.2.1, p.1.2.2.1, p.1.2.2.2.1, p.1.2.2.2.2.1, p.1.2.2.2.2.2.1, p.1.2.2.2.2.2.2, p.2.1, p.2.2⟩
+  toFun s := ((s.curve, s.rows, s.signs, s.exception, s.joins, s.pins, s.recX, s.recY), (s.zeros, s.deltas))
+  invFun p := ⟨p.1.1, p.1.2.1, p.1.2.2.1, p.1.2.2.2.1, p.1.2.2.2.2.1, p.1.2.2.2.2.2.1, p.1.2.2.2.2.2.2.1,
+    p.1.2.2.2.2.2.2.2, p.2.1, p.2.2⟩
   left_inv _ := rfl
   right_inv _ := rfl
 

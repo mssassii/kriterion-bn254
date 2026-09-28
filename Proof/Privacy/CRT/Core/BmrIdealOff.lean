@@ -15,6 +15,7 @@
 -/
 
 import Proof.Privacy.CRT.Core.BmrCore
+import Proof.Privacy.CRT.Core.BmrNorm
 import Proof.Privacy.CRT.Core.BodyMaskRowOff
 import Proof.Privacy.CRT.Core.ReplayDelivered
 import Proof.Privacy.CRT.Core.SourceSplit
@@ -202,23 +203,26 @@ theorem bmrJoinsOf_publish (s : Kriterion.CRT.Entry.Source) :
     unfold recordJoin
     rw [Nat.mod_eq_of_lt (s.recY (yFlat y)).isLt]
 
-/-- **The P45 cells of a source**: the joins its records carry, its row constants, its curve constants. -/
-def srcOf (s : Kriterion.CRT.Entry.Source) : Source Tb :=
-  (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish s), s.rows, s.curve)
+/-- **The P45 cells of a source**: the joins its records carry, its row cells (the published `X` constant and the two
+hidden cells), its signs, its curve constants. -/
+def srcOf (s : Kriterion.CRT.Entry.Source) : NSource Tb :=
+  (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish s), s.rows, s.signs, s.curve)
 
 /-- The source's cells other than P45's: the exception entries, the conversion joins and pins. -/
 abbrev RestCells := (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Kriterion.CRT.Entry.joinCount → Label) ×
   (Fin 2 → (k : Fin Kriterion.CRT.Entry.pinCount) → Lanes (Kriterion.CRT.Entry.pinWidth k))
 
 /-- **A source's published cells are P45's cells and the rest.** -/
-def cellsEquiv : EntrySplit.Cells ≃ Source Tb × RestCells where
-  toFun c := ((recJoinsEquiv (c.2.2.2.2.2.1, c.2.2.2.2.2.2), c.2.1, c.1), (c.2.2.1, c.2.2.2.1, c.2.2.2.2.1))
-  invFun p := (p.1.2.2, p.1.2.1, p.2.1, p.2.2.1, p.2.2.2, (recJoinsEquiv.symm p.1.1).1, (recJoinsEquiv.symm p.1.1).2)
+def cellsEquiv : EntrySplit.Cells ≃ NSource Tb × RestCells where
+  toFun c := ((recJoinsEquiv (c.2.2.2.2.2.2.1, c.2.2.2.2.2.2.2), c.2.1, c.2.2.1, c.1),
+    (c.2.2.2.1, c.2.2.2.2.1, c.2.2.2.2.2.1))
+  invFun p := (p.1.2.2.2, p.1.2.1, p.1.2.2.1, p.2.1, p.2.2.1, p.2.2.2, (recJoinsEquiv.symm p.1.1).1,
+    (recJoinsEquiv.symm p.1.1).2)
   left_inv c := by
-    obtain ⟨curve, rows, exc, joins, pins, rx, ry⟩ := c
+    obtain ⟨curve, rows, signs, exc, joins, pins, rx, ry⟩ := c
     simp only [Equiv.symm_apply_apply]
   right_inv p := by
-    obtain ⟨⟨J, rows, curve⟩, exc, joins, pins⟩ := p
+    obtain ⟨⟨J, rows, signs, curve⟩, exc, joins, pins⟩ := p
     simp only [Prod.mk.eta, Equiv.apply_symm_apply]
 
 instance restCellsFinite : Finite RestCells :=
@@ -233,14 +237,14 @@ instance restCellsNonempty : Nonempty RestCells := ⟨(cellsEquiv (Classical.arb
 
 theorem srcOf_split (c : EntrySplit.Cells) (k : EntrySplit.LabelKey) :
     srcOf (EntrySplit.split.symm (c, k)) = (cellsEquiv c).1 := by
-  show (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish (EntrySplit.split.symm (c, k))), c.2.1, c.1) = _
+  show (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish (EntrySplit.split.symm (c, k))), c.2.1, c.2.2.1, c.1) = _
   rw [bmrJoinsOf_publish]
   rfl
 
 /-- **The P45 cells of a uniform source are uniform.** -/
 theorem uniform_srcOf :
     (letI := Fintype.ofFinite Kriterion.CRT.Entry.Source
-     (PMF.uniformOfFintype Kriterion.CRT.Entry.Source).map srcOf) = PMF.uniformOfFintype (Source Tb) := by
+     (PMF.uniformOfFintype Kriterion.CRT.Entry.Source).map srcOf) = PMF.uniformOfFintype (NSource Tb) := by
   rw [EntrySplit.uniform_source, PMF.map_comp]
   have factor : srcOf ∘ EntrySplit.split.symm = Prod.fst ∘ cellsEquiv ∘ Prod.fst := by
     funext p
@@ -290,24 +294,29 @@ theorem publish_recY (s : Kriterion.CRT.Entry.Source) (e : Fin Kriterion.CRT.Ent
     rw [← publish_recY_val s e]; exact ((Kriterion.CRT.Entry.publish s).recY.get e).isLt)).symm
 
 /-- The two-sided window flag of P45's cells off the curve. -/
-def windowFlag (u : AffineInput) (cells : Source Tb × Cold Tb u) : Prop :=
+def windowFlag (u : AffineInput) (cells : NSource Tb × Cold Tb u) : Prop :=
   ∃ e, InWindow Tb (evalInt u cells.1.1 cells.2 e)
 
-theorem not_window (u : AffineInput) (cells : Source Tb × Cold Tb u) (clear : ¬ windowFlag u cells) :
+theorem not_window (u : AffineInput) (cells : NSource Tb × Cold Tb u) (clear : ¬ windowFlag u cells) :
     ∀ e, ¬ InWindow Tb (evalInt u cells.1.1 cells.2 e) :=
   fun e hit => clear ⟨e, hit⟩
 
-/-- **Route M's off-curve reveal is the window event of P45's `evalInt`.** -/
-theorem replayWraps_iff [FieldCertificate] [GroupCertificate] (s : Kriterion.CRT.Entry.Source) (u : AffineInput)
+/-- **The normalization flag of a source is P45's hidden-cell flag of its cells.** -/
+theorem normBadSrc_iff (s : Kriterion.CRT.Entry.Source) : H8.normBadSrc s ↔ normBad (srcOf s) := by
+  unfold H8.normBadSrc normBad GoodScales hiddenCells srcOf
+  simp only [not_forall, not_and_or, ne_eq, not_not]
+
+/-- **Route M's window event is the window event of P45's `evalInt`.** -/
+theorem replayWindow_iff [FieldCertificate] [GroupCertificate] (s : Kriterion.CRT.Entry.Source) (u : AffineInput)
     (table : TagTable) :
-    H8.replayWraps s u table ↔ windowFlag u (srcOf s, H8.bmrColdOf table u) := by
+    H8.replayWindow s u table ↔ windowFlag u (srcOf s, H8.bmrColdOf table u) := by
   have hx : ∀ x : XEnc, (H8.replayCrtValues s u table).1 (xFlat x) =
       evalInt u (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish s)) (H8.bmrColdOf table u) (.inl x) :=
     fun x => H8.replayCrtValues_x s u table x
   have hy : ∀ y : YEnc, (H8.replayCrtValues s u table).2 (yFlat y) =
       evalInt u (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish s)) (H8.bmrColdOf table u) (.inr y) :=
     fun y => H8.replayCrtValues_y s u table y
-  unfold H8.replayWraps windowFlag srcOf
+  unfold H8.replayWindow windowFlag srcOf
   constructor
   · rintro (⟨e, hit⟩ | ⟨e, hit⟩)
     · refine ⟨.inl (xEncEquiv.symm e), ?_⟩
@@ -332,6 +341,13 @@ theorem replayWraps_iff [FieldCertificate] [GroupCertificate] (s : Kriterion.CRT
       refine ⟨yFlat y, ?_⟩
       rw [hy]
       exact hit
+
+/-- **Route M's off-curve reveal is the window event of P45's `evalInt` or the normalization flag.** -/
+theorem replayWraps_iff [FieldCertificate] [GroupCertificate] (s : Kriterion.CRT.Entry.Source) (u : AffineInput)
+    (table : TagTable) :
+    H8.replayWraps s u table ↔ windowFlag u (srcOf s, H8.bmrColdOf table u) ∨ normBad (srcOf s) := by
+  unfold H8.replayWraps
+  rw [replayWindow_iff, normBadSrc_iff]
 
 end Source
 
