@@ -29,10 +29,10 @@ theorem xor_cancel_left' (a b d : Block) (h : a = b) : d = (a ^^^ d) ^^^ b := by
   subst h
   rw [BitVec.xor_comm a d, BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
 
-/-- `d = a ⊕ (b ⊕ d)` when `a = b`. -/
-theorem xor_cancel_right' (a b d : Block) (h : a = b) : d = a ^^^ (b ^^^ d) := by
+/-- `d = (a ⊕ 0) ⊕ (b ⊕ d)` when `a = b` (the honest label at bit `0` is `Z ⊕ 0`). -/
+theorem xor_cancel_right' (a b d : Block) (h : a = b) : d = (a ^^^ 0) ^^^ (b ^^^ d) := by
   subst h
-  rw [← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
+  rw [show a ^^^ (0 : Block) = a from BitVec.xor_zero, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
 
 /-- **A garbler input at a digest label at the other bit fixes the coordinate's `Δ`**: it is `E ⊕ label`, with `E`
 the evaluator's label at that position. The coordinate and the position are read from the input's tag. -/
@@ -85,7 +85,7 @@ theorem digestOther_delta (scalar : NonZeroScalar) (u : AffineInput) (tape : Tab
       refine ⟨c, p, by rw [hashInput_div, hcoord], by rw [hashInput_div, hslot], ?_⟩
       rw [ofNat_label, EntryCorrect.labelsOf_honest (schemeHash (tableOracle (FI := Empty) (EI := Empty) tab)) coins u c p]
       have zero : ¬ coordBit u c p.val = 1 := fun one => otherBit one.symm
-      rw [if_neg zero, BitVec.xor_zero]
+      rw [if_neg zero]
       exact xor_cancel_right' _ _ _ rfl
   · rw [asked_tableM] at inFinals
     simp only [List.mem_flatMap, List.mem_finRange, true_and] at inFinals

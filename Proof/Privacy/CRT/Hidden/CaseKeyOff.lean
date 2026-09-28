@@ -354,7 +354,9 @@ theorem view_fd_core (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput
         (n : BaseField)⟩ : Entry Empty Empty))
         (List.filter (fun n => designTag Entry.table (Entry.exceptional scalar c2) u (n / 2 ^ 128))
           (gAsked scalar (c2, T'))) := by
-    have hzero : zeroOn c1 T = zeroOn c2 T' := keyZero_low hZero hDelta low
+    have hzero : zeroOn c1 T = zeroOn c2 T' := by
+      rw [zeroOn_eq, zeroOn_eq]
+      exact keyZero_low hZero hDelta low
     rw [hexc, gAsked_eq, gAsked_eq, hzero, hDelta, hZero, deltaOf_congr hDelta,
       outputKeysOf_congr scalar hOff, hPad,
       asked_coordGarbleM _ _ (by decide) (by norm_num) _ _ low,

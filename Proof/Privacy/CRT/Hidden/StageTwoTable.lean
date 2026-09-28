@@ -254,6 +254,10 @@ def zeroOn (coins : Entry.Coins) (T : TagTable) : Fin 2 → Fin coordinateBitCou
     ((coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)))
     ((coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))))
 
+/-- The actual zero labels on a table are the garbler's `keyZero` at the table's hash. -/
+theorem zeroOn_eq (coins : Entry.Coins) (T : TagTable) :
+    zeroOn coins T = EntryCorrect.keyZero (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)) coins := rfl
+
 theorem digest_tagged (scalar : NonZeroScalar) (coins : Entry.Coins) (zero : Fin 2 → Fin coordinateBitCount → Block) :
     Paths.Tagged (Paths.digestLabelKeys coordinateBitCount ∪ Paths.digestFinalKeys digitCount)
       (digestGarbleM coordinateBitCount digitCount zero (Entry.deltaOf coins)
