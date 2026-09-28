@@ -96,8 +96,11 @@ theorem split_join (x : Rest × Layer) : splitFun (joinFun x) = x := by
 def splitEquiv : Kriterion.ArgoMAC.Scheme.Coins ≃ Rest × Layer :=
   ⟨splitFun, joinFun, join_split, split_join⟩
 
-theorem layerOf_symm (x : Rest × Layer) : layerOf (splitEquiv.symm x) = x.2 :=
-  congrArg Prod.snd (splitEquiv.apply_symm_apply x)
+theorem splitFun_snd (c : Kriterion.ArgoMAC.Scheme.Coins) : (splitFun c).2 = layerOf c := rfl
+
+theorem layerOf_symm (x : Rest × Layer) : layerOf (splitEquiv.symm x) = x.2 := by
+  rw [← splitFun_snd]
+  exact congrArg Prod.snd (splitEquiv.apply_symm_apply x)
 
 theorem symm_apply (x : Rest × Layer) : splitEquiv.symm x = joinFun x := rfl
 
