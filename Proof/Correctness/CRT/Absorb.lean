@@ -20,6 +20,12 @@ open Cryptography Kriterion.CRT Kriterion.ArgoMAC Kriterion.CRT.FlatLayout
 
 /-! ### One step and one tree -/
 
+/-- `x ⊕ 0 = x` at the literal `0` of `Label` (the `BitVec` lemma is stated at `0#w`). -/
+theorem label_xor_zero (x : Label) : x ^^^ (0 : Label) = x := BitVec.xor_zero
+
+/-- `0 ⊕ x = x` at the literal `0` of `Label`. -/
+theorem label_zero_xor (x : Label) : (0 : Label) ^^^ x = x := BitVec.zero_xor
+
 /-- The evaluator's step reads its join and its bit label only through their XOR. -/
 theorem evalStepM_xor_congr (n : Nat) (tagOf : Nat → Nat) (active : Fin (2 ^ n))
     (b₁ j₁ b₂ j₂ : Label) (parent : Fin (2 ^ n) → Label) (same : j₁ ^^^ b₁ = j₂ ^^^ b₂) :
@@ -114,12 +120,11 @@ theorem coordEvalM_absorb (T : CrtTable) (hk : 0 < T.chunkBits) (S coord : Nat) 
       (fun n lower upper => ?_)
     · have inRange := chunkOffset_add_lt T c.val 0 positive
       rw [Nat.add_zero] at inRange
-      rw [absorbed _ inRange, chunkShift_first]
-      simp only [BitVec.xor_zero]
+      rw [absorbed _ inRange, chunkShift_first, label_xor_zero]
     · rw [absorbed _ (chunkOffset_add_lt T c.val n upper), chunkShift_at T hk _ c.val n lower upper]
       show (0 : Label) ^^^ (labels (T.chunkOffset c.val + n) ^^^ pub.chunkJoin c.val n) =
         pub.chunkJoin c.val n ^^^ labels (T.chunkOffset c.val + n)
-      simp only [BitVec.zero_xor]
+      rw [label_zero_xor]
       exact BitVec.xor_comm _ _
   have mods : ∀ joins chunks, modEvalM T S coord pub.dropChunkJoins joins v chunks =
       modEvalM T S coord pub joins v chunks :=
