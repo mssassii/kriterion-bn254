@@ -24,15 +24,15 @@ open Cryptography Kriterion.CRT Kriterion.ArgoMAC
 def ModAgree (row : OddRow) (i : Nat) (p q : ConvPublic) : Prop :=
   (∀ n, 1 ≤ n → n < row.width0 → p.stageJoin i 0 n = q.stageJoin i 0 n) ∧
   (∀ n, 1 ≤ n → n < row.width1 → p.stageJoin i 1 n = q.stageJoin i 1 n) ∧
-  (∀ k < row.ell, p.stagePin i 0 k = q.stagePin i 0 k) ∧
-  (∀ k < row.ell - row.width0, p.stagePin i 1 k = q.stagePin i 1 k) ∧
+  (∀ k < row.ell - 1, p.stagePin i 0 k = q.stagePin i 0 k) ∧
+  (∀ k < row.ell - row.width0 - 1, p.stagePin i 1 k = q.stagePin i 1 k) ∧
   (∀ j, row.width0 ≤ j → j < row.keep → p.growJoin i j = q.growJoin i j) ∧
   (∀ j, row.keep ≤ j → j < row.ell → p.foldJoin i j = q.foldJoin i j)
 
 /-- Two published materials agree on every index the evaluator reads. -/
 def ConvAgree (T : CrtTable) (p q : ConvPublic) : Prop :=
   (∀ c < T.chunkCount, ∀ n, 1 ≤ n → n < T.chunkWidth c → p.chunkJoin c n = q.chunkJoin c n) ∧
-  (∀ c < T.chunkCount, ∀ k < T.castWidth, p.chunkPin c k = q.chunkPin c k) ∧
+  (∀ c < T.chunkCount, ∀ k < T.castWidth - 1, p.chunkPin c k = q.chunkPin c k) ∧
   (∀ (i : Fin T.count) (row : OddRow), T.kind i = .odd row → ModAgree row i.val p q)
 
 /-! ### Congruence of the evaluator's blocks -/
@@ -122,9 +122,9 @@ theorem conversionEvalM_congr (coord i : Nat) (row : OddRow) (m value : Nat) (wo
       extStageEvalM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) R v
       (p.stageJoin i 1) pin = extStageEvalM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) R v
       (q.stageJoin i 1) pin := fun R v pin => extStageEvalM_congr _ _ _ R v _ _ pin j1
-  have pin0 : (fun k : Fin row.ell => p.stagePin i 0 k.val) = fun k => q.stagePin i 0 k.val :=
+  have pin0 : (fun k : Fin (row.ell - 1) => p.stagePin i 0 k.val) = fun k => q.stagePin i 0 k.val :=
     funext fun k => p0 k.val k.isLt
-  have pin1 : (fun k : Fin (row.ell - row.width0) => p.stagePin i 1 k.val) =
+  have pin1 : (fun k : Fin (row.ell - row.width0 - 1) => p.stagePin i 1 k.val) =
       fun k => q.stagePin i 1 k.val := funext fun k => p1 k.val k.isLt
   have grow : ∀ v bitLabel labels, growEvalM (growTag coord i) v bitLabel (p.growJoin i) row.width0
       labels (row.keep - row.width0) = growEvalM (growTag coord i) v bitLabel (q.growJoin i) row.width0
@@ -157,11 +157,11 @@ theorem coordEvalM_congr (T : CrtTable) (S coord : Nat) (p q : ConvPublic) (reco
   obtain ⟨cJ, cP, mA⟩ := agree
   have chunks : ∀ c : Fin T.chunkCount,
       chunkEvalM T coord labels v (p.chunkJoin c.val)
-          (pinOfBlocks T.castWidth fun k => p.chunkPin c.val k.val) c.val =
+          (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => p.chunkPin c.val k.val)) c.val =
         chunkEvalM T coord labels v (q.chunkJoin c.val)
-          (pinOfBlocks T.castWidth fun k => q.chunkPin c.val k.val) c.val := by
+          (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => q.chunkPin c.val k.val)) c.val := by
     intro c
-    have pins : (fun k : Fin T.castWidth => p.chunkPin c.val k.val) = fun k => q.chunkPin c.val k.val :=
+    have pins : (fun k : Fin (T.castWidth - 1) => p.chunkPin c.val k.val) = fun k => q.chunkPin c.val k.val :=
       funext fun k => cP c.val c.isLt k.val k.isLt
     have tree := treeEvalM_congr (chunkTreeTag coord c.val) (T.chunkValue v c.val)
       (fun n => labels (T.chunkOffset c.val + n)) (p.chunkJoin c.val) (q.chunkJoin c.val)
@@ -224,7 +224,7 @@ theorem flatMap_finRange_eq {α : Type} (n : Nat) (g : Fin n → List α) :
 /-- Chunk `c`'s section: its joins, then its pin blocks. -/
 def chunkSection (T : CrtTable) (pub : ConvPublic) (c : Nat) : List Label :=
   (List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1)) ++
-    (List.range T.castWidth).map (pub.chunkPin c)
+    (List.range (T.castWidth - 1)).map (pub.chunkPin c)
 
 /-- Modulus `i`'s section. -/
 def modSection (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) : List Label :=
@@ -232,9 +232,9 @@ def modSection (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) : List Label 
   | .chunkZero => []
   | .odd row =>
     (List.range (row.width0 - 1)).map (fun n => pub.stageJoin i 0 (n + 1)) ++
-    (List.range row.ell).map (pub.stagePin i 0) ++
+    (List.range (row.ell - 1)).map (pub.stagePin i 0) ++
     (List.range (row.width1 - 1)).map (fun n => pub.stageJoin i 1 (n + 1)) ++
-    (List.range (row.ell - row.width0)).map (pub.stagePin i 1) ++
+    (List.range (row.ell - row.width0 - 1)).map (pub.stagePin i 1) ++
     (List.range (row.keep - row.width0)).map (fun n => pub.growJoin i (row.width0 + n)) ++
     (List.range (row.ell - row.keep)).map (fun n => pub.foldJoin i (row.keep + n))
 
@@ -351,9 +351,9 @@ theorem modSection_odd (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) (row 
     (kind : T.kind i = .odd row) :
     modSection T pub i =
       (List.range (row.width0 - 1)).map (fun n => pub.stageJoin i 0 (n + 1)) ++
-      ((List.range row.ell).map (pub.stagePin i 0) ++
+      ((List.range (row.ell - 1)).map (pub.stagePin i 0) ++
       ((List.range (row.width1 - 1)).map (fun n => pub.stageJoin i 1 (n + 1)) ++
-      ((List.range (row.ell - row.width0)).map (pub.stagePin i 1) ++
+      ((List.range (row.ell - row.width0 - 1)).map (pub.stagePin i 1) ++
       ((List.range (row.keep - row.width0)).map (fun n => pub.growJoin i (row.width0 + n)) ++
       (List.range (row.ell - row.keep)).map (fun n => pub.foldJoin i (row.keep + n)))))) := by
   unfold modSection
@@ -379,15 +379,15 @@ theorem convAgree_unflatten (T : CrtTable) (pub : ConvPublic) :
     have blocks : modBlocksNat T i.val = modBlocks (.odd row) := by simp [modBlocksNat, kindAt]
     have section_ : modSectionNat T pub i.val = modSection T pub i := by simp [modSectionNat, hi]
     let J0 := (List.range (row.width0 - 1)).map (fun n => pub.stageJoin i 0 (n + 1))
-    let P0 := (List.range row.ell).map (pub.stagePin i 0)
+    let P0 := (List.range (row.ell - 1)).map (pub.stagePin i 0)
     let J1 := (List.range (row.width1 - 1)).map (fun n => pub.stageJoin i 1 (n + 1))
-    let P1 := (List.range (row.ell - row.width0)).map (pub.stagePin i 1)
+    let P1 := (List.range (row.ell - row.width0 - 1)).map (pub.stagePin i 1)
     let G := (List.range (row.keep - row.width0)).map (fun n => pub.growJoin i (row.width0 + n))
     let F := (List.range (row.ell - row.keep)).map (fun n => pub.foldJoin i (row.keep + n))
     have lJ0 : J0.length = row.width0 - 1 := by simp [J0]
-    have lP0 : P0.length = row.ell := by simp [P0]
+    have lP0 : P0.length = row.ell - 1 := by simp [P0]
     have lJ1 : J1.length = row.width1 - 1 := by simp [J1]
-    have lP1 : P1.length = row.ell - row.width0 := by simp [P1]
+    have lP1 : P1.length = row.ell - row.width0 - 1 := by simp [P1]
     have lG : G.length = row.keep - row.width0 := by simp [G]
     have lF : F.length = row.ell - row.keep := by simp [F]
     have whole : modSection T pub i = J0 ++ (P0 ++ (J1 ++ (P1 ++ (G ++ F)))) :=

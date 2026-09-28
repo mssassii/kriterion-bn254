@@ -67,7 +67,7 @@ theorem chunkJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
 theorem chunkPins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ c, c < 32 → ∀ i (ib : i < laneCount),
       ram (word (Layout.sourcePin κ 0 0 + 128 * c + i)) =
-        word ((pinOfBlocks 14 fun k => (convPub s ⟨κ, hκ⟩).chunkPin c k.val) ⟨i, ib⟩).val := by
+        word ((pinOfBlocks 13 fun k => (convPub s ⟨κ, hκ⟩).chunkPin c k.val) ⟨i, ib⟩).val := by
   intro c hc i ib
   have hk : c < pinCount := (CrtConv.chunkFacts ⟨c, hc⟩).2.1
   have hc' : c < Entry.table.chunkCount := by rw [CrtConv.chunkCount_eq]; exact hc
@@ -106,7 +106,7 @@ theorem stageJoins1 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
 theorem stagePins0 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
       ∀ j : Fin laneCount, ram (word (Machine.stagePin κ i.val 0 + j.val)) =
-        word ((pinOfBlocks row.ell fun k => (convPub s ⟨κ, hκ⟩).stagePin i.val 0 k.val) j).val := by
+        word ((pinOfBlocks (row.ell - 1) fun k => (convPub s ⟨κ, hκ⟩).stagePin i.val 0 k.val) j).val := by
   intro i row kind j
   obtain ⟨-, pinsIn, width0, -⟩ := CrtConv.modFacts_of i row kind
   obtain ⟨w0pos, -, ellEq, -, -, -, -⟩ := TableFacts.odd_facts i row kind
@@ -115,16 +115,16 @@ theorem stagePins0 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
     simp only [Machine.stagePin, Layout.sourcePin]
     omega
   rw [addr, holds.pins _ hk j.val j.isLt]
-  have sameWidth : pinWidth ⟨modPinBase i + 0, hk⟩ = row.ell := by
+  have sameWidth : pinWidth ⟨modPinBase i + 0, hk⟩ = row.ell - 1 := by
     rw [← CrtConv.pinWidthAt_eq, Nat.add_zero]
     exact width0
-  exact congrArg word (SourceReads.stagePin_lanes s ⟨κ, hκ⟩ i row kind 0 row.ell (by simp) hk sameWidth
+  exact congrArg word (SourceReads.stagePin_lanes s ⟨κ, hκ⟩ i row kind 0 (row.ell - 1) (by simp) hk sameWidth
     (by omega) (by omega) j).symm
 
 theorem stagePins1 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
       ∀ j : Fin laneCount, ram (word (Machine.stagePin κ i.val 1 + j.val)) =
-        word ((pinOfBlocks (row.ell - row.width0) fun k => (convPub s ⟨κ, hκ⟩).stagePin i.val 1 k.val) j).val := by
+        word ((pinOfBlocks (row.ell - row.width0 - 1) fun k => (convPub s ⟨κ, hκ⟩).stagePin i.val 1 k.val) j).val := by
   intro i row kind j
   obtain ⟨-, pinsIn, -, width1⟩ := CrtConv.modFacts_of i row kind
   obtain ⟨-, w1pos, ellEq, -, -, -, -⟩ := TableFacts.odd_facts i row kind
@@ -132,10 +132,10 @@ theorem stagePins1 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
     simp only [Machine.stagePin, Layout.sourcePin]
     omega
   rw [addr, holds.pins _ pinsIn j.val j.isLt]
-  have sameWidth : pinWidth ⟨modPinBase i + 1, pinsIn⟩ = row.ell - row.width0 := by
+  have sameWidth : pinWidth ⟨modPinBase i + 1, pinsIn⟩ = row.ell - row.width0 - 1 := by
     rw [← CrtConv.pinWidthAt_eq]
     exact width1
-  exact congrArg word (SourceReads.stagePin_lanes s ⟨κ, hκ⟩ i row kind 1 (row.ell - row.width0) (by simp)
+  exact congrArg word (SourceReads.stagePin_lanes s ⟨κ, hκ⟩ i row kind 1 (row.ell - row.width0 - 1) (by simp)
     pinsIn sameWidth (by omega) (by omega) j).symm
 
 theorem growJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :

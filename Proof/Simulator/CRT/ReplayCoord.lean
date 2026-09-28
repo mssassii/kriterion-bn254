@@ -201,7 +201,7 @@ theorem agree_coordReplay (T : CrtTable) (S coord : Nat) (coordLt : coord < 2) (
       memory.ram (word (cc.chunkJoin c n)) = labelWord (pub.chunkJoin c n))
     (pinCells : ∀ c, c < T.chunkCount → ∀ i (ib : i < laneCount),
       memory.ram (word (cc.pinBase + 128 * c + i)) =
-        word ((pinOfBlocks T.castWidth fun k => pub.chunkPin c k.val) ⟨i, ib⟩).val)
+        word ((pinOfBlocks (T.castWidth - 1) fun k => pub.chunkPin c k.val) ⟨i, ib⟩).val)
     (hints : ∀ e : Fin S, memory.ram (word (dc.hintBase + e.val)) =
       word (if decide (T.product ≤ records e) then 1 else 0))
     (contract : ∀ (chunkTable : Fin T.chunkCount → ChunkEval T.castWidth) (base : Memory),
@@ -226,8 +226,11 @@ theorem agree_coordReplay (T : CrtTable) (S coord : Nat) (coordLt : coord < 2) (
   rw [tree_seq, TreeLaws.monad_bind, liftHash_bind]
   refine Agree.bindOpt (fun chunkTable base post => ?_)
     (agree_chunkLoop_tags T coord coordLt cc T.chunkCount countLe chain T.inputBits shape lPos lSmall answersLe
-      labels v vSmall pub.chunkJoin (fun c => pinOfBlocks T.castWidth fun k => pub.chunkPin c k.val)
-      memory coordVal labelCells joinCells pinCells)
+      labels v vSmall pub.chunkJoin
+      (fun c => Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => pub.chunkPin c k.val))
+      memory coordVal labelCells joinCells
+      (fun c cb i ib => by rw [Parity.pinExpand_val_half T.castWidth lPos]; exact pinCells c cb i ib)
+      (fun c _ => Parity.evenLanes_pinExpand _ _))
   have frameC := post.2.2
   rw [tree_seq, TreeLaws.monad_bind, liftHash_bind]
   refine Agree.bindOpt (fun residue after inv => ?_)

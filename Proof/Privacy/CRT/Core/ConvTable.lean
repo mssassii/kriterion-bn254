@@ -1,28 +1,21 @@
 /-
-**CRT privacy core: the conversion garbler on an answer table.**
+The parity conversion garbler on an answer table.
 
-On the answer-table reading of the oracle a labelled query is answered by
-its tag alone (`hLabel_tableHash`, `hlong_tableHash`), so the garbler's published conversion material of one coordinate
-is an explicit function of the table's readings (a tree, growth or fold material clips `.1` of one answer; a cast reads
-`castAnswers l` answers by D11), the zero labels and `Δ`, and never of the tree labels. This file computes it, gadget by
-gadget, for the frozen programs (`Construction/CRT/{Tree, Chunk, Extract, Fold, Coord}.lean`):
+Raw hashes depend only on tags on this table reading. Tree materials therefore
+ignore their control labels, but arithmetic casts keep their leaf label in the
+low plane. Their independent upper planes use the original full-width hash
+reading with its old low random plane discarded.
 
-* `treeGarbleM_levelSum_table`, `growGarbleM_levelSum_table`, `foldsGarbleM_join_table`: a tree, growth or fold join is
-  the XOR of the table's materials of its level, XOR the bit mask;
-* `castM_table`: a cast is the table's cast reading `castRd`;
-* `chunk_table`: a chunk's joins, casts and pin;
-* `tableStage`, `hashStage_table`: an extraction stage on a table is `ExtractSpec`'s stage with label-free materials
-  and casts (`extStageGarbleM_eval` then gives the program);
-* `conversion_table`: one odd modulus's stage joins and pins, growth and fold joins;
-* `coord_pub_chunk`, `coord_pub_mod`: the coordinate's published material read from its chunks and moduli.
-
-Every statement holds for every table `A`; the hidden values of the core (`Conversion.lean`) are readings of `A` at the
-hot slots.
+The material-tree bridge reconstructs every actual leaf before its parity cast
+is evaluated. Published pins serialize only their upper planes. Extraction
+stages use the same label-aware cast rule through `tableStage`.
 -/
 
 import Proof.Correctness.CRT.ChunkStep
 import Proof.Privacy.CRT.Core.ExtractStageHash
 import Proof.Privacy.CRT.Core.ExtractStageSpec
+import Proof.Privacy.CRT.Core.ParityExtractStage
+import Proof.Correctness.CRT.ParityCast
 
 namespace Kriterion.CRT.Privacy.Conv
 
@@ -35,11 +28,29 @@ open Kriterion.CRT.ExtractSpec (StageParams gJoin gPin gBit gNext gCast gLeaf gR
 def castRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) : Lanes l :=
   castLanes l (packAnswers (castAnswers l) fun j => A (tagOf j.val))
 
+/-- The independent upper planes retain the original hash readings. -/
+def upperRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) : Lanes (l - 1) :=
+  Parity.pinHalf l (castRd A l tagOf)
+
+theorem upperRd_congr (A A' : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ)
+    (same : ∀ j : Fin (castAnswers l), A (tagOf j.val) = A' (tagOf j.val)) :
+    upperRd A l tagOf = upperRd A' l tagOf := by
+  exact congrArg (fun answers : Fin (castAnswers l) → Block × Block =>
+    Parity.pinHalf l (castLanes l (packAnswers (castAnswers l) answers))) (funext same)
+
+/-- The cast on a tag table still derives its low plane from its leaf label. -/
+def parityRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) (G : Label) : Lanes l :=
+  Parity.liftUpper l (upperRd A l tagOf) G
+
+@[simp] theorem parityRd_low (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ)
+    (G : Label) (hl : 1 ≤ l) : laneBit (parityRd A l tagOf G) 0 = G :=
+  Parity.laneBit_liftUpper_zero l _ G hl
+
 theorem hLabel_table (A : ℕ → Block × Block) (G : Label) (tag : ℕ) : hLabel (tableHash A) G tag = (clip (A tag).1) :=
   ExtractStage.hLabel_tableHash A G tag
 
 theorem castM_table (A : ℕ → Block × Block) (l : ℕ) (G : Label) (tagOf : ℕ → ℕ) :
-    (castM l G tagOf).eval (tableHash A) = castRd A l tagOf := by
+    (castM l G tagOf).eval (tableHash A) = parityRd A l tagOf G := by
   rw [SliceC.eval_castM, ExtractStage.hlong_tableHash]
   rfl
 
@@ -79,21 +90,68 @@ theorem foldsGarbleM_join_table (A : ℕ → Block × Block) (m : ℕ) (tagOf : 
 
 /-! ### A chunk -/
 
-/-- **A chunk on a table**: its joins, its casts and its pin. -/
+/-- A tree evaluated with fixed materials indexed by level and slot. -/
+def materialTree (mat : ℕ → ℕ → Label) (Δ b0 : Label) : (n : ℕ) → Fin (2 ^ n) → Label
+  | 0 => fun _ => Δ
+  | n + 1 => extendLevel n (materialTree mat Δ b0 n)
+      (fun slot => if n = 0 then b0 else mat n slot.val)
+
+/-- Fixed-material tree evaluation is the tag-table reading of the garbler. -/
+theorem treeGarbleM_table_leaves (A : ℕ → Block × Block) (tagOf : ℕ → ℕ → ℕ)
+    (Δ b0 : Label) : ∀ n,
+    ((treeGarbleM tagOf Δ b0 n).eval (tableHash A)).1 =
+      materialTree (fun level slot => clip (A (tagOf level slot)).1) Δ b0 n
+  | 0 => rfl
+  | n + 1 => by
+      simp only [treeGarbleM, FreeQuery.eval_bind]
+      by_cases hn : n = 0
+      · simp only [if_pos hn, FreeQuery.eval_pure, stored_eq, materialTree,
+          treeGarbleM_table_leaves A tagOf Δ b0 n]
+      · simp only [if_neg hn, FreeQuery.eval_bind, SliceC.eval_garbleStepM, FreeQuery.eval_pure,
+          hLabel_table, materialTree, treeGarbleM_table_leaves A tagOf Δ b0 n]
+
+/-- Only the materials of the in-range hashed levels influence a material tree. -/
+theorem materialTree_congr (mat mat' : ℕ → ℕ → Label) (Δ b0 : Label) :
+    ∀ n, (∀ k, 1 ≤ k → k < n → ∀ slot, slot < 2 ^ k → mat k slot = mat' k slot) →
+      materialTree mat Δ b0 n = materialTree mat' Δ b0 n
+  | 0, _ => rfl
+  | n + 1, same => by
+      rw [materialTree, materialTree, materialTree_congr mat mat' Δ b0 n
+        (fun k h1 h2 slot hs => same k h1 (by omega) slot hs)]
+      congr 1
+      funext slot
+      by_cases hn : n = 0
+      · simp only [if_pos hn]
+      · simp only [if_neg hn]
+        exact same n (by omega) (by omega) slot.val slot.isLt
+
+/-- Every material tree preserves the XOR of its root. -/
+theorem materialTree_xor (mat : ℕ → ℕ → Label) (Δ b0 : Label) :
+    ∀ n, xorFold (materialTree mat Δ b0 n) = Δ
+  | 0 => by
+      change (0 : Label) ^^^ Δ = Δ
+      exact BitVec.zero_xor
+  | n + 1 => by rw [materialTree, SliceC.xorFold_extendLevel, materialTree_xor mat Δ b0 n]
+
+/-- **A chunk on a table**: casts keep the actual leaf parity. -/
 theorem chunk_table (A : ℕ → Block × Block) (tbl : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) :
     let g := (chunkGarbleM tbl coord Δ Z c).eval (tableHash A)
+    let leaves := materialTree (fun n slot => clip (A (chunkTreeTag coord c n slot)).1)
+      Δ (Z (tbl.chunkOffset c)) (tbl.chunkWidth c)
     (∀ n, 1 ≤ n → n < tbl.chunkWidth c →
         g.joins n = xorFold (fun slot : Fin (2 ^ n) => (clip (A (chunkTreeTag coord c n slot.val)).1)) ^^^
           Z (tbl.chunkOffset c + n)) ∧
-    (∀ leaf, leaf < 2 ^ tbl.chunkWidth c → g.casts leaf = castRd A tbl.castWidth (chunkCastTag coord c leaf)) ∧
-    g.pin = (∑ leaf : Fin (2 ^ tbl.chunkWidth c), castRd A tbl.castWidth (chunkCastTag coord c leaf.val)) +
-      deltaLanes tbl.castWidth Δ := by
-  intro g
+    (∀ leaf, leaf < 2 ^ tbl.chunkWidth c → g.casts leaf =
+      parityRd A tbl.castWidth (chunkCastTag coord c leaf) (atNat leaves 0 leaf)) ∧
+    g.pin = (∑ leaf : Fin (2 ^ tbl.chunkWidth c),
+      parityRd A tbl.castWidth (chunkCastTag coord c leaf.val) (leaves leaf)) + deltaLanes tbl.castWidth Δ := by
+  intro g leaves
   simp only [g, chunkGarbleM, FreeQuery.eval_bind, eval_tableM, castM_table, FreeQuery.eval_pure,
-    materialize_eq, SliceC.sumLanes_eq]
-  refine ⟨fun n h1 h2 => ?_, fun leaf hl => ?_, trivial⟩
+    materialize_eq, SliceC.sumLanes_eq, treeGarbleM_table_leaves]
+  refine ⟨fun n h1 h2 => ?_, fun leaf hl => ?_, rfl⟩
   · rw [treeGarbleM_levelSum_table A _ _ _ _ n h1 h2]
-  · rw [SliceC.atNat_of_lt _ _ hl]
+  · rw [SliceC.atNat_of_lt _ _ hl, SliceC.atNat_of_lt _ _ hl]
+    rfl
 
 /-! ### An extraction stage -/
 
@@ -101,7 +159,50 @@ theorem chunk_table (A : ℕ → Block × Block) (tbl : CrtTable) (coord : ℕ) 
 ignored. -/
 def tableStage (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ) :
     StageParams rb :=
-  ExtractStage.stageOf w hw (fun n x _ => (clip (A (treeTag n x)).1)) (fun α _ => castRd A rb (castTag α))
+  ExtractStage.stageOf w hw (fun n x _ => (clip (A (treeTag n x)).1)) (fun α G => parityRd A rb (castTag α) G)
+
+@[simp] theorem tableStage_low (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb)
+    (treeTag castTag : ℕ → ℕ → ℕ) (positive : 1 ≤ rb) (α : ℕ) (G : Label) :
+    laneBit ((tableStage A w hw treeTag castTag).castF α G) 0 = G :=
+  parityRd_low A rb (castTag α) G positive
+
+/-- Hot tree materials and hot upper casts on a tag table do not depend on the current labels. -/
+@[simp] theorem upperHidden_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb)
+    (treeTag castTag : ℕ → ℕ → ℕ) (R : Lanes rb) (Δ : Label) (s : ℕ) :
+    ExtractStage.upperHiddenOfSpec (tableStage A w hw treeTag castTag) R Δ s =
+      ((fun k => clip (A (treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1),
+        upperRd A rb (castTag s)) := by
+  simp only [ExtractStage.upperHiddenOfSpec, ExtractStage.hiddenOfSpec, tableStage,
+    ExtractStage.stageOf, gCast, parityRd, Parity.pinHalf_liftUpper]
+
+theorem gNext_upper_table_self (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb)
+    (treeTag castTag : ℕ → ℕ → ℕ) (positive : 1 ≤ rb) (R : Lanes rb) (Δ : Label) (s : ℕ) :
+    (gNext (ExtractStage.upperOverrideHot (tableStage A w hw treeTag castTag) s
+      ((fun k => clip (A (treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1),
+        upperRd A rb (castTag s))) R Δ : Lanes (rb - w)) =
+      gNext (tableStage A w hw treeTag castTag) R Δ := by
+  exact ExtractStage.gNext_upper_override_of_eq (tableStage A w hw treeTag castTag)
+    (tableStage_low A w hw treeTag castTag positive) R Δ s _ (upperHidden_table A w hw treeTag castTag R Δ s).symm
+
+theorem gBit_upper_table_self (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb)
+    (treeTag castTag : ℕ → ℕ → ℕ) (positive : 1 ≤ rb) (R : Lanes rb) (Δ : Label) (s n : ℕ) :
+    gBit (ExtractStage.upperOverrideHot (tableStage A w hw treeTag castTag) s
+      ((fun k => clip (A (treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1),
+        upperRd A rb (castTag s))) R Δ n = gBit (tableStage A w hw treeTag castTag) R Δ n := by
+  simpa only [upperHidden_table] using ExtractStage.gBit_upper_override_self
+    (tableStage A w hw treeTag castTag) (tableStage_low A w hw treeTag castTag positive) R Δ s n
+
+theorem upperSpecPublish_table_self (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb)
+    (treeTag castTag : ℕ → ℕ → ℕ) (positive : 1 ≤ w) (R : Lanes rb) (Δ : Label) (s : ℕ)
+    (hs : s < 2 ^ w) :
+    ExtractStage.upperSpecPublish (tableStage A w hw treeTag castTag) R Δ s
+      ((fun k => clip (A (treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1),
+        upperRd A rb (castTag s)) =
+      ((fun k => gJoin (tableStage A w hw treeTag castTag) R Δ (k.val + 1)),
+        Parity.pinHalf rb (gPin (tableStage A w hw treeTag castTag) R Δ)) := by
+  simpa only [upperHidden_table] using ExtractStage.upperSpecPublish_self
+    (tableStage A w hw treeTag castTag) positive (tableStage_low A w hw treeTag castTag (by omega))
+      R Δ s hs
 
 theorem hashStage_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ) :
     SliceC.hashStage (tableHash A) w hw treeTag castTag = tableStage A w hw treeTag castTag := by
@@ -110,7 +211,8 @@ theorem hashStage_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : 
   · funext n x lab
     exact hLabel_table A lab (treeTag n x)
   · funext α lab
-    simp only [castRd, ExtractStage.hlong_tableHash]
+    simp only [parityRd, upperRd, castRd, ExtractStage.hlong_tableHash]
+    rfl
 
 /-- `gNext` of the hashed stage on a table (the stage appears in its type, so `hashStage_table` does not rewrite
 it directly). -/
@@ -143,7 +245,7 @@ theorem conversionGarbleM_eval (H : HashN) (coord i : ℕ) (row : OddRow) (m : �
     (conversionGarbleM coord i row m Δ W).eval H =
       { stageJoins := fun stage n => if stage = 0 then g0.joins n else g1.joins n
         stagePins := fun stage k =>
-          if stage = 0 then atNat (stored (pinBlocks g0.pin)) 0 k else atNat (stored (pinBlocks g1.pin)) 0 k
+          if stage = 0 then atNat (stored (pinBlocks (Parity.pinHalf row.ell g0.pin))) 0 k else atNat (stored (pinBlocks (Parity.pinHalf (row.ell - row.width0) g1.pin))) 0 k
         growJoins := fun position => grown.2 position ^^^ wordBit row g0.bits g1.bits (laneBit g1.next 0) position
         foldJoins := folded.2
         final := folded.1 } := by
@@ -163,9 +265,9 @@ theorem conversion_table (A : ℕ → Block × Block) (coord i : ℕ) (row : Odd
       else laneBit (gNext sp1 R1 Δ) 0
     let g := (conversionGarbleM coord i row m Δ W).eval (tableHash A)
     (∀ n, 1 ≤ n → n < row.width0 → g.stageJoins 0 n = gJoin sp0 W Δ n) ∧
-    (∀ k, g.stagePins 0 k = atNat (stored (pinBlocks (gPin sp0 W Δ))) 0 k) ∧
+    (∀ k, g.stagePins 0 k = atNat (stored (pinBlocks (Parity.pinHalf row.ell (gPin sp0 W Δ)))) 0 k) ∧
     (∀ n, 1 ≤ n → n < row.width1 → g.stageJoins 1 n = gJoin sp1 R1 Δ n) ∧
-    (∀ k, g.stagePins 1 k = atNat (stored (pinBlocks (gPin sp1 R1 Δ))) 0 k) ∧
+    (∀ k, g.stagePins 1 k = atNat (stored (pinBlocks (Parity.pinHalf (row.ell - row.width0) (gPin sp1 R1 Δ)))) 0 k) ∧
     (∀ j, j < row.keep - row.width0 → g.growJoins (row.width0 + j) =
         xorFold (fun slot : Fin (2 ^ (row.width0 + j)) => (clip (A (growTag coord i (row.width0 + j) slot.val)).1)) ^^^
           bitMask (row.width0 + j)) ∧
@@ -209,14 +311,14 @@ theorem conversion_table (A : ℕ → Block × Block) (coord i : ℕ) (row : Odd
   · show (if (0 : ℕ) = 0 then g0.joins n else g1.joins n) = _
     rw [if_pos rfl]
     exact j0 n h1 h2
-  · show (if (0 : ℕ) = 0 then atNat (stored (pinBlocks g0.pin)) 0 k
-      else atNat (stored (pinBlocks g1.pin)) 0 k) = _
+  · show (if (0 : ℕ) = 0 then atNat (stored (pinBlocks (Parity.pinHalf row.ell g0.pin))) 0 k
+      else atNat (stored (pinBlocks (Parity.pinHalf (row.ell - row.width0) g1.pin))) 0 k) = _
     rw [if_pos rfl, p0]
   · show (if (1 : ℕ) = 0 then g0.joins n else g1.joins n) = _
     rw [if_neg one_ne_zero]
     exact j1 n h1 h2
-  · show (if (1 : ℕ) = 0 then atNat (stored (pinBlocks g0.pin)) 0 k
-      else atNat (stored (pinBlocks g1.pin)) 0 k) = _
+  · show (if (1 : ℕ) = 0 then atNat (stored (pinBlocks (Parity.pinHalf row.ell g0.pin))) 0 k
+      else atNat (stored (pinBlocks (Parity.pinHalf (row.ell - row.width0) g1.pin))) 0 k) = _
     rw [if_neg one_ne_zero, p1]
   · show grown.2 (row.width0 + j) ^^^ _ = _
     rw [← hgrown, growGarbleM_levelSum_table A (growTag coord i) row.width0 _ _ j hj, high _ (by omega)]
@@ -245,7 +347,7 @@ theorem coord_pub (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Label) (Z :
     let pub := ((coordGarbleM tbl S coord Δ Z).eval H).pub
     (∀ c, c < tbl.chunkCount → ∀ n, pub.chunkJoin c n = ((chunkGarbleM tbl coord Δ Z c).eval H).joins n) ∧
     (∀ c, c < tbl.chunkCount → ∀ k,
-      pub.chunkPin c k = atNat (stored (pinBlocks ((chunkGarbleM tbl coord Δ Z c).eval H).pin)) 0 k) ∧
+      pub.chunkPin c k = atNat (stored (pinBlocks (Parity.pinHalf tbl.castWidth ((chunkGarbleM tbl coord Δ Z c).eval H).pin))) 0 k) ∧
     (∀ i (hi : i < tbl.count) stage n,
       pub.stageJoin i stage n = ((modGarbleM tbl S coord Δ chunks ⟨i, hi⟩).eval H).stageJoins stage n) ∧
     (∀ i (hi : i < tbl.count) stage k,

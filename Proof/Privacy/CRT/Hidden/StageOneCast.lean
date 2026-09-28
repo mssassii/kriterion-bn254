@@ -1,26 +1,22 @@
 /-
-**H6 for the CRT entry: the 30 never-hot casts**.
+H6 for the 30 never-hot chunk casts. Their query labels are clipped table
+materials at final-level slots 17..31 of chunk 31.
 
-`StageOneProof.neverCase : OneCase NeverHotCast (2^104)⁻¹`. The casts `49 .. 63` of chunk 31 (width 6) are hot at no
-input, so the stage-2 case `convHot` does not cover them; they are bounded directly.
-
-* **The label** (`never_input`): a garbler input at a never-hot cast tag of coordinate `κ` and leaf `α` is labelled by
-  the right child `α` of chunk 31's tree, which is the level-5 material at slot `α − 32`, a table answer: the label is
-  the zero-embedded low 104 bits of the table at `P = treePos κ (α − 32)`.
-* **The symmetry** (`pub_shift`): shifting the first blocks of the table at `P` and at a second level-5 slot `Q` of the
-  same tree by the same `d` keeps the published value. On the tag reading the table enters the published value only
-  through answers by tag; the two materials enter only the level-5 join (their XOR is unchanged), the leaf labels they
-  feed are only hash labels (casts read the table by tag), and every other block reads neither position.
-* **The count** (`outer_family_le`, `count_le`): under the swapped table law the answers at `P` and `Q` are uniform and
-  independent of the rest (`indep_swapped_family`); the shifts pair the fibres of the clipped first block at `P` within each
-  view, so each fibre carries `2^-104` of the view's mass.
+The conversion split at input zero hides a disjoint hot set. Its public vector
+is uniform independently of these cold materials and of the remaining public
+fields. Those fields ignore conversion positions altogether (for this
+coordinate), since tag-table records read only the body pads. A one-position
+uniform refill therefore gives the same 2^-104 conditional guessing bound.
+This proof does not assume that casts are independent of their label bits.
 -/
 
 import Proof.Privacy.CRT.Hidden.StageOneTable
+import Proof.Privacy.CRT.Laws.CoreReads
 import Proof.Correctness.CRT.ChunkStep
 
 set_option linter.unusedSectionVars false
 set_option autoImplicit false
+set_option maxRecDepth 4096
 
 namespace Kriterion.CRT.Privacy.CastNever
 
@@ -28,18 +24,15 @@ open BN254 Cryptography GarbledCircuit Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB
 open Kriterion.CRT.Privacy.Align
 open Kriterion.CRT.Privacy.StageTwo (gAsked)
 open Kriterion.CRT.Privacy.StageOneProof (OneCase NeverHotCast keyRun_congr tagHash_key label_of_hashInput pubT
-  pubT_congr viewSet_eq swappedTableTape_eq stageOneView_pubT gAsked_eq entriesOf_tagHash away_of_family)
+  viewSet_eq swappedTableTape_eq stageOneView_pubT gAsked_eq entriesOf_tagHash away_of_family)
 open Kriterion.CRT.Privacy.Laws (Indep Ignores)
-open Kriterion.CRT.Privacy.HiddenGuess (fillAt fillAt_comp fillAt_self fillAt_apply_of_not_mem indep_swapped_family)
 open scoped ENNReal
 
 noncomputable section
 
-theorem xz {width : ℕ} (a : BitVec width) : a ^^^ (0 : BitVec width) = a := BitVec.xor_zero
+attribute [local instance 2000] H8.tableModulusNeZero
 
-theorem zx {width : ℕ} (a : BitVec width) : (0 : BitVec width) ^^^ a = a := BitVec.zero_xor
-
-/-! ### 1. The positions of chunk 31's level-5 materials -/
+/-! ### The query label -/
 
 /-- The position of the level-5 material at slot `s` of chunk 31's tree of coordinate `κ`. -/
 def treePos (κ s : ℕ) : Fin (2 ^ 40) := Conv.tag40 (chunkTreeTag κ 31 5 s)
@@ -65,147 +58,12 @@ theorem treePos_inj {κ s t : ℕ} (hκ : κ < 2) (hs : s < 65536) (ht : t < 655
     s = t := by
   rw [← treePos_slot hκ hs, ← treePos_slot hκ ht, same]
 
-/-- The fields of a key whose position is a level-5 material of chunk 31 of coordinate `κ`. -/
-def Level5 (κ : ℕ) (k : Paths.TagKey) : Prop := k.fam = 0 ∧ k.coord = κ ∧ k.idx = 31 ∧ k.level = 5
-
-theorem level5_of_pos {κ s : ℕ} (hκ : κ < 2) (hs : s < 65536) {k : Paths.TagKey} (range : k.InRange)
-    (same : Conv.tag40 k.code = treePos κ s) : Level5 κ k := by
-  have e := congrArg Fin.val same
-  rw [treePos_val hκ hs] at e
-  have e' : k.code = chunkTreeTag κ 31 5 s := by
-    rw [← e]
-    exact (Nat.mod_eq_of_lt (Paths.TagKey.code_lt range)).symm
-  obtain ⟨f, c, i, _, l, _, _⟩ := tagCode_injective (tagInRange_of_key range) (treeRange hκ hs) e'
-  exact ⟨f, c, i, l⟩
-
-/-! ### 2. Two tables that differ by a shift at two positions -/
-
-/-- `A'` is `A` with the first answer blocks at `P` and `Q` shifted by `d`. -/
-structure Shift2 (P Q : Fin (2 ^ 40)) (d : Block) (A A' : TagTable) : Prop where
-  off : ∀ i, i ≠ P → i ≠ Q → A' i = A i
-  atP : (A' P).1 = (A P).1 ^^^ d
-  atQ : (A' Q).1 = (A Q).1 ^^^ d
-
-section Shifted
-
-variable {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 65536) (hs' : s' < 65536) {d : Block} {A A' : TagTable}
-  (shift : Shift2 (treePos κ s) (treePos κ s') d A A')
-include hκ hs hs' shift
-
-/-- The tables agree off family 0. -/
-theorem pos_agree (p : Fin (2 ^ 40)) (fam : tagFamily p.val ≠ 0) : A' p = A p := by
-  refine shift.off p (fun h => fam ?_) (fun h => fam ?_)
-  · rw [h]; exact treePos_family hκ hs
-  · rw [h]; exact treePos_family hκ hs'
-
-/-- **The hashes agree at every key that is not a level-5 material of chunk 31 of `κ`.** -/
-theorem key_agree {k : Paths.TagKey} (range : k.InRange) (not5 : ¬ Level5 κ k) (label : Block) :
-    H8.tagHash A' (hashInput label k.code) = H8.tagHash A (hashInput label k.code) := by
-  rw [tagHash_key A' range, tagHash_key A range]
-  exact shift.off _ (fun h => not5 (level5_of_pos hκ hs range h)) (fun h => not5 (level5_of_pos hκ hs' range h))
-
-/-- The first blocks of the level-5 materials of chunk 31 of `κ`. -/
-theorem shift_at {t : ℕ} (ht : t < 65536) :
-    (A' (treePos κ t)).1 = (A (treePos κ t)).1 ^^^ (if t = s ∨ t = s' then d else 0) := by
-  by_cases h1 : t = s
-  · subst h1
-    rw [if_pos (Or.inl rfl)]
-    exact shift.atP
-  · by_cases h2 : t = s'
-    · subst h2
-      rw [if_pos (Or.inr rfl)]
-      exact shift.atQ
-    · rw [if_neg (by tauto), xz,
-        shift.off _ (fun h => h1 (treePos_inj hκ ht hs h)) (fun h => h2 (treePos_inj hκ ht hs' h))]
-
-end Shifted
-
-/-! ### 3. XOR folds -/
-
-theorem xorFold_xor {count : ℕ} (f g : Fin count → Label) :
-    xorFold (fun r => f r ^^^ g r) = xorFold f ^^^ xorFold g := by
-  induction count with
-  | zero =>
-      unfold xorFold
-      rw [Fin.foldl_zero, Fin.foldl_zero, Fin.foldl_zero]
-      exact BitVec.xor_self.symm
-  | succ n ih =>
-      unfold xorFold at ih ⊢
-      rw [Fin.foldl_succ_last, Fin.foldl_succ_last, Fin.foldl_succ_last]
-      have := ih (fun r => f r.castSucc) (fun r => g r.castSucc)
-      simp only at this ⊢
-      rw [this]
-      ac_rfl
-
-theorem xorFold_zero {count : ℕ} : xorFold (fun _ : Fin count => (0 : Label)) = 0 := by
-  have h := xorFold_xor (fun _ : Fin count => (0 : Label)) (fun _ => 0)
-  simp only [BitVec.xor_self] at h
-  exact h
-
-theorem xorFold_single {count : ℕ} (s : ℕ) (hs : s < count) (d : Label) :
-    xorFold (fun t : Fin count => if t.val = s then d else 0) = d := by
-  induction count with
-  | zero => exact absurd hs (Nat.not_lt_zero _)
-  | succ n ih =>
-      unfold xorFold at ih ⊢
-      rw [Fin.foldl_succ_last]
-      rcases Nat.lt_succ_iff_lt_or_eq.mp hs with lt | eq
-      · have first := ih lt
-        simp only [Fin.val_castSucc, Fin.val_last] at first ⊢
-        rw [first, if_neg (by omega), xz]
-      · subst eq
-        have zero : (fun (acc : Label) (t : Fin s) => acc ^^^ if (Fin.castSucc t).val = s then d else 0) =
-            fun acc (t : Fin s) => acc ^^^ (fun _ : Fin s => (0 : Label)) t := by
-          funext acc t
-          rw [if_neg (by simp only [Fin.val_castSucc]; omega)]
-        simp only [Fin.val_last, if_true]
-        rw [zero]
-        have := @xorFold_zero s
-        unfold xorFold at this
-        rw [this, zx]
-
-/-- **Shifting two entries of a XOR fold by the same block keeps it.** -/
-theorem xorFold_shift2 {count : ℕ} (f : Fin count → Label) {s s' : ℕ} (hs : s < count) (hs' : s' < count)
-    (ne : s ≠ s') (d : Label) :
-    xorFold (fun t => f t ^^^ (if t.val = s ∨ t.val = s' then d else 0)) = xorFold f := by
-  have split : (fun t : Fin count => if t.val = s ∨ t.val = s' then d else 0) =
-      fun t => (if t.val = s then d else 0) ^^^ (if t.val = s' then d else 0) := by
-    funext t
-    by_cases h1 : t.val = s
-    · rw [if_pos (Or.inl h1), if_pos h1, if_neg (by omega), xz]
-    · by_cases h2 : t.val = s'
-      · rw [if_pos (Or.inr h2), if_neg h1, if_pos h2, zx]
-      · rw [if_neg (by tauto), if_neg h1, if_neg h2, xz]
-  rw [xorFold_xor f, split, xorFold_xor, xorFold_single s hs, xorFold_single s' hs', BitVec.xor_self,
-    BitVec.xor_zero]
-
-/-! ### 4. The garbler's pieces on two hashes -/
-
-/-- A cast on the tag reading reads the table by tag only (its label does not matter). -/
-theorem castM_tagHash (A : TagTable) (l : ℕ) (label : Label) (tagOf : ℕ → ℕ) :
-    (castM l label tagOf).eval (H8.tagHash A) =
-      materialize (castLanes l (packAnswers (castAnswers l) fun j => A (Conv.tag40 (tagOf j.val)))) := by
-  simp only [castM, FreeQuery.eval_bind, eval_hlongM, FreeQuery.eval_pure, hlong, BmrEntry.tagHash_hashInput]
-  rfl
-
 /-- A one-block hash on the tag reading. -/
 theorem hLabel_tagHash (A : TagTable) (label : Label) (tag : ℕ) :
     hLabel (H8.tagHash A) label tag = clip (A (Conv.tag40 tag)).1 := by
   unfold hLabel h128
   rw [BmrEntry.tagHash_hashInput]
   rfl
-
-/-- The joins of a tree whose levels below `n` agree and whose level-`n` XOR agrees. -/
-theorem tree_snd (H H' : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (L n : ℕ) (hL : L = n + 1) (hn : n ≠ 0)
-    (prev : (treeGarbleM tagOf Δ b0 n).eval H = (treeGarbleM tagOf Δ b0 n).eval H')
-    (level : ∀ parent : Fin (2 ^ n) → Label, xorFold (fun slot => hLabel H (parent slot) (tagOf n slot.val)) =
-      xorFold (fun slot => hLabel H' (parent slot) (tagOf n slot.val))) :
-    ((treeGarbleM tagOf Δ b0 L).eval H).2 = ((treeGarbleM tagOf Δ b0 L).eval H').2 := by
-  subst hL
-  rw [SliceC.eval_treeGarbleM_succ H tagOf Δ b0 n hn, SliceC.eval_treeGarbleM_succ H' tagOf Δ b0 n hn]
-  funext m
-  simp only
-  rw [prev, level]
 
 /-- The right half of the last level of a tree is its last level's materials. -/
 theorem tree_right (H : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (L n : ℕ) (hL : L = n + 1) (hn : n ≠ 0)
@@ -216,202 +74,7 @@ theorem tree_right (H : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (L 
   simp only [extendLevel, dif_neg (not_lt.mpr big)]
   exact ⟨_, rfl⟩
 
-/-- The fields of a chunk that the rest of the coordinate reads. -/
-theorem chunk_joins (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) (H : HashN) :
-    ((chunkGarbleM T coord Δ Z c).eval H).joins = fun n =>
-      ((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval H).2 n ^^^
-        Z (T.chunkOffset c + n) := by
-  simp only [chunkGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure]
-
-theorem chunk_casts (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) (H : HashN) :
-    ((chunkGarbleM T coord Δ Z c).eval H).casts = atNat (fun leaf : Fin (2 ^ T.chunkWidth c) =>
-      (castM T.castWidth (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval
-        H).1 leaf) (chunkCastTag coord c leaf.val)).eval H) 0 := by
-  simp only [chunkGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure]
-
-theorem chunk_pin (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) (H : HashN) :
-    ((chunkGarbleM T coord Δ Z c).eval H).pin = materialize ((sumLanes fun leaf : Fin (2 ^ T.chunkWidth c) =>
-      (castM T.castWidth (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval
-        H).1 leaf) (chunkCastTag coord c leaf.val)).eval H) + deltaLanes T.castWidth Δ) := by
-  simp only [chunkGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure]
-
-/-- What the rest of a coordinate reads of a chunk: its joins, pin and casts, and the leaves of chunk 0. -/
-def ChunkAgree (c : ℕ) {L : ℕ} (g g' : ChunkGarbled L) : Prop :=
-  g.joins = g'.joins ∧ g.pin = g'.pin ∧ g.casts = g'.casts ∧ (c = 0 → g.leaves = g'.leaves)
-
-/-- **A chunk whose tree agrees below level `n`, whose level-`n` XOR agrees and whose casts read the same answers.** -/
-theorem chunk_agree (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c n : ℕ) (H H' : HashN)
-    (hw : T.chunkWidth c = n + 1) (hn : n ≠ 0) (c0 : c ≠ 0)
-    (prev : (treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) n).eval H =
-      (treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) n).eval H')
-    (level : ∀ parent : Fin (2 ^ n) → Label,
-      xorFold (fun slot => hLabel H (parent slot) (chunkTreeTag coord c n slot.val)) =
-        xorFold (fun slot => hLabel H' (parent slot) (chunkTreeTag coord c n slot.val)))
-    (casts : ∀ (label label' : Label) (leaf : ℕ), leaf < 2 ^ T.chunkWidth c →
-      (castM T.castWidth label (chunkCastTag coord c leaf)).eval H =
-        (castM T.castWidth label' (chunkCastTag coord c leaf)).eval H') :
-    ChunkAgree c ((chunkGarbleM T coord Δ Z c).eval H) ((chunkGarbleM T coord Δ Z c).eval H') := by
-  have htree := tree_snd H H' (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c) n hw hn prev level
-  have hcasts : (fun leaf : Fin (2 ^ T.chunkWidth c) =>
-      (castM T.castWidth (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval
-        H).1 leaf) (chunkCastTag coord c leaf.val)).eval H) = fun leaf =>
-      (castM T.castWidth (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval
-        H').1 leaf) (chunkCastTag coord c leaf.val)).eval H' :=
-    funext fun leaf => casts _ _ leaf.val leaf.isLt
-  refine ⟨?_, ?_, ?_, fun h => absurd h c0⟩
-  · rw [chunk_joins, chunk_joins, htree]
-  · rw [chunk_pin, chunk_pin, hcasts]
-  · rw [chunk_casts, chunk_casts, hcasts]
-
-/-- A modulus's garbler reads its chunks only through their casts and the leaves of chunk 0. -/
-theorem mod_congr (T : CrtTable) (S coord : ℕ) (Δ : Label) (X X' : ℕ → ChunkGarbled T.castWidth)
-    (hcasts : ∀ c, (X c).casts = (X' c).casts) (hleaves : (X 0).leaves = (X' 0).leaves) (i : Fin T.count) :
-    modGarbleM T S coord Δ X i = modGarbleM T S coord Δ X' i := by
-  unfold modGarbleM
-  cases h : T.kind i <;> simp only [hcasts, hleaves]
-
-/-- **A coordinate on two hashes**: chunks that agree on what the rest reads, and moduli that read the same answers. -/
-theorem coord_congr_of (T : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ → Label) (H H' : HashN)
-    (chunks : ∀ c : Fin T.chunkCount,
-      ChunkAgree c.val ((chunkGarbleM T coord Δ Z c.val).eval H) ((chunkGarbleM T coord Δ Z c.val).eval H'))
-    (mods : ∀ (X : ℕ → ChunkGarbled T.castWidth) (i : Fin T.count),
-      (modGarbleM T S coord Δ X i).eval H = (modGarbleM T S coord Δ X i).eval H') :
-    (coordGarbleM T S coord Δ Z).eval H = (coordGarbleM T S coord Δ Z).eval H' := by
-  set X := atNat (fun index : Fin T.chunkCount => (chunkGarbleM T coord Δ Z index.val).eval H)
-    (ChunkGarbled.empty T.castWidth) with hX
-  set X' := atNat (fun index : Fin T.chunkCount => (chunkGarbleM T coord Δ Z index.val).eval H')
-    (ChunkGarbled.empty T.castWidth) with hX'
-  have hjoins : ∀ c, (X c).joins = (X' c).joins := by
-    intro c
-    rw [hX, hX']
-    unfold atNat
-    split
-    · exact (chunks ⟨c, ‹_›⟩).1
-    · rfl
-  have hcasts : ∀ c, (X c).casts = (X' c).casts := by
-    intro c
-    rw [hX, hX']
-    unfold atNat
-    split
-    · exact (chunks ⟨c, ‹_›⟩).2.2.1
-    · rfl
-  have hleaves : (X 0).leaves = (X' 0).leaves := by
-    rw [hX, hX']
-    unfold atNat
-    split
-    · exact (chunks ⟨0, ‹_›⟩).2.2.2 rfl
-    · rfl
-  have hpin : ∀ c : Fin T.chunkCount, ((chunkGarbleM T coord Δ Z c.val).eval H).pin =
-      ((chunkGarbleM T coord Δ Z c.val).eval H').pin := fun c => (chunks c).2.1
-  have hmod : ∀ i, (modGarbleM T S coord Δ X i).eval H = (modGarbleM T S coord Δ X' i).eval H' := by
-    intro i
-    rw [mod_congr T S coord Δ X X' hcasts hleaves i]
-    exact mods X' i
-  simp only [coordGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure]
-  simp only [← hX, ← hX', hmod, hjoins, hpin]
-
-/-! ### 5. The published value under the shift -/
-
 theorem table_chunkCount' : table.chunkCount = 32 := Paths.bn254_chunkCount
-
-/-- **The published value is invariant under the two-slot shift** at level 5 of chunk 31 of coordinate `κ`. -/
-theorem pub_shift (scalar : NonZeroScalar) (coins : Entry.Coins) {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 32)
-    (hs' : s' < 32) (ne : s ≠ s') {d : Block} {A A' : TagTable}
-    (shift : Shift2 (treePos κ s) (treePos κ s') d A A') :
-    EntryCorrect.pubOf (H8.tagHash A') scalar coins = EntryCorrect.pubOf (H8.tagHash A) scalar coins := by
-  have hs6 : s < 65536 := by omega
-  have hs6' : s' < 65536 := by omega
-  have coordEq : ∀ (S coord : ℕ), S ≤ 1000 → coord < 2 → ∀ (Δ : Label) (Z : ℕ → Label),
-      (coordGarbleM table S coord Δ Z).eval (H8.tagHash A') =
-        (coordGarbleM table S coord Δ Z).eval (H8.tagHash A) := by
-    intro S coord hS hc Δ Z
-    have ranges := Paths.bn254_ranges S hS
-    refine coord_congr_of table S coord Δ Z _ _ (fun c => ?_) (fun X i => ?_)
-    · have cLt : c.val < 32 := lt_of_lt_of_le c.isLt table_chunkCount'.le
-      by_cases special : coord = κ ∧ c.val = 31
-      · obtain ⟨hcκ, c31⟩ := special
-        refine chunk_agree table coord Δ Z c.val 5 _ _ (by rw [c31]; rfl) (by norm_num) (by omega) ?_ ?_ ?_
-        · exact (keyRun_congr (Paths.treeGarbleM_tagged 0 coord c.val 0
-            ⟨by norm_num, hc, by omega, by norm_num, by norm_num, by norm_num⟩ Δ _ 5 (by norm_num)) _ _
-            fun k member range label => key_agree hκ hs6 hs6' shift range (fun h5 => by
-              simp only [Paths.treeKeys, Set.mem_ofPred_eq] at member
-              exact absurd h5.2.2.2 (by omega)) label).1
-        · intro parent
-          simp only [hLabel_tagHash]
-          have hpos : ∀ slot : Fin (2 ^ 5), Conv.tag40 (chunkTreeTag coord c.val 5 slot.val) = treePos κ slot.val := by
-            intro slot
-            rw [hcκ, c31]
-            rfl
-          simp only [hpos]
-          have each : ∀ slot : Fin (2 ^ 5), clip (A' (treePos κ slot.val)).1 =
-              clip (A (treePos κ slot.val)).1 ^^^ (if slot.val = s ∨ slot.val = s' then clip d else 0) := by
-            intro slot
-            rw [shift_at hκ hs6 hs6' shift (by have := slot.isLt; omega), Narrow.clip_xor]
-            split_ifs <;> simp only [Narrow.clip_zero]
-          simp only [each]
-          exact xorFold_shift2 _ (by norm_num; omega) (by norm_num; omega) ne (clip d)
-        · intro label label' leaf hleaf
-          rw [castM_tagHash, castM_tagHash]
-          have leafLt : leaf < 256 := lt_of_lt_of_le hleaf
-            (le_trans (Nat.pow_le_pow_right (by norm_num) (Paths.bn254_chunkWidth c.val)) (by norm_num))
-          have e : (fun j : Fin (castAnswers table.castWidth) => A' (Conv.tag40 (chunkCastTag coord c.val leaf j.val))) =
-              fun j => A (Conv.tag40 (chunkCastTag coord c.val leaf j.val)) := by
-            funext j
-            have jLt : j.val < 64 := lt_of_lt_of_le j.isLt ranges.castAnswers
-            have range : TagInRange coord c.val 0 0 leaf j.val := ⟨hc, by omega, by norm_num, by norm_num, by omega, jLt⟩
-            refine pos_agree hκ hs6 hs6' shift _ ?_
-            have lt40 : chunkCastTag coord c.val leaf j.val < 2 ^ 40 :=
-              Asks.tagCode_lt (fam := Family.chunkCast) (by decide) range
-            have hf : tagFamily (chunkCastTag coord c.val leaf j.val) = Family.chunkCast := tagFamily_tagCode range
-            show tagFamily (chunkCastTag coord c.val leaf j.val % 2 ^ 40) ≠ 0
-            rw [Nat.mod_eq_of_lt lt40, hf]
-            decide
-          rw [e]
-      · have full := (keyRun_congr (Paths.chunkGarbleM_tagged table coord Δ Z c.val hc (by omega)
-          (ranges.chunkWidth c.val c.isLt) ranges.castAnswers) (H8.tagHash A') (H8.tagHash A)
-          fun k member range label => key_agree hκ hs6 hs6' shift range (fun h5 => special (by
-            simp only [Paths.pairKeys, Set.mem_ofPred_eq] at member
-            obtain ⟨_, h2, h3, _⟩ := h5
-            omega)) label).1
-        rw [full]
-        exact ⟨rfl, rfl, rfl, fun _ => rfl⟩
-    · exact (keyRun_congr (Paths.modGarbleM_tagged table S coord ranges hc Δ X i) _ _
-        fun k member range label => key_agree hκ hs6 hs6' shift range (fun h5 => by
-          simp only [Paths.modKeys, Set.mem_ofPred_eq] at member
-          have := h5.1
-          omega) label).1
-  have masks : EntryCorrect.masksOf (H8.tagHash A') coins = EntryCorrect.masksOf (H8.tagHash A) coins := by
-    have maskFams : ∀ k ∈ Paths.maskKeys digitCount, ¬ Level5 κ k := by
-      intro k member h5
-      simp only [Paths.maskKeys, Paths.nonCollectorKeys, Paths.maskStageKeys, Paths.maskSiteKeys, Set.mem_union,
-        Set.mem_ofPred_eq] at member
-      have := h5.1
-      omega
-    have tagged := Paths.maskAnswersM_tagged (0 : Block) digitCount (by decide) (by decide)
-    have same := (keyRun_congr tagged (H8.tagHash A') (H8.tagHash A) fun k member range label =>
-      key_agree hκ hs6 hs6' shift range (maskFams k member) label).1
-    calc EntryCorrect.masksOf (H8.tagHash A') coins
-        = maskValues (H8.tagHash A') 0 digitCount := BmrEntry.maskValues_tagHash A' _
-      _ = (maskAnswersM (0 : Block) digitCount).eval (H8.tagHash A') := (eval_maskAnswersM _ _ _).symm
-      _ = (maskAnswersM (0 : Block) digitCount).eval (H8.tagHash A) := same
-      _ = maskValues (H8.tagHash A) 0 digitCount := eval_maskAnswersM _ _ _
-      _ = EntryCorrect.masksOf (H8.tagHash A) coins := (BmrEntry.maskValues_tagHash A _).symm
-  have entries : EntryCorrect.entriesOf (H8.tagHash A') scalar coins =
-      EntryCorrect.entriesOf (H8.tagHash A) scalar coins := by
-    funext o
-    rw [entriesOf_tagHash, entriesOf_tagHash]
-    have h0 : 2 * o.val < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
-    have h1 : 2 * o.val + 1 < 65536 := by have := o.isLt; simp only [digitCount] at this; omega
-    rw [pos_agree hκ hs6 hs6' shift _ (by rw [DigestSplit.family_final _ h0]; decide),
-      pos_agree hκ hs6 hs6' shift _ (by rw [DigestSplit.family_final _ h1]; decide)]
-  have gx : EntryCorrect.gxOf (H8.tagHash A') coins = EntryCorrect.gxOf (H8.tagHash A) coins :=
-    coordEq xCount 0 (by decide) (by norm_num) _ _
-  have gy : EntryCorrect.gyOf (H8.tagHash A') coins = EntryCorrect.gyOf (H8.tagHash A) coins :=
-    coordEq yCount 1 (by decide) (by norm_num) _ _
-  unfold EntryCorrect.pubOf
-  rw [gx, gy, masks, entries]
-
-/-! ### 6. The label of a never-hot cast -/
 
 /-- What a never-hot garbler input is: a cast of chunk 31 of a coordinate at a leaf `49 ≤ α < 64`, labelled by the
 first block of the table at the level-5 material `α − 32`. -/
@@ -498,209 +161,280 @@ theorem never_input (scalar : NonZeroScalar) (coins : Entry.Coins) (A : TagTable
     simp only [Paths.digestLabelKeys, Paths.digestFinalKeys, Set.mem_union, Set.mem_ofPred_eq] at member
     omega
 
-/-! ### 7. The count -/
+/-! ### The public fields outside one conversion vector -/
 
-open Classical in
-/-- The mass of a table event, through the refill of the table at an independent uniform family. -/
-theorem mass_eq {ι : Type} [Fintype ι] [DecidableEq ι] (μT : PMF TagTable) (pos : ι → Fin (2 ^ 40))
-    (indep : Indep μT (Set.range pos) (PMF.uniformOfFintype (ι → Block × Block)) (fun T => T ∘ pos) (fun _ => True))
-    (R : TagTable → Prop) :
-    μT.toOuterMeasure {T | R T} =
-      ∑' T, μT T * ((Fintype.card (ι → Block × Block) : ℝ≥0∞)⁻¹ *
-        ((Finset.univ.filter fun f => R (fillAt pos f T)).card : ℝ≥0∞)) := by
-  let G : (ι → Block × Block) → TagTable → PMF Bool := fun f T => PMF.pure (decide (R (fillAt pos f T)))
-  have ignoresG : ∀ f, True → Ignores (Set.range pos) (G f) := by
-    intro f _ T T' agree
-    have same : fillAt pos f T = fillAt pos f T' := by
-      funext i
-      unfold fillAt
-      split
-      · rfl
-      · rename_i miss
-        exact agree i fun ⟨k, hk⟩ => miss ⟨k, hk⟩
-    simp only [G, same]
-  have law := indep Bool G ignoresG
-  have atTrue := congrArg (fun p : PMF Bool => p true) law
-  simp only [G, fillAt_self] at atTrue
-  have lhs : μT.toOuterMeasure {T | R T} = (μT.bind fun T => PMF.pure (decide (R T))) true := by
-    rw [PMF.bind_apply, PMF.toOuterMeasure_apply]
-    refine tsum_congr fun T => ?_
-    by_cases h : R T
-    · rw [Set.indicator_of_mem (show T ∈ {T | R T} from h), PMF.pure_apply, decide_eq_true h, if_pos rfl, mul_one]
-    · rw [Set.indicator_of_notMem (show T ∉ {T | R T} from h), PMF.pure_apply, decide_eq_false h,
-        if_neg (by decide), mul_zero]
-  have inner : ∀ T, (∑' f : ι → Block × Block, (PMF.uniformOfFintype (ι → Block × Block)) f *
-      (PMF.pure (decide (R (fillAt pos f T))) : PMF Bool) true) =
-      (Fintype.card (ι → Block × Block) : ℝ≥0∞)⁻¹ *
-        ((Finset.univ.filter fun f => R (fillAt pos f T)).card : ℝ≥0∞) := by
-    intro T
-    rw [tsum_fintype, Finset.card_filter, Nat.cast_sum, Finset.mul_sum]
-    refine Finset.sum_congr rfl fun f _ => ?_
-    rw [PMF.uniformOfFintype_apply]
-    by_cases h : R (fillAt pos f T)
-    · rw [PMF.pure_apply, decide_eq_true h, if_pos rfl, if_pos h, Nat.cast_one]
-    · rw [PMF.pure_apply, decide_eq_false h, if_neg (by decide), if_neg h, Nat.cast_zero]
-  rw [lhs, atTrue, PMF.bind_apply]
-  simp_rw [PMF.bind_apply]
-  calc ∑' f, (PMF.uniformOfFintype (ι → Block × Block)) f *
-        ∑' T, μT T * (PMF.pure (decide (R (fillAt pos f T))) : PMF Bool) true
-      = ∑' T, ∑' f, (PMF.uniformOfFintype (ι → Block × Block)) f *
-          (μT T * (PMF.pure (decide (R (fillAt pos f T))) : PMF Bool) true) := by
-        simp_rw [← ENNReal.tsum_mul_left]
-        exact ENNReal.tsum_comm
-    _ = ∑' T, μT T * ∑' f, (PMF.uniformOfFintype (ι → Block × Block)) f *
-          (PMF.pure (decide (R (fillAt pos f T))) : PMF Bool) true := by
-        refine tsum_congr fun T => ?_
-        rw [← ENNReal.tsum_mul_left]
-        refine tsum_congr fun f => ?_
-        ring
-    _ = _ := by simp_rw [inner]
+/-- Conversion positions belonging to one coordinate (body pads are excluded). -/
+def ConvPos (κ : Fin 2) (p : Fin (2 ^ 40)) : Prop :=
+  tagFamily p.val ≤ 5 ∧ tagCoord p.val = κ.val
 
-/-- **A table event through an independent uniform family**: if, for every coins and cold part, the refills that
-satisfy the event and give the view `v` are at most `ε` of those that give `v`, the event has conditional mass at most
-`ε` given the view. -/
-theorem outer_family_le {C V ι : Type} [Fintype ι] [DecidableEq ι] (coinsLaw : PMF C) (μT : PMF TagTable)
-    (pos : ι → Fin (2 ^ 40))
-    (indep : Indep μT (Set.range pos) (PMF.uniformOfFintype (ι → Block × Block)) (fun T => T ∘ pos) (fun _ => True))
-    (view : C → TagTable → V) (E : C → TagTable → Prop) (ε : ℝ≥0∞)
-    (count : ∀ c T v (inst : DecidablePred fun f => view c (fillAt pos f T) = v ∧ E c (fillAt pos f T))
-      (inst' : DecidablePred fun f => view c (fillAt pos f T) = v),
-      ((@Finset.filter _ _ inst Finset.univ).card : ℝ≥0∞) ≤ ε * (@Finset.filter _ _ inst' Finset.univ).card)
-    (v : V) :
-    (coinsLaw.bind fun c => μT.map fun T => (c, T)).toOuterMeasure {ω | view ω.1 ω.2 = v ∧ E ω.1 ω.2} ≤
-      ε * (coinsLaw.bind fun c => μT.map fun T => (c, T)).toOuterMeasure {ω | view ω.1 ω.2 = v} := by
-  rw [PMF.toOuterMeasure_bind_apply, PMF.toOuterMeasure_bind_apply, ← ENNReal.tsum_mul_left]
-  refine ENNReal.tsum_le_tsum fun c => ?_
-  rw [mul_left_comm]
-  refine mul_le_mul' le_rfl ?_
-  rw [PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_map_apply]
-  have e1 : (fun T => (c, T)) ⁻¹' {ω : C × TagTable | view ω.1 ω.2 = v ∧ E ω.1 ω.2} =
-      {T | view c T = v ∧ E c T} := rfl
-  have e2 : (fun T => (c, T)) ⁻¹' {ω : C × TagTable | view ω.1 ω.2 = v} = {T | view c T = v} := rfl
-  rw [e1, e2, mass_eq μT pos indep (fun T => view c T = v ∧ E c T), mass_eq μT pos indep (fun T => view c T = v),
-    ← ENNReal.tsum_mul_left]
-  refine ENNReal.tsum_le_tsum fun T => ?_
-  calc μT T * ((Fintype.card (ι → Block × Block) : ℝ≥0∞)⁻¹ *
-        ((@Finset.filter _ (fun f => view c (fillAt pos f T) = v ∧ E c (fillAt pos f T))
-          (fun _ => Classical.propDecidable _) Finset.univ).card : ℝ≥0∞))
-      ≤ μT T * ((Fintype.card (ι → Block × Block) : ℝ≥0∞)⁻¹ *
-        (ε * ((@Finset.filter _ (fun f => view c (fillAt pos f T) = v)
-          (fun _ => Classical.propDecidable _) Finset.univ).card : ℝ≥0∞))) :=
-        mul_le_mul' le_rfl (mul_le_mul' le_rfl (count c T v _ _))
-    _ = ε * (μT T * ((Fintype.card (ι → Block × Block) : ℝ≥0∞)⁻¹ *
-        ((@Finset.filter _ (fun f => view c (fillAt pos f T) = v)
-          (fun _ => Classical.propDecidable _) Finset.univ).card : ℝ≥0∞))) := by ring
+/-- Read one coordinate's public vector. -/
+def crtOf (κ : Fin 2) (p : Entry.Public) : Vector Label convCount :=
+  if κ = 0 then p.crtX else p.crtY
 
-/-! ### 8. The two positions and the shift of their refills -/
+/-- Replace one public conversion vector. -/
+def setCrt (κ : Fin 2) (b : Vector Label convCount) (p : Entry.Public) : Entry.Public :=
+  if κ = 0 then { p with crtX := b } else { p with crtY := b }
 
-/-- The family of the two level-5 positions `s` and `s'`. -/
-def pairPos (κ s s' : ℕ) (k : Fin 2) : Fin (2 ^ 40) := if k = 0 then treePos κ s else treePos κ s'
+/-- The remaining public fields. -/
+def restPub (κ : Fin 2) (p : Entry.Public) : Entry.Public :=
+  setCrt κ (Vector.replicate convCount 0) p
 
-theorem pairPos_zero (κ s s' : ℕ) : pairPos κ s s' 0 = treePos κ s := if_pos rfl
+theorem setCrt_rest (κ : Fin 2) (p : Entry.Public) :
+    setCrt κ (crtOf κ p) (restPub κ p) = p := by
+  fin_cases κ <;> cases p <;> rfl
 
-theorem pairPos_one (κ s s' : ℕ) : pairPos κ s s' 1 = treePos κ s' := if_neg (by decide)
+theorem pub_eq_iff (κ : Fin 2) (p q : Entry.Public) :
+    p = q ↔ crtOf κ p = crtOf κ q ∧ restPub κ p = restPub κ q := by
+  constructor
+  · intro h; rw [h]; exact ⟨rfl, rfl⟩
+  · rintro ⟨hc, hr⟩
+    calc p = setCrt κ (crtOf κ p) (restPub κ p) := (setCrt_rest κ p).symm
+      _ = setCrt κ (crtOf κ q) (restPub κ q) := by rw [hc, hr]
+      _ = q := setCrt_rest κ q
 
-theorem pairPos_inj {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 65536) (hs' : s' < 65536) (ne : s ≠ s') :
-    Function.Injective (pairPos κ s s') := by
-  intro a b h
-  fin_cases a <;> fin_cases b
-  · rfl
-  · exact absurd (treePos_inj hκ hs hs' (by simpa [pairPos_zero, pairPos_one] using h)) ne
-  · exact absurd (treePos_inj hκ hs hs' (by simpa [pairPos_zero, pairPos_one] using h.symm)) ne
-  · rfl
+section Public
 
-theorem pairPos_mem {κ s s' : ℕ} {i : Fin (2 ^ 40)} (hi : i ∈ Set.range (pairPos κ s s')) :
-    i = treePos κ s ∨ i = treePos κ s' := by
-  obtain ⟨k, rfl⟩ := hi
-  fin_cases k
-  · exact Or.inl (pairPos_zero κ s s')
-  · exact Or.inr (pairPos_one κ s s')
+variable [FieldCertificate] [GroupCertificate]
 
-theorem fill_at {κ : Type} [Fintype κ] [DecidableEq κ] (pos : κ → Fin (2 ^ 40)) (inj : Function.Injective pos)
-    (f : κ → Block × Block) (A : TagTable) (k : κ) : fillAt pos f A (pos k) = f k :=
-  congrFun (fillAt_comp pos inj f A) k
+/-- On the tag reading, all fields other than this conversion vector ignore
+its conversion positions. In particular, changing its truth words does not
+change records: pad answers depend on their tags alone. -/
+theorem restPub_congr (κ : Fin 2) (scalar : NonZeroScalar) (c : Entry.Coins)
+    (A A' : TagTable) (agree : ∀ p, ¬ ConvPos κ p → A p = A' p) :
+    restPub κ (pubT scalar c A) = restPub κ (pubT scalar c A') := by
+  have fams : Laws.P4Reads.FamAgree A A' := by
+    intro p hp
+    apply agree
+    rintro ⟨low, _⟩
+    rcases hp with h | h | h <;> omega
+  have bc : BmrEntry.bmrCoinsOf c A = BmrEntry.bmrCoinsOf c A' := by
+    unfold BmrEntry.bmrCoinsOf
+    rw [Laws.P4Reads.bmrPadsOf_congr fams, Laws.P4Reads.bmrMasksOf_congr fams]
+  have curve : (pubT scalar c A).curve = (pubT scalar c A').curve := by
+    unfold pubT
+    rw [BmrEntry.curve_eq, BmrEntry.curve_eq, bc]
+  have rows : (pubT scalar c A).rows = (pubT scalar c A').rows := by
+    ext i hi
+    change (pubT scalar c A).rows.get ⟨i, hi⟩ = (pubT scalar c A').rows.get ⟨i, hi⟩
+    unfold pubT
+    have h := BmrEntry.rows_eq scalar c A ⟨i, hi⟩
+    rw [bc] at h
+    exact h.trans (BmrEntry.rows_eq scalar c A' ⟨i, hi⟩).symm
+  have rx : (pubT scalar c A).recX = (pubT scalar c A').recX := by
+    unfold pubT
+    rw [BmrReal.recX_vec, BmrReal.recX_vec, bc]
+  have ry : (pubT scalar c A).recY = (pubT scalar c A').recY := by
+    unfold pubT
+    rw [BmrReal.recY_vec, BmrReal.recY_vec, bc]
+  have ex : (pubT scalar c A).exception = (pubT scalar c A').exception := by
+    have h := Laws.P4Reads.exception_congr 0 scalar c (t := A) (t' := A')
+      (fun p hp => agree p (fun h => by have := h.1; omega))
+    rw [BmrReal.realGarbled_pair, BmrReal.realGarbled_pair] at h
+    exact h
+  have coord : ∀ (S k : ℕ), S ≤ 1000 → k < 2 → k ≠ κ.val → ∀ (Δ : Label) (Z : ℕ → Label),
+      (coordGarbleM table S k Δ Z).eval (H8.tagHash A) =
+        (coordGarbleM table S k Δ Z).eval (H8.tagHash A') := by
+    intro S k hS hk hne Δ Z
+    refine (keyRun_congr (Paths.coordGarbleM_tagged table S k (Paths.bn254_ranges S hS) hk Δ Z)
+      _ _ fun key member range label => ?_).1
+    rw [tagHash_key A range, tagHash_key A' range]
+    apply agree
+    rintro ⟨_, same⟩
+    have val : (Conv.tag40 key.code).val = key.code := Nat.mod_eq_of_lt (Paths.TagKey.code_lt range)
+    rw [val] at same
+    have decoded : tagCoord key.code = key.coord := tagCoord_tagCode (tagInRange_of_key range)
+    rw [decoded, member.2] at same
+    exact hne same
+  have other : (if κ = 0 then (pubT scalar c A).crtY else (pubT scalar c A).crtX) =
+      (if κ = 0 then (pubT scalar c A').crtY else (pubT scalar c A').crtX) := by
+    fin_cases κ
+    · change convVector (EntryCorrect.gyOf (H8.tagHash A) c).pub =
+        convVector (EntryCorrect.gyOf (H8.tagHash A') c).pub
+      unfold EntryCorrect.gyOf
+      rw [coord yCount 1 (by decide) (by decide) (by decide)]
+    · change convVector (EntryCorrect.gxOf (H8.tagHash A) c).pub =
+        convVector (EntryCorrect.gxOf (H8.tagHash A') c).pub
+      unfold EntryCorrect.gxOf
+      rw [coord xCount 0 (by decide) (by decide) (by decide)]
+  fin_cases κ
+  · change Entry.Public.mk _ _ _ _ _ _ _ = Entry.Public.mk _ _ _ _ _ _ _
+    change (pubT scalar c A).crtY = (pubT scalar c A').crtY at other
+    rw [curve, rows, ex, other, rx, ry]
+  · change Entry.Public.mk _ _ _ _ _ _ _ = Entry.Public.mk _ _ _ _ _ _ _
+    change (pubT scalar c A).crtX = (pubT scalar c A').crtX at other
+    rw [curve, rows, ex, other, rx, ry]
 
-/-- Shift the first blocks of a refill by `d`. -/
-def shiftF (d : Block) (f : Fin 2 → Block × Block) : Fin 2 → Block × Block := fun k => ((f k).1 ^^^ d, (f k).2)
+/-- The zero input leaves the never-hot label's tree position cold. -/
+def zeroInput : AffineInput := ⟨0, 0⟩
 
-theorem shiftF_shiftF (d : Block) (f : Fin 2 → Block × Block) : shiftF d (shiftF d f) = f := by
-  funext k
-  unfold shiftF
-  rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
+theorem treePos_cold (κ : Fin 2) {s : ℕ} (hs : s < 32) (hne : s ≠ 0) :
+    ¬ H8.hotConvTag table zeroInput κ.val (treePos κ.val s) := by
+  intro hot
+  have h := hot.2.2
+  rw [treePos_val κ.isLt (by omega), hotTag_chunkTree table zeroInput (treeRange κ.isLt (by omega))] at h
+  have value : coordValue zeroInput κ.val = 0 := by simp [coordValue, zeroInput]
+  have chunk : table.chunkValue 0 31 = 0 := by simp [CrtTable.chunkValue]
+  rw [value, chunk, Nat.zero_mod, beq_iff_eq] at h
+  exact hne h
 
-theorem shift2_fill {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 65536) (hs' : s' < 65536) (ne : s ≠ s') (d : Block)
-    (f : Fin 2 → Block × Block) (T : TagTable) :
-    Shift2 (treePos κ s) (treePos κ s') d (fillAt (pairPos κ s s') f T)
-      (fillAt (pairPos κ s s') (shiftF d f) T) := by
-  have inj := pairPos_inj hκ hs hs' ne
-  refine ⟨fun i hP hQ => ?_, ?_, ?_⟩
-  · have miss : i ∉ Set.range (pairPos κ s s') := fun hit => by
-      rcases pairPos_mem hit with h | h
-      · exact hP h
-      · exact hQ h
-    rw [fillAt_apply_of_not_mem _ _ _ i miss, fillAt_apply_of_not_mem _ _ _ i miss]
-  · rw [← pairPos_zero κ s s', fill_at _ inj (shiftF d f) T 0, fill_at _ inj f T 0]
-    rfl
-  · rw [← pairPos_one κ s s', fill_at _ inj (shiftF d f) T 1, fill_at _ inj f T 1]
-    rfl
+theorem treePos_conv (κ : Fin 2) {s : ℕ} (hs : s < 32) : ConvPos κ (treePos κ.val s) := by
+  refine ⟨by rw [treePos_family κ.isLt (by omega)]; omega, ?_⟩
+  rw [treePos_val κ.isLt (by omega)]
+  exact tagCoord_tagCode (treeRange κ.isLt (by omega))
+
+/-- `restPub` ignores the full conversion family, hence also its hot subset. -/
+theorem restPub_reads (κ : Fin 2) (scalar : NonZeroScalar) :
+    H8.ReadsOff Eq (H8.hotConvTag table zeroInput κ.val)
+      (fun tape => restPub κ (pubT scalar tape.1 tape.2)) := by
+  rintro ⟨c, A⟩ ⟨c', A'⟩ same agree
+  dsimp only at same ⊢
+  subst c'
+  apply restPub_congr κ scalar c A A'
+  intro p hp
+  exact agree p (fun hot => hp ⟨hot.1, hot.2.1⟩)
+
+/-- Reading the target cold material does not disturb the conversion split. -/
+theorem restPub_label_reads (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ}
+    (hs : s < 32) (hne : s ≠ 0) :
+    H8.ReadsOff Eq (H8.hotConvTag table zeroInput κ.val)
+      (fun tape => (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1)) := by
+  intro tape tape' same agree
+  exact Prod.ext (restPub_reads κ scalar tape tape' same agree)
+    (congrArg (fun answer : Block × Block => clip answer.1) (agree _ (treePos_cold κ hs hne)))
+
+/-- The conversion part used by `conv_split` is the selected public vector. -/
+theorem crtPart_pubT (κ : Fin 2) (scalar : NonZeroScalar) (tape : TableTape Instance.crtEntry) :
+    DeltaView.crtPart 0 scalar κ tape = crtOf κ (pubT scalar tape.1 tape.2) := by
+  rcases tape with ⟨c, T⟩
+  unfold DeltaView.crtPart crtOf pubT
+  split_ifs
+  · exact congrArg (fun p => p.1.crtX) (BmrReal.realGarbled_pair 0 scalar c T)
+  · exact congrArg (fun p => p.1.crtY) (BmrReal.realGarbled_pair 0 scalar c T)
+
+/-! ### Probability factorization -/
+
+/-- A mass at a mapped value is the mass of its fibre. -/
+theorem map_mass {Ω V : Type} (μ : PMF Ω) (f : Ω → V) (v : V) :
+    (μ.map f) v = μ.toOuterMeasure {ω | f ω = v} := by
+  rw [← PMF.toOuterMeasure_apply_singleton, PMF.toOuterMeasure_map_apply]
+  rfl
 
 set_option linter.constructorNameAsVariable false in
-/-- **The count**: the refills that give the view `v` and the clipped first block `g` at `P` are `2^-104` of those that
-give `v`. -/
-theorem count_le (scalar : NonZeroScalar) {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 32) (hs' : s' < 32) (ne : s ≠ s')
-    (g : Label) (c : Entry.Coins) (T : TagTable) (v : Instance.crtEntry.Public)
-    (inst : DecidablePred fun f => pubT scalar c (fillAt (pairPos κ s s') f T) = v ∧
-      clip (fillAt (pairPos κ s s') f T (treePos κ s)).1 = g)
-    (inst' : DecidablePred fun f => pubT scalar c (fillAt (pairPos κ s s') f T) = v) :
-    ((@Finset.filter _ _ inst Finset.univ).card : ℝ≥0∞) ≤
-      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ * (@Finset.filter _ _ inst' Finset.univ).card := by
+/-- The raw first-block fibre includes 24 unused high bits; the second block is arbitrary. -/
+theorem clip_answer_card (g : Label) [DecidablePred fun a : Block × Block => clip a.1 = g] :
+    (Finset.univ.filter fun a : Block × Block => clip a.1 = g).card ≤ 2 ^ (256 - labelBits) := by
   classical
-  have hs6 : s < 65536 := by omega
-  have hs6' : s' < 65536 := by omega
-  have inj := pairPos_inj hκ hs6 hs6' ne
-  have inv : ∀ d f, pubT scalar c (fillAt (pairPos κ s s') (shiftF d f) T) =
-      pubT scalar c (fillAt (pairPos κ s s') f T) :=
-    fun d f => pub_shift scalar c hκ hs hs' ne (shift2_fill hκ hs6 hs6' ne d f T)
-  have at0 : ∀ f, (fillAt (pairPos κ s s') f T (treePos κ s)).1 = (f 0).1 := by
-    intro f
-    rw [← pairPos_zero κ s s', fill_at _ inj f T 0]
-  set S := @Finset.filter _ _ inst' Finset.univ with hS
-  let fib : Label → Finset (Fin 2 → Block × Block) := fun y => S.filter fun f => clip (f 0).1 = y
-  have mem_fib : ∀ y f, f ∈ fib y ↔ pubT scalar c (fillAt (pairPos κ s s') f T) = v ∧ clip (f 0).1 = y := by
-    intro y f
-    simp only [fib, hS, Finset.mem_filter, Finset.mem_univ, true_and]
-  have first : @Finset.filter _ _ inst Finset.univ = fib g := by
-    ext f
-    rw [mem_fib, Finset.mem_filter, at0]
-    simp only [Finset.mem_univ, true_and]
-  have each : ∀ y, (fib y).card = (fib g).card := by
-    intro y
-    refine Finset.card_nbij' (shiftF (embed (y ^^^ g))) (shiftF (embed (y ^^^ g))) (fun f hf => ?_) (fun f hf => ?_)
-      (fun f _ => shiftF_shiftF _ f) (fun f _ => shiftF_shiftF _ f)
-    · rw [Finset.mem_coe, mem_fib] at hf ⊢
-      refine ⟨by rw [inv]; exact hf.1, ?_⟩
-      show clip ((f 0).1 ^^^ embed (y ^^^ g)) = g
-      rw [Narrow.clip_xor_embed]
-      rw [hf.2, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
-    · rw [Finset.mem_coe, mem_fib] at hf ⊢
-      refine ⟨by rw [inv]; exact hf.1, ?_⟩
-      show clip ((f 0).1 ^^^ embed (y ^^^ g)) = y
-      rw [Narrow.clip_xor_embed]
-      rw [hf.2, BitVec.xor_comm y g, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
-  have total : S.card = 2 ^ labelBits * (fib g).card := by
-    rw [Finset.card_eq_sum_card_fiberwise (f := fun f => clip (f 0).1) (t := Finset.univ)
-      (fun _ _ => Finset.mem_univ _)]
-    rw [Finset.sum_congr rfl fun y _ => each y, Finset.sum_const, Finset.card_univ,
-      Narrow.card_label, smul_eq_mul]
-  rw [first, total, Nat.cast_mul, Nat.cast_pow, Nat.cast_ofNat, ← mul_assoc,
-    ENNReal.inv_mul_cancel (pow_ne_zero _ two_ne_zero) (ENNReal.pow_ne_top ENNReal.ofNat_ne_top), one_mul]
+  have sub : (Finset.univ.filter fun a : Block × Block => clip a.1 = g) ⊆
+      (Finset.univ.filter fun b : Block => clip b = g) ×ˢ Finset.univ := by
+    intro a ha
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_product] at ha ⊢
+    exact ⟨ha, trivial⟩
+  refine le_trans (Finset.card_le_card sub) ?_
+  rw [Finset.card_product, Finset.card_univ]
+  have fibre : (Finset.univ.filter fun b : Block => clip b = g).card = 2 ^ (128 - labelBits) := by
+    rw [← Fintype.card_subtype]
+    exact Narrow.card_clip_fibre g
+  rw [fibre, Kriterion.ArgoMAC.Security.PGS.card_block]
+  decide
+
+theorem clip_answer_ratio :
+    ((2 ^ (256 - labelBits) : ℕ) : ℝ≥0∞) / Fintype.card (Block × Block) =
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by
+  have den : Fintype.card (Block × Block) = 2 ^ (256 - labelBits) * 2 ^ labelBits := by
+    rw [Fintype.card_prod, Kriterion.ArgoMAC.Security.PGS.card_block]
+    decide
+  have nz : (2 : ℝ≥0∞) ^ (256 - labelBits) ≠ 0 := pow_ne_zero _ two_ne_zero
+  have nt : (2 : ℝ≥0∞) ^ (256 - labelBits) ≠ ⊤ := ENNReal.pow_ne_top ENNReal.ofNat_ne_top
+  rw [den]
+  simp only [Nat.cast_mul, Nat.cast_pow, Nat.cast_ofNat]
+  rw [ENNReal.div_eq_inv_mul, ENNReal.mul_inv (Or.inl nz) (Or.inl nt)]
+  calc _ = (((2 : ℝ≥0∞) ^ (256 - labelBits))⁻¹ * 2 ^ (256 - labelBits)) *
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by ring
+    _ = _ := by rw [ENNReal.inv_mul_cancel nz nt, one_mul]
+
+/-- The target material is uniform conditional on the remaining public fields. -/
+theorem rest_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 32)
+    (g : Label) (v : Entry.Public) :
+    (swappedTableTape Instance.crtEntry).toOuterMeasure
+        {tape | restPub κ (pubT scalar tape.1 tape.2) = v ∧ clip (tape.2 (treePos κ.val s)).1 = g} ≤
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ * (swappedTableTape Instance.crtEntry).toOuterMeasure
+        {tape | restPub κ (pubT scalar tape.1 tape.2) = v} := by
+  rw [swappedTableTape_eq]
+  rw [← clip_answer_ratio]
+  refine HiddenGuess.outer_table_le _ (swappedTableLaw crtLayout) (treePos κ.val s)
+    (Laws.indep_swapped_pos crtLayout _ (away_of_family _
+      (by rw [treePos_family κ.isLt (by omega)]; decide)
+      (by rw [treePos_family κ.isLt (by omega)]; decide)))
+    (fun c T => restPub κ (pubT scalar c T)) ?_
+    (fun _ _ a => clip a.1 = g) (2 ^ (256 - labelBits)) (fun _ _ => @clip_answer_card _ _ g (fun _ => Classical.propDecidable _)) v
+  intro c A A' agree
+  apply restPub_congr κ scalar c A A'
+  intro p hp
+  apply agree
+  intro eq
+  have eq' : p = treePos κ.val s := eq
+  apply hp
+  rw [eq']
+  exact treePos_conv κ hs
+
+/-- Factoring out the uniform conversion vector restores the same bound for
+the complete public value, including every half-pin. -/
+theorem public_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 32) (hne : s ≠ 0)
+    (g : Label) (v : Entry.Public) :
+    (swappedTableTape Instance.crtEntry).toOuterMeasure
+        {tape | pubT scalar tape.1 tape.2 = v ∧ clip (tape.2 (treePos κ.val s)).1 = g} ≤
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ * (swappedTableTape Instance.crtEntry).toOuterMeasure
+        {tape | pubT scalar tape.1 tape.2 = v} := by
+  have joint := DeltaView.conv_split 0 scalar zeroInput κ
+    (fun tape => (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1))
+    (restPub_label_reads κ scalar hs hne) (crtOf κ v) (restPub κ v, g)
+  have marginal := DeltaView.conv_split 0 scalar zeroInput κ
+    (fun tape => restPub κ (pubT scalar tape.1 tape.2)) (restPub_reads κ scalar)
+    (crtOf κ v) (restPub κ v)
+  simp only [crtPart_pubT, map_mass] at joint marginal
+  have jointSet : {tape : TableTape Instance.crtEntry |
+      (crtOf κ (pubT scalar tape.1 tape.2),
+        (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1)) =
+        (crtOf κ v, (restPub κ v, g))} =
+      {tape | pubT scalar tape.1 tape.2 = v ∧ clip (tape.2 (treePos κ.val s)).1 = g} := by
+    ext tape
+    change ((crtOf κ (pubT scalar tape.1 tape.2),
+      (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1)) =
+      (crtOf κ v, (restPub κ v, g))) ↔ _
+    rw [Prod.mk.injEq, Prod.mk.injEq]
+    constructor
+    · rintro ⟨hc, hr, hy⟩
+      exact ⟨(pub_eq_iff κ _ v).mpr ⟨hc, hr⟩, hy⟩
+    · rintro ⟨hp, hy⟩
+      obtain ⟨hc, hr⟩ := (pub_eq_iff κ _ v).mp hp
+      exact ⟨hc, hr, hy⟩
+  have marginalSet : {tape : TableTape Instance.crtEntry |
+      (crtOf κ (pubT scalar tape.1 tape.2), restPub κ (pubT scalar tape.1 tape.2)) =
+        (crtOf κ v, restPub κ v)} = {tape | pubT scalar tape.1 tape.2 = v} := by
+    ext tape
+    change ((crtOf κ (pubT scalar tape.1 tape.2), restPub κ (pubT scalar tape.1 tape.2)) =
+      (crtOf κ v, restPub κ v)) ↔ _
+    rw [Prod.mk.injEq]
+    exact (pub_eq_iff κ _ v).symm
+  rw [jointSet] at joint
+  rw [marginalSet] at marginal
+  have restSet : {tape : TableTape Instance.crtEntry |
+      (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1) = (restPub κ v, g)} =
+      {tape | restPub κ (pubT scalar tape.1 tape.2) = restPub κ v ∧
+        clip (tape.2 (treePos κ.val s)).1 = g} := by
+    ext tape
+    simp only [Set.mem_ofPred_eq, Prod.mk.injEq]
+  rw [restSet] at joint
+  rw [joint, marginal]
+  calc _ ≤ _ := mul_le_mul' le_rfl (rest_guess κ scalar hs g (restPub κ v))
+    _ = _ := by ring
+
+end Public
 
 end
 
-/-! ### 9. The case -/
-
 open Kriterion.CRT.Privacy.CastNever in
-/-- **The 30 never-hot casts.** -/
+/-- **The 30 never-hot casts**, using conditional conversion uniformity and a cold material. -/
 theorem _root_.Kriterion.CRT.Privacy.StageOneProof.neverCase :
     StageOneProof.OneCase StageOneProof.NeverHotCast ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by
   intro field group parameter scalar view N never
@@ -708,22 +442,12 @@ theorem _root_.Kriterion.CRT.Privacy.StageOneProof.neverCase :
   · obtain ⟨tape0, h0⟩ := asked
     rw [gAsked_eq] at h0
     obtain ⟨hκ, lo, hi, -⟩ := never_input scalar tape0.1 tape0.2 N h0 never
+    let κ : Fin 2 := ⟨tagCoord (N / 2 ^ 128), hκ⟩
     have hs : tagSlot (N / 2 ^ 128) - 32 < 32 := by omega
     have ne : tagSlot (N / 2 ^ 128) - 32 ≠ 0 := by omega
-    have hs6 : tagSlot (N / 2 ^ 128) - 32 < 65536 := by omega
-    have away : ∀ site ∈ crtLayout.sites, ∀ k,
-        pairPos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32) 0 k ∉ (siteTags crtLayout site).map tagPos := by
-      intro site mem k
-      have fam : tagFamily (pairPos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32) 0 k).val = 0 := by
-        rcases pairPos_mem (⟨k, rfl⟩ : pairPos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32) 0 k ∈
-          Set.range (pairPos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32) 0)) with h | h
-        · rw [h]; exact treePos_family hκ hs6
-        · rw [h]; exact treePos_family hκ (by norm_num)
-      exact away_of_family _ (by rw [fam]; decide) (by rw [fam]; decide) site mem
-    let E : Instance.crtEntry.Coins → TagTable → Prop := fun _ T =>
-      clip (T (treePos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32))).1 = clip (BitVec.ofNat 128 N)
     have sub : {tape | stageOneView Instance.crtEntry parameter scalar tape = view ∧ N ∈ gAsked scalar tape} ⊆
-        {ω : TableTape Instance.crtEntry | pubT scalar ω.1 ω.2 = view ∧ E ω.1 ω.2} := by
+        {tape : TableTape Instance.crtEntry | pubT scalar tape.1 tape.2 = view ∧
+          clip (tape.2 (treePos κ.val (tagSlot (N / 2 ^ 128) - 32))).1 = clip (BitVec.ofNat 128 N)} := by
       rintro tape ⟨hv, hN⟩
       rw [stageOneView_pubT] at hv
       rw [gAsked_eq] at hN
@@ -731,10 +455,8 @@ theorem _root_.Kriterion.CRT.Privacy.StageOneProof.neverCase :
       have label := congrArg clip (never_input scalar tape.1 tape.2 N hN never).2.2.2.symm
       simpa only [Narrow.clip_embed] using label
     refine le_trans (MeasureTheory.measure_mono sub) ?_
-    rw [viewSet_eq, swappedTableTape_eq]
-    exact outer_family_le _ (swappedTableLaw crtLayout) (pairPos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32) 0)
-      (indep_swapped_family crtLayout _ (pairPos_inj hκ hs6 (by norm_num) ne) away) (pubT scalar) E _
-      (fun c T v inst inst' => count_le scalar hκ hs (by norm_num) ne (clip (BitVec.ofNat 128 N)) c T v inst inst') view
+    rw [viewSet_eq]
+    exact public_guess κ scalar hs ne (clip (BitVec.ofNat 128 N)) view
   · have empty : {tape | stageOneView Instance.crtEntry parameter scalar tape = view ∧ N ∈ gAsked scalar tape} = ∅ := by
       ext tape
       simp only [Set.mem_ofPred_eq, Set.mem_empty_iff_false, iff_false, not_and]

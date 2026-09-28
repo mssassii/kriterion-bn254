@@ -119,7 +119,7 @@ one-hot, every other modulus gets `t9Row 32 m`. -/
 def t9Kind (m : Nat) : Kind := if m = 256 then .chunkZero else .odd (t9Row 32 m)
 
 /-- A T9 BN254 table on the given moduli, retained for reduced tests and the original
-schedule's lemmas. The real table below uses `fallbackTableOf`. -/
+schedule's lemmas. The real table below uses `width8TableOf`. -/
 def bn254TableOf (moduli : Array Nat) : CrtTable :=
   CrtTable.ofModuli 254 8 14 moduli t9Kind padSlack (wrapBound BN254.baseFieldModulus)
 
@@ -157,8 +157,24 @@ the existing T9 reduced fixture and generic T9 statements retain their meaning. 
 def fallbackTableOf (moduli : Array Nat) : CrtTable :=
   CrtTable.ofModuli 254 8 14 moduli fallbackKind padSlack (wrapBound BN254.baseFieldModulus)
 
-/-- **The real table**: 85 moduli, 67 width-8 and 17 width-7 odd rows, slack 120. -/
-def bn254Table : CrtTable := fallbackTableOf bn254Moduli
+/-- Width-8 extraction on every odd modulus; the word width is unchanged from T9. -/
+def width8Row (chunks m : Nat) : OddRow :=
+  let ell := bitLength (chunks * (m - 1))
+  { ell, width0 := 8, width1 := ell - 8 - 1, keep := max 8 (ell - 5) }
+
+@[simp] theorem width8Row_ell (chunks m : Nat) :
+    (width8Row chunks m).ell = (t9Row chunks m).ell := rfl
+
+/-- Modulus 256 reuses chunk 0; every odd modulus uses first extraction width 8. -/
+def width8Kind (m : Nat) : Kind :=
+  if m = 256 then .chunkZero else .odd (width8Row 32 m)
+
+/-- A BN254 table with width 8 for every odd row. -/
+def width8TableOf (moduli : Array Nat) : CrtTable :=
+  CrtTable.ofModuli 254 8 14 moduli width8Kind padSlack (wrapBound BN254.baseFieldModulus)
+
+/-- **The real table**: 85 moduli, all 84 odd rows at width 8, slack 120. -/
+def bn254Table : CrtTable := width8TableOf bn254Moduli
 
 /-- The reduced table of the differential test: growth 0, 1 and 2 and
 the power of two. -/

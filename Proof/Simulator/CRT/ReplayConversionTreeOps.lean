@@ -83,7 +83,7 @@ theorem tree_castQueryDyn (cells : StageCells) (j : Nat) : (castQueryDyn cells j
   ⟨trivial, trivial, trivial, ⟨trivial, trivial⟩, ⟨trivial, trivial⟩⟩
 
 theorem tree_castLanesProg (cells : CastCells) (l : Nat) : (castLanesProg cells l).OpsSatisfy TreeOp :=
-  opsSatisfy_rep _ _ fun _ _ => ⟨⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, ⟨trivial, trivial⟩⟩
+  tree_of_det (det_castLanesProg cells l)
 
 theorem tree_castDyn (cells : StageCells) (rb start t base stride : Nat) :
     (castDyn cells rb start t base stride).OpsSatisfy TreeOp :=

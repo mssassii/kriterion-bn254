@@ -48,14 +48,27 @@ theorem bn254_fallbackFacts : ∀ i : Fin bn254Table.count, bn254Table.modulus i
         2 ^ (fallbackRow 32 (bn254Table.modulus i)).ell := by
   decide +kernel
 
+/-- The width-8 facts of every real odd modulus. Only small row data is evaluated here. -/
+theorem bn254_width8Facts : ∀ i : Fin bn254Table.count, bn254Table.modulus i ≠ 256 →
+    1 ≤ (width8Row 32 (bn254Table.modulus i)).width0 ∧
+      1 ≤ (width8Row 32 (bn254Table.modulus i)).width1 ∧
+      (width8Row 32 (bn254Table.modulus i)).width0 +
+        (width8Row 32 (bn254Table.modulus i)).width1 + 1 = (width8Row 32 (bn254Table.modulus i)).ell ∧
+      (width8Row 32 (bn254Table.modulus i)).width0 ≤ (width8Row 32 (bn254Table.modulus i)).keep ∧
+      (width8Row 32 (bn254Table.modulus i)).keep ≤ (width8Row 32 (bn254Table.modulus i)).ell ∧
+      (width8Row 32 (bn254Table.modulus i)).ell ≤ bn254Table.castWidth ∧
+      bn254Table.chunkCount * (bn254Table.modulus i - 1) <
+        2 ^ (width8Row 32 (bn254Table.modulus i)).ell := by
+  decide +kernel
+
 theorem bn254_odd : ∀ i row, bn254Table.kind i = .odd row →
     1 ≤ row.width0 ∧ 1 ≤ row.width1 ∧ row.width0 + row.width1 + 1 = row.ell ∧
       row.width0 ≤ row.keep ∧ row.keep ≤ row.ell ∧ row.ell ≤ bn254Table.castWidth ∧
       bn254Table.chunkCount * (bn254Table.modulus i - 1) < 2 ^ row.ell := by
   intro i row kind
-  have facts := bn254_fallbackFacts i
-  change fallbackKind (bn254Table.modulus i) = .odd row at kind
-  unfold fallbackKind at kind
+  have facts := bn254_width8Facts i
+  change width8Kind (bn254Table.modulus i) = .odd row at kind
+  unfold width8Kind at kind
   split at kind
   · cases kind
   · rename_i notPow

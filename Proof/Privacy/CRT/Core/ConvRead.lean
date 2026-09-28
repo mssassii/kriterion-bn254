@@ -4,14 +4,15 @@
 `Conversion.lean` states the conversion core on the hidden values `ConvVals tbl`. On the chain's tag table
 (`TagTable := Fin (2 ^ 40) → Block × Block`, read by tag, `tagRead`) the garbler's own hidden values are the readings
 of the table at the hot tags (`readHot tbl coord v (tagRead A)`): `clip` of `.1` of one answer per hashed tree, growth or fold
-level, the cast reading of `castAnswers l` answers per pin. This file names every such read (`HotRead tbl`, one index
+level, the upper planes of the cast reading of `castAnswers l` answers per pin. This file names every such read (`HotRead tbl`, one index
 per answer read) and its tag (`readTag`), shows that the hot readings are a fixed function `rho` of the table read at
 those tags (`readHot_eq`, by `rfl`), and that `rho` pushes the uniform law to the uniform law (`rho_uniform`, from the
-clipped first-block projection and `castLanes_uniform`). The index types are built from sums and sigmas in the shape of
+clipped first-block projection and `upperRead_uniform`). The index types are built from sums and sigmas in the shape of
 `ConvVals`, so the law is the composition of `TableSplit`'s combinators.
 -/
 
 import Proof.Privacy.CRT.Core.LabelUniform
+import Proof.Privacy.CRT.Core.ParityRead
 import Proof.Privacy.CRT.Core.Conversion
 import Proof.Privacy.CRT.Core.TableSplit
 import Proof.Privacy.CRT.Swap.Reading
@@ -22,7 +23,7 @@ set_option linter.unusedSectionVars false
 namespace Kriterion.CRT.Privacy.Conv
 
 open Cryptography Kriterion.ArgoMAC Kriterion.CRT
-open Kriterion.CRT.Privacy.ExtractStage (Hidden)
+open Kriterion.CRT.Privacy.ExtractStage (Hidden UpperHidden)
 open Kriterion.CRT.ExtractSpec (StageParams gJoin gPin gBit gNext gCast gLeaf gRes gNode gBit0 gLevelSum)
 open Kriterion.CRT.Privacy.Split (pi_map_uniform prod_map_uniform)
 
@@ -100,6 +101,16 @@ theorem castRead_uniform (l : ℕ) (hl : l ≤ 128) :
     exact PMF.tsum_coe _
   · exact Privacy.castLanes_uniform l hpos hl
 
+/-- Only the upper cast planes are independent hidden randomness. The old full
+cast reading is used solely before its low plane is discarded. -/
+theorem upperRead_uniform (l : ℕ) (hl : l ≤ 128) :
+    (PMF.uniformOfFintype (Fin (castAnswers l) → Block × Block)).map
+        (fun answers => Parity.pinHalf l (castLanes l (packAnswers (castAnswers l) answers))) =
+      PMF.uniformOfFintype (Lanes (l - 1)) := by
+  change (PMF.uniformOfFintype _).map
+    ((Parity.pinHalf l) ∘ fun answers => castLanes l (packAnswers (castAnswers l) answers)) = _
+  rw [← PMF.map_comp, castRead_uniform l hl, ParityRead.pinHalf_uniform]
+
 /-! ### The hot reads -/
 
 /-- The hot reads of one fused stage: the hashed levels' materials and the hot cast's answers. -/
@@ -122,8 +133,8 @@ abbrev HotRead (tbl : CrtTable) : Type :=
 def fstRho (n : ℕ) (g : Fin n → Block × Block) : Fin n → Label := fun k => (clip (g k).1)
 
 /-- A stage's hidden tuple from its reads. -/
-def pairRho (w l : ℕ) (g : PairRead w l → Block × Block) : Hidden labelBits w l :=
-  (fstRho _ fun k => g (.inl k), castLanes l (packAnswers (castAnswers l) fun j => g (.inr j)))
+def pairRho (w l : ℕ) (g : PairRead w l → Block × Block) : UpperHidden w l :=
+  (fstRho _ fun k => g (.inl k), Parity.pinHalf l (castLanes l (packAnswers (castAnswers l) fun j => g (.inr j))))
 
 /-- The growth and fold materials of a modulus from their reads. -/
 def gfRho (row : OddRow) (g : (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep)) → Block × Block) :
@@ -133,7 +144,7 @@ def gfRho (row : OddRow) (g : (Fin (row.keep - row.width0) ⊕ Fin (row.ell - ro
 /-- Stage 1, growth and folds of a modulus from their reads. -/
 def tailRho (row : OddRow) (g : (PairRead row.width1 (row.ell - row.width0) ⊕
     (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep))) → Block × Block) :
-    Hidden labelBits row.width1 (row.ell - row.width0) ×
+    UpperHidden row.width1 (row.ell - row.width0) ×
       ((Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label)) :=
   (pairRho row.width1 (row.ell - row.width0) fun r => g (.inl r), gfRho row fun r => g (.inr r))
 
@@ -148,8 +159,8 @@ def chunkJoinRho (tbl : CrtTable) (g : (Σ c : Fin tbl.chunkCount, Fin (tbl.chun
 
 /-- The chunks' hot casts from their reads. -/
 def chunkPinRho (tbl : CrtTable) (g : (Σ c : Fin tbl.chunkCount, Fin (castAnswers tbl.castWidth)) → Block × Block) :
-    Fin tbl.chunkCount → Lanes tbl.castWidth :=
-  fun c => castLanes tbl.castWidth (packAnswers (castAnswers tbl.castWidth) fun j => g ⟨c, j⟩)
+    Fin tbl.chunkCount → Lanes (tbl.castWidth - 1) :=
+  fun c => Parity.pinHalf tbl.castWidth (castLanes tbl.castWidth (packAnswers (castAnswers tbl.castWidth) fun j => g ⟨c, j⟩))
 
 /-- The chunks' hidden values from their reads. -/
 def chunkRho (tbl : CrtTable) (g : ChunkRead tbl → Block × Block) : ChunkVals tbl :=
@@ -170,9 +181,9 @@ theorem fstRho_uniform (n : ℕ) :
 
 theorem pairRho_uniform (w l : ℕ) (hl : l ≤ 128) :
     (PMF.uniformOfFintype (PairRead w l → Block × Block)).map (pairRho w l) =
-      PMF.uniformOfFintype (Hidden labelBits w l) :=
-  sum_map_uniform (fstRho _) (fun g => castLanes l (packAnswers (castAnswers l) g)) (fstRho_uniform _)
-    (castRead_uniform l hl)
+      PMF.uniformOfFintype (UpperHidden w l) :=
+  sum_map_uniform (fstRho _) (fun g => Parity.pinHalf l (castLanes l (packAnswers (castAnswers l) g))) (fstRho_uniform _)
+    (upperRead_uniform l hl)
 
 theorem gfRho_uniform (row : OddRow) :
     (PMF.uniformOfFintype ((Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep)) → Block × Block)).map
@@ -182,7 +193,7 @@ theorem gfRho_uniform (row : OddRow) :
 theorem tailRho_uniform (row : OddRow) (hl : row.ell ≤ 128) :
     (PMF.uniformOfFintype ((PairRead row.width1 (row.ell - row.width0) ⊕
       (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep))) → Block × Block)).map (tailRho row) =
-      PMF.uniformOfFintype (Hidden labelBits row.width1 (row.ell - row.width0) ×
+      PMF.uniformOfFintype (UpperHidden row.width1 (row.ell - row.width0) ×
         ((Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label))) :=
   sum_map_uniform (pairRho _ _) (gfRho row) (pairRho_uniform _ _ (le_trans (Nat.sub_le _ _) hl)) (gfRho_uniform row)
 
@@ -198,7 +209,7 @@ theorem chunkRho_uniform (tbl : CrtTable) (hL : tbl.castWidth ≤ 128) :
     (sigma_map_uniform (β := fun c : Fin tbl.chunkCount => Fin (tbl.chunkWidth c.val - 1))
       (fun _ => fstRho _) fun _ => fstRho_uniform _)
     (sigma_map_uniform (β := fun _ : Fin tbl.chunkCount => Fin (castAnswers tbl.castWidth))
-      (fun _ g => castLanes tbl.castWidth (packAnswers (castAnswers tbl.castWidth) g)) fun _ => castRead_uniform _ hL)
+      (fun _ g => Parity.pinHalf tbl.castWidth (castLanes tbl.castWidth (packAnswers (castAnswers tbl.castWidth) g))) fun _ => upperRead_uniform _ hL)
 
 /-- **The hidden values of uniform hot reads are uniform** (cast widths at most `128`). -/
 theorem rho_uniform (tbl : CrtTable) (hL : tbl.castWidth ≤ 128)
@@ -413,47 +424,80 @@ theorem tag40_not_hot (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : ℕ
 
 section Congr
 
-open Kriterion.CRT.Privacy.ExtractStage (overrideHot specPublish)
+open Kriterion.CRT.Privacy.ExtractStage (upperOverrideHot upperSpecPublish)
 
 /-- **A stage on two tables that agree at its cold tags** publishes the same, with the same remainder and bits. -/
 theorem stage_congr (T T' : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (tt ct : ℕ → ℕ → ℕ) (s : ℕ)
-    (h : Hidden labelBits w rb) (R : Lanes rb) (Δ : Label)
+    (h : UpperHidden w rb) (R : Lanes rb) (Δ : Label)
     (treeEq : ∀ n x, 1 ≤ n → n < w → x < 2 ^ n → x ≠ s % 2 ^ n → (clip (T (tt n x)).1) = (clip (T' (tt n x)).1))
-    (castEq : ∀ α, α < 2 ^ w → α ≠ s → castRd T rb (ct α) = castRd T' rb (ct α)) :
-    specPublish (tableStage T w hw tt ct) R Δ s h = specPublish (tableStage T' w hw tt ct) R Δ s h ∧
-      (gNext (overrideHot (tableStage T w hw tt ct) s h) R Δ : Lanes (rb - w)) =
-        gNext (overrideHot (tableStage T' w hw tt ct) s h) R Δ ∧
-      ∀ n, gBit (overrideHot (tableStage T w hw tt ct) s h) R Δ n =
-        gBit (overrideHot (tableStage T' w hw tt ct) s h) R Δ n := by
-  have casts : ∀ α ∈ Finset.range (2 ^ w), gCast (overrideHot (tableStage T w hw tt ct) s h) R Δ α =
-      gCast (overrideHot (tableStage T' w hw tt ct) s h) R Δ α := by
-    intro α hα
-    show (if α = s then h.2 else castRd T rb (ct α)) = (if α = s then h.2 else castRd T' rb (ct α))
-    split_ifs with e
+    (castEq : ∀ α, α < 2 ^ w → α ≠ s → upperRd T rb (ct α) = upperRd T' rb (ct α)) :
+    upperSpecPublish (tableStage T w hw tt ct) R Δ s h = upperSpecPublish (tableStage T' w hw tt ct) R Δ s h ∧
+      (gNext (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ : Lanes (rb - w)) =
+        gNext (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ ∧
+      ∀ n, gBit (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ n =
+        gBit (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ n := by
+  have mats : ∀ n x G G', 1 ≤ n → n < w → x < 2 ^ n →
+      (upperOverrideHot (tableStage T w hw tt ct) s h).mat n x G =
+      (upperOverrideHot (tableStage T' w hw tt ct) s h).mat n x G' := by
+    intro n x G G' hn1 hn2 hx
+    change (if x = s % 2 ^ n then _ else clip (T (tt n x)).1) =
+      (if x = s % 2 ^ n then _ else clip (T' (tt n x)).1)
+    split_ifs with hit
     · rfl
-    · exact castEq α (Finset.mem_range.mp hα) e
-  have res : ∀ n, gRes (overrideHot (tableStage T w hw tt ct) s h) R Δ n =
-      gRes (overrideHot (tableStage T' w hw tt ct) s h) R Δ n := fun n =>
+    · exact treeEq n x hn1 hn2 hx hit
+  have nodes : ∀ n, n ≤ w → ∀ x,
+      gNode (upperOverrideHot (tableStage T w hw tt ct) s h)
+        (gBit0 (tableStage T w hw tt ct) R) Δ n x =
+      gNode (upperOverrideHot (tableStage T' w hw tt ct) s h)
+        (gBit0 (tableStage T' w hw tt ct) R) Δ n x := by
+    intro n
+    induction n with
+    | zero => intros; rfl
+    | succ n ih =>
+      intro hn x
+      simp only [gNode, ih (by omega)]
+      cases n with
+      | zero => rfl
+      | succ n =>
+        simp only [Kriterion.CRT.ExtractSpec.stepMat]
+        rw [mats (n + 1) (x % 2 ^ (n + 1)) _ _ (by omega) (by omega)
+          (Nat.mod_lt _ (Nat.two_pow_pos _))]
+  have casts : ∀ α ∈ Finset.range (2 ^ w), gCast (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ α =
+      gCast (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ α := by
+    intro α hα
+    unfold gCast gLeaf
+    rw [show (upperOverrideHot (tableStage T w hw tt ct) s h).w = w from rfl,
+      show gBit0 (upperOverrideHot (tableStage T w hw tt ct) s h) R =
+        gBit0 (tableStage T w hw tt ct) R from rfl, nodes w le_rfl α]
+    change (if α = s then _ else parityRd T rb (ct α) _) =
+      (if α = s then _ else parityRd T' rb (ct α) _)
+    split_ifs with hit
+    · rfl
+    · unfold parityRd
+      rw [castEq α (Finset.mem_range.mp hα) hit]
+      rfl
+  have res : ∀ n, gRes (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ n =
+      gRes (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ n := fun n =>
     Finset.sum_congr rfl fun α hα => by rw [casts α hα]
-  have bits : ∀ n, gBit (overrideHot (tableStage T w hw tt ct) s h) R Δ n =
-      gBit (overrideHot (tableStage T' w hw tt ct) s h) R Δ n := by
+  have bits : ∀ n, gBit (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ n =
+      gBit (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ n := by
     intro n
     unfold gBit
     rw [res]
     rfl
-  have next : (gNext (overrideHot (tableStage T w hw tt ct) s h) R Δ : Lanes (rb - w)) =
-      gNext (overrideHot (tableStage T' w hw tt ct) s h) R Δ := by
-    show peelDiv R (gRes (overrideHot (tableStage T w hw tt ct) s h) R Δ w) w =
-      peelDiv R (gRes (overrideHot (tableStage T' w hw tt ct) s h) R Δ w) w
+  have next : (gNext (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ : Lanes (rb - w)) =
+      gNext (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ := by
+    show peelDiv R (gRes (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ w) w =
+      peelDiv R (gRes (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ w) w
     rw [res]
-  have pin : gPin (overrideHot (tableStage T w hw tt ct) s h) R Δ =
-      gPin (overrideHot (tableStage T' w hw tt ct) s h) R Δ := by
-    show (∑ α ∈ Finset.range (2 ^ w), gCast (overrideHot (tableStage T w hw tt ct) s h) R Δ α) +
+  have pin : gPin (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ =
+      gPin (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ := by
+    show (∑ α ∈ Finset.range (2 ^ w), gCast (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ α) +
         deltaLanes rb Δ =
-      (∑ α ∈ Finset.range (2 ^ w), gCast (overrideHot (tableStage T' w hw tt ct) s h) R Δ α) + deltaLanes rb Δ
+      (∑ α ∈ Finset.range (2 ^ w), gCast (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ α) + deltaLanes rb Δ
     rw [Finset.sum_congr rfl casts]
-  have levels : ∀ n, 1 ≤ n → n < w → gLevelSum (overrideHot (tableStage T w hw tt ct) s h) R Δ n =
-      gLevelSum (overrideHot (tableStage T' w hw tt ct) s h) R Δ n := by
+  have levels : ∀ n, 1 ≤ n → n < w → gLevelSum (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ n =
+      gLevelSum (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ n := by
     intro n h1 h2
     unfold gLevelSum
     apply SliceC.xsum_congr
@@ -463,27 +507,27 @@ theorem stage_congr (T T' : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w
     split_ifs with e
     · rfl
     · exact treeEq n x h1 h2 (Finset.mem_range.mp hx) e
-  refine ⟨Prod.ext (funext fun k => ?_) pin, next, bits⟩
+  refine ⟨Prod.ext (funext fun k => ?_) (congrArg (Parity.pinHalf rb) pin), next, bits⟩
   have hk : k.val < w - 1 := k.isLt
-  show gLevelSum (overrideHot (tableStage T w hw tt ct) s h) R Δ (k.val + 1) ^^^
-      gBit (overrideHot (tableStage T w hw tt ct) s h) R Δ (k.val + 1) =
-    gLevelSum (overrideHot (tableStage T' w hw tt ct) s h) R Δ (k.val + 1) ^^^
-      gBit (overrideHot (tableStage T' w hw tt ct) s h) R Δ (k.val + 1)
+  show gLevelSum (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ (k.val + 1) ^^^
+      gBit (upperOverrideHot (tableStage T w hw tt ct) s h) R Δ (k.val + 1) =
+    gLevelSum (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ (k.val + 1) ^^^
+      gBit (upperOverrideHot (tableStage T' w hw tt ct) s h) R Δ (k.val + 1)
   rw [levels (k.val + 1) (by omega) (by omega), bits]
 
 /-- Stage 1's input remainder in `modPublish`. -/
 def modR1 (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ) (Δ : Label) (hw0 : row.width0 ≤ row.ell)
     (W : Lanes row.ell) (h : StageVals row) : Lanes (row.ell - row.width0) :=
-  gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
+  gNext (upperOverrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
     (σ % 2 ^ row.width0) h.1) W Δ
 
 /-- The bit masks of the growth and fold joins in `modPublish`. -/
 def modBit (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ) (Δ : Label) (hw0 : row.width0 ≤ row.ell)
     (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) (h : StageVals row) (p : ℕ) : Label :=
   if p < row.width0 + row.width1 then
-    gBit (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+    gBit (upperOverrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
       (σ / 2 ^ row.width0 % 2 ^ row.width1) h.2.1) (modR1 T coord i row σ Δ hw0 W h) Δ (p - row.width0)
-  else laneBit (gNext (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+  else laneBit (gNext (upperOverrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
       (σ / 2 ^ row.width0 % 2 ^ row.width1) h.2.1) (modR1 T coord i row σ Δ hw0 W h) Δ) 0
 
 section Forms
@@ -492,11 +536,11 @@ variable (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ
   (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) (h : StageVals row)
 
 theorem modPublish_stage0 : (modPublish T coord i row m σ Δ hw0 hw1 W h).1 =
-    specPublish (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
+    upperSpecPublish (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)) W Δ
       (σ % 2 ^ row.width0) h.1 := rfl
 
 theorem modPublish_stage1 : (modPublish T coord i row m σ Δ hw0 hw1 W h).2.1 =
-    specPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
+    upperSpecPublish (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
       (modR1 T coord i row σ Δ hw0 W h) Δ (σ / 2 ^ row.width0 % 2 ^ row.width1) h.2.1 := rfl
 
 theorem modPublish_grow (k : Fin (row.keep - row.width0)) : (modPublish T coord i row m σ Δ hw0 hw1 W h).2.2.1 k =
@@ -519,12 +563,12 @@ theorem modPublish_congr (T T' : ℕ → Block × Block) (coord i : ℕ) (row : 
     (tree0 : ∀ n x, 1 ≤ n → n < row.width0 → x < 2 ^ n → x ≠ σ % 2 ^ row.width0 % 2 ^ n →
       (clip (T (extTreeTag coord i 0 n x)).1) = (clip (T' (extTreeTag coord i 0 n x)).1))
     (cast0 : ∀ α, α < 2 ^ row.width0 → α ≠ σ % 2 ^ row.width0 →
-      castRd T row.ell (extCastTag coord i 0 α) = castRd T' row.ell (extCastTag coord i 0 α))
+      upperRd T row.ell (extCastTag coord i 0 α) = upperRd T' row.ell (extCastTag coord i 0 α))
     (tree1 : ∀ n x, 1 ≤ n → n < row.width1 → x < 2 ^ n → x ≠ σ / 2 ^ row.width0 % 2 ^ row.width1 % 2 ^ n →
       (clip (T (extTreeTag coord i 1 n x)).1) = (clip (T' (extTreeTag coord i 1 n x)).1))
     (cast1 : ∀ α, α < 2 ^ row.width1 → α ≠ σ / 2 ^ row.width0 % 2 ^ row.width1 →
-      castRd T (row.ell - row.width0) (extCastTag coord i 1 α) =
-        castRd T' (row.ell - row.width0) (extCastTag coord i 1 α))
+      upperRd T (row.ell - row.width0) (extCastTag coord i 1 α) =
+        upperRd T' (row.ell - row.width0) (extCastTag coord i 1 α))
     (grow : ∀ k, k < row.keep - row.width0 → ∀ x, x < 2 ^ (row.width0 + k) → x ≠ σ % 2 ^ (row.width0 + k) →
       (clip (T (growTag coord i (row.width0 + k) x)).1) = (clip (T' (growTag coord i (row.width0 + k) x)).1))
     (fold : ∀ k, k < row.ell - row.keep → ∀ ρ, ρ < m → ρ ≠ σ % 2 ^ (row.keep + k) % m →
@@ -584,20 +628,35 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
     (agree : ∀ x, (∀ r, tag40 (readTag tbl coord v r) ≠ x) → A x = A' x) (h : ConvVals tbl) :
     convPublish tbl coord v ⟨tagRead A, Z, Δ⟩ h = convPublish tbl coord v ⟨tagRead A', Z, Δ⟩ h := by
   have cold := cold_at tbl range coord v hc A A' agree
+  have trees : ∀ c : Fin tbl.chunkCount,
+      chunkTreeH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.1 c =
+        chunkTreeH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.1 c := by
+    intro c
+    apply materialTree_congr
+    intro n hn1 hn2 slot hslot
+    unfold chunkMatH
+    split_ifs with hit
+    · rfl
+    · obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
+      have cw := range.chunkWidth c.val c.isLt
+      exact congrArg (fun a => clip a.1) (cold (.inl (.inl ⟨c, ⟨k, by omega⟩⟩)) slot
+        (lt_of_lt_of_le hslot (le_of_lt (two_pow_lt_65536 (by omega)))) hit)
   -- the chunks' casts
   have casts : ∀ (c : Fin tbl.chunkCount) (leaf : ℕ), leaf < 2 ^ tbl.chunkWidth c.val →
-      chunkCastH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.2 c leaf = chunkCastH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.2 c leaf := by
+      chunkCastH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 c leaf = chunkCastH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 c leaf := by
     intro c leaf hleaf
     unfold chunkCastH
+    rw [trees c]
     split_ifs with e
     · rfl
-    · show castLanes _ (packAnswers _ _) = castLanes _ (packAnswers _ _)
-      congr 2
-      funext j
+    · unfold parityRd
+      apply congrArg (fun upper => Parity.liftUpper tbl.castWidth upper _)
+      apply upperRd_congr
+      intro j
       exact cold (.inl (.inr ⟨c, j⟩)) leaf
         (lt_of_lt_of_le hleaf (le_of_lt (two_pow_lt_65536 (range.chunkWidth c.val c.isLt)))) e
-  have word : ∀ m ell, wordH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.2 m ell =
-      wordH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.2 m ell := by
+  have word : ∀ m ell, wordH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 m ell =
+      wordH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 m ell := by
     intro m ell
     unfold wordH
     congr 1
@@ -616,11 +675,11 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
       have hw := range.chunkWidth c.val c.isLt
       exact congrArg (fun a => clip a.1) (cold (.inl (.inl ⟨c, k⟩)) slot.val
         (lt_of_lt_of_le slot.isLt (le_of_lt (two_pow_lt_65536 (by omega)))) e)
-  · show chunkPinH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.2 c = chunkPinH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.2 c
-    unfold chunkPinH
+  · show chunkPinH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 c = chunkPinH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 c
+    unfold chunkPinH chunkFullPinH
     rw [Finset.sum_congr rfl fun leaf _ => casts c leaf.val leaf.isLt]
-  · show modPublish (tagRead A) coord i.val _ _ _ Δ _ _ (wordH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.2 _ _) (h.2 i) =
-      modPublish (tagRead A') coord i.val _ _ _ Δ _ _ (wordH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.2 _ _) (h.2 i)
+  · show modPublish (tagRead A) coord i.val _ _ _ Δ _ _ (wordH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 _ _) (h.2 i) =
+      modPublish (tagRead A') coord i.val _ _ _ Δ _ _ (wordH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 _ _) (h.2 i)
     rw [← word]
     have hl := range.ell i
     have hm := range.modulus i
@@ -639,18 +698,16 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
       exact congrArg (fun a => clip a.1) (cold (.inr ⟨i, .inl (.inl ⟨k, by omega⟩)⟩) x
         (lt_of_lt_of_le hx (le_of_lt (two_pow_lt_65536 (by omega)))) e)
     · intro α hα e
-      show castLanes _ (packAnswers _ _) = castLanes _ (packAnswers _ _)
-      congr 2
-      funext j
+      apply upperRd_congr
+      intro j
       exact cold (.inr ⟨i, .inl (.inr j)⟩) α (lt_of_lt_of_le hα (le_of_lt (two_pow_lt_65536 (by omega)))) e
     · intro n x h1 h2 hx e
       obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
       exact congrArg (fun a => clip a.1) (cold (.inr ⟨i, .inr (.inl (.inl ⟨k, by omega⟩))⟩) x
         (lt_of_lt_of_le hx (le_of_lt (two_pow_lt_65536 (by omega)))) e)
     · intro α hα e
-      show castLanes _ (packAnswers _ _) = castLanes _ (packAnswers _ _)
-      congr 2
-      funext j
+      apply upperRd_congr
+      intro j
       exact cold (.inr ⟨i, .inr (.inl (.inr j))⟩) α (lt_of_lt_of_le hα (le_of_lt (two_pow_lt_65536 (by omega))))
         e
     · intro k hk x hx e

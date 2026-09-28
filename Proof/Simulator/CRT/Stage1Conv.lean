@@ -6,7 +6,7 @@ conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatte
 block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
-`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `3412` for every `ConvPublic`.
+`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `3178` for every `ConvPublic`.
 -/
 
 import Proof.Simulator.CRT.Stage1Wire
@@ -29,9 +29,10 @@ theorem chunkCount_eq : Entry.table.chunkCount = 32 := by decide
 
 theorem castWidth_eq : Entry.table.castWidth = 14 := rfl
 
-/-- Every chunk's joins and pin are in range, and a chunk pin has the cast width. -/
+/-- Every chunk's joins and pin are in range, and a chunk's stored half-pin has one lane bit less than the cast
+width. -/
 theorem chunkFacts : ∀ c : Fin 32, chunkJoinBase c + (Entry.table.chunkWidth c - 1) ≤ joinCount ∧
-    c.val < pinCount ∧ pinWidthAt c = Entry.table.castWidth := by
+    c.val < pinCount ∧ pinWidthAt c = Entry.table.castWidth - 1 := by
   decide +kernel
 
 /-- The facts of one modulus. -/
@@ -41,8 +42,8 @@ def modFacts (i : Fin Entry.table.count) : Bool :=
   | .odd row =>
     decide (modJoinBase i + (row.width0 - 1) + (row.width1 - 1) + (row.keep - row.width0) + (row.ell - row.keep)
       ≤ joinCount) &&
-    decide (modPinBase i + 1 < pinCount) && decide (pinWidthAt (modPinBase i) = row.ell) &&
-    decide (pinWidthAt (modPinBase i + 1) = row.ell - row.width0)
+    decide (modPinBase i + 1 < pinCount) && decide (pinWidthAt (modPinBase i) = row.ell - 1) &&
+    decide (pinWidthAt (modPinBase i + 1) = row.ell - row.width0 - 1)
 
 set_option maxRecDepth 100000 in
 theorem modFacts_all : ∀ i, modFacts i = true := by decide +kernel
@@ -50,8 +51,8 @@ theorem modFacts_all : ∀ i, modFacts i = true := by decide +kernel
 theorem modFacts_of (i : Fin Entry.table.count) (row : OddRow) (odd : Entry.table.kind i = .odd row) :
     modJoinBase i + (row.width0 - 1) + (row.width1 - 1) + (row.keep - row.width0) + (row.ell - row.keep)
         ≤ joinCount ∧
-      modPinBase i + 1 < pinCount ∧ pinWidthAt (modPinBase i) = row.ell ∧
-      pinWidthAt (modPinBase i + 1) = row.ell - row.width0 := by
+      modPinBase i + 1 < pinCount ∧ pinWidthAt (modPinBase i) = row.ell - 1 ∧
+      pinWidthAt (modPinBase i + 1) = row.ell - row.width0 - 1 := by
   have facts := modFacts_all i
   simp only [modFacts, odd, Bool.and_eq_true, decide_eq_true_eq] at facts
   exact ⟨facts.1.1.1, facts.1.1.2, facts.1.2, facts.2⟩
@@ -210,7 +211,7 @@ theorem conv_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : 
     rw [blockBits_append, pieceListBits_append]
     congr 1
     · exact joins_bits ram source κ holds _ _ joinsIn _ (fun n _ => by simp [Source.conv])
-    · rw [show Entry.table.castWidth = pinWidthAt c from pinWidthIs.symm]
+    · rw [show Entry.table.castWidth - 1 = pinWidthAt c from pinWidthIs.symm]
       exact pin_bits ram source κ holds c pinIn _ (fun b _ => by simp [Source.conv])
   · congr 1
     apply List.map_congr_left

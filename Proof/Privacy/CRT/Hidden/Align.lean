@@ -1044,15 +1044,15 @@ theorem conversion_aligned (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label)
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H).next).eval H).joins := by
     rw [hpJ]
     rfl
-  have hP0 : (pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) =
+  have hP0 : (Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub.stagePin i 0 k.val)) =
       ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H).pin := by
     rw [hpP]
-    exact pinOfBlocks_atNat (by omega) _
-  have hP1 : (pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) =
+    exact expand_pinOfBlocks_atNat _ _ (extStageGarbleM_pin_even _ _ _ _ _ _)
+  have hP1 : (Parity.pinExpand (row.ell - row.width0) (pinOfBlocks (row.ell - row.width0 - 1) fun k => pub.stagePin i 1 k.val)) =
       ((extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ
         ((extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H).next).eval H).pin := by
     rw [hpP]
-    exact pinOfBlocks_atNat (by omega) _
+    exact expand_pinOfBlocks_atNat _ _ (extStageGarbleM_pin_even _ _ _ _ _ _)
   simp only [conversionGarbleM, conversionEvalM, asked_bind, asked_pure, List.append_nil]
   rw [hJ0, hP0, hn0, hJ1, hP1, hpG, hpF]
   set g0 := (extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H with hg0
@@ -1197,23 +1197,23 @@ theorem coord_aligned (T : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ → L
   set g := (coordGarbleM T S coord Δ Z).eval H with hg
   have hchunk : ∀ c (hc : c < T.chunkCount),
       asked H (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v (g.pub.chunkJoin c)
-        (pinOfBlocks T.castWidth fun k => g.pub.chunkPin c k.val) c) =
+        (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => g.pub.chunkPin c k.val)) c) =
       asked H (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v
         ((chunkGarbleM T coord Δ Z c).eval H).joins ((chunkGarbleM T coord Δ Z c).eval H).pin c) := by
     intro c hc
-    rw [fJ c, fP c hc, pinOfBlocks_pinBlocks hT.castWidth_pos, atNat_of_lt _ _ hc]
+    rw [fJ c, fP c hc, pinOfBlocks_pinBlocks_all, Parity.pinExpand_pinHalf _ _ (chunkGarbleM_pin_even _ _ _ _ _ _), atNat_of_lt _ _ hc]
   have hchunkEval : ∀ c (hc : c < T.chunkCount),
       (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v (g.pub.chunkJoin c)
-        (pinOfBlocks T.castWidth fun k => g.pub.chunkPin c k.val) c).eval H =
+        (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => g.pub.chunkPin c k.val)) c).eval H =
       (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v
         ((chunkGarbleM T coord Δ Z c).eval H).joins ((chunkGarbleM T coord Δ Z c).eval H).pin c).eval H := by
     intro c hc
-    rw [fJ c, fP c hc, pinOfBlocks_pinBlocks hT.castWidth_pos, atNat_of_lt _ _ hc]
+    rw [fJ c, fP c hc, pinOfBlocks_pinBlocks_all, Parity.pinExpand_pinHalf _ _ (chunkGarbleM_pin_even _ _ _ _ _ _), atNat_of_lt _ _ hc]
   set chunksG := atNat (fun c : Fin T.chunkCount => (chunkGarbleM T coord Δ Z c.val).eval H)
     (ChunkGarbled.empty T.castWidth) with hchunksG
   set chunksE := atNat (fun index : Fin T.chunkCount =>
     (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v (g.pub.chunkJoin index.val)
-      (pinOfBlocks T.castWidth fun k => g.pub.chunkPin index.val k.val) index.val).eval H)
+      (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => g.pub.chunkPin index.val k.val)) index.val).eval H)
     (ChunkEval.empty T.castWidth) with hchunksE
   have hL : ∀ c < T.chunkCount, ∀ α < 2 ^ T.chunkWidth c,
       (chunksE c).leaves α = (chunksG c).leaves α ^^^ (if α = T.chunkValue v c then Δ else 0) := by

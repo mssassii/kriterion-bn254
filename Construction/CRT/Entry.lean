@@ -398,8 +398,24 @@ theorem stagesNonempty_fallbackTableOf (moduli : Array Nat) (large : ∀ i : Fin
     simp only [fallbackRow, bitLength]
     constructor <;> omega
 
+/-- Every width-8 row has nonempty extraction stages for moduli at least 17. -/
+theorem stagesNonempty_width8TableOf (moduli : Array Nat)
+    (large : ∀ i : Fin moduli.size, 17 ≤ moduli[i]) :
+    (width8TableOf moduli).StagesNonempty := by
+  intro i row kind
+  have atLeast := large i
+  simp only [width8TableOf, CrtTable.ofModuli, width8Kind] at kind
+  split at kind
+  · cases kind
+  · cases kind
+    have nonzero : 32 * (moduli[i] - 1) ≠ 0 := by omega
+    have nine : 9 ≤ Nat.log2 (32 * (moduli[i] - 1)) :=
+      (Nat.le_log2 nonzero).mpr (by omega)
+    simp only [width8Row, bitLength]
+    constructor <;> omega
+
 theorem stagesNonempty_table : table.StagesNonempty :=
-  stagesNonempty_fallbackTableOf bn254Moduli (by decide)
+  stagesNonempty_width8TableOf bn254Moduli (by decide)
 
 theorem bounded_garbleCM (scalar : NonZeroScalar) (coins : Coins) :
     (garbleCM scalar coins).Bounded garbleBudget := by

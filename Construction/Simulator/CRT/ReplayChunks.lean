@@ -115,23 +115,23 @@ theorem cost_treeEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (levels 
   rfl
 
 theorem cost_castEntry (cc : ChunkCastCells) (width l : Nat) (tagOf : Nat → Nat → Nat) (leaf : Nat) :
-    (castEntry cc width l tagOf leaf).cost = 8 + (9 * castAnswers l + 8 * laneCount) := by
+    (castEntry cc width l tagOf leaf).cost = 8 + (9 * castAnswers l + 2 + 14 * laneCount) := by
   simp only [castEntry, Prog.cost_seq, Prog.cost_ite, cost_castBlock]
-  show 6 + (1 + max (9 * castAnswers l + 8 * laneCount + 1) 0) = _
+  show 6 + (1 + max (9 * castAnswers l + 2 + 14 * laneCount + 1) 0) = _
   omega
 
 theorem cost_solveTerm (cc : ChunkCastCells) (width l i leaf : Nat) :
     (solveTerm cc width l i leaf).cost = 15 := rfl
 
 theorem cost_solveLane (cc : ChunkCastCells) (width l i : Nat) :
-    (solveLane cc width l i).cost = 9 + 15 * 2 ^ width := by
+    (solveLane cc width l i).cost = 10 + 15 * 2 ^ width := by
   simp only [solveLane, Prog.cost_seq, Prog.cost_rep _ _ 15 (fun leaf _ => cost_solveTerm cc width l i leaf)]
-  show 2 + (2 ^ width * 15 + (2 + (1 + (1 + (1 + (1 + 1)))))) = _
+  show 2 + (1 + (2 ^ width * 15 + (2 + (1 + (1 + (1 + (1 + 1))))))) = _
   omega
 
 theorem cost_chunkCastPhase (cc : ChunkCastCells) (width l : Nat) (tagOf : Nat → Nat → Nat) :
     (chunkCastPhase cc width l tagOf).cost =
-      2 ^ width * (8 + (9 * castAnswers l + 8 * laneCount)) + laneCount * (9 + 15 * 2 ^ width) := by
+      2 ^ width * (8 + (9 * castAnswers l + 2 + 14 * laneCount)) + laneCount * (10 + 15 * 2 ^ width) := by
   simp only [chunkCastPhase, castLoop, pinSolve, Prog.cost_seq,
     Prog.cost_rep _ _ _ (fun leaf _ => cost_castEntry cc width l tagOf leaf),
     Prog.cost_rep _ _ _ (fun i _ => cost_solveLane cc width l i), laneCount]
@@ -145,7 +145,7 @@ theorem cost_chunkStep (cc : CoordCells) (offset width : Nat → Nat)
     (tagTree tagCast : Nat → Nat → Nat → Nat) (l c : Nat) :
     (chunkStep cc offset width tagTree tagCast l c).cost =
       8 + (8 + ∑ k ∈ Finset.range (width c - 1), (16 + 27 * 2 ^ (k + 1))) +
-        (2 ^ width c * (8 + (9 * castAnswers l + 8 * laneCount)) + laneCount * (9 + 15 * 2 ^ width c)) +
+        (2 ^ width c * (8 + (9 * castAnswers l + 2 + 14 * laneCount)) + laneCount * (10 + 15 * 2 ^ width c)) +
         4 * 2 ^ width c := by
   simp only [chunkStep, chunkReplay, Prog.cost_seq, cost_treeEval, cost_chunkCastPhase, cost_saveLeaves]
   rw [show (chunkPrefix cc.coordCell cc.alpha (offset c) (width c)).cost = 8 from rfl]
@@ -156,7 +156,7 @@ theorem cost_chunkLoop (cc : CoordCells) (offset width : Nat → Nat)
     (tagTree tagCast : Nat → Nat → Nat → Nat) (l count : Nat) :
     (chunkLoop cc offset width tagTree tagCast l count).cost =
       ∑ c ∈ Finset.range count, (8 + (8 + ∑ k ∈ Finset.range (width c - 1), (16 + 27 * 2 ^ (k + 1))) +
-        (2 ^ width c * (8 + (9 * castAnswers l + 8 * laneCount)) + laneCount * (9 + 15 * 2 ^ width c)) +
+        (2 ^ width c * (8 + (9 * castAnswers l + 2 + 14 * laneCount)) + laneCount * (10 + 15 * 2 ^ width c)) +
         4 * 2 ^ width c) := by
   simp only [chunkLoop, cost_rep_sum, cost_chunkStep]
 

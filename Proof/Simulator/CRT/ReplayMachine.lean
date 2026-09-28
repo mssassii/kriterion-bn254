@@ -29,7 +29,7 @@ structure CoordReads (κ S : Nat) (conv : ConvPublic) (records : Fin S → Nat) 
     memory.ram (word (Layout.sourceJoin κ (Entry.chunkJoinBase c + (n - 1)))) = labelWord (conv.chunkJoin c n)
   chunkPins : ∀ c, c < 32 → ∀ i (ib : i < laneCount),
     memory.ram (word (Layout.sourcePin κ 0 0 + 128 * c + i)) =
-      word ((pinOfBlocks 14 fun k => conv.chunkPin c k.val) ⟨i, ib⟩).val
+      word ((pinOfBlocks 13 fun k => conv.chunkPin c k.val) ⟨i, ib⟩).val
   stageJoins0 : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ n, 1 ≤ n → n < row.width0 →
       memory.ram (word (stageJoin κ i.val 0 + n)) = labelWord (conv.stageJoin i.val 0 n)
@@ -38,10 +38,10 @@ structure CoordReads (κ S : Nat) (conv : ConvPublic) (records : Fin S → Nat) 
       memory.ram (word (stageJoin κ i.val 1 + n)) = labelWord (conv.stageJoin i.val 1 n)
   stagePins0 : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ j : Fin laneCount, memory.ram (word (stagePin κ i.val 0 + j.val)) =
-      word ((pinOfBlocks row.ell fun k => conv.stagePin i.val 0 k.val) j).val
+      word ((pinOfBlocks (row.ell - 1) fun k => conv.stagePin i.val 0 k.val) j).val
   stagePins1 : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ j : Fin laneCount, memory.ram (word (stagePin κ i.val 1 + j.val)) =
-      word ((pinOfBlocks (row.ell - row.width0) fun k => conv.stagePin i.val 1 k.val) j).val
+      word ((pinOfBlocks (row.ell - row.width0 - 1) fun k => conv.stagePin i.val 1 k.val) j).val
   growJoins : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ n, row.width0 ≤ n → n < row.keep →
       memory.ram (word (growJoin κ i.val n)) = labelWord (conv.growJoin i.val n)

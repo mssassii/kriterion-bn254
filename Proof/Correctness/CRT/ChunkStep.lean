@@ -138,15 +138,16 @@ theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label) (Z :
   set G1 := ((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval H).1
     with hG1
   set A : Fin (2 ^ T.chunkWidth c) → Lanes T.castWidth := fun x =>
-    castLanes T.castWidth (hlong H (embed (G1 x)) (chunkCastTag coord c x.val) (castAnswers T.castWidth)) with hA
+    Parity.parityCastLanes T.castWidth (G1 x) (hlong H (embed (G1 x)) (chunkCastTag coord c x.val) (castAnswers T.castWidth)) with hA
   have key : ∀ x : Fin (2 ^ T.chunkWidth c),
       (if x.val = s then (0 : Lanes T.castWidth) else if x.val = s then 0 else
-        castLanes T.castWidth (hlong H (embed (G1 x ^^^ if x.val = s then Δ else 0)) (chunkCastTag coord c x.val)
+        Parity.parityCastLanes T.castWidth (G1 x ^^^ if x.val = s then Δ else 0) (hlong H (embed (G1 x ^^^ if x.val = s then Δ else 0)) (chunkCastTag coord c x.val)
           (castAnswers T.castWidth))) = if x.val = s then 0 else A x := by
     intro x
     by_cases hx : x.val = s
     · rw [if_pos hx, if_pos hx]
-    · rw [if_neg hx, if_neg hx, if_neg hx, if_neg hx, xor_zero_block]
+    · simp only [if_neg hx, xor_zero_block]
+      rfl
   simp only [key]
   refine ⟨fun α hα => ?_, fun α hα => ?_⟩
   · rw [atNat_of_lt _ _ hα, atNat_of_lt _ _ hα]
@@ -170,6 +171,21 @@ theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label) (Z :
       ring
     · rw [if_neg has, if_neg has, atNat_of_lt _ _ hα, atNat_of_lt _ _ hα, add_zero]
       simp only
-      rw [if_neg has, if_neg has, xor_zero_block]
+      simp only [if_neg has, xor_zero_block]
+      rfl
+
+/-- Every chunk pin is even, with no nonzero-offset or oracle assumptions. -/
+theorem chunkGarbleM_pin_even (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label)
+    (Z : Nat → Label) (c : Nat) :
+    Parity.EvenLanes ((chunkGarbleM T coord Δ Z c).eval H).pin := by
+  let tree := (treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0))
+    (T.chunkWidth c)).eval H
+  have even := pin_even_of_leaf_xor_total
+    (fun leaf : Fin (2 ^ T.chunkWidth c) => Parity.parityCastLanes T.castWidth (tree.1 leaf)
+      (hlong H (embed (tree.1 leaf)) (chunkCastTag coord c leaf.val) (castAnswers T.castWidth)))
+    tree.1 Δ (fun positive leaf => parityCastLanes_low positive _ _)
+    (treeGarbleM_xor H (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c))
+  simpa only [chunkGarbleM, FreeQuery.eval_bind, eval_tableM, eval_castM,
+    FreeQuery.eval_pure, materialize_eq, sumLanes_eq] using even
 
 end Kriterion.CRT.SliceC

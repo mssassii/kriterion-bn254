@@ -102,8 +102,8 @@ def conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delta : Label)
           (row.keep - row.width0) >>= fun grown =>
         foldsGarbleM m (foldTag coord i) bitMask (row.ell - row.keep) row.keep
             (reindex _ grown.1 m) >>= fun folded =>
-          let pin0 := stored (pinBlocks g0.pin)
-          let pin1 := stored (pinBlocks g1.pin)
+          let pin0 := stored (pinBlocks (Parity.pinHalf row.ell g0.pin))
+          let pin1 := stored (pinBlocks (Parity.pinHalf (row.ell - row.width0) g1.pin))
           pure { stageJoins := fun stage n => if stage = 0 then g0.joins n else g1.joins n
                  stagePins := fun stage k => if stage = 0 then atNat pin0 0 k else atNat pin1 0 k
                  growJoins := fun position => grown.2 position ^^^ bitMask position
@@ -117,10 +117,10 @@ def conversionEvalM (coord i : Nat) (row : OddRow) (m : Nat) (value : Nat) (word
   let value1 := value / 2 ^ row.width0
   extStageEvalM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) word
       (value % 2 ^ row.width0) (pub.stageJoin i 0)
-      (pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) >>= fun e0 =>
+      (Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub.stagePin i 0 k.val)) >>= fun e0 =>
     extStageEvalM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) e0.next
         (value1 % 2 ^ row.width1) (pub.stageJoin i 1)
-        (pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) >>= fun e1 =>
+        (Parity.pinExpand (row.ell - row.width0) (pinOfBlocks (row.ell - row.width0 - 1) fun k => pub.stagePin i 1 k.val)) >>= fun e1 =>
       let bitLabel := wordBit row e0.bits e1.bits (laneBit e1.next 0)
       growEvalM (growTag coord i) value bitLabel (pub.growJoin i) row.width0
           (stored fun leaf => e0.leaves leaf.val) (row.keep - row.width0) >>= fun grown =>
@@ -196,8 +196,8 @@ def coordGarbleM (T : CrtTable) (S coord : Nat) (delta : Label) (zeroLabel : Nat
     CM (CoordGarbled T S) :=
   tableM T.chunkCount (fun c => chunkGarbleM T coord delta zeroLabel c.val) >>= fun chunkTable =>
     let chunks : Nat → ChunkGarbled T.castWidth := atNat chunkTable (ChunkGarbled.empty _)
-    let chunkPins : Fin T.chunkCount → Fin T.castWidth → Label :=
-      stored fun c => stored (pinBlocks (chunkTable c).pin)
+    let chunkPins : Fin T.chunkCount → Fin (T.castWidth - 1) → Label :=
+      stored fun c => stored (pinBlocks (Parity.pinHalf T.castWidth (chunkTable c).pin))
     tableM T.count (modGarbleM T S coord delta chunks) >>= fun mods =>
       let modAt : Nat → Option (ModGarbled S) := fun i =>
         if inRange : i < T.count then some (mods ⟨i, inRange⟩) else none
@@ -264,7 +264,7 @@ def coordEvalM (T : CrtTable) (S coord : Nat) (pub : ConvPublic) (records : Fin 
     stored fun i => stored fun e => recordJoin T product radix (records e) i
   tableM T.chunkCount (fun c =>
     chunkEvalM T coord labels v (pub.chunkJoin c.val)
-      (pinOfBlocks T.castWidth fun k => pub.chunkPin c.val k.val) c.val) >>= fun chunkTable =>
+      (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => pub.chunkPin c.val k.val)) c.val) >>= fun chunkTable =>
     let chunks : Nat → ChunkEval T.castWidth := atNat chunkTable (ChunkEval.empty _)
     tableM T.count (modEvalM T S coord pub joins v chunks) >>= fun residue =>
       let idempotent := stored T.idempotent
@@ -279,13 +279,13 @@ def coordEvalM (T : CrtTable) (S coord : Nat) (pub : ConvPublic) (records : Fin 
 /-- Published blocks of one modulus. -/
 def modBlocks : Kind → Nat
   | .chunkZero => 0
-  | .odd row => (row.width0 - 1) + row.ell + (row.width1 - 1) + (row.ell - row.width0)
+  | .odd row => (row.width0 - 1) + (row.ell - 1) + (row.width1 - 1) + (row.ell - row.width0 - 1)
       + (row.keep - row.width0) + (row.ell - row.keep)
 
 /-- Published blocks of chunk `c`: its joins and its pin. -/
-def CrtTable.chunkBlocks (T : CrtTable) (c : Nat) : Nat := (T.chunkWidth c - 1) + T.castWidth
+def CrtTable.chunkBlocks (T : CrtTable) (c : Nat) : Nat := (T.chunkWidth c - 1) + (T.castWidth - 1)
 
-/-- Published conversion blocks of one coordinate (3,412 for the real table). -/
+/-- Published conversion blocks of one coordinate (3,178 for the real table). -/
 def CrtTable.convBlocks (T : CrtTable) : Nat :=
   (∑ c : Fin T.chunkCount, T.chunkBlocks c.val) + ∑ i : Fin T.count, modBlocks (T.kind i)
 
@@ -294,14 +294,14 @@ joins and pin, stage 1's joins and pin, the growth joins and the fold joins. -/
 def ConvPublic.flatten (T : CrtTable) (pub : ConvPublic) : List Label :=
   ((List.range T.chunkCount).flatMap fun c =>
     (List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1)) ++
-      (List.range T.castWidth).map (pub.chunkPin c)) ++
+      (List.range (T.castWidth - 1)).map (pub.chunkPin c)) ++
   ((List.finRange T.count).flatMap fun i => match T.kind i with
     | .chunkZero => []
     | .odd row =>
       (List.range (row.width0 - 1)).map (fun n => pub.stageJoin i 0 (n + 1)) ++
-      (List.range row.ell).map (pub.stagePin i 0) ++
+      (List.range (row.ell - 1)).map (pub.stagePin i 0) ++
       (List.range (row.width1 - 1)).map (fun n => pub.stageJoin i 1 (n + 1)) ++
-      (List.range (row.ell - row.width0)).map (pub.stagePin i 1) ++
+      (List.range (row.ell - row.width0 - 1)).map (pub.stagePin i 1) ++
       (List.range (row.keep - row.width0)).map (fun n => pub.growJoin i (row.width0 + n)) ++
       (List.range (row.ell - row.keep)).map (fun n => pub.foldJoin i (row.keep + n)))
 
@@ -325,16 +325,16 @@ def ConvPublic.unflatten (T : CrtTable) (blocks : Array Label) : ConvPublic :=
     chunkPin := fun c k => at_ (T.chunkBase c + (T.chunkWidth c - 1) + k)
     stageJoin := fun i stage n =>
       if stage = 0 then at_ (T.modBase i + (n - 1))
-      else at_ (T.modBase i + ((row i).width0 - 1) + (row i).ell + (n - 1))
+      else at_ (T.modBase i + ((row i).width0 - 1) + ((row i).ell - 1) + (n - 1))
     stagePin := fun i stage k =>
       if stage = 0 then at_ (T.modBase i + ((row i).width0 - 1) + k)
-      else at_ (T.modBase i + ((row i).width0 - 1) + (row i).ell + ((row i).width1 - 1) + k)
+      else at_ (T.modBase i + ((row i).width0 - 1) + ((row i).ell - 1) + ((row i).width1 - 1) + k)
     growJoin := fun i j =>
-      at_ (T.modBase i + ((row i).width0 - 1) + (row i).ell + ((row i).width1 - 1)
-        + ((row i).ell - (row i).width0) + (j - (row i).width0))
+      at_ (T.modBase i + ((row i).width0 - 1) + ((row i).ell - 1) + ((row i).width1 - 1)
+        + ((row i).ell - (row i).width0 - 1) + (j - (row i).width0))
     foldJoin := fun i j =>
-      at_ (T.modBase i + ((row i).width0 - 1) + (row i).ell + ((row i).width1 - 1)
-        + ((row i).ell - (row i).width0) + ((row i).keep - (row i).width0) + (j - (row i).keep)) }
+      at_ (T.modBase i + ((row i).width0 - 1) + ((row i).ell - 1) + ((row i).width1 - 1)
+        + ((row i).ell - (row i).width0 - 1) + ((row i).keep - (row i).width0) + (j - (row i).keep)) }
 
 /-! ### Budgets -/
 

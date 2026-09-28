@@ -46,10 +46,10 @@ theorem coordEvalM_labels_congr (T : CrtTable) (S coord : Nat) (pub : ConvPublic
     (v : Nat) (l₁ l₂ : Nat → Label) (agree : ∀ j < T.inputBits, l₁ j = l₂ j) :
     coordEvalM T S coord pub records v l₁ = coordEvalM T S coord pub records v l₂ := by
   have chunks : ∀ c : Fin T.chunkCount,
-      chunkEvalM T coord l₁ v (pub.chunkJoin c.val) (pinOfBlocks T.castWidth fun k => pub.chunkPin c.val k.val)
+      chunkEvalM T coord l₁ v (pub.chunkJoin c.val) (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => pub.chunkPin c.val k.val))
           c.val =
         chunkEvalM T coord l₂ v (pub.chunkJoin c.val)
-          (pinOfBlocks T.castWidth fun k => pub.chunkPin c.val k.val) c.val := by
+          (Parity.pinExpand T.castWidth (pinOfBlocks (T.castWidth - 1) fun k => pub.chunkPin c.val k.val)) c.val := by
     intro c
     have tree := treeEvalM_bits_congr (chunkTreeTag coord c.val) (T.chunkValue v c.val)
       (fun n => l₁ (T.chunkOffset c.val + n)) (fun n => l₂ (T.chunkOffset c.val + n)) (pub.chunkJoin c.val)

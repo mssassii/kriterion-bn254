@@ -370,9 +370,9 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
     (joinCells1 : ∀ n, 1 ≤ n → n < row.width1 →
       m0.ram (word (joinBase 1 + n)) = labelWord (pub.stageJoin i 1 n))
     (pinCells0 : ∀ j : Fin laneCount, m0.ram (word (pinBase 0 + j.val)) =
-      word ((pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) j).val)
+      word ((pinOfBlocks (row.ell - 1) fun k => pub.stagePin i 0 k.val) j).val)
     (pinCells1 : ∀ j : Fin laneCount, m0.ram (word (pinBase 1 + j.val)) =
-      word ((pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) j).val)
+      word ((pinOfBlocks (row.ell - row.width0 - 1) fun k => pub.stagePin i 1 k.val) j).val)
     (growJoinCells : ∀ n, row.width0 ≤ n → n < row.keep →
       m0.ram (word (growJoin n)) = labelWord (pub.growJoin i n))
     (foldJoinCells : ∀ n, row.keep ≤ n → n < row.ell →
@@ -427,7 +427,7 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
           (ne_of_not_convRegs out rAddr (by simp))]⟩
   have inputs0 : StageInputs (convStage0 row W (joinBase 0) (pinBase 0)) row.width0 row.ell
       (value % 2 ^ row.width0) lanes (pub.stageJoin i 0)
-      (pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) m2 :=
+      (Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub.stagePin i 0 k.val)) m2 :=
     ⟨by
       show m2.ram (word (W + 256)) = _
       rw [ram2, Function.update_of_ne (word_ne (by omega) (by omega) (by omega)), ram1,
@@ -440,7 +440,9 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
       rw [fr2.ram _ (below _ (by omega))]; exact joinCells0 n h1 h2,
      fun j => by
       show m2.ram (word (pinBase 0 + j.val)) = _
-      rw [fr2.ram _ (below _ (by have := j.isLt; omega))]; exact pinCells0 j⟩
+      rw [fr2.ram _ (below _ (by have := j.isLt; omega)), Parity.pinExpand_val_half _ (by omega)]
+      exact pinCells0 j,
+     Parity.evenLanes_pinExpand _ _⟩
   unfold conversionReplay conversionEvalM
   rw [tree_seq_exec _ _ (det_stageValue0 W row.width0) m0 m1 run1,
     tree_seq_exec _ _ (det_stageValue1 W row.width0 row.width1) m1 m2 run2]
@@ -450,7 +452,7 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
   refine Agree.bindOpt (fun e0 m3 post3 => ?_)
     (agree_stageReplay (convStage0 row W (joinBase 0) (pinBase 0)) row.width0 row.ell
       (value % 2 ^ row.width0) lanes (pub.stageJoin i 0)
-      (pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) layout0 ellLe w0Pos (by omega) (by omega)
+      (Parity.pinExpand row.ell (pinOfBlocks (row.ell - 1) fun k => pub.stagePin i 0 k.val)) layout0 ellLe w0Pos (by omega) (by omega)
       (fun level => extTreeTag coord i 0 level 0) (extCastTag coord i 0 0 0) 64 (by norm_num)
       (extTreeTag coord i 0) (extCastTag coord i 0)
       (fun L x _ => extTreeTag_affine coord i 0 L x)
@@ -470,7 +472,9 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
     fun k hk kb => frame3.ram _ (not_sw_below _ _ _ layout0 (by omega))
   have inputs1 : StageInputs (convStage1 row W (joinBase 0) (pinBase 0) (joinBase 1) (pinBase 1))
       row.width1 (row.ell - row.width0) (value / 2 ^ row.width0 % 2 ^ row.width1) e0.next
-      (pub.stageJoin i 1) (pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) m3 :=
+      (pub.stageJoin i 1)
+      (Parity.pinExpand (row.ell - row.width0) (pinOfBlocks (row.ell - row.width0 - 1) fun k =>
+        pub.stagePin i 1 k.val)) m3 :=
     ⟨by
       show m3.ram (word (W + 257)) = _
       rw [off3 _ (by omega) (by omega), ram2, Function.update_self],
@@ -480,14 +484,17 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
       rw [fr3.ram _ (below _ (by omega))]; exact joinCells1 n h1 h2,
      fun j => by
       show m3.ram (word (pinBase 1 + j.val)) = _
-      rw [fr3.ram _ (below _ (by have := j.isLt; omega))]; exact pinCells1 j⟩
+      rw [fr3.ram _ (below _ (by have := j.isLt; omega)), Parity.pinExpand_val_half _ (by omega)]
+      exact pinCells1 j,
+     Parity.evenLanes_pinExpand _ _⟩
   try dsimp only
   -- stage 1
   rw [tree_seq, TreeLaws.monad_bind, liftHash_bind]
   refine Agree.bindOpt (fun e1 m4 post4 => ?_)
     (agree_stageReplay (convStage1 row W (joinBase 0) (pinBase 0) (joinBase 1) (pinBase 1)) row.width1
       (row.ell - row.width0) (value / 2 ^ row.width0 % 2 ^ row.width1) e0.next (pub.stageJoin i 1)
-      (pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) layout1 (by omega) w1Pos
+      (Parity.pinExpand (row.ell - row.width0) (pinOfBlocks (row.ell - row.width0 - 1) fun k =>
+        pub.stagePin i 1 k.val)) layout1 (by omega) w1Pos
       (by omega) (by omega)
       (fun level => extTreeTag coord i 1 level 0) (extCastTag coord i 1 0 0) 64 (by norm_num)
       (extTreeTag coord i 1) (extCastTag coord i 1)

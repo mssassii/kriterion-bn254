@@ -26,14 +26,14 @@ def modJoins : Kind → Nat
   | .chunkZero => 0
   | .odd row => (row.width0 - 1) + (row.width1 - 1) + (row.keep - row.width0) + (row.ell - row.keep)
 
-/-- The pin widths of one modulus: stages 0 and 1. -/
+/-- The stored upper-plane widths of one modulus: stages 0 and 1. -/
 def modPinWidths : Kind → List Nat
   | .chunkZero => []
-  | .odd row => [row.ell, row.ell - row.width0]
+  | .odd row => [row.ell - 1, row.ell - row.width0 - 1]
 
-/-- The pin widths of one coordinate in pin order: one per chunk, then two per odd modulus. -/
+/-- The stored half-pin widths of one coordinate in pin order: one per chunk, then two per odd modulus. -/
 def pinWidths : List Nat :=
-  List.replicate table.chunkCount table.castWidth ++
+  List.replicate table.chunkCount (table.castWidth - 1) ++
     (List.finRange table.count).flatMap fun i => modPinWidths (table.kind i)
 
 /-- Joins per coordinate. -/
