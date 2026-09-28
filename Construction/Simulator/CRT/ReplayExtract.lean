@@ -39,7 +39,7 @@ structure StageCells where
   remBase : Nat
   /-- The join `J_n` at `joinBase + n` (input, `1 ≤ n < w`). -/
   joinBase : Nat
-  /-- The pin, lane `i` at `pinBase + i` (input). -/
+  /-- The stored half-pin, lane `i` at `pinBase + i` (input; the pin lane is twice the cell). -/
   pinBase : Nat
   /-- `sub = reduce_w R^E`, lane `i` at `subBase + i` (scratch). -/
   subBase : Nat
@@ -189,13 +189,15 @@ def expandReplay (cells : StageCells) (w rb start : Nat) (treeBase : Nat → Nat
 
 /-! ### A round -/
 
-/-- `rC := (P_i + 2 ^ rb − T_n[i]) · q` with `q` in `rF` (clobbers `rB`, `rC`, `rE`, `rAddr`). -/
+/-- `rC := (P_i + 2 ^ rb − T_n[i]) · q` with `q` in `rF`, where the pin lane `P_i` is twice the stored
+half-pin cell (clobbers `rB`, `rC`, `rE`, `rAddr`). -/
 def resHead (cells : StageCells) (rb n i : Nat) : Prog :=
   .seq (loadAt rC (cells.pinBase + i))
+    (.seq (ar .add rC rC rC)
     (.seq (loadAt rE (cells.castSumBase + 128 * n + i))
     (.seq (cst rB (2 ^ rb))
     (.seq (ar .add rC rC rB)
-    (.seq (ar .sub rC rC rE) (ar .mul rC rC rF)))))
+    (.seq (ar .sub rC rC rE) (ar .mul rC rC rF))))))
 
 /-- `rC := (rC + R_n[i]) mod 2 ^ rb` (clobbers `rB`, `rC`, `rE`, `rAddr`). -/
 def resTail (cells : StageCells) (rb n i : Nat) : Prog :=

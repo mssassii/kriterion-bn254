@@ -268,35 +268,179 @@ theorem ansCell_halves (cells : CastCells) (total : Nat) (start memory : Memory)
     simp only [halvesOf, half, oddMod, jb, dif_pos, one_ne_zero, if_false]
     exact (done j jb).2
 
-theorem exec_laneExtract (cells : CastCells) (l i : Nat) (memory : Memory) (half : Nat)
+/-! ### The parity lane -/
+
+/-- Bit `i` read by `/ 2 ^ i % 2`: two naturals with the same bit `i` agree. -/
+theorem div_pow_mod_two_of_testBit {a b i : Nat} (same : a.testBit i = b.testBit i) :
+    a / 2 ^ i % 2 = b / 2 ^ i % 2 := by
+  rw [Nat.testBit_eq_decide_div_mod_eq, Nat.testBit_eq_decide_div_mod_eq] at same
+  rcases Nat.mod_two_eq_zero_or_one (a / 2 ^ i) with ha | ha <;>
+    rcases Nat.mod_two_eq_zero_or_one (b / 2 ^ i) with hb | hb <;> simp_all
+
+/-- The low 128 bits of a word carry the label: bit `i < 104` of `S` is bit `i` of the label. -/
+theorem label_bit_of_low (label : Label) (S i : Nat) (low : S % 2 ^ 128 = label.toNat) (iSmall : i < 128) :
+    S / 2 ^ i % 2 = label.toNat / 2 ^ i % 2 := by
+  apply div_pow_mod_two_of_testBit
+  rw [← low, Nat.testBit_mod_two_pow]
+  simp [iSmall]
+
+/-- The parity bit of a lane as a natural. -/
+theorem getLsbD_ite_eq (label : Label) (i : Nat) :
+    (if label.getLsbD i then 1 else 0) = label.toNat / 2 ^ i % 2 := by
+  rw [BitVec.getLsbD, Nat.testBit_eq_decide_div_mod_eq]
+  rcases Nat.mod_two_eq_zero_or_one (label.toNat / 2 ^ i) with h | h <;> simp [h]
+
+theorem half_lane_arith (h s w : Nat) :
+    (h >>> s) % 2 ^ (w + 1) / 2 = h / 2 ^ (s + 1) % 2 ^ (w + 1 - 1) := by
+  rw [Nat.shiftRight_eq_div_pow, Nat.add_sub_cancel, pow_succ' 2 w, Nat.mod_mul_right_div_self,
+    Nat.div_div_eq_div_mul, ← pow_succ]
+
+/-- **A parity lane of a limb value**: twice the upper `l - 1` bits of the block-aligned lane, plus bit `i`
+of the label. -/
+theorem parityCastLanes_val (l : Nat) (lPos : 0 < l) (lSmall : l ≤ 128) {count : Nat}
+    (values : Vector (Block × Block) count) (label : Label) (i : Fin laneCount)
+    (blockBound : i.val / lanesPerBlock l < 2 * count) :
+    (Parity.parityCastLanes l label (packAnswers count values.get) i).val =
+      2 * (halvesOf values (i.val / lanesPerBlock l) / 2 ^ (l * (i.val % lanesPerBlock l) + 1) %
+        2 ^ (l - 1)) + label.toNat / 2 ^ i.val % 2 := by
+  obtain ⟨w, rfl⟩ : ∃ w, l = w + 1 := ⟨l - 1, by omega⟩
+  have base := castLanes_val (w + 1) lPos lSmall values i blockBound
+  set X := castLanes (w + 1) (packAnswers count values.get) with XDef
+  show (Parity.parityLift (Parity.halfLanes X) label i).val = _
+  rw [Parity.parityLift_val, getLsbD_ite_eq]
+  have half : (Parity.halfLanes X i).val = (X i).val / 2 := by
+    simp only [Parity.halfLanes, ZMod.val_natCast]
+    apply Nat.mod_eq_of_lt
+    have := ZMod.val_lt (X i)
+    have e : (2 : Nat) ^ (w + 1) = 2 ^ w * 2 := pow_succ 2 w
+    omega
+  rw [half, base, half_lane_arith]
+
+theorem exec_laneBitProg (i : Nat) (memory : Memory) (S : Nat) (dReg : memory.registers rD = word S)
+    (SSmall : S < 2 ^ 256) (iSmall : i < 256) :
+    ∃ after, (laneBitProg i).exec memory = some after ∧ after.ram = memory.ram ∧ after.bits = memory.bits ∧
+      after.registers rSecond = word (S / 2 ^ i % 2) ∧
+      ∀ register, register ≠ rB → register ≠ rSecond → after.registers register = memory.registers register := by
+  have bitDivSmall : S / 2 ^ i < 2 ^ 256 := lt_of_le_of_lt (Nat.div_le_self _ _) SSmall
+  refine ⟨_, rfl, rfl, rfl, ?_, fun register notB notSecond => ?_⟩
+  · simp (config := { decide := true }) only [reg_setReg, reduceIte, dReg]
+    rw [eval_shr_word S i SSmall (by omega),
+      show Arithmetic.and.eval (word (S / 2 ^ i)) (word 1) = word (S / 2 ^ i % 2 ^ 1) from
+        eval_and_pow _ 1 bitDivSmall (by norm_num), pow_one]
+  · simp only [reg_setReg, if_neg notB, if_neg notSecond]
+
+set_option maxHeartbeats 800000 in
+theorem exec_laneUpperProg (cells : CastCells) (l i : Nat) (memory : Memory) (half b : Nat)
     (blockCell : memory.ram (word (cells.ansBase + i / lanesPerBlock l)) = word half)
-    (halfSmall : half < 2 ^ 256) (lPos : 0 < l) (lLe : l ≤ 128) :
-    ∃ after, (laneExtract cells l i).exec memory = some after ∧
+    (secondReg : memory.registers rSecond = word b)
+    (halfSmall : half < 2 ^ 256) (bSmall : b < 2) (lPos : 0 < l) (lLe : l ≤ 128) :
+    ∃ after, (laneUpperProg cells l i).exec memory = some after ∧
       after.ram = Function.update memory.ram (word (cells.laneBase + i))
-        (word (half / 2 ^ (l * (i % lanesPerBlock l)) % 2 ^ l)) ∧
+        (word (2 * (half / 2 ^ (l * (i % lanesPerBlock l) + 1) % 2 ^ (l - 1)) + b)) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr →
         after.registers register = memory.registers register := by
-  have shiftSmall : l * (i % lanesPerBlock l) < 2 ^ 256 := by
+  have shiftSmall : l * (i % lanesPerBlock l) + 1 < 2 ^ 256 := by
     have : l * (i % lanesPerBlock l) ≤ l * lanesPerBlock l :=
       Nat.mul_le_mul_left _ (Nat.mod_lt _ (Nat.div_pos lLe lPos)).le
     have : l * lanesPerBlock l ≤ 128 := by
       unfold lanesPerBlock; rw [Nat.mul_comm]; exact Nat.div_mul_le_self 128 l
     omega
-  have divSmall : half / 2 ^ (l * (i % lanesPerBlock l)) < 2 ^ 256 :=
+  have divSmall : half / 2 ^ (l * (i % lanesPerBlock l) + 1) < 2 ^ 256 :=
     lt_of_le_of_lt (Nat.div_le_self _ _) halfSmall
+  set u := half / 2 ^ (l * (i % lanesPerBlock l) + 1) % 2 ^ (l - 1) with uDef
+  have uSmall : u < 2 ^ 128 := by
+    have : 2 ^ (l - 1) ≤ 2 ^ 128 := Nat.pow_le_pow_right (by norm_num) (by omega)
+    have := Nat.mod_lt (half / 2 ^ (l * (i % lanesPerBlock l) + 1)) (Nat.two_pow_pos (l - 1))
+    omega
   refine ⟨_, rfl, ?_, rfl, fun register notA notB notAddr => ?_⟩
   · simp (config := { decide := true }) only [ram_storeRam, ram_setReg, reg_setReg, reduceIte,
-      blockCell]
-    rw [eval_shr_word _ _ halfSmall shiftSmall, eval_and_pow _ _ divSmall (by omega)]
+      blockCell, secondReg]
+    rw [eval_shr_word half _ halfSmall shiftSmall, eval_and_pow _ (l - 1) divSmall (by omega),
+      eval_add_word u u (by omega), eval_add_word (u + u) b (by omega)]
+    congr 2
+    omega
   · simp only [reg_storeRam, reg_setReg, if_neg notA, if_neg notB, if_neg notAddr]
+
+theorem exec_laneExtract (cells : CastCells) (l i : Nat) (memory : Memory) (half S : Nat)
+    (blockCell : memory.ram (word (cells.ansBase + i / lanesPerBlock l)) = word half)
+    (dReg : memory.registers rD = word S)
+    (halfSmall : half < 2 ^ 256) (SSmall : S < 2 ^ 256) (lPos : 0 < l) (lLe : l ≤ 128) (iSmall : i < 256) :
+    ∃ after, (laneExtract cells l i).exec memory = some after ∧
+      after.ram = Function.update memory.ram (word (cells.laneBase + i))
+        (word (2 * (half / 2 ^ (l * (i % lanesPerBlock l) + 1) % 2 ^ (l - 1)) + S / 2 ^ i % 2)) ∧
+      after.bits = memory.bits ∧
+      ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr → register ≠ rSecond →
+        after.registers register = memory.registers register := by
+  obtain ⟨m1, run1, ram1, bits1, second1, regs1⟩ := exec_laneBitProg i memory S dReg SSmall iSmall
+  obtain ⟨m2, run2, ram2, bits2, regs2⟩ := exec_laneUpperProg cells l i m1 half (S / 2 ^ i % 2)
+    (by rw [ram1]; exact blockCell) second1 halfSmall (Nat.mod_lt _ (by norm_num)) lPos lLe
+  refine ⟨m2, by rw [laneExtract, Prog.exec_seq_some _ _ memory m1 run1, run2], by rw [ram2, ram1],
+    by rw [bits2, bits1], fun register notA notB notAddr notSecond => ?_⟩
+  rw [regs2 register notA notB notAddr, regs1 register notB notSecond]
 
 theorem det_castLanesProg (cells : CastCells) (l : Nat) : (castLanesProg cells l).OpsSatisfy Op.Det :=
   det_rep _ _ fun _ _ =>
-    ⟨⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, ⟨trivial, trivial⟩⟩
+    ⟨⟨trivial, trivial, trivial, trivial⟩, ⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, trivial,
+      trivial, ⟨trivial, trivial⟩⟩
 
-/-- **One cast** against the evaluator's `castM`: the same answers in the same order, the 104
-lanes in the lane region, and the frame of the schema. -/
+/-- **The lane loop of a cast**: with the answers' halves in the answer region and a word whose low
+128 bits are the label in `rD`, the 104 parity lanes land in the lane region. -/
+theorem exec_castLanesProg (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l ≤ 128)
+    (values : Vector (Block × Block) (castAnswers l)) (label : Label) (S : Nat) (memory : Memory)
+    (halves : ∀ b, b < 2 * castAnswers l → memory.ram (word (cells.ansBase + b)) = word (halvesOf values b))
+    (dReg : memory.registers rD = word S) (SSmall : S < 2 ^ 256) (low : S % 2 ^ 128 = label.toNat)
+    (ansFits : cells.ansBase + 2 * castAnswers l < 2 ^ 256) (laneFits : cells.laneBase + laneCount < 2 ^ 256)
+    (apart : ∀ b, b < 2 * castAnswers l → ∀ i, i < laneCount → cells.ansBase + b ≠ cells.laneBase + i) :
+    ∃ after, (castLanesProg cells l).exec memory = some after ∧
+      (∀ i : Fin laneCount, after.ram (word (cells.laneBase + i.val)) =
+        word (Parity.parityCastLanes l label (packAnswers (castAnswers l) values.get) i).val) ∧
+      (∀ address, (∀ i', i' < laneCount → address ≠ word (cells.laneBase + i')) →
+        after.ram address = memory.ram address) ∧
+      after.bits = memory.bits ∧
+      ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr → register ≠ rSecond →
+        after.registers register = memory.registers register := by
+  have lc : laneCount = 104 := rfl
+  obtain ⟨final, run, lanes, frameL, bitsL, regsL⟩ := Prog.exec_rep (laneExtract cells l)
+    (fun i current =>
+      (∀ i', i' < i → current.ram (word (cells.laneBase + i')) =
+          word (2 * (halvesOf values (i' / lanesPerBlock l) / 2 ^ (l * (i' % lanesPerBlock l) + 1) %
+            2 ^ (l - 1)) + S / 2 ^ i' % 2)) ∧
+        (∀ address, (∀ i', i' < laneCount → address ≠ word (cells.laneBase + i')) →
+          current.ram address = memory.ram address) ∧
+        current.bits = memory.bits ∧
+        ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr → register ≠ rSecond →
+          current.registers register = memory.registers register)
+    laneCount (fun i bound current holds => by
+      obtain ⟨done, frame, bits, regs⟩ := holds
+      have blockBound := laneBlock_lt l lPos lSmall i bound
+      have blockNow : current.ram (word (cells.ansBase + i / lanesPerBlock l)) =
+          word (halvesOf values (i / lanesPerBlock l)) := by
+        rw [frame _ fun i' ib => word_ne (by omega) (by omega) (apart _ blockBound i' ib)]
+        exact halves _ blockBound
+      have dNow : current.registers rD = word S := by
+        rw [regs rD (by decide) (by decide) (by decide) (by decide)]
+        exact dReg
+      obtain ⟨next, step, ram, bitsN, regsN⟩ := exec_laneExtract cells l i current _ S blockNow dNow
+        (lt_trans (halvesOf_lt values _) (by norm_num)) SSmall lPos lSmall (by omega)
+      have laneSmall : cells.laneBase + i < 2 ^ 256 := by omega
+      refine ⟨next, step, fun i' ib => ?_, fun address off => ?_, by rw [bitsN, bits],
+        fun register notA notB notAddr notSecond => by rw [regsN register notA notB notAddr notSecond,
+          regs register notA notB notAddr notSecond]⟩
+      · rw [ram]
+        by_cases last : i' = i
+        · subst last
+          rw [Function.update_self]
+        · rw [Function.update_of_ne (word_ne (by omega) laneSmall (by omega)), done i' (by omega)]
+      · rw [ram, Function.update_of_ne (off i bound)]
+        exact frame address off)
+    memory ⟨fun i' ib => absurd ib (Nat.not_lt_zero _), fun _ _ => rfl, rfl, fun _ _ _ _ _ => rfl⟩
+  refine ⟨final, run, fun i => ?_, frameL, bitsL, regsL⟩
+  rw [lanes i.val i.isLt, parityCastLanes_val l lPos lSmall values label i
+    (laneBlock_lt l lPos lSmall i.val i.isLt), label_bit_of_low label S i.val low (by omega)]
+
+/-- **One cast** against the evaluator's parity `castM`: the same answers in the same order, the 104
+parity lanes in the lane region, and the frame of the schema. -/
 theorem agree_castBlock (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l ≤ 128)
     (layout : CastLayout cells l) (tagOf : Nat → Nat) (label : Label) (memory : Memory)
     (labelCell : memory.ram (word cells.label) = labelWord label)
@@ -304,7 +448,7 @@ theorem agree_castBlock (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
       (fun (lanes : Lanes l) after =>
         (∀ i : Fin laneCount, after.ram (word (cells.laneBase + i.val)) = word (lanes i).val) ∧
-          Frame (castWrites cells l) castClobbers memory after)
+          Frame (castWrites cells l) castBlockClobbers memory after)
       ((castBlock cells l tagOf).tree memory) (liftHash (castM l label tagOf)) := by
   have ansFits := layout.ansFits
   have laneFits : cells.laneBase + 104 < 2 ^ 256 := layout.laneFits
@@ -319,52 +463,37 @@ theorem agree_castBlock (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l
       memory ⟨fun j bound => absurd bound (Nat.not_lt_zero _), fun _ _ => rfl, rfl, fun _ _ => rfl⟩)
   have halves := ansCell_halves cells (castAnswers l) memory after values inv
   obtain ⟨_, frameQ, bitsQ, regsQ⟩ := inv
-  rw [tree_eq_exec _ (det_castLanesProg cells l)]
-  obtain ⟨final, run, lanes, frameL, bitsL, regsL⟩ := Prog.exec_rep (laneExtract cells l)
-    (fun i current =>
-      (∀ i', i' < i → current.ram (word (cells.laneBase + i')) =
-          word (halvesOf values (i' / lanesPerBlock l) >>> (l * (i' % lanesPerBlock l)) % 2 ^ l)) ∧
-        (∀ address, (∀ i', i' < laneCount → address ≠ word (cells.laneBase + i')) →
-          current.ram address = after.ram address) ∧
-        current.bits = after.bits ∧
-        ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr →
-          current.registers register = after.registers register)
-    laneCount (fun i bound current holds => by
-      obtain ⟨done, frame, bits, regs⟩ := holds
-      have blockBound := laneBlock_lt l lPos lSmall i bound
-      have blockNow : current.ram (word (cells.ansBase + i / lanesPerBlock l)) =
-          word (halvesOf values (i / lanesPerBlock l)) := by
-        rw [frame _ fun i' ib => word_ne (by simp only [laneCount, labelBits] at ib; omega)
-          (by simp only [laneCount, labelBits] at ib; omega) (layout.apart _ blockBound i' ib)]
-        exact halves _ blockBound
-      obtain ⟨next, step, ram, bitsN, regsN⟩ := exec_laneExtract cells l i current _ blockNow
-        (lt_trans (halvesOf_lt values _) (by norm_num)) lPos lSmall
-      have laneSmall : cells.laneBase + i < 2 ^ 256 := by simp only [laneCount, labelBits] at bound; omega
-      refine ⟨next, step, fun i' ib => ?_, fun address off => ?_, by rw [bitsN, bits],
-        fun register notA notB notAddr => by rw [regsN register notA notB notAddr,
-          regs register notA notB notAddr]⟩
-      · rw [ram, Nat.shiftRight_eq_div_pow]
-        by_cases last : i' = i
-        · subst last
-          rw [Function.update_self]
-        · rw [Function.update_of_ne (word_ne (by simp only [laneCount, labelBits] at bound; omega) laneSmall
-            (by omega)), done i' (by omega), Nat.shiftRight_eq_div_pow]
-      · rw [ram, Function.update_of_ne (off i bound)]
-        exact frame address off)
-    after ⟨fun i' ib => absurd ib (Nat.not_lt_zero _), fun _ _ => rfl, rfl, fun _ _ _ _ => rfl⟩
-  rw [show castLanesProg cells l = Prog.rep laneCount (laneExtract cells l) from rfl, run]
+  have labelNow : after.ram (word cells.label) = labelWord label := by
+    rw [frameQ _ fun b bound => word_ne layout.labelSmall (by omega) (layout.labelOff b bound)]
+    exact labelCell
+  set m0 := setReg (setReg after rAddr (word cells.label)) rD (labelWord label) with m0Def
+  have load : (loadAt rD cells.label).exec after = some m0 := by rw [exec_loadAt, labelNow]
+  have labelSmall : label.toNat < 2 ^ 256 := lt_trans label.isLt (by norm_num)
+  obtain ⟨final, run, lanes, frameL, bitsL, regsL⟩ := exec_castLanesProg cells l lPos lSmall values label
+    label.toNat m0 (fun b bb => by rw [m0Def, ram_setReg, ram_setReg]; exact halves b bb)
+    (by rw [m0Def, reg_setReg, if_pos rfl, labelWord_eq_word])
+    labelSmall (Nat.mod_eq_of_lt (lt_trans label.isLt (by norm_num))) ansFits layout.laneFits layout.apart
+  rw [tree_eq_exec _ (show (Prog.seq (loadAt rD cells.label) (castLanesProg cells l)).OpsSatisfy Op.Det from
+      ⟨⟨trivial, trivial⟩, det_castLanesProg cells l⟩),
+    Prog.exec_seq_some _ _ after m0 load, run]
   refine .leaf ⟨fun i => ?_, ⟨fun address outside => ?_, ?_, fun register outside => ?_⟩⟩
-  · rw [lanes i.val i.isLt, materialize_eq,
-      castLanes_val l lPos lSmall values i (laneBlock_lt l lPos lSmall i.val i.isLt)]
+  · rw [lanes i, materialize_eq]
   · have offAns : ∀ b, b < 2 * castAnswers l → address ≠ word (cells.ansBase + b) :=
       fun b bb same => outside (Or.inl ⟨b, bb, same⟩)
     have offLane : ∀ i', i' < laneCount → address ≠ word (cells.laneBase + i') :=
       fun i' ib same => outside (Or.inr ⟨i', ib, same⟩)
-    rw [frameL address offLane, frameQ address offAns]
-  · rw [bitsL, bitsQ]
-  · rw [regsL register (ne_of_not_cast outside rA (by simp)) (ne_of_not_cast outside rB (by simp))
-      (ne_of_not_cast outside rAddr (by simp))]
-    exact regsQ register outside
+    rw [frameL address offLane, m0Def, ram_setReg, ram_setReg, frameQ address offAns]
+  · rw [bitsL, m0Def, bits_setReg, bits_setReg, bitsQ]
+  · have notIn : ∀ r, r ∈ [rA, rB, rD, rAddr, rInput, rFirst, rSecond] → register ≠ r :=
+      fun r inside same => outside (by rw [same]; exact inside)
+    rw [regsL register (notIn rA (by simp)) (notIn rB (by simp)) (notIn rAddr (by simp))
+      (notIn rSecond (by simp)), m0Def, reg_setReg, if_neg (notIn rD (by simp)), reg_setReg,
+      if_neg (notIn rAddr (by simp))]
+    exact regsQ register fun inside => outside (by
+      unfold castClobbers Clobbers.ofList at inside
+      unfold castBlockClobbers Clobbers.ofList
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at inside ⊢
+      rcases inside with h | h | h | h | h | h <;> simp [h])
 
 end Agreement
 
@@ -463,10 +592,10 @@ theorem ne_of_not_chunkCast {register : Register} (outside : ¬ chunkCastClobber
     (other : Register) (inside : other ∈ [rA, rB, rC, rD, rAddr, rInput, rFirst, rSecond]) :
     register ≠ other := fun same => outside (by rw [same]; exact inside)
 
-theorem castClobbers_sub (register : Register) (inside : castClobbers register) :
+theorem castClobbers_sub (register : Register) (inside : castBlockClobbers register) :
     chunkCastClobbers register := by
   revert register inside
-  simp only [castClobbers, chunkCastClobbers, Clobbers.ofList]
+  simp only [castBlockClobbers, chunkCastClobbers, Clobbers.ofList]
   decide
 
 /-- A cell of an earlier leaf is outside a later leaf's cast writes. -/
@@ -572,14 +701,15 @@ theorem coldTerm_sum {l width : Nat} (values : Vector (Lanes l) (2 ^ width)) (va
   · rfl
   · rfl
 
-/-- **One lane of the solve**: the hot cast's lane `i` is the pin lane minus the cold cast lanes,
-stored at `castBase + 128 · α + i`. -/
+/-- **One lane of the solve**: the hot cast's lane `i` is the pin lane (twice the stored half-pin cell)
+minus the cold cast lanes, stored at `castBase + 128 · α + i`. -/
 theorem exec_solveLane (cc : ChunkCastCells) (width l i : Nat) (memory : Memory) (value : Nat)
     (values : Vector (Lanes l) (2 ^ width)) (pin : Lanes l) (widthSmall : width < 20)
     (lPos : 0 < l) (lSmall : l ≤ 128) (layout : ChunkCastLayout cc width l)
     (valueLt : value < 2 ^ width) (iBound : i < laneCount)
     (alphaCell : memory.ram (word cc.alpha) = word value)
-    (pinCell : memory.ram (word (cc.pinBase + i)) = word (pin ⟨i, iBound⟩).val)
+    (pinCell : memory.ram (word (cc.pinBase + i)) = word ((pin ⟨i, iBound⟩).val / 2))
+    (pinEven : (pin ⟨i, iBound⟩).val % 2 = 0)
     (castCells : ∀ leaf (bound : leaf < 2 ^ width), leaf ≠ value →
       memory.ram (word (cc.castBase + 128 * leaf + i)) = word ((values[leaf]'bound) ⟨i, iBound⟩).val) :
     ∃ after, (solveLane cc width l i).exec memory = some after ∧
@@ -591,7 +721,8 @@ theorem exec_solveLane (cc : ChunkCastCells) (width l i : Nat) (memory : Memory)
   have NPos : 0 < 2 ^ l := by positivity
   have castFits := layout.castFits
   set lane : Fin laneCount := ⟨i, iBound⟩ with laneDef
-  set m0 := setReg (setReg memory rAddr (word (cc.pinBase + i))) rD (word (pin lane).val) with m0Def
+  set m0 := setReg (setReg (setReg memory rAddr (word (cc.pinBase + i))) rD (word ((pin lane).val / 2))) rD
+    (word (pin lane).val) with m0Def
   obtain ⟨m1, run1, acc1, ram1, bits1, regs1⟩ := Prog.exec_rep (solveTerm cc width l i)
     (fun k current =>
       current.registers rD = word ((pin lane - ∑ j ∈ range k, coldTerm values value lane j).val) ∧
@@ -616,17 +747,25 @@ theorem exec_solveLane (cc : ChunkCastCells) (width l i : Nat) (memory : Memory)
       · rw [if_neg hot, if_neg hot]
         conv_rhs => rw [zmod_sub_val' _ NPos])
     m0 ⟨by rw [m0Def, reg_setReg, if_pos rfl, sum_range_zero, sub_zero], rfl, rfl,
-      fun register n1 n2 n3 n4 n5 => by rw [m0Def, reg_setReg, if_neg n4, reg_setReg, if_neg n5]⟩
+      fun register n1 n2 n3 n4 n5 => by rw [m0Def, reg_setReg, if_neg n4, reg_setReg, if_neg n4, reg_setReg,
+        if_neg n5]⟩
   have prodSmall : value * 128 < 2 ^ 256 := by omega
   have addrSmall : value * 128 + (cc.castBase + i) < 2 ^ 256 := by
     simp only [laneCount, labelBits] at iBound; omega
   have runAll : (solveLane cc width l i).exec memory =
       (Prog.seq (loadAt rA cc.alpha) (.seq (cst rB 128) (.seq (ar .mul rA rA rB)
         (.seq (cst rB (cc.castBase + i)) (.seq (ar .add rA rA rB) (.op (.store rA rD))))))).exec m1 := by
+    have pinSmall : (pin lane).val < 2 ^ 256 := by
+      have := ZMod.val_lt (pin lane)
+      have : 2 ^ l ≤ 2 ^ 256 := Nat.pow_le_pow_right (by norm_num) (by omega)
+      omega
     unfold solveLane
-    rw [exec_loadAt_seq]
-    simp only [pinCell]
-    rw [Prog.exec_seq_some _ _ m0 m1 run1]
+    rw [exec_loadAt_seq, pinCell,
+      exec_ar_val _ _ _ _ _ _ (word ((pin lane).val / 2)) (word ((pin lane).val / 2))
+        (by rw [reg_setReg, if_pos rfl]) (by rw [reg_setReg, if_pos rfl]),
+      eval_add_word _ _ (by omega),
+      show (pin lane).val / 2 + (pin lane).val / 2 = (pin lane).val by omega, ← m0Def,
+      Prog.exec_seq_some _ _ m0 m1 run1]
   rw [runAll]
   refine ⟨_, rfl, ?_, ?_, fun register n1 n2 n3 n4 n5 => ?_⟩
   · simp (config := { decide := true }) only [ram_storeRam, ram_setReg, reg_setReg, reduceIte, ram1,
@@ -643,7 +782,7 @@ theorem det_solveTerm (cc : ChunkCastCells) (width l i leaf : Nat) :
   ⟨det_entryTest _ _ _, ⟨⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, trivial⟩, trivial⟩
 
 theorem det_pinSolve (cc : ChunkCastCells) (width l : Nat) : (pinSolve cc width l).OpsSatisfy Op.Det :=
-  det_rep _ _ fun i _ => ⟨⟨trivial, trivial⟩, det_rep _ _ (fun leaf _ => det_solveTerm cc width l i leaf),
+  det_rep _ _ fun i _ => ⟨⟨trivial, trivial⟩, trivial, det_rep _ _ (fun leaf _ => det_solveTerm cc width l i leaf),
     ⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, trivial⟩
 
 /-- **The pin solve**: all 104 lanes of the hot cast. -/
@@ -652,7 +791,8 @@ theorem exec_pinSolve (cc : ChunkCastCells) (width l : Nat) (memory : Memory) (v
     (lPos : 0 < l) (lSmall : l ≤ 128) (layout : ChunkCastLayout cc width l)
     (valueLt : value < 2 ^ width)
     (alphaCell : memory.ram (word cc.alpha) = word value)
-    (pinCells : ∀ i (ib : i < laneCount), memory.ram (word (cc.pinBase + i)) = word (pin ⟨i, ib⟩).val)
+    (pinCells : ∀ i (ib : i < laneCount), memory.ram (word (cc.pinBase + i)) = word ((pin ⟨i, ib⟩).val / 2))
+    (pinEven : Parity.EvenLanes pin)
     (castCells : ∀ leaf (bound : leaf < 2 ^ width), leaf ≠ value → ∀ i (ib : i < laneCount),
       memory.ram (word (cc.castBase + 128 * leaf + i)) = word ((values[leaf]'bound) ⟨i, ib⟩).val) :
     ∃ after, (pinSolve cc width l).exec memory = some after ∧
@@ -691,6 +831,7 @@ theorem exec_pinSolve (cc : ChunkCastCells) (width l : Nat) (memory : Memory) (v
               rw [Nat.add_assoc]; exact layout.pinCast i (by simp only [laneCount, labelBits] at bound; omega) _
                 (by simp only [laneCount, labelBits] at ib; omega)]
             exact pinCells i bound)
+        (pinEven ⟨i, bound⟩)
         (fun leaf lb notHot => by
           rw [offHot _ (by simp only [laneCount, labelBits] at bound; omega) fun i' ib same => by
             simp only [laneCount, labelBits] at bound ib
@@ -804,7 +945,8 @@ theorem agree_castPhase (cc : ChunkCastCells) (width l : Nat) (widthSmall : widt
     (alphaCell : memory.ram (word cc.alpha) = word value)
     (leafCellsHold : ∀ leaf : Fin (2 ^ width),
       memory.ram (word (cc.levelBase + leaf.val)) = labelWord (tree leaf))
-    (pinCells : ∀ i (ib : i < laneCount), memory.ram (word (cc.pinBase + i)) = word (pin ⟨i, ib⟩).val)
+    (pinCells : ∀ i (ib : i < laneCount), memory.ram (word (cc.pinBase + i)) = word ((pin ⟨i, ib⟩).val / 2))
+    (pinEven : Parity.EvenLanes pin)
     (tagSmall : ∀ leaf j, leaf < 2 ^ width → j < castAnswers l → tagOf leaf j < 2 ^ 127) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
       (fun (result : ChunkEval l) after =>
@@ -831,7 +973,7 @@ theorem agree_castPhase (cc : ChunkCastCells) (width l : Nat) (widthSmall : widt
     rw [frameL _ (not_chunkCastWrites cc width l _ layout layout.alphaSmall layout.alphaAns
       layout.alphaCast)]
     exact alphaCell
-  have pinNow : ∀ i (ib : i < laneCount), after.ram (word (cc.pinBase + i)) = word (pin ⟨i, ib⟩).val :=
+  have pinNow : ∀ i (ib : i < laneCount), after.ram (word (cc.pinBase + i)) = word ((pin ⟨i, ib⟩).val / 2) :=
     fun i ib => by
       simp only [laneCount, labelBits] at ib
       rw [frameL _ (not_chunkCastWrites cc width l _ layout (by omega) (layout.pinAns i (by omega))
@@ -839,7 +981,7 @@ theorem agree_castPhase (cc : ChunkCastCells) (width l : Nat) (widthSmall : widt
       exact pinCells i ib
   rw [tree_eq_exec _ (det_pinSolve cc width l)]
   obtain ⟨final, run, hot, frameP, bitsP, regsP⟩ := exec_pinSolve cc width l after value values pin
-    widthSmall lPos lSmall layout valueLt alphaNow pinNow casts
+    widthSmall lPos lSmall layout valueLt alphaNow pinNow pinEven casts
   rw [run]
   refine .leaf ⟨fun leaf lb => ?_, fun leaf lb i ib => ?_,
     ⟨fun address outside => ?_, ?_, fun register outside => ?_⟩⟩
@@ -889,7 +1031,8 @@ theorem agree_chunkReplay (cells : TreeCells) (cc : ChunkCastCells) (tagTree tag
     (alphaCell : memory.ram (word cells.alpha) = word value)
     (joinCells : ∀ k, 1 ≤ k → k < width → memory.ram (word (cells.join k)) = labelWord (join k))
     (bitCells : ∀ k, k < width → memory.ram (word (cells.bit k)) = blockWord (bitLabel k))
-    (pinCells : ∀ i (ib : i < laneCount), memory.ram (word (cc.pinBase + i)) = word (pin ⟨i, ib⟩).val)
+    (pinCells : ∀ i (ib : i < laneCount), memory.ram (word (cc.pinBase + i)) = word ((pin ⟨i, ib⟩).val / 2))
+    (pinEven : Parity.EvenLanes pin)
     (tagTreeSmall : ∀ k s, k < width → s < 2 ^ k → tagTree k s < 2 ^ 127)
     (tagCastSmall : ∀ leaf j, leaf < 2 ^ width → j < castAnswers l → tagCast leaf j < 2 ^ 127) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
@@ -913,13 +1056,13 @@ theorem agree_chunkReplay (cells : TreeCells) (cc : ChunkCastCells) (tagTree tag
   have alphaNow : after.ram (word cc.alpha) = word value := by
     rw [sameAlpha, frameT.ram _ alphaOffTree]
     exact alphaCell
-  have pinNow : ∀ i (ib : i < laneCount), after.ram (word (cc.pinBase + i)) = word (pin ⟨i, ib⟩).val :=
+  have pinNow : ∀ i (ib : i < laneCount), after.ram (word (cc.pinBase + i)) = word ((pin ⟨i, ib⟩).val / 2) :=
     fun i ib => by rw [frameT.ram _ (pinOffTree i ib)]; exact pinCells i ib
   have leavesNow : ∀ leaf : Fin (2 ^ width),
       after.ram (word (cc.levelBase + leaf.val)) = labelWord (tree leaf) := fun leaf => by
     rw [sameLevel]; exact levels leaf
   refine (agree_castPhase cc width l widthSmall lPos lSmall castLayout tagCast tree value valueLt pin
-    after alphaNow leavesNow pinNow tagCastSmall).mono fun result final post => ?_
+    after alphaNow leavesNow pinNow pinEven tagCastSmall).mono fun result final post => ?_
   obtain ⟨leavesEq, casts, frameC⟩ := post
   refine ⟨fun leaf lb => ?_, casts, frameT.trans frameC⟩
   have levelFits := castLayout.levelFits

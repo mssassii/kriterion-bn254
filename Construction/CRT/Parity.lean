@@ -247,4 +247,17 @@ theorem pinHalf_injective_on_even (width : Nat) {a b : Lanes width}
     simpa [pinExpand, hz]
   | succ width => exact evenLanes_doubleLanes pin
 
+/-- At a positive width every expanded lane is twice the stored lane. -/
+theorem pinExpand_val (width : Nat) (positive : 1 ≤ width) (pin : Lanes (width - 1))
+    (i : Fin laneCount) : (pinExpand width pin i).val = 2 * (pin i).val := by
+  cases width with
+  | zero => omega
+  | succ width => exact doubleLanes_val pin i
+
+/-- At a positive width the stored lane is half the expanded lane. -/
+theorem pinExpand_val_half (width : Nat) (positive : 1 ≤ width) (pin : Lanes (width - 1))
+    (i : Fin laneCount) : (pinExpand width pin i).val / 2 = (pin i).val := by
+  rw [pinExpand_val width positive]
+  omega
+
 end Kriterion.CRT.Parity
