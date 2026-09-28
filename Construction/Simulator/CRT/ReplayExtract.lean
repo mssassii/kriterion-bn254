@@ -96,7 +96,8 @@ def matStore (cells : StageCells) (level t : Nat) : Prog :=
 def hashEntry (cells : StageCells) (start level base stride t : Nat) : Prog :=
   .seq (absSlot cells start t)
     (.seq (nodeInput cells base stride)
-    (.seq (.op (.query 4 rIndex rInput rFirst rSecond)) (matStore cells level t)))
+    (.seq (.op (.query 4 rIndex rInput rFirst rSecond))
+      (.seq (clipReg rFirst) (matStore cells level t))))
 
 /-- One node of the extension of level `level`: `node[x] ^= mat[t]`, `node[x + 2 ^ level] := mat[t]`
 (clobbers `rB`, `rC`, `rE`, `rF`, `rAddr`). -/

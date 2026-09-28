@@ -67,6 +67,11 @@ theorem liftHash_h128M (label : Block) (tag : Nat) :
 
 end Lift
 
+theorem liftHash_hLabelM {FixedIndex EncIndex : Type} (label : Label) (tag : Nat) :
+    liftHash (FixedIndex := FixedIndex) (EncIndex := EncIndex) (hLabelM label tag) =
+      .query (.hash ((hashInput (embed label) tag : Nat) : BN254.BaseField))
+        fun answer => .pure (clip answer.1) := rfl
+
 /-! ### Generic tree steps -/
 
 section Trees
@@ -135,6 +140,26 @@ end Trees
 
 theorem blockWord_eq_word (block : Block) : blockWord block = word block.toNat := rfl
 
+/-- A conversion label zero-extended to a machine word. -/
+def labelWord (label : Label) : Word := BitVec.ofNat 256 label.toNat
+
+theorem labelWord_eq_word (label : Label) : labelWord label = word label.toNat := rfl
+
+theorem labelWord_toNat (label : Label) : (labelWord label).toNat = label.toNat := by
+  unfold labelWord
+  rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (lt_trans label.isLt (by decide))]
+
+theorem labelWord_xor (first second : Label) :
+    labelWord first ^^^ labelWord second = labelWord (first ^^^ second) := by
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_xor, labelWord_toNat, labelWord_toNat, labelWord_toNat, BitVec.toNat_xor]
+
+theorem labelWord_zero : labelWord 0 = 0 := rfl
+
+theorem labelWord_embed (label : Label) : blockWord (embed label) = labelWord label := by
+  unfold blockWord labelWord
+  rw [show (embed label).toNat = label.toNat from Narrow.embed_toNat label]
+
 theorem eval_xor (first second : Word) : Arithmetic.xor.eval first second = first ^^^ second := rfl
 
 theorem eval_and_pow (value n : Nat) (small : value < 2 ^ 256) (nSmall : n < 256) :
@@ -147,6 +172,25 @@ theorem eval_and_pow (value n : Nat) (small : value < 2 ^ 256) (nSmall : n < 256
   rw [BitVec.toNat_and, word_toNat small, word_toNat maskSmall,
     word_toNat (lt_of_le_of_lt (Nat.mod_le _ _) small)]
   exact Nat.and_two_pow_sub_one_eq_mod value n
+
+theorem blockWord_clip (block : Block) :
+    Arithmetic.and.eval (blockWord block) (word (2 ^ labelBits - 1)) = labelWord (clip block) := by
+  rw [blockWord_eq_word, eval_and_pow _ _ (lt_trans block.isLt (by decide)) (by decide)]
+  change word (block.toNat % 2 ^ labelBits) = word (clip block).toNat
+  rw [show (clip block).toNat = block.toNat % 2 ^ labelBits from Narrow.clip_toNat block]
+
+theorem exec_clipReg (register : Register) (notB : register ≠ rB) (memory : Memory)
+    (block : Block) (holds : memory.registers register = blockWord block) :
+    ∃ after, (clipReg register).exec memory = some after ∧ after.ram = memory.ram ∧
+      after.bits = memory.bits ∧ after.registers register = labelWord (clip block) ∧
+      ∀ other, other ≠ register → other ≠ rB → after.registers other = memory.registers other := by
+  refine ⟨_, rfl, rfl, rfl, ?_, fun other notReg notB => ?_⟩
+  · simp only [reg_setReg, if_pos rfl, if_neg notB, holds]
+    exact blockWord_clip block
+  · simp only [reg_setReg, if_neg notReg, if_neg notB]
+
+theorem det_clipReg (register : Register) : (clipReg register).OpsSatisfy Op.Det :=
+  ⟨trivial, trivial⟩
 
 theorem word_xor_eq_zero {first second : Nat} (firstSmall : first < 2 ^ 256)
     (secondSmall : second < 2 ^ 256) : word first ^^^ word second = 0 ↔ first = second := by

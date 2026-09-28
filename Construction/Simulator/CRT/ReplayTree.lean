@@ -32,6 +32,10 @@ namespace Kriterion.CRT.SimMachine
 open Cryptography.BoundedMachine Kriterion.ArgoMAC.PlanB.SimMachine
 open Kriterion.ArgoMAC.PlanB.SimMachine.Blocks
 
+/-- Project a raw register onto the active conversion-label bits. -/
+def clipReg (register : Register) : Prog :=
+  .seq (cst rB (2 ^ Kriterion.CRT.labelBits - 1)) (ar .and register register rB)
+
 /-- The RAM cells one tree's evaluation uses. -/
 structure TreeCells where
   /-- The level labels, `2 ^ levels` cells (level `n` in the first `2 ^ n`). -/
@@ -64,7 +68,8 @@ def entryStore (cells : TreeCells) (s : Nat) : Prog :=
 /-- The paid arm of an entry: build the input, ask the hash, store the material. -/
 def entryHash (cells : TreeCells) (tag s : Nat) : Prog :=
   .seq (entryInput cells tag s)
-    (.seq (.op (.query 4 rIndex rInput rFirst rSecond)) (entryStore cells s))
+    (.seq (.op (.query 4 rIndex rInput rFirst rSecond))
+      (.seq (clipReg rFirst) (entryStore cells s)))
 
 /-- One slot of level `n`. -/
 def treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n s : Nat) : Prog :=
@@ -75,12 +80,13 @@ def treeRecover (cells : TreeCells) (n : Nat) : Prog :=
   .seq (loadAt rE (cells.join n))
     (.seq (ar .xor rD rD rE)
     (.seq (loadAt rE (cells.bit n))
+    (.seq (clipReg rE)
     (.seq (ar .xor rD rD rE)
     (.seq (loadAt rA cells.alpha)
     (.seq (cst rB (2 ^ n - 1))
     (.seq (ar .and rA rA rB)
     (.seq (cst rB cells.matBase)
-    (.seq (ar .add rA rA rB) (.op (.store rA rD))))))))))
+    (.seq (ar .add rA rA rB) (.op (.store rA rD)))))))))))
 
 /-- One entry of the extension: `E_{s + 2^n} := y_s`, `E_s := E_s ⊕ y_s`. -/
 def treeLevelBody (cells : TreeCells) (n s : Nat) : Prog :=
@@ -103,7 +109,8 @@ def treeStep (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) : Prog :=
 /-- Level 1: both slots hold the bit-0 label (step 0 is free). -/
 def treePrefix (cells : TreeCells) : Prog :=
   .seq (loadAt rInput (cells.bit 0))
-    (.seq (storeAt cells.levelBase rInput) (storeAt (cells.levelBase + 1) rInput))
+    (.seq (clipReg rInput)
+    (.seq (storeAt cells.levelBase rInput) (storeAt (cells.levelBase + 1) rInput)))
 
 /-- **A tree over `levels` bits with known bits** (`tagOf n s` the tag of slot `s` at level `n`): level 1, then the paid levels `1 .. levels - 1`. -/
 def treeEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (levels : Nat) : Prog :=
@@ -129,18 +136,18 @@ def treeStepClobbers : Clobbers := Clobbers.ofList [rA, rB, rC, rD, rE, rAddr, r
 
 /-! ### Sizes and costs -/
 
-theorem cost_entryHash (cells : TreeCells) (tag s : Nat) : (entryHash cells tag s).cost = 8 := rfl
+theorem cost_entryHash (cells : TreeCells) (tag s : Nat) : (entryHash cells tag s).cost = 10 := rfl
 theorem cost_treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n s : Nat) :
-    (treeEntry cells tagOf n s).cost = 16 := rfl
+    (treeEntry cells tagOf n s).cost = 18 := rfl
 theorem size_treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n s : Nat) :
-    (treeEntry cells tagOf n s).size = 25 := rfl
-theorem cost_treeRecover (cells : TreeCells) (n : Nat) : (treeRecover cells n).cost = 13 := rfl
+    (treeEntry cells tagOf n s).size = 29 := rfl
+theorem cost_treeRecover (cells : TreeCells) (n : Nat) : (treeRecover cells n).cost = 15 := rfl
 theorem cost_treeLevelBody (cells : TreeCells) (n s : Nat) : (treeLevelBody cells n s).cost = 9 := rfl
 
 theorem cost_treeStep (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) :
-    (treeStep cells tagOf n).cost = 14 + 25 * 2 ^ n := by
+    (treeStep cells tagOf n).cost = 16 + 27 * 2 ^ n := by
   simp only [treeStep, treeLevel, Prog.cost, cst]
-  rw [Prog.cost_rep _ _ 16 (fun s _ => cost_treeEntry cells tagOf n s),
+  rw [Prog.cost_rep _ _ 18 (fun s _ => cost_treeEntry cells tagOf n s),
     Prog.cost_rep _ _ 9 (fun s _ => cost_treeLevelBody cells n s), cost_treeRecover]
   omega
 
