@@ -121,38 +121,55 @@ theorem garbleY_norm [FieldCertificate] (rows : Coordinates.Rows) (K : Biquadrat
   unfold kappaOf
   linear_combination product
 
-/-- **The evaluator's value of a digit on the curve**: the normalized rows at the input, the sign row signed. -/
+/-- The corrected value of a digit: the normalized rows at the input, the sign row signed. -/
+def corrected (rows : Coordinates.Rows) (K : Biquadratic.Values) (input : AffineInput) :
+    FieldMacToECMac.HomogeneousValue :=
+  { x := Coordinates.evaluate (normRows rows K).x input
+    y := signed (signBit (kappaOf rows K)) (Coordinates.evaluate (normRows rows K).y input)
+    z := Coordinates.evaluate (normRows rows K).z input }
+
+/-- **The evaluator's value of a digit on the curve** is the corrected value. -/
 theorem evaluateNormRow_encoded [FieldCertificate] (rows : Coordinates.Rows) (K : Biquadratic.Values)
     (x : Biquadratic.XRandomness) (y : Biquadratic.YRandomness) (z : Biquadratic.ZRandomness)
     (input : AffineInput) (onCurve : OnCurve input) (zNe : rows.z.constant ≠ 0)
     (sNe : rows.y.xSquared ≠ 0) (sparse : FieldMacToECMac.SparseRow rows) :
     evaluateNormRow (garbleNormRow rows K) input (Biquadratic.delivered (normRows rows K) x y z K input) =
-      { x := Coordinates.evaluate (normRows rows K).x input
-        y := signed (signBit (kappaOf rows K)) (Coordinates.evaluate (normRows rows K).y input)
-        z := Coordinates.evaluate (normRows rows K).z input } := by
+      corrected rows K input := by
   have xRow := Biquadratic.evaluateEncodedX (normRows rows K) x y z K input
   have yRow := Biquadratic.evaluateEncodedY (normRows rows K) x y z K input onCurve
   have zRow := Biquadratic.evaluateEncodedZ (normRows rows K) x y z K input
   rw [garbleY_norm rows K sNe] at yRow
   rw [garbleZ_norm rows K zNe] at zRow
   obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := scaled_sparse (rhoOf rows K) (kappaOf rows K) rows sparse
-  unfold evaluateNormRow garbleNormRow
-  simp only
-  congr 1
-  · rw [show ({ c0 := (Biquadratic.garbleX (normRows rows K).x.constant K).c0 } : Biquadratic.XGamma) =
-      Biquadratic.garbleX (normRows rows K).x.constant K from rfl, xRow]
+  have ex : Coordinates.evaluate (normRows rows K).x input = (normRows rows K).x.constant +
+      (normRows rows K).x.x * input.x + (normRows rows K).x.y * input.y +
+      (normRows rows K).x.xSquared * input.x ^ 2 := by
     simp only [Coordinates.evaluate]
     rw [show (normRows rows K).x.xy = 0 from h1, show (normRows rows K).x.ySquared = 0 from h2]
     ring
-  · rw [yRow]
+  have ey : Coordinates.evaluate (normRows rows K).y input = (normRows rows K).y.constant +
+      (normRows rows K).y.y * input.y + (normRows rows K).y.xSquared * input.x ^ 2 +
+      (normRows rows K).y.ySquared * input.y ^ 2 := by
     simp only [Coordinates.evaluate]
     rw [show (normRows rows K).y.x = 0 from h3, show (normRows rows K).y.xy = 0 from h4]
-    ring_nf
-  · rw [zRow]
+    ring
+  have ez : Coordinates.evaluate (normRows rows K).z input =
+      (normRows rows K).z.constant + (normRows rows K).z.x * input.x := by
     simp only [Coordinates.evaluate]
     rw [show (normRows rows K).z.y = 0 from h5, show (normRows rows K).z.xy = 0 from h6,
       show (normRows rows K).z.xSquared = 0 from h7, show (normRows rows K).z.ySquared = 0 from h8]
     ring
+  show FieldMacToECMac.HomogeneousValue.mk
+      (Biquadratic.evaluateX (Biquadratic.garbleX (normRows rows K).x.constant K) input
+        (Biquadratic.delivered (normRows rows K) x y z K input))
+      (signed (signBit (kappaOf rows K))
+        (Biquadratic.evaluateY { c4 := flagValue (zeroFlag (K (.inl .rowY_cubic))) } input
+          (Biquadratic.delivered (normRows rows K) x y z K input)))
+      (Biquadratic.evaluateZ { c0 := flagValue (zeroFlag (K (.inl .rowZ_x9))) } input
+        (Biquadratic.delivered (normRows rows K) x y z K input)) = corrected rows K input
+  rw [xRow, yRow, zRow]
+  unfold corrected
+  rw [ex, ey, ez]
 
 /-! ### The sign correction -/
 
@@ -163,6 +180,8 @@ theorem tauOf_ne_zero [FieldCertificate] (kappa : BaseField) (ne : kappa ≠ 0) 
   unfold tauOf
   rw [JacobianMixed.fieldPower_eq _ _ JacobianMixed.rootExponent_lt]
   exact pow_ne_zero _ ne
+
+theorem two_ne_zero_base : (2 : BaseField) ≠ 0 := by decide
 
 /-- The quadratic character of a nonzero element is `±1`. -/
 theorem character_cases [FieldCertificate] (kappa : BaseField) (ne : kappa ≠ 0) :
@@ -176,12 +195,10 @@ theorem character_cases [FieldCertificate] (kappa : BaseField) (ne : kappa ≠ 0
 theorem tauOf_sq [FieldCertificate] (kappa : BaseField) :
     tauOf kappa ^ 2 = kappa ^ Garbling.characterExponent * kappa := by
   unfold tauOf
-  rw [JacobianMixed.fieldPower_eq _ _ JacobianMixed.rootExponent_lt, ← pow_mul, ← pow_succ]
-  congr 1
-  have total := JacobianMixed.characterExponent_add_root
-  have twice := JacobianMixed.two_characterExponent
-  have pos : 0 < baseFieldModulus := by unfold baseFieldModulus; norm_num
-  omega
+  have exponent : Garbling.rootExponent * 2 = Garbling.characterExponent + 1 := by
+    unfold Garbling.rootExponent Garbling.characterExponent baseFieldModulus
+    norm_num
+  rw [JacobianMixed.fieldPower_eq _ _ JacobianMixed.rootExponent_lt, ← pow_mul, exponent, pow_succ]
 
 /-- **`(−1)^ν κ s = τ² s`**: the correction makes the sign row's scale the square `τ²`. -/
 theorem signed_signBit [FieldCertificate] (kappa value : BaseField) (ne : kappa ≠ 0) :
@@ -194,20 +211,13 @@ theorem signed_signBit [FieldCertificate] (kappa value : BaseField) (ne : kappa 
       rw [one]
       intro same
       have two : (2 : BaseField) = 0 := by linear_combination same
-      exact absurd two (by decide)
+      exact two_ne_zero_base two
     rw [if_neg (by simpa using notMinus), one]
     ring
   · rw [if_pos (by simpa using minus), minus]
     ring
 
 /-! ### The corrected values are the old rows' values -/
-
-/-- The corrected value of a digit: the normalized rows at the input, the sign row signed. -/
-def corrected (rows : Coordinates.Rows) (K : Biquadratic.Values) (input : AffineInput) :
-    FieldMacToECMac.HomogeneousValue :=
-  { x := Coordinates.evaluate (normRows rows K).x input
-    y := signed (signBit (kappaOf rows K)) (Coordinates.evaluate (normRows rows K).y input)
-    z := Coordinates.evaluate (normRows rows K).z input }
 
 theorem corrected_eq [FieldCertificate] (rows : Coordinates.Rows) (K : Biquadratic.Values) (input : AffineInput)
     (sNe : rows.y.xSquared ≠ 0) :
@@ -227,19 +237,27 @@ theorem corrected_some [FieldCertificate] (offset : AffineInput) (phi : BaseFiel
         (tauOf (kappaOf (unscaledRows offset (some phi)) K))) input := by
   rw [corrected_eq _ _ _ sNe]
   simp only [FieldMacToECMac.evaluateRow, Coordinates.rows, unscaledRows, Coordinates.evaluateScaleSome, one_pow,
-    one_mul]
-  rfl
+    one_mul, pow_one]
 
 /-- For digit zero the corrected value is the old rows' value at `(ρ, τ)` with the sign row times `x²`. -/
 theorem corrected_none [FieldCertificate] (offset : AffineInput) (K : Biquadratic.Values) (input : AffineInput)
     (sNe : (unscaledRows offset none).y.xSquared ≠ 0) :
     corrected (unscaledRows offset none) K input =
-      let old := FieldMacToECMac.evaluateRow (Coordinates.rows offset none (rhoOf (unscaledRows offset none) K)
-        (tauOf (kappaOf (unscaledRows offset none) K))) input
-      { x := old.x, y := input.x ^ 2 * old.y, z := old.z } := by
-  rw [corrected_eq _ _ _ sNe]
-  simp only [FieldMacToECMac.evaluateRow, Coordinates.rows, unscaledRows, Coordinates.evaluateScaleNone,
-    Coordinates.evaluate, zeroSign, FieldMacToECMac.HomogeneousValue.mk.injEq]
+      { x := (FieldMacToECMac.evaluateRow (Coordinates.rows offset none (rhoOf (unscaledRows offset none) K)
+          (tauOf (kappaOf (unscaledRows offset none) K))) input).x
+        y := input.x ^ 2 * (FieldMacToECMac.evaluateRow (Coordinates.rows offset none
+          (rhoOf (unscaledRows offset none) K) (tauOf (kappaOf (unscaledRows offset none) K))) input).y
+        z := (FieldMacToECMac.evaluateRow (Coordinates.rows offset none (rhoOf (unscaledRows offset none) K)
+          (tauOf (kappaOf (unscaledRows offset none) K))) input).z } := by
+  rw [corrected_eq _ _ _ sNe, FieldMacToECMac.evaluateRowsNone]
+  have ex : Coordinates.evaluate (unscaledRows offset none).x input = offset.x := by
+    simp [unscaledRows, Coordinates.evaluateScaleNone]
+  have ey : Coordinates.evaluate (unscaledRows offset none).y input = offset.y * input.x ^ 2 := by
+    simp [unscaledRows, zeroSign, Coordinates.evaluate]
+  have ez : Coordinates.evaluate (unscaledRows offset none).z input = 1 := by
+    simp [unscaledRows, Coordinates.evaluateScaleNone]
+  rw [ex, ey, ez]
+  simp only [FieldMacToECMac.HomogeneousValue.mk.injEq]
   refine ⟨by ring, by ring, by ring⟩
 
 /-! ### The decoder does not see a square factor of the sign row -/
