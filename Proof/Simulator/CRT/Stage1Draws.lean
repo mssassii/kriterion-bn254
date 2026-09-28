@@ -113,7 +113,7 @@ structure Draw where
   fields : Fin fieldCount → BaseField
   bytes : Fin exceptionByteCount → Nat
   joins : Fin (2 * joinCount) → Nat
-  pins : Fin (2 * (pinCount * 128)) → Nat
+  pins : Fin (2 * (pinCount * laneCount)) → Nat
   digits : Fin (recordCount * moduliCount) → Nat
   zeros : Fin labelCount → Nat
   deltas : Fin 2 → Nat
@@ -121,9 +121,9 @@ structure Draw where
 def fieldsLaw : PMF (Option (Fin fieldCount → BaseField)) := optionProduct fieldCount fun _ => fieldCellLaw
 def bytesLaw : PMF (Option (Fin exceptionByteCount → Nat)) :=
   optionProduct exceptionByteCount fun _ => (wordLaw 8).map some
-def joinsLaw : PMF (Option (Fin (2 * joinCount) → Nat)) := optionProduct (2 * joinCount) fun _ => (wordLaw 128).map some
-def pinsLaw : PMF (Option (Fin (2 * (pinCount * 128)) → Nat)) :=
-  optionProduct (2 * (pinCount * 128)) fun n => (wordLaw (pinWidthAt (pinOf n.val))).map some
+def joinsLaw : PMF (Option (Fin (2 * joinCount) → Nat)) := optionProduct (2 * joinCount) fun _ => (wordLaw labelBits).map some
+def pinsLaw : PMF (Option (Fin (2 * (pinCount * laneCount)) → Nat)) :=
+  optionProduct (2 * (pinCount * laneCount)) fun n => (wordLaw (pinWidthAt (pinOf n.val))).map some
 def digitsLaw : PMF (Option (Fin (recordCount * moduliCount) → Nat)) :=
   optionProduct (recordCount * moduliCount) fun n => digitLaw (modulusAt (n.val % moduliCount))
 def zerosLaw : PMF (Option (Fin labelCount → Nat)) := optionProduct labelCount fun _ => (wordLaw 128).map some
@@ -138,7 +138,7 @@ def drawLaw : PMF (Option Draw) :=
 /-- The address of join word `n`. -/
 def joinAddr (n : Nat) : Nat := Layout.sourceJoin (n / joinCount) (n % joinCount)
 /-- The address of lane word `n`. -/
-def pinAddr (n : Nat) : Nat := Layout.sourcePin (pinCoord n) (pinOf n) (n % 128)
+def pinAddr (n : Nat) : Nat := Layout.sourcePin (pinCoord n) (pinOf n) (n % laneCount)
 /-- The address of digit `n`. -/
 def digitAddr (n : Nat) : Nat :=
   Layout.residueCell (recordCoord (n / moduliCount)) (n % moduliCount) (recordIndex (n / moduliCount))
@@ -148,7 +148,7 @@ def storedMem (memory : Memory) (d : Draw) : Memory :=
   foldStore (fun n => wordStore (Layout.deltaCell n)) 2
     (foldStore (fun n => wordStore (keyBase + 2 * n)) labelCount
       (foldStore (fun n => cellStore (digitAddr n)) (recordCount * moduliCount)
-        (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * 128))
+        (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * laneCount))
           (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount)
             (foldStore (wordStep exceptionBase) exceptionByteCount
               (foldStore (cellStep fieldBase) fieldCount memory d.fields) d.bytes) d.joins) d.pins) d.digits)
@@ -179,13 +179,13 @@ theorem seq_bytes (rest : Prog) (memory : Memory) :
 theorem seq_joins (rest : Prog) (memory : Memory) :
     (Prog.seq joins rest).memSem memory =
       optBind joinsLaw fun j => rest.memSem (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount) memory j) :=
-  memSem_seq_law _ _ _ _ _ (memSem_wordCells (2 * joinCount) (fun _ => 128) joinAddr (fun _ => by norm_num) memory)
+  memSem_seq_law _ _ _ _ _ (memSem_wordCells (2 * joinCount) (fun _ => labelBits) joinAddr (fun _ => by norm_num) memory)
 
 theorem seq_pins (rest : Prog) (memory : Memory) :
     (Prog.seq pins rest).memSem memory =
       optBind pinsLaw fun p =>
-        rest.memSem (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * 128)) memory p) :=
-  memSem_seq_law _ _ _ _ _ (memSem_wordCells (2 * (pinCount * 128)) (fun n => pinWidthAt (pinOf n)) pinAddr
+        rest.memSem (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * laneCount)) memory p) :=
+  memSem_seq_law _ _ _ _ _ (memSem_wordCells (2 * (pinCount * laneCount)) (fun n => pinWidthAt (pinOf n)) pinAddr
     (fun n => pinWidthAt_small _) memory)
 
 theorem seq_digits (rest : Prog) (memory : Memory) :

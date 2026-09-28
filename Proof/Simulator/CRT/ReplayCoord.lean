@@ -170,7 +170,7 @@ def ChunkOut (cc : CoordCells) (T : CrtTable) (chunkTable : Fin T.chunkCount →
       after.ram (word (cc.castBase + 32768 * c + 128 * leaf + i)) =
         word (((chunkTable ⟨c, cb⟩).casts leaf) ⟨i, ib⟩).val) ∧
     (∀ c (cb : c < T.chunkCount), ∀ leaf, leaf < 2 ^ T.chunkWidth c →
-      after.ram (word (cc.leafBase + 256 * c + leaf)) = blockWord ((chunkTable ⟨c, cb⟩).leaves leaf)) ∧
+      after.ram (word (cc.leafBase + 256 * c + leaf)) = labelWord ((chunkTable ⟨c, cb⟩).leaves leaf)) ∧
     Frame (chunkLoopWrites cc T.chunkCount) chunkLoopClobbers start after
 
 /-- The residue joins as `coordEvalM` reads them from the records. -/
@@ -198,7 +198,7 @@ theorem agree_coordReplay (T : CrtTable) (S coord : Nat) (coordLt : coord < 2) (
     (coordVal : memory.ram (word cc.coordCell) = word v)
     (labelCells : ∀ j, j < T.inputBits → memory.ram (word (cc.labelBase + j)) = blockWord (labels j))
     (joinCells : ∀ c, c < T.chunkCount → ∀ n, 1 ≤ n → n < T.chunkWidth c →
-      memory.ram (word (cc.chunkJoin c n)) = blockWord (pub.chunkJoin c n))
+      memory.ram (word (cc.chunkJoin c n)) = labelWord (pub.chunkJoin c n))
     (pinCells : ∀ c, c < T.chunkCount → ∀ i (ib : i < laneCount),
       memory.ram (word (cc.pinBase + 128 * c + i)) =
         word ((pinOfBlocks T.castWidth fun k => pub.chunkPin c k.val) ⟨i, ib⟩).val)
@@ -216,7 +216,7 @@ theorem agree_coordReplay (T : CrtTable) (S coord : Nat) (coordLt : coord < 2) (
               (decodeWrites dc nz S))
             ((chunkLoopClobbers.union modClobbers).union reconstructClobbers) memory after)
       ((coordReplay cc T coord modProg dc nz S).tree memory)
-      (liftHash (coordEvalM T S coord pub records v labels)) := by
+      (liftHash (coordEvalM T S coord pub records v (fun j => clip (labels j)))) := by
   have := chain.alphaBelow; have := chain.levelsBelow; have := chain.matsBelow
   have := chain.ansBelow; have := chain.castBelow; have := chain.leafFits
   have := dchain.hintBelow; have := dchain.gatherBelow; have := dchain.digitsBelow

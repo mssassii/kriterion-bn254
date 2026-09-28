@@ -96,7 +96,8 @@ def matStore (cells : StageCells) (level t : Nat) : Prog :=
 def hashEntry (cells : StageCells) (start level base stride t : Nat) : Prog :=
   .seq (absSlot cells start t)
     (.seq (nodeInput cells base stride)
-    (.seq (.op (.query 4 rIndex rInput rFirst rSecond)) (matStore cells level t)))
+    (.seq (.op (.query 4 rIndex rInput rFirst rSecond))
+      (.seq (clipReg rFirst) (matStore cells level t))))
 
 /-- One node of the extension of level `level`: `node[x] ^= mat[t]`, `node[x + 2 ^ level] := mat[t]`
 (clobbers `rB`, `rC`, `rE`, `rF`, `rAddr`). -/
@@ -294,7 +295,7 @@ def subLane (cells : StageCells) (w i : Nat) : Prog :=
 def packLane (base b i : Nat) : Prog :=
   .seq (loadAt rE (base + i)) (bitInsert b i)
 
-/-- **The lane-bit pack**: `rD := laneBit lanes b` for the 128 lanes at `base .. base + 127`
+/-- **The lane-bit pack**: `rD := laneBit lanes b` for the 104 active lanes at `base .. base + 103`
 (clobbers `rB`, `rD`, `rE`, `rAddr`). -/
 def lanePack (base b : Nat) : Prog :=
   .seq (cst rD 0) (Prog.rep Kriterion.CRT.laneCount (packLane base b))

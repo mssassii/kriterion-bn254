@@ -38,7 +38,7 @@ theorem tree_of_det {program : Prog} (det : program.OpsSatisfy Op.Det) : program
 /-! ### The growth (as in `treeOps_growEval`) -/
 
 theorem tree_entryHash (cells : TreeCells) (tag s : Nat) : (entryHash cells tag s).OpsSatisfy TreeOp :=
-  ⟨⟨⟨trivial, trivial⟩, trivial, trivial⟩, trivial, ⟨⟨trivial, trivial⟩, trivial⟩⟩
+  ⟨⟨⟨trivial, trivial⟩, trivial, trivial⟩, trivial, ⟨trivial, trivial⟩, ⟨⟨trivial, trivial⟩, trivial⟩⟩
 
 theorem tree_treeStep (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) :
     (treeStep cells tagOf n).OpsSatisfy TreeOp :=
@@ -68,7 +68,7 @@ theorem tree_foldsLoop (cells : FoldCells) (m start count : Nat) (tagOf : Nat �
 theorem tree_hashEntry (cells : StageCells) (start level base stride t : Nat) :
     (hashEntry cells start level base stride t).OpsSatisfy TreeOp :=
   ⟨tree_of_det (det_absSlot cells start t), tree_of_det (det_nodeInput cells base stride), trivial,
-    tree_of_det (det_matStore cells level t)⟩
+    tree_of_det (det_clipReg rFirst), tree_of_det (det_matStore cells level t)⟩
 
 theorem tree_subtreeLevel (cells : StageCells) (start d base stride : Nat) :
     (subtreeLevel cells start d base stride).OpsSatisfy TreeOp :=

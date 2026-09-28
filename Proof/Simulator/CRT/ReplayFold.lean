@@ -49,21 +49,21 @@ private theorem det_foldTest (cells : FoldCells) (ρ : Nat) : (foldTest cells ρ
   ⟨⟨trivial, trivial⟩, trivial, trivial⟩
 
 private theorem exec_foldRecover (cells : FoldCells) (j : Nat) (memory : Memory) (hot : Nat)
-    (X J L : Block) (hotSmall : cells.matBase + hot < 2 ^ 256) (hotLt : hot < 2 ^ 256)
-    (xorReg : memory.registers rD = blockWord X)
-    (joinCell : memory.ram (word (cells.join j)) = blockWord J)
-    (bitCell : memory.ram (word (cells.bit j)) = blockWord L)
+    (X J L : Label) (hotSmall : cells.matBase + hot < 2 ^ 256) (hotLt : hot < 2 ^ 256)
+    (xorReg : memory.registers rD = labelWord X)
+    (joinCell : memory.ram (word (cells.join j)) = labelWord J)
+    (bitCell : memory.ram (word (cells.bit j)) = labelWord L)
     (hotCell : memory.ram (word cells.hot) = word hot) :
     ∃ after, (foldRecover cells j).exec memory = some after ∧
       after.ram = Function.update memory.ram (word (cells.matBase + hot))
-        (blockWord (X ^^^ J ^^^ L)) ∧ after.bits = memory.bits ∧
+        (labelWord (X ^^^ J ^^^ L)) ∧ after.bits = memory.bits ∧
       ∀ register, ¬ treeStepClobbers register →
         after.registers register = memory.registers register := by
   refine ⟨_, rfl, ?_, rfl, fun register outside => ?_⟩
   · simp (config := { decide := true }) only [ram_setReg, ram_storeRam, reg_setReg, reduceIte,
       joinCell, bitCell, hotCell]
-    rw [eval_add_word _ _ (by omega), Nat.add_comm, eval_xor, eval_xor, xorReg, blockWord_xor,
-      blockWord_xor]
+    rw [eval_add_word _ _ (by omega), Nat.add_comm, eval_xor, eval_xor, xorReg, labelWord_xor,
+      labelWord_xor]
   · simp only [reg_setReg, reg_storeRam, if_neg (ne_of_not_clobbered outside rA (by simp)),
       if_neg (ne_of_not_clobbered outside rB (by simp)), if_neg (ne_of_not_clobbered outside rD (by simp)),
       if_neg (ne_of_not_clobbered outside rE (by simp)), if_neg (ne_of_not_clobbered outside rAddr (by simp))]
@@ -209,10 +209,10 @@ private theorem det_hotUpdate (cells : FoldCells) (m s j : Nat) :
 
 /-- The invariant of a fold's entry loop after `count` residues. -/
 def FoldEntryInv (cells : FoldCells) (m hot : Nat) (start : Memory) (count : Nat)
-    (values : Vector Block count) (memory : Memory) : Prop :=
+    (values : Vector Label count) (memory : Memory) : Prop :=
   (∀ r (bound : r < count), r ≠ hot →
-      memory.ram (word (cells.matBase + r)) = blockWord (values[r]'bound)) ∧
-    memory.registers rD = blockWord (xorSkip hot values) ∧
+      memory.ram (word (cells.matBase + r)) = labelWord (values[r]'bound)) ∧
+    memory.registers rD = labelWord (xorSkip hot values) ∧
     (∀ address, (∀ r, r < m → address ≠ word (cells.matBase + r)) →
       memory.ram address = start.ram address) ∧
     memory.bits = start.bits ∧
@@ -225,17 +225,17 @@ variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
 
 /-- **One residue of a fold.** -/
 theorem agree_foldEntry (cells : FoldCells) (m j : Nat) (layout : FoldLayout cells m j)
-    (tagOf : Nat → Nat) (hot : Nat) (hotLt : hot < m) (labels : Fin m → Block) (start : Memory)
+    (tagOf : Nat → Nat) (hot : Nat) (hotLt : hot < m) (labels : Fin m → Label) (start : Memory)
     (hotCell : start.ram (word cells.hot) = word hot)
-    (vecCells : ∀ ρ : Fin m, start.ram (word (cells.vecBase + ρ.val)) = blockWord (labels ρ))
+    (vecCells : ∀ ρ : Fin m, start.ram (word (cells.vecBase + ρ.val)) = labelWord (labels ρ))
     (tagSmall : ∀ ρ, ρ < m → tagOf ρ < 2 ^ 127)
-    (index : Fin m) (values : Vector Block index.val) (memory : Memory)
+    (index : Fin m) (values : Vector Label index.val) (memory : Memory)
     (holds : FoldEntryInv cells m hot start index.val values memory) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-      (fun (result : Block) after =>
+      (fun (result : Label) after =>
         FoldEntryInv cells m hot start (index.val + 1) (values.push result) after)
       ((foldEntry cells tagOf index.val).tree memory)
-      (liftHash (if index.val = hot then pure 0 else h128M (labels index) (tagOf index.val))) := by
+      (liftHash (if index.val = hot then pure 0 else hLabelM (labels index) (tagOf index.val))) := by
   obtain ⟨mats, xorReg, frame, bitsSame, regs⟩ := holds
   have below := layout.vecBelow
   have fits := layout.matFits
@@ -245,7 +245,7 @@ theorem agree_foldEntry (cells : FoldCells) (m j : Nat) (layout : FoldLayout cel
   have hotNow : memory.ram (word cells.hot) = word hot := by
     rw [frame _ fun r rb => word_ne layout.hotOff.1 (by omega) (layout.hotOff.2.2 r rb)]
     exact hotCell
-  have labelNow : memory.ram (word (cells.vecBase + index.val)) = blockWord (labels index) := by
+  have labelNow : memory.ram (word (cells.vecBase + index.val)) = labelWord (labels index) := by
     rw [frame _ fun r rb => word_ne (by have := index.isLt; omega) (by omega) (by
       have := index.isLt; omega)]
     exact vecCells index
@@ -273,27 +273,31 @@ theorem agree_foldEntry (cells : FoldCells) (m j : Nat) (layout : FoldLayout cel
       exec_entryInput cells.asTree (tagOf index.val) index.val m1 (labels index)
         (by show m1.ram (word (cells.vecBase + index.val)) = _; rw [ram1]; exact labelNow)
         (tagSmall _ index.isLt)
-    have hashSmall : hashInput (labels index) (tagOf index.val) < 2 ^ 256 := by
+    have hashSmall : hashInput (embed (labels index)) (tagOf index.val) < 2 ^ 256 := by
       unfold hashInput
-      have := (labels index).isLt
+      simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
+      have : (labels index).toNat < 2 ^ 104 := (labels index).isLt
       have := tagSmall _ index.isLt
       omega
     unfold entryHash
     rw [tree_seq_exec _ _ (det_entryInput cells.asTree (tagOf index.val) index.val) m1 m2 run2,
-      tree_query_hash _ m2 _ hashSmall input2, liftHash_h128M]
+      tree_query_hash _ m2 _ hashSmall input2, liftHash_hLabelM]
     refine .node _ fun answer => ?_
-    rw [tree_eq_exec _ (det_entryStore cells.asTree index.val)]
-    obtain ⟨m3, run3, ram3, bits3, rD3, regs3⟩ := exec_entryStore cells.asTree index.val
-      (writePair m2 rFirst rSecond (blockWord answer.1, blockWord answer.2))
-    rw [run3]
-    have firstReg : (writePair m2 rFirst rSecond (blockWord answer.1, blockWord answer.2)).registers
+    have rawFirst : (writePair m2 rFirst rSecond (blockWord answer.1, blockWord answer.2)).registers
         rFirst = blockWord answer.1 := by
       rw [writePair_reg, if_neg (by decide), if_pos rfl]
+    obtain ⟨mClip, runClip, ramClip, bitsClip, firstReg, regsClip⟩ :=
+      exec_clipReg rFirst (by decide)
+        (writePair m2 rFirst rSecond (blockWord answer.1, blockWord answer.2)) answer.1 rawFirst
+    rw [tree_seq_exec _ _ (det_clipReg rFirst) _ mClip runClip,
+      tree_eq_exec _ (det_entryStore cells.asTree index.val)]
+    obtain ⟨m3, run3, ram3, bits3, rD3, regs3⟩ := exec_entryStore cells.asTree index.val mClip
+    rw [run3]
     have matSmall : cells.matBase + index.val < 2 ^ 256 := by have := index.isLt; omega
     refine .leaf ⟨fun r bound notSkip => ?_, ?_, fun address off => ?_, ?_,
       fun register outside => ?_⟩
     · show m3.ram (word (cells.matBase + r)) = _
-      rw [ram3, firstReg, writePair_ram, ram2, ram1]
+      rw [ram3, firstReg, ramClip, writePair_ram, ram2, ram1]
       by_cases last : r = index.val
       · subst last
         rw [show (cells.asTree).matBase + index.val = cells.matBase + index.val from rfl,
@@ -302,16 +306,18 @@ theorem agree_foldEntry (cells : FoldCells) (m j : Nat) (layout : FoldLayout cel
         rw [show (cells.asTree).matBase + index.val = cells.matBase + index.val from rfl,
           Function.update_of_ne (word_ne (by omega) matSmall (by omega)), Vector.getElem_push_lt rSmall]
         exact mats r rSmall notSkip
-    · rw [rD3, firstReg, writePair_reg, if_neg (by decide), if_neg (by decide),
+    · rw [rD3, firstReg, regsClip rD (by decide) (by decide), writePair_reg, if_neg (by decide), if_neg (by decide),
         regs2 rD (by decide) (by decide) (by decide), regs1 rD (by decide) (by decide) (by decide),
-        xorReg, blockWord_xor, xorSkip_push, if_neg same]
+        xorReg, labelWord_xor, xorSkip_push, if_neg same]
     · rw [ram3, show (cells.asTree).matBase + index.val = cells.matBase + index.val from rfl,
-        Function.update_of_ne (off index.val index.isLt), writePair_ram, ram2, ram1]
+        Function.update_of_ne (off index.val index.isLt), ramClip, writePair_ram, ram2, ram1]
       exact frame address off
-    · rw [bits3, writePair_bits, bits2, bits1]
+    · rw [bits3, bitsClip, writePair_bits, bits2, bits1]
       exact bitsSame
     · rw [regs3 register (ne_of_not_clobbered outside rD (by simp))
-          (ne_of_not_clobbered outside rAddr (by simp)), writePair_reg,
+          (ne_of_not_clobbered outside rAddr (by simp)),
+        regsClip register (ne_of_not_clobbered outside rFirst (by simp))
+          (ne_of_not_clobbered outside rB (by simp)), writePair_reg,
         if_neg (ne_of_not_clobbered outside rSecond (by simp)),
         if_neg (ne_of_not_clobbered outside rFirst (by simp)),
         regs2 register (ne_of_not_clobbered outside rInput (by simp))
@@ -323,16 +329,16 @@ theorem agree_foldEntry (cells : FoldCells) (m j : Nat) (layout : FoldLayout cel
 /-- **One fold** against the evaluator's `foldEvalM`: the cold residues asked in ascending order,
 the hot material recovered, the vector updated in place, under the frame of the schema. -/
 theorem agree_foldStep (cells : FoldCells) (m s j : Nat) (layout : FoldLayout cells m j)
-    (tagOf : Nat → Nat) (hot : Nat) (hotLt : hot < m) (bitLabel join : Block)
-    (labels : Fin m → Block) (memory : Memory)
+    (tagOf : Nat → Nat) (hot : Nat) (hotLt : hot < m) (bitLabel join : Label)
+    (labels : Fin m → Label) (memory : Memory)
     (hotCell : memory.ram (word cells.hot) = word hot)
-    (vecCells : ∀ ρ : Fin m, memory.ram (word (cells.vecBase + ρ.val)) = blockWord (labels ρ))
-    (joinCell : memory.ram (word (cells.join j)) = blockWord join)
-    (bitCell : memory.ram (word (cells.bit j)) = blockWord bitLabel)
+    (vecCells : ∀ ρ : Fin m, memory.ram (word (cells.vecBase + ρ.val)) = labelWord (labels ρ))
+    (joinCell : memory.ram (word (cells.join j)) = labelWord join)
+    (bitCell : memory.ram (word (cells.bit j)) = labelWord bitLabel)
     (tagSmall : ∀ ρ, ρ < m → tagOf ρ < 2 ^ 127) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-      (fun (vec : Fin m → Block) after =>
-        (∀ ρ : Fin m, after.ram (word (cells.vecBase + ρ.val)) = blockWord (vec ρ)) ∧
+      (fun (vec : Fin m → Label) after =>
+        (∀ ρ : Fin m, after.ram (word (cells.vecBase + ρ.val)) = labelWord (vec ρ)) ∧
           Frame (foldWrites cells m) treeStepClobbers memory after)
       ((foldStep cells m s j tagOf).tree memory)
       (liftHash (foldEvalM m tagOf s hot bitLabel join labels)) := by
@@ -361,9 +367,9 @@ theorem agree_foldStep (cells : FoldCells) (m s j : Nat) (layout : FoldLayout ce
     frame _ fun r rb => word_ne small (by omega) (off r rb)
   have hotNow : after.ram (word cells.hot) = word hot := by
     rw [offMat _ layout.hotOff.1 layout.hotOff.2.2]; exact hotCell
-  have joinNow : after.ram (word (cells.join j)) = blockWord join := by
+  have joinNow : after.ram (word (cells.join j)) = labelWord join := by
     rw [offMat _ layout.joinOff.1 layout.joinOff.2.2]; exact joinCell
-  have bitNow : after.ram (word (cells.bit j)) = blockWord bitLabel := by
+  have bitNow : after.ram (word (cells.bit j)) = labelWord bitLabel := by
     rw [offMat _ layout.bitOff.1 layout.bitOff.2.2]; exact bitCell
   obtain ⟨m3, run3, ram3, bits3, regs3⟩ := exec_foldRecover cells j after hot (xorSkip hot values) join
     bitLabel (by omega) (by omega) xorReg joinNow bitNow hotNow
@@ -372,7 +378,7 @@ theorem agree_foldStep (cells : FoldCells) (m s j : Nat) (layout : FoldLayout ce
   obtain ⟨m4, run4, cells4, frame4, bits4, regs4⟩ := exec_foldUpdates cells m s m3 below fits mPos m le_rfl
   rw [run4]
   have matCell : ∀ r (rb : r < m), m3.ram (word (cells.matBase + r)) =
-      blockWord (if r = hot then bitLabel ^^^ join ^^^
+      labelWord (if r = hot then bitLabel ^^^ join ^^^
         Fin.foldl m (fun acc other => if other.val = hot then acc else acc ^^^ values.get other) 0
         else values.get ⟨r, rb⟩) := by
     intro r rb
@@ -387,7 +393,7 @@ theorem agree_foldStep (cells : FoldCells) (m s j : Nat) (layout : FoldLayout ce
       rw [BitVec.xor_comm _ bitLabel, BitVec.xor_assoc, BitVec.xor_comm _ join, ← BitVec.xor_assoc]
     · rw [if_neg isHot, Function.update_of_ne (word_ne (by omega) (by omega) (by omega)),
         mats r rb isHot, Vector.get_eq_getElem]
-  have vecCell3 : ∀ r (rb : r < m), m3.ram (word (cells.vecBase + r)) = blockWord (labels ⟨r, rb⟩) := by
+  have vecCell3 : ∀ r (rb : r < m), m3.ram (word (cells.vecBase + r)) = labelWord (labels ⟨r, rb⟩) := by
     intro r rb
     rw [ram3, Function.update_of_ne (word_ne (by omega) (by omega) (by omega)),
       offMat _ (by omega) (fun r' rb' => by omega)]
@@ -395,7 +401,7 @@ theorem agree_foldStep (cells : FoldCells) (m s j : Nat) (layout : FoldLayout ce
   refine .leaf ⟨fun ρ => ?_, ⟨fun address outside => ?_, ?_, fun register outside => ?_⟩⟩
   · have ρb := ρ.isLt
     rw [cells4 ρ.val ρb, vecCell3 ρ.val ρb, matCell ρ.val ρb,
-      matCell (foldSourceNat m s ρ.val) (Nat.mod_lt _ mPos), blockWord_xor, blockWord_xor]
+      matCell (foldSourceNat m s ρ.val) (Nat.mod_lt _ mPos), labelWord_xor, labelWord_xor]
     rfl
   · have notVec : ∀ r, r < m → address ≠ word (cells.vecBase + r) :=
       fun r rb same => outside (Or.inl ⟨r, rb, same⟩)
@@ -428,22 +434,22 @@ theorem tree_rep_cons (count : Nat) (body : Nat → Prog) (memory : Memory) :
 evaluator's `foldsEvalM`: the final vector and the final hot index in RAM, under the frame of the
 vector, the materials and the hot cell. -/
 theorem agree_foldsLoop (cells : FoldCells) (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat)
-    (valueSmall : value < 2 ^ 256) (bitLabel join : Nat → Block)
+    (valueSmall : value < 2 ^ 256) (bitLabel join : Nat → Label)
     (sigmaOff : cells.sigma < 2 ^ 256 ∧ cells.sigma ≠ cells.hot ∧
       (∀ r, r < m → cells.sigma ≠ cells.vecBase + r) ∧ ∀ r, r < m → cells.sigma ≠ cells.matBase + r) :
-    ∀ (count start hot : Nat) (labels : Fin m → Block) (memory : Memory),
+    ∀ (count start hot : Nat) (labels : Fin m → Label) (memory : Memory),
       start + count ≤ 256 →
       (∀ k, k < count → FoldLayout cells m (start + k)) →
       hot < m →
       memory.ram (word cells.sigma) = word value →
       memory.ram (word cells.hot) = word hot →
-      (∀ ρ : Fin m, memory.ram (word (cells.vecBase + ρ.val)) = blockWord (labels ρ)) →
-      (∀ k, k < count → memory.ram (word (cells.join (start + k))) = blockWord (join (start + k))) →
-      (∀ k, k < count → memory.ram (word (cells.bit (start + k))) = blockWord (bitLabel (start + k))) →
+      (∀ ρ : Fin m, memory.ram (word (cells.vecBase + ρ.val)) = labelWord (labels ρ)) →
+      (∀ k, k < count → memory.ram (word (cells.join (start + k))) = labelWord (join (start + k))) →
+      (∀ k, k < count → memory.ram (word (cells.bit (start + k))) = labelWord (bitLabel (start + k))) →
       (∀ k ρ, k < count → ρ < m → tagOf (start + k) ρ < 2 ^ 127) →
       Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-        (fun (result : (Fin m → Block) × Nat) after =>
-          (∀ ρ : Fin m, after.ram (word (cells.vecBase + ρ.val)) = blockWord (result.1 ρ)) ∧
+        (fun (result : (Fin m → Label) × Nat) after =>
+          (∀ ρ : Fin m, after.ram (word (cells.vecBase + ρ.val)) = labelWord (result.1 ρ)) ∧
             after.ram (word cells.hot) = word result.2 ∧
             Frame (foldsWrites cells m) treeStepClobbers memory after)
         ((foldsLoop cells m start count tagOf).tree memory)
@@ -554,10 +560,10 @@ open Kriterion.ArgoMAC Finset
 /-! ### The reindex and the first hot index -/
 
 /-- The reindex fold over the first `k` leaves. -/
-def reindexPartial (labels : Nat → Block) (m ρ k : Nat) : Block :=
+def reindexPartial (labels : Nat → Label) (m ρ k : Nat) : Label :=
   Fin.foldl k (fun acc (leaf : Fin k) => if leaf.val % m = ρ then acc ^^^ labels leaf.val else acc) 0
 
-theorem reindexPartial_succ (labels : Nat → Block) (m ρ k : Nat) :
+theorem reindexPartial_succ (labels : Nat → Label) (m ρ k : Nat) :
     reindexPartial labels m ρ (k + 1) =
       if k % m = ρ then reindexPartial labels m ρ k ^^^ labels k else reindexPartial labels m ρ k := by
   unfold reindexPartial
@@ -565,7 +571,7 @@ theorem reindexPartial_succ (labels : Nat → Block) (m ρ k : Nat) :
   simp only [Fin.val_last, Fin.val_castSucc]
 
 /-- The construction's `reindex` is the full partial fold. -/
-theorem reindex_eq_partial (n : Nat) (labels : Fin (2 ^ n) → Block) (m : Nat) (ρ : Fin m) :
+theorem reindex_eq_partial (n : Nat) (labels : Fin (2 ^ n) → Label) (m : Nat) (ρ : Fin m) :
     reindex n labels m ρ =
       reindexPartial (fun j => if h : j < 2 ^ n then labels ⟨j, h⟩ else 0) m ρ.val (2 ^ n) := by
   unfold reindex reindexPartial stored
@@ -575,18 +581,18 @@ theorem reindex_eq_partial (n : Nat) (labels : Fin (2 ^ n) → Block) (m : Nat) 
   rw [dif_pos leaf.isLt]
 
 private theorem exec_reindexResidue (levelBase vecBase n m ρ : Nat) (memory : Memory)
-    (labels : Nat → Block) (nSmall : n ≤ 20) (fits : levelBase + 2 ^ n < 2 ^ 256)
+    (labels : Nat → Label) (nSmall : n ≤ 20) (fits : levelBase + 2 ^ n < 2 ^ 256)
     (vecSmall : vecBase + ρ < 2 ^ 256)
-    (levelCells : ∀ j, j < 2 ^ n → memory.ram (word (levelBase + j)) = blockWord (labels j)) :
+    (levelCells : ∀ j, j < 2 ^ n → memory.ram (word (levelBase + j)) = labelWord (labels j)) :
     ∃ after, (reindexResidue levelBase vecBase n m ρ).exec memory = some after ∧
       after.ram = Function.update memory.ram (word (vecBase + ρ))
-        (blockWord (reindexPartial labels m ρ (2 ^ n))) ∧
+        (labelWord (reindexPartial labels m ρ (2 ^ n))) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rC → register ≠ rD → register ≠ rAddr →
         after.registers register = memory.registers register := by
   set m0 := setReg memory rD (word 0) with m0Def
   obtain ⟨m1, run1, acc1, ram1, bits1, regs1⟩ := Prog.exec_rep (reindexStep levelBase m ρ)
-    (fun k current => current.registers rD = blockWord (reindexPartial labels m ρ k) ∧
+    (fun k current => current.registers rD = labelWord (reindexPartial labels m ρ k) ∧
       current.ram = memory.ram ∧ current.bits = memory.bits ∧
       ∀ register, register ≠ rC → register ≠ rD → register ≠ rAddr →
         current.registers register = memory.registers register)
@@ -596,7 +602,7 @@ private theorem exec_reindexResidue (levelBase vecBase n m ρ : Nat) (memory : M
       · refine ⟨_, by rw [reindexStep, if_pos member]; rfl, ?_, by simp only [ram_setReg]; exact ram,
           by simp only [bits_setReg]; exact bits, fun register n1 n2 n3 => ?_⟩
         · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte]
-          rw [eval_xor, acc, ram, levelCells k kb, blockWord_xor, reindexPartial_succ, if_pos member]
+          rw [eval_xor, acc, ram, levelCells k kb, labelWord_xor, reindexPartial_succ, if_pos member]
         · simp only [reg_setReg, if_neg n1, if_neg n2, if_neg n3]
           exact regs register n1 n2 n3
       · refine ⟨current, by rw [reindexStep, if_neg member]; rfl, ?_, ram, bits, regs⟩
@@ -616,22 +622,22 @@ private theorem exec_reindexResidue (levelBase vecBase n m ρ : Nat) (memory : M
   · rw [reg_storeRam, reg_setReg, if_neg n3, regs1 register n1 n2 n3]
 
 /-- **The reindex**: residue `ρ < m` holds `reindex n labels m ρ`. -/
-theorem exec_reindexBlock (levelBase vecBase n m : Nat) (memory : Memory) (labels : Fin (2 ^ n) → Block)
+theorem exec_reindexBlock (levelBase vecBase n m : Nat) (memory : Memory) (labels : Fin (2 ^ n) → Label)
     (nSmall : n ≤ 20) (levelFits : levelBase + 2 ^ n < 2 ^ 256) (vecFits : vecBase + m < 2 ^ 256)
     (apart : ∀ j, j < 2 ^ n → ∀ ρ, ρ < m → levelBase + j ≠ vecBase + ρ)
-    (levelCells : ∀ j : Fin (2 ^ n), memory.ram (word (levelBase + j.val)) = blockWord (labels j)) :
+    (levelCells : ∀ j : Fin (2 ^ n), memory.ram (word (levelBase + j.val)) = labelWord (labels j)) :
     ∃ after, (reindexBlock levelBase vecBase n m).exec memory = some after ∧
-      (∀ ρ : Fin m, after.ram (word (vecBase + ρ.val)) = blockWord (reindex n labels m ρ)) ∧
+      (∀ ρ : Fin m, after.ram (word (vecBase + ρ.val)) = labelWord (reindex n labels m ρ)) ∧
       (∀ address, (∀ ρ, ρ < m → address ≠ word (vecBase + ρ)) → after.ram address = memory.ram address) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rC → register ≠ rD → register ≠ rAddr →
         after.registers register = memory.registers register := by
-  set labels' : Nat → Block := fun j => if h : j < 2 ^ n then labels ⟨j, h⟩ else 0 with labelsDef
-  have cells' : ∀ j, j < 2 ^ n → memory.ram (word (levelBase + j)) = blockWord (labels' j) :=
+  set labels' : Nat → Label := fun j => if h : j < 2 ^ n then labels ⟨j, h⟩ else 0 with labelsDef
+  have cells' : ∀ j, j < 2 ^ n → memory.ram (word (levelBase + j)) = labelWord (labels' j) :=
     fun j jb => by rw [labelsDef]; simp only [dif_pos jb]; exact levelCells ⟨j, jb⟩
   obtain ⟨after, run, done, frame, bits, regs⟩ := Prog.exec_rep (reindexResidue levelBase vecBase n m)
     (fun k current =>
-      (∀ ρ, ρ < k → current.ram (word (vecBase + ρ)) = blockWord (reindexPartial labels' m ρ (2 ^ n))) ∧
+      (∀ ρ, ρ < k → current.ram (word (vecBase + ρ)) = labelWord (reindexPartial labels' m ρ (2 ^ n))) ∧
       (∀ address, (∀ ρ, ρ < m → address ≠ word (vecBase + ρ)) → current.ram address = memory.ram address) ∧
       current.bits = memory.bits ∧
       ∀ register, register ≠ rC → register ≠ rD → register ≠ rAddr →

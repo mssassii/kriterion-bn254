@@ -8,7 +8,6 @@ import Proof.Simulator.CRT.ReplayCoord
 import Proof.Simulator.CRT.ReplayKey
 import Proof.Simulator.CRT.ReplayMasks
 import Proof.Simulator.CRT.OutCells
-import Proof.Privacy.CRT.EntryInstance
 import Construction.Simulator.CRT.ReplayEntry
 
 namespace Kriterion.CRT.SimMachine
@@ -16,6 +15,27 @@ namespace Kriterion.CRT.SimMachine
 open Cryptography Cryptography.BoundedMachine Kriterion.ArgoMAC.PlanB.SimMachine
 open Kriterion.ArgoMAC.PlanB.SimMachine.Blocks Kriterion.CRT
 open Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB BN254
+
+/-! ### Reading replay results independently of the privacy instance -/
+
+namespace ReplayView
+
+/-- The non-collector answers in the entry's mask representation. -/
+def nonCollectorValues (rest : (Fin (pairSites digitCount) → BaseField × BaseField) × BaseField) :
+    MaskValues digitCount :=
+  { collector := fun _ => 0, pair := rest.1, single := rest.2 }
+
+/-- Delivered values indexed by the abstract simulator's encoding index. -/
+def toDelivered (conv : Entry.ConvOut) : Privacy.BMR.Enc → BaseField
+  | .inl x => conv.deliveredX (Privacy.BMR.xFlat x)
+  | .inr y => conv.deliveredY (Privacy.BMR.yFlat y)
+
+/-- Non-collector masks indexed by the abstract simulator's row index. -/
+def toMasks (masks : Entry.RowEncoding → BaseField) : Privacy.BMR.NonCollector → BaseField
+  | ⟨(d, .inl x), _⟩ => masks (.inl (xElementIndex d x))
+  | ⟨(d, .inr y), _⟩ => masks (.inr (yElementIndex d y))
+
+end ReplayView
 
 /-! ### The curve check's output -/
 
@@ -61,7 +81,7 @@ theorem maskCells_of_post (pairs : Fin (pairSites digitCount) → BaseField × B
         memory.ram (word (maskCellOf digitCount (2 * k + 1))) = fieldWord (pairs ⟨k, kb⟩).2)
     (n : Nat) (nb : n < 364) :
     memory.ram (word (maskCellOf digitCount n)) =
-      fieldWord (nonCollectorMask (EntryReading.nonCollectorValues (pairs, single)) n) := by
+      fieldWord (nonCollectorMask (ReplayView.nonCollectorValues (pairs, single)) n) := by
   have pairsEq : pairSites digitCount = 182 := rfl
   have inPairs : n / 2 < pairSites digitCount := by rw [pairsEq]; omega
   unfold nonCollectorMask
@@ -96,7 +116,7 @@ theorem outMasks_of (values : MaskValues digitCount) (memory : Memory)
     (cells : ∀ n, n < 364 → memory.ram (word (maskCellOf digitCount n)) = fieldWord (nonCollectorMask values n))
     (nc : Privacy.BMR.NonCollector) :
     memory.ram (word (OutCells.rowMaskCell nc)) =
-      fieldWord (Privacy.Instance.toMasks (Entry.maskFunction values) nc) := by
+      fieldWord (ReplayView.toMasks (Entry.maskFunction values) nc) := by
   obtain ⟨⟨d, element⟩, plain⟩ := nc
   have dLt := d.isLt
   cases element with
@@ -128,9 +148,9 @@ theorem outMasks_of (values : MaskValues digitCount) (memory : Memory)
 
 /-- The replay's output in the tier-2 index (as `EntryInstance.view_replayProgram_eval` reads it). -/
 def routeView (out : Entry.RouteMOut) : Privacy.ReplayOut where
-  delivered := Privacy.Instance.toDelivered out.conv
-  masks := Privacy.Instance.toMasks
-    (Entry.maskFunction (EntryReading.nonCollectorValues (out.pairs, out.single)))
+  delivered := ReplayView.toDelivered out.conv
+  masks := ReplayView.toMasks
+    (Entry.maskFunction (ReplayView.nonCollectorValues (out.pairs, out.single)))
   key := out.key
 
 theorem pure_bind' {spec : Cryptography.OracleSpec.{0, 0}} {α β : Type} (a : α) (f : α → FreeQuery spec β) :
@@ -178,7 +198,7 @@ theorem agree_entryReplay (pub : Entry.Public) (input : AffineInput)
           fieldWord ((ex.decoded e : Nat) : BaseField)) ∧ Frame WX CX memory after)
       (coordX.tree memory)
       (liftHash (coordEvalM Entry.table Entry.xCount 0 (Entry.convOf pub.crtX) (fun e => (pub.recX.get e).val)
-        input.x.val (Entry.labelX labels))))
+        input.x.val (fun j => clip (Entry.labelX labels j)))))
     (hy : ∀ m1 : Memory, (∀ address, ¬ WX address → m1.ram address = memory.ram address) →
       Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
         (fun (ey : CoordEval Entry.table Entry.yCount) after =>
@@ -186,7 +206,7 @@ theorem agree_entryReplay (pub : Entry.Public) (input : AffineInput)
             fieldWord ((ey.decoded e : Nat) : BaseField)) ∧ Frame WY CY m1 after)
         (coordY.tree m1)
         (liftHash (coordEvalM Entry.table Entry.yCount 1 (Entry.convOf pub.crtY)
-          (fun e => (pub.recY.get e).val) input.y.val (Entry.labelY labels))))
+          (fun e => (pub.recY.get e).val) input.y.val (fun j => clip (Entry.labelY labels j)))))
     (xSafe : ∀ e : Fin Entry.xCount, ¬ WY (word (Layout.decodedCell 0 e.val)))
     (reqXCell : memory.ram (word reqX) = fieldWord input.x)
     (reqYCell : memory.ram (word reqY) = fieldWord input.y)

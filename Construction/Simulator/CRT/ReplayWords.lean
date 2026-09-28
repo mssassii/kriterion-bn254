@@ -33,12 +33,12 @@ def wordLane (castBase wordBase : Nat) (truthOf : Nat → Nat → Nat) (width : 
     (.seq (Prog.rep count (wordChunk castBase truthOf width i))
     (.seq (cst rB (2 ^ ell - 1)) (.seq (ar .and rA rA rB) (storeAt (wordBase + i) rA))))
 
-/-- **The word** of one modulus: its 128 lanes. -/
+/-- **The word** of one modulus: its 104 lanes. -/
 def truthWordBlock (castBase wordBase : Nat) (truthOf : Nat → Nat → Nat) (width : Nat → Nat)
     (count ell : Nat) : Prog :=
-  Prog.rep 128 (wordLane castBase wordBase truthOf width count ell)
+  Prog.rep laneCount (wordLane castBase wordBase truthOf width count ell)
 
-/-- The word writes its 128 lane cells. -/
-def wordWrites (wordBase : Nat) : Writes := Writes.region ⟨wordBase, 128⟩
+/-- The word writes its 104 lane cells. -/
+def wordWrites (wordBase : Nat) : Writes := Writes.region ⟨wordBase, laneCount⟩
 
 end Kriterion.CRT.SimMachine

@@ -1,7 +1,7 @@
 /-
 **The replay of a coordinate's chunks agrees with the evaluator's chunk table**
 (`agree_chunkLoop`): the machine's `chunkLoop` against
-`liftHash (tableM count fun c => chunkEvalM T coord labels v (joins c) (pins c) c)`, the first step
+`liftHash (tableM count fun c => chunkEvalM T coord (fun j => clip (labels j)) v (joins c) (pins c) c)`, the first step
 of `coordEvalM` (`Construction/CRT/Coord.lean`).
 
 The composition is by `agree_rep_vector_plain` over bodies of unequal width; every layout fact of
@@ -180,7 +180,7 @@ def ChunkLoopInv (cc : CoordCells) (width : Nat → Nat) (l count : Nat) (start 
       memory.ram (word (cc.castBase + 32768 * c + 128 * leaf + i)) =
         word ((((values[c]'bound).casts leaf) ⟨i, ib⟩).val)) ∧
     (∀ c (bound : c < k), ∀ leaf, leaf < 2 ^ width c →
-      memory.ram (word (cc.leafBase + 256 * c + leaf)) = blockWord ((values[c]'bound).leaves leaf)) ∧
+      memory.ram (word (cc.leafBase + 256 * c + leaf)) = labelWord ((values[c]'bound).leaves leaf)) ∧
     (∀ address, ¬ chunkLoopWrites cc count address → memory.ram address = start.ram address) ∧
     memory.bits = start.bits ∧
     ∀ register, ¬ chunkLoopClobbers register → memory.registers register = start.registers register
@@ -209,12 +209,12 @@ theorem agree_chunkStep (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
     (chain : CoordChain cc count T.castWidth)
     (bits : Nat) (shape : ChunkShape T.chunkOffset T.chunkWidth count bits)
     (lPos : 0 < T.castWidth) (lSmall : T.castWidth ≤ 128)
-    (labels : Nat → Block) (v : Nat) (vSmall : v < 2 ^ 256) (joins : Nat → Nat → Block)
+    (labels : Nat → Block) (v : Nat) (vSmall : v < 2 ^ 256) (joins : Nat → Nat → Label)
     (pins : Nat → Lanes T.castWidth) (start : Memory)
     (coordVal : start.ram (word cc.coordCell) = word v)
     (labelCells : ∀ j, j < bits → start.ram (word (cc.labelBase + j)) = blockWord (labels j))
     (joinCells : ∀ c, c < count → ∀ n, 1 ≤ n → n < T.chunkWidth c →
-      start.ram (word (cc.chunkJoin c n)) = blockWord (joins c n))
+      start.ram (word (cc.chunkJoin c n)) = labelWord (joins c n))
     (pinCells : ∀ c, c < count → ∀ i (ib : i < laneCount),
       start.ram (word (cc.pinBase + 128 * c + i)) = word ((pins c) ⟨i, ib⟩).val)
     (tagTreeSmall : ∀ c k s, c < count → k < T.chunkWidth c → s < 2 ^ k →
@@ -228,7 +228,7 @@ theorem agree_chunkStep (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
         ChunkLoopInv cc T.chunkWidth T.castWidth count start (index.val + 1) (values.push result) after)
       ((chunkStep cc T.chunkOffset T.chunkWidth (chunkTreeTag coord) (chunkCastTag coord) T.castWidth
         index.val).tree memory)
-      (liftHash (chunkEvalM T coord labels v (joins index.val) (pins index.val) index.val)) := by
+      (liftHash (chunkEvalM T coord (fun j => clip (labels j)) v (joins index.val) (pins index.val) index.val)) := by
   obtain ⟨c, cb⟩ := index
   simp only at values holds ⊢
   obtain ⟨done, leavesDone, frame, bitsSame, regs⟩ := holds
@@ -265,7 +265,7 @@ theorem agree_chunkStep (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
         · exact not_region_of_apart _ _ (by omega) (by simp; omega) (Or.inl (by simp; omega)) inside)
     (fun i ib => by
       simp only [CoordCells.tree, CoordCells.cast]
-      unfold laneCount at ib
+      have ib128 : i < 128 := lt_of_lt_of_le ib (by decide : laneCount ≤ 128)
       exact fun inside => by
         rcases inside with inside | inside
         · exact not_region_of_apart _ _ (by omega) (by simp; omega) (Or.inl (by simp; omega)) inside
@@ -286,7 +286,7 @@ theorem agree_chunkStep (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
       exact labelCells _ (by omega))
     (fun i ib => by
       show m1.ram (word (cc.pinBase + 128 * c + i)) = _
-      unfold laneCount at ib
+      have ib128 : i < 128 := lt_of_lt_of_le ib (by decide : laneCount ≤ 128)
       rw [m1Below _ (by omega)]
       exact pinCells c cb i ib)
     (fun k s kb sb => tagTreeSmall c k s cb kb sb)
@@ -331,7 +331,7 @@ theorem agree_chunkStep (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
       simp only [Vector.getElem_push_lt lt]
       have w8' := shape.widthSmall c' (by omega)
       have p0' := pow_le_256 (T.chunkWidth c') w8'
-      unfold laneCount at ib
+      have ib128 : i < 128 := lt_of_lt_of_le ib (by decide : laneCount ≤ 128)
       have c1' : 32768 * c' + 32768 ≤ 32768 * c := by omega
       rw [frameC.ram _ ?_, ram1, Function.update_of_ne (word_ne (by omega) (by omega) (by omega))]
       · exact done c' lt leaf lb i ib
@@ -360,7 +360,7 @@ theorem agree_chunkStep (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
     fun address off => ?_, ?_, fun register outside => ?_⟩
   · have w8' := shape.widthSmall c' (by omega)
     have p0' := pow_le_256 (T.chunkWidth c') w8'
-    have ib' : i < 128 := ib
+    have ib' : i < 128 := lt_of_lt_of_le ib (by decide : laneCount ≤ 128)
     have c1' : 32768 * c' + 32768 ≤ 32768 * count := by omega
     rw [offLeaves _ (by omega)]
     exact castsAfter c' bound leaf lb i ib
@@ -396,12 +396,12 @@ theorem agree_chunkLoop (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
     (chain : CoordChain cc count T.castWidth)
     (bits : Nat) (shape : ChunkShape T.chunkOffset T.chunkWidth count bits)
     (lPos : 0 < T.castWidth) (lSmall : T.castWidth ≤ 128)
-    (labels : Nat → Block) (v : Nat) (vSmall : v < 2 ^ 256) (joins : Nat → Nat → Block)
+    (labels : Nat → Block) (v : Nat) (vSmall : v < 2 ^ 256) (joins : Nat → Nat → Label)
     (pins : Nat → Lanes T.castWidth) (memory : Memory)
     (coordVal : memory.ram (word cc.coordCell) = word v)
     (labelCells : ∀ j, j < bits → memory.ram (word (cc.labelBase + j)) = blockWord (labels j))
     (joinCells : ∀ c, c < count → ∀ n, 1 ≤ n → n < T.chunkWidth c →
-      memory.ram (word (cc.chunkJoin c n)) = blockWord (joins c n))
+      memory.ram (word (cc.chunkJoin c n)) = labelWord (joins c n))
     (pinCells : ∀ c, c < count → ∀ i (ib : i < laneCount),
       memory.ram (word (cc.pinBase + 128 * c + i)) = word ((pins c) ⟨i, ib⟩).val)
     (tagTreeSmall : ∀ c k s, c < count → k < T.chunkWidth c → s < 2 ^ k →
@@ -414,15 +414,15 @@ theorem agree_chunkLoop (T : CrtTable) (coord : Nat) (cc : CoordCells) (count : 
           after.ram (word (cc.castBase + 32768 * c + 128 * leaf + i)) =
             word (((chunks ⟨c, cb⟩).casts leaf) ⟨i, ib⟩).val) ∧
           (∀ c (cb : c < count), ∀ leaf, leaf < 2 ^ T.chunkWidth c →
-            after.ram (word (cc.leafBase + 256 * c + leaf)) = blockWord ((chunks ⟨c, cb⟩).leaves leaf)) ∧
+            after.ram (word (cc.leafBase + 256 * c + leaf)) = labelWord ((chunks ⟨c, cb⟩).leaves leaf)) ∧
           Frame (chunkLoopWrites cc count) chunkLoopClobbers memory after)
       ((chunkLoop cc T.chunkOffset T.chunkWidth (chunkTreeTag coord) (chunkCastTag coord) T.castWidth
         count).tree memory)
-      (liftHash (tableM count fun c => chunkEvalM T coord labels v (joins c.val) (pins c.val) c.val)) := by
+      (liftHash (tableM count fun c => chunkEvalM T coord (fun j => clip (labels j)) v (joins c.val) (pins c.val) c.val)) := by
   have loop := agree_rep_vector_plain (FixedIndex := FixedIndex) (EncIndex := EncIndex)
     (chunkStep cc T.chunkOffset T.chunkWidth (chunkTreeTag coord) (chunkCastTag coord) T.castWidth)
     (ChunkLoopInv cc T.chunkWidth T.castWidth count memory) count
-    (fun c => liftHash (chunkEvalM T coord labels v (joins c.val) (pins c.val) c.val))
+    (fun c => liftHash (chunkEvalM T coord (fun j => clip (labels j)) v (joins c.val) (pins c.val) c.val))
     (fun index values current holds =>
       agree_chunkStep T coord cc count chain bits shape lPos lSmall labels v vSmall joins pins memory
         coordVal labelCells joinCells pinCells tagTreeSmall tagCastSmall index values current holds)
@@ -461,12 +461,12 @@ theorem agree_chunkLoop_tags (T : CrtTable) (coord : Nat) (coordLt : coord < 2) 
     (count : Nat) (countLe : count ≤ 128) (chain : CoordChain cc count T.castWidth)
     (bits : Nat) (shape : ChunkShape T.chunkOffset T.chunkWidth count bits)
     (lPos : 0 < T.castWidth) (lSmall : T.castWidth ≤ 128) (answersLe : castAnswers T.castWidth ≤ 64)
-    (labels : Nat → Block) (v : Nat) (vSmall : v < 2 ^ 256) (joins : Nat → Nat → Block)
+    (labels : Nat → Block) (v : Nat) (vSmall : v < 2 ^ 256) (joins : Nat → Nat → Label)
     (pins : Nat → Lanes T.castWidth) (memory : Memory)
     (coordVal : memory.ram (word cc.coordCell) = word v)
     (labelCells : ∀ j, j < bits → memory.ram (word (cc.labelBase + j)) = blockWord (labels j))
     (joinCells : ∀ c, c < count → ∀ n, 1 ≤ n → n < T.chunkWidth c →
-      memory.ram (word (cc.chunkJoin c n)) = blockWord (joins c n))
+      memory.ram (word (cc.chunkJoin c n)) = labelWord (joins c n))
     (pinCells : ∀ c, c < count → ∀ i (ib : i < laneCount),
       memory.ram (word (cc.pinBase + 128 * c + i)) = word ((pins c) ⟨i, ib⟩).val) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
@@ -475,11 +475,11 @@ theorem agree_chunkLoop_tags (T : CrtTable) (coord : Nat) (coordLt : coord < 2) 
           after.ram (word (cc.castBase + 32768 * c + 128 * leaf + i)) =
             word (((chunks ⟨c, cb⟩).casts leaf) ⟨i, ib⟩).val) ∧
           (∀ c (cb : c < count), ∀ leaf, leaf < 2 ^ T.chunkWidth c →
-            after.ram (word (cc.leafBase + 256 * c + leaf)) = blockWord ((chunks ⟨c, cb⟩).leaves leaf)) ∧
+            after.ram (word (cc.leafBase + 256 * c + leaf)) = labelWord ((chunks ⟨c, cb⟩).leaves leaf)) ∧
           Frame (chunkLoopWrites cc count) chunkLoopClobbers memory after)
       ((chunkLoop cc T.chunkOffset T.chunkWidth (chunkTreeTag coord) (chunkCastTag coord) T.castWidth
         count).tree memory)
-      (liftHash (tableM count fun c => chunkEvalM T coord labels v (joins c.val) (pins c.val) c.val)) :=
+      (liftHash (tableM count fun c => chunkEvalM T coord (fun j => clip (labels j)) v (joins c.val) (pins c.val) c.val)) :=
   agree_chunkLoop T coord cc count chain bits shape lPos lSmall labels v vSmall joins pins memory coordVal
     labelCells joinCells pinCells
     (fun c k s cb kb sb => chunkTreeTag_lt coord c k s coordLt (by omega)

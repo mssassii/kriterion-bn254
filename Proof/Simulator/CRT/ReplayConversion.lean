@@ -44,9 +44,9 @@ theorem AllResults.liftHash {α : Type} {Q : α → Prop} {FixedIndex EncIndex :
   | _, .query _ each => .query _ fun answer => AllResults.liftHash (each answer)
 
 theorem foldsEvalM_hot_lt (m : Nat) (mPos : 0 < m) (tagOf : Nat → Nat → Nat) (value : Nat)
-    (bitLabel join : Nat → Block) :
-    ∀ (count start hot : Nat) (labels : Fin m → Block), hot < m →
-      AllResults (fun result : (Fin m → Block) × Nat => result.2 < m)
+    (bitLabel join : Nat → Label) :
+    ∀ (count start hot : Nat) (labels : Fin m → Label), hot < m →
+      AllResults (fun result : (Fin m → Label) × Nat => result.2 < m)
         (foldsEvalM m tagOf value bitLabel join count start hot labels)
   | 0, _, _, _, hotLt => .pure hotLt
   | count + 1, start, hot, labels, _ => by
@@ -76,8 +76,10 @@ end Agreement
 
 theorem castAnswers_le_128 (l : Nat) (h1 : 1 ≤ l) (h2 : l ≤ 128) : castAnswers l ≤ 128 := by
   unfold castAnswers castBlocks lanesPerBlock
+  have lb : labelBits = 104 := rfl
+  rw [lb]
   have p1 : 1 ≤ 128 / l := (Nat.le_div_iff_mul_le (by omega)).mpr (by omega)
-  have : (128 + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
+  have : (104 + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
   omega
 
 theorem stageChain_layout (S w rb value remBase joinBase pinBase : Nat) (wPos : 1 ≤ w) (wLe : w ≤ 12)
@@ -98,7 +100,7 @@ theorem sw_chain_in (S w rb value remBase joinBase pinBase : Nat) (wLe : w ≤ 1
   have ca := castAnswers_le_128 rb rbPos rbLe
   have pw : 2 ^ w ≤ 2 ^ 12 := Nat.pow_le_pow_right (by norm_num) wLe
   have hw := Nat.two_pow_pos w
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   simp only [stageWrites, Writes.union, Writes.region, Writes.cell, Region.Holds, stageChain] at h
   rcases h with ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ |
     ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | h | h | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ <;>
@@ -197,7 +199,7 @@ theorem exec_lastBitProg {l : Nat} (W nextBase : Nat) (memory : Memory) (lanes :
     (laneCells : ∀ i : Fin laneCount, memory.ram (word (nextBase + i.val)) = word (lanes i).val)
     (lSmall : l ≤ 256) :
     ∃ after, (lastBitProg W nextBase).exec memory = some after ∧
-      after.ram = Function.update memory.ram (word (W + 258)) (blockWord (laneBit lanes 0)) ∧
+      after.ram = Function.update memory.ram (word (W + 258)) (labelWord (laneBit lanes 0)) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rB → register ≠ rD → register ≠ rE → register ≠ rAddr →
         after.registers register = memory.registers register := by
@@ -262,17 +264,17 @@ theorem convStage_layouts (w0Pos : 1 ≤ row.width0) (w1Pos : 1 ≤ row.width1) 
   exact ⟨l0, e0', l1, e1⟩
 
 /-- The bit labels the growth and the folds read, where they lie. -/
-def BitsHeld (bits0 bits1 : Nat → Block) (last : Block) (m : Memory) : Prop :=
+def BitsHeld (bits0 bits1 : Nat → Label) (last : Label) (m : Memory) : Prop :=
   (∀ n, n < row.width0 →
-      m.ram (word ((convStage0 row W (joinBase 0) (pinBase 0)).bitBase + n)) = blockWord (bits0 n)) ∧
+      m.ram (word ((convStage0 row W (joinBase 0) (pinBase 0)).bitBase + n)) = labelWord (bits0 n)) ∧
     (∀ n, n < row.width1 →
       m.ram (word ((convStage1 row W (joinBase 0) (pinBase 0) (joinBase 1) (pinBase 1)).bitBase + n)) =
-        blockWord (bits1 n)) ∧
-    m.ram (word (W + 258)) = blockWord last
+        labelWord (bits1 n)) ∧
+    m.ram (word (W + 258)) = labelWord last
 
-theorem BitsHeld.read {bits0 bits1 : Nat → Block} {last : Block} {m : Memory}
+theorem BitsHeld.read {bits0 bits1 : Nat → Label} {last : Label} {m : Memory}
     (held : BitsHeld row W joinBase pinBase bits0 bits1 last m) (p : Nat) :
-    m.ram (word (convBit row W joinBase pinBase p)) = blockWord (wordBit row bits0 bits1 last p) := by
+    m.ram (word (convBit row W joinBase pinBase p)) = labelWord (wordBit row bits0 bits1 last p) := by
   unfold convBit wordBit
   split_ifs with h1 h2
   · exact held.1 p h1
@@ -307,7 +309,7 @@ theorem convBit_range (w0Pos : 1 ≤ row.width0) (w1Pos : 1 ≤ row.width1) (w0L
 theorem BitsHeld.transfer (w0Pos : 1 ≤ row.width0) (w1Pos : 1 ≤ row.width1) (w0Le : row.width0 ≤ 12)
     (w1Le : row.width1 ≤ 12) (ellEq : row.width0 + row.width1 + 1 = row.ell)
     (fits : W + 2 ^ 18 < 2 ^ 256) (joinBelow : ∀ q, q < 2 → joinBase q + 16 ≤ W)
-    (pinBelow : ∀ q, q < 2 → pinBase q + 128 ≤ W) {bits0 bits1 : Nat → Block} {last : Block}
+    (pinBelow : ∀ q, q < 2 → pinBase q + 128 ≤ W) {bits0 bits1 : Nat → Label} {last : Label}
     {m m' : Memory} (held : BitsHeld row W joinBase pinBase bits0 bits1 last m)
     (same : ∀ k, (k = W + 258 ∨ (W + 2 ^ 14 ≤ k ∧ k < W + 2 ^ 16)) → m'.ram (word k) = m.ram (word k)) :
     BitsHeld row W joinBase pinBase bits0 bits1 last m' := by
@@ -364,20 +366,20 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
     (laneCells : ∀ j : Fin laneCount, m0.ram (word (W + j.val)) = word (lanes j).val)
     (sigmaCell : m0.ram (word (W + 128)) = word value)
     (joinCells0 : ∀ n, 1 ≤ n → n < row.width0 →
-      m0.ram (word (joinBase 0 + n)) = blockWord (pub.stageJoin i 0 n))
+      m0.ram (word (joinBase 0 + n)) = labelWord (pub.stageJoin i 0 n))
     (joinCells1 : ∀ n, 1 ≤ n → n < row.width1 →
-      m0.ram (word (joinBase 1 + n)) = blockWord (pub.stageJoin i 1 n))
+      m0.ram (word (joinBase 1 + n)) = labelWord (pub.stageJoin i 1 n))
     (pinCells0 : ∀ j : Fin laneCount, m0.ram (word (pinBase 0 + j.val)) =
       word ((pinOfBlocks row.ell fun k => pub.stagePin i 0 k.val) j).val)
     (pinCells1 : ∀ j : Fin laneCount, m0.ram (word (pinBase 1 + j.val)) =
       word ((pinOfBlocks (row.ell - row.width0) fun k => pub.stagePin i 1 k.val) j).val)
     (growJoinCells : ∀ n, row.width0 ≤ n → n < row.keep →
-      m0.ram (word (growJoin n)) = blockWord (pub.growJoin i n))
+      m0.ram (word (growJoin n)) = labelWord (pub.growJoin i n))
     (foldJoinCells : ∀ n, row.keep ≤ n → n < row.ell →
-      m0.ram (word (foldJoin n)) = blockWord (pub.foldJoin i n)) :
+      m0.ram (word (foldJoin n)) = labelWord (pub.foldJoin i n)) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-      (fun (conv : (Fin m → Block) × Nat) after =>
-        (∀ ρ : Fin m, after.ram (word (W + 2 ^ 12 + ρ.val)) = blockWord (conv.1 ρ)) ∧
+      (fun (conv : (Fin m → Label) × Nat) after =>
+        (∀ ρ : Fin m, after.ram (word (W + 2 ^ 12 + ρ.val)) = labelWord (conv.1 ρ)) ∧
         after.ram (word (W + 2 ^ 12 + 2 ^ 11)) = word conv.2 ∧ conv.2 < m ∧
         Frame (convWrites W) convClobbers m0 after)
       ((conversionReplay coord i row m W joinBase pinBase growJoin foldJoin).tree m0)
@@ -389,7 +391,7 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
   have pw1 : 2 ^ row.width1 ≤ 2 ^ 12 := Nat.pow_le_pow_right (by norm_num) w1Le
   have pkeep : 2 ^ (row.width0 + (row.keep - row.width0)) ≤ 2 ^ 16 :=
     Nat.pow_le_pow_right (by norm_num) (by omega)
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have ellLe : row.ell ≤ 128 := by omega
   have valueSmall : value < 2 ^ 256 :=
     lt_of_lt_of_le valueLt (Nat.pow_le_pow_right (by norm_num) (by omega))

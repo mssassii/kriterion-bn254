@@ -14,7 +14,7 @@ open Kriterion.ArgoMAC Finset
 
 /-- The rounds in snoc form: the last round after the others. -/
 theorem stageRoundsM_snoc {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w)
-    (value : Nat) (joins : Nat → Block) (pin : Lanes rb) :
+    (value : Nat) (joins : Nat → Label) (pin : Lanes rb) :
     ∀ (r n : Nat) (state : StageState rb),
       stageRoundsM w treeTag castTag sub value joins pin (r + 1) n state =
         FreeQuery.bind (stageRoundsM w treeTag castTag sub value joins pin r n state)
@@ -51,7 +51,7 @@ theorem exec_subLanes (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c10 := layout.c10; have c11 := layout.c11; have c12 := layout.c12; have c13 := layout.c13
   have c14 := layout.c14; have c15 := layout.c15
   have hw := Nat.two_pow_pos w
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   have powRb : 2 ^ rb ≤ 2 ^ 128 := Nat.pow_le_pow_right (by norm_num) rbLe
   obtain ⟨final, run, subs, frame, bits, regs⟩ := Prog.exec_rep (subLane cells w)
@@ -167,19 +167,19 @@ def stageStart {rb : Nat} (w : Nat) (remainder : Lanes rb) : StageState rb :=
 
 /-- **The prefix**: `sub`, `b_0^E`, zero sums, the closed level-1 slot and its label. -/
 theorem exec_stagePrefix (cells : StageCells) (w rb value : Nat) (remainder : Lanes rb)
-    (joins : Nat → Block) (pin : Lanes rb) (layout : StageLayout cells w rb) (rbLe : rb ≤ 128)
+    (joins : Nat → Label) (pin : Lanes rb) (layout : StageLayout cells w rb) (rbLe : rb ≤ 128)
     (wSmall : w ≤ 64) (wPos : 1 ≤ w) (valueLt : value < 2 ^ w) (m : Memory)
     (inputs : StageInputs cells w rb value remainder joins pin m) :
     ∃ m1, (stagePrefix cells w).exec m = some m1 ∧
       StageRel cells w rb value (materialize (reduceTo w remainder)) 0 1 m (stageStart w remainder) m1 ∧
       m1.ram (word cells.slot) = word (value % 2 ^^^ 1) ∧
       m1.ram (word (cells.nodeBase + (value % 2 ^^^ 1))) =
-        blockWord (laneBit (materialize (reduceTo w remainder)) 0) := by
+        labelWord (laneBit (materialize (reduceTo w remainder)) 0) := by
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   have two : 2 ≤ 2 ^ w := le_trans (by norm_num : 2 ≤ 2 ^ 1) (Nat.pow_le_pow_right (by norm_num) wPos)
   have slotLt : value % 2 ^^^ 1 < 2 := by
@@ -203,7 +203,7 @@ theorem exec_stagePrefix (cells : StageCells) (w rb value : Nat) (remainder : La
       mD.ram (word k) = mB.ram (word k) := fun k h1 h2 kb => by
     rw [ramD, Function.update_of_ne (word_ne kb (by omega) h2), ramC,
       Function.update_of_ne (word_ne kb (by omega) h1)]
-  have dG : mG.registers rD = blockWord (laneBit (materialize (reduceTo w remainder)) 0) := by
+  have dG : mG.registers rD = labelWord (laneBit (materialize (reduceTo w remainder)) 0) := by
     rw [regsG rD (by decide) (by decide), regsF rD (by decide) (by decide),
       regsE rD (by decide) (by decide), regsD rD (by decide), regsC rD (by decide), dB]
   have valueG : mG.ram (word cells.value) = word value := by
@@ -250,14 +250,10 @@ theorem exec_stagePrefix (cells : StageCells) (w rb value : Nat) (remainder : La
     exact subA i
   · rw [ramH, Function.update_of_ne (ne_of_sw outside (sw_node cells w rb (x := value % 2 ^^^ 1) (by omega))),
       Function.update_of_ne (ne_of_sw outside (sw_slot cells w rb)),
-      offG address fun k kb => ne_of_sw outside (by
-        have : k = 128 * (k / 128) + k % 128 := (Nat.div_add_mod k 128).symm
-        rw [this, ← Nat.add_assoc]
-        exact sw_cast cells w rb (by omega) (by omega)),
-      offF address fun k kb => ne_of_sw outside (by
-        have : k = 128 * (k / 128) + k % 128 := (Nat.div_add_mod k 128).symm
-        rw [this, ← Nat.add_assoc]
-        exact sw_class cells w rb (by omega) (by omega)),
+      offG address fun k kb => ne_of_sw outside
+        (Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl ⟨k, kb, rfl⟩),
+      offF address fun k kb => ne_of_sw outside
+        (Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl ⟨k, kb, rfl⟩),
       offE address fun k kb => ne_of_sw outside (sw_levelSum cells w rb kb), ramD,
       Function.update_of_ne (ne_of_sw outside (by simpa using sw_bit cells w rb (b := 0) (by omega))),
       ramC, Function.update_of_ne (ne_of_sw outside (sw_active cells w rb)), ramB,
@@ -311,13 +307,13 @@ theorem peel_value {rb : Nat} (w : Nat) (wLe : w ≤ rb) (remainder C P T : Lane
   rw [Nat.div_lt_iff_lt_mul (Nat.two_pow_pos w), split]
   exact Nat.mod_lt _ (Nat.two_pow_pos rb)
 
-theorem exec_finalStore (cells : StageCells) (memory : Memory) (value : Nat) (A : Block)
+theorem exec_finalStore (cells : StageCells) (memory : Memory) (value : Nat) (A : Label)
     (fReg : memory.registers rF = word value)
-    (activeCell : memory.ram (word cells.active) = blockWord A)
+    (activeCell : memory.ram (word cells.active) = labelWord A)
     (small : cells.nodeBase + value < 2 ^ 256) :
     ∃ after, (Prog.seq (loadAt rE cells.active) (.seq (cst rB cells.nodeBase)
         (.seq (ar .add rAddr rF rB) (.op (.store rAddr rE))))).exec memory = some after ∧
-      after.ram = Function.update memory.ram (word (cells.nodeBase + value)) (blockWord A) ∧
+      after.ram = Function.update memory.ram (word (cells.nodeBase + value)) (labelWord A) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rB → register ≠ rE → register ≠ rAddr →
         after.registers register = memory.registers register := by
@@ -330,7 +326,7 @@ theorem exec_finalStore (cells : StageCells) (memory : Memory) (value : Nat) (A 
 /-- **The final block**: the next remainder lane by lane, and the active leaf's label at node `s`. -/
 theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C T : Lanes rb)
     (layout : StageLayout cells w rb) (rbLe : rb ≤ 128) (wSmall : w ≤ 64) (wLe : w ≤ rb)
-    (valueLt : value < 2 ^ w) (A : Block) (m : Memory)
+    (valueLt : value < 2 ^ w) (A : Label) (m : Memory)
     (valueCell : m.ram (word cells.value) = word value)
     (remCells : ∀ i : Fin laneCount, m.ram (word (cells.remBase + i.val)) = word (remainder i).val)
     (pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word (pin i).val)
@@ -338,11 +334,11 @@ theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C
       m.ram (word (cells.classBase + 128 * w + i.val)) = word (C i).val)
     (castCells : ∀ i : Fin laneCount,
       m.ram (word (cells.castSumBase + 128 * w + i.val)) = word (T i).val)
-    (activeCell : m.ram (word cells.active) = blockWord A) :
+    (activeCell : m.ram (word cells.active) = labelWord A) :
     ∃ m1, (stageFinal cells w rb).exec m = some m1 ∧
       (∀ i : Fin laneCount, m1.ram (word (cells.nextBase + i.val)) =
         word ((materialize (peelDiv remainder (materialize (C + scaleLanes value (pin - T))) w)) i).val) ∧
-      m1.ram (word (cells.nodeBase + value)) = blockWord A ∧
+      m1.ram (word (cells.nodeBase + value)) = labelWord A ∧
       (∀ address, (∀ i, i < laneCount → address ≠ word (cells.nextBase + i)) →
         address ≠ word (cells.nodeBase + value) → m1.ram address = m.ram address) ∧
       m1.bits = m.bits ∧
@@ -352,7 +348,7 @@ theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   set m0 := setReg (setReg m rAddr (word cells.value)) rF (m.ram (word cells.value)) with m0Def
@@ -397,7 +393,7 @@ theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C
       · rw [regs3 register nB nE nAddr, regs2 register nB nC nE nAddr, regs register nB nC nE nAddr])
     m0 ⟨fun _ _ lt => absurd lt (Nat.not_lt_zero _), fun _ _ => by rw [ram0], by rw [m0Def, bits_setReg,
       bits_setReg], f0, fun _ _ _ _ _ => rfl⟩
-  have activeL : mL.ram (word cells.active) = blockWord A := by
+  have activeL : mL.ram (word cells.active) = labelWord A := by
     rw [frameL _ fun i ib => word_ne (by omega) (by omega) (by omega)]; exact activeCell
   obtain ⟨m1, run1, ram1, bits1, regs1⟩ := exec_finalStore cells mL value A fL activeL (by omega)
   refine ⟨m1, ?_, fun i => ?_, ?_, fun address offN offV => ?_, by rw [bits1, bitsL],
@@ -453,7 +449,7 @@ variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
 /-- **Round `n`** (`1 ≤ n < w`) against `stageRoundM`: from `n` levels closed and `n` bits known to
 `n + 1` of each. -/
 theorem agree_roundReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
-    (remainder : Lanes rb) (joins : Nat → Block) (pin : Lanes rb) (layout : StageLayout cells w rb)
+    (remainder : Lanes rb) (joins : Nat → Label) (pin : Lanes rb) (layout : StageLayout cells w rb)
     (rbPos : 0 < rb) (rbLe : rb ≤ 128) (wSmall : w ≤ 64)
     (treeBase : Nat → Nat) (castBase stride : Nat) (strideSmall : stride < 2 ^ 64)
     (treeTag castTag : Nat → Nat → Nat)
@@ -511,7 +507,7 @@ theorem agree_roundReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes w
 
 /-- **The rounds `1 .. count`** against `stageRoundsM`. -/
 theorem agree_roundsReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
-    (remainder : Lanes rb) (joins : Nat → Block) (pin : Lanes rb) (layout : StageLayout cells w rb)
+    (remainder : Lanes rb) (joins : Nat → Label) (pin : Lanes rb) (layout : StageLayout cells w rb)
     (rbPos : 0 < rb) (rbLe : rb ≤ 128) (wSmall : w ≤ 64)
     (treeBase : Nat → Nat) (castBase stride : Nat) (strideSmall : stride < 2 ^ 64)
     (treeTag castTag : Nat → Nat → Nat)
@@ -546,7 +542,7 @@ theorem agree_roundsReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes 
 the leaves `α < 2 ^ w` at `nodeBase + α`, the bit labels at `bitBase + n`, the next remainder's lanes
 at `nextBase + i`, with the frame of `stageWrites` and `stageClobbers`. -/
 theorem agree_stageReplay (cells : StageCells) (w rb value : Nat) (remainder : Lanes rb)
-    (joins : Nat → Block) (pin : Lanes rb) (layout : StageLayout cells w rb)
+    (joins : Nat → Label) (pin : Lanes rb) (layout : StageLayout cells w rb)
     (rbLe : rb ≤ 128) (wPos : 1 ≤ w) (wLe : w ≤ rb) (wSmall : w ≤ 64)
     (treeBase : Nat → Nat) (castBase stride : Nat) (strideSmall : stride < 2 ^ 64)
     (treeTag castTag : Nat → Nat → Nat)
@@ -558,8 +554,8 @@ theorem agree_stageReplay (cells : StageCells) (w rb value : Nat) (remainder : L
     (inputs : StageInputs cells w rb value remainder joins pin m) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
       (fun (out : StageEval rb w) after =>
-        (∀ α, α < 2 ^ w → after.ram (word (cells.nodeBase + α)) = blockWord (out.leaves α)) ∧
-        (∀ n, n < w → after.ram (word (cells.bitBase + n)) = blockWord (out.bits n)) ∧
+        (∀ α, α < 2 ^ w → after.ram (word (cells.nodeBase + α)) = labelWord (out.leaves α)) ∧
+        (∀ n, n < w → after.ram (word (cells.bitBase + n)) = labelWord (out.bits n)) ∧
         (∀ i : Fin laneCount, after.ram (word (cells.nextBase + i.val)) = word (out.next i).val) ∧
         Frame (stageWrites cells w rb) stageClobbers m after)
       ((stageReplay cells w rb treeBase castBase stride).tree m)
@@ -567,7 +563,7 @@ theorem agree_stageReplay (cells : StageCells) (w rb value : Nat) (remainder : L
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have rbPos : 0 < rb := by omega
   have slotLt : value % 2 ^^^ 1 < 2 := by
     rcases Nat.mod_two_eq_zero_or_one value with h | h <;> rw [h] <;> decide

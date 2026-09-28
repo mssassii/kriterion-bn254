@@ -30,8 +30,8 @@ def sourceOf (d : Draw) : Source where
   rows g := ⟨total 0 d.fields (3 + 3 * g.val), total 0 d.fields (3 + 3 * g.val + 1),
     total 0 d.fields (3 + 3 * g.val + 2)⟩
   exception g := Vector.ofFn fun b : Fin 12 => BitVec.ofNat 8 (total 0 d.bytes (12 * g.val + b.val))
-  joins κ i := BitVec.ofNat 128 (total 0 d.joins (κ.val * joinCount + i.val))
-  pins κ k lane := ((total 0 d.pins ((κ.val * pinCount + k.val) * 128 + lane.val) : Nat) : ZMod (2 ^ pinWidth k))
+  joins κ i := BitVec.ofNat labelBits (total 0 d.joins (κ.val * joinCount + i.val))
+  pins κ k lane := ((total 0 d.pins ((κ.val * pinCount + k.val) * laneCount + lane.val) : Nat) : ZMod (2 ^ pinWidth k))
   recX e := ⟨recordNat d e.val % Entry.table.product, Nat.mod_lt _ Entry.table_product_pos⟩
   recY e := ⟨recordNat d (Entry.xCount + e.val) % Entry.table.product, Nat.mod_lt _ Entry.table_product_pos⟩
   zeros κ i := BitVec.ofNat 128 (total 0 d.zeros (254 * κ.val + i.val))
@@ -44,8 +44,8 @@ def extract (ram : Word → Word) : Source := sourceOf (readDraw ram)
 structure CellsValid (ram : Word → Word) : Prop where
   fields : ∀ index, index < fieldCount → (ram (word (fieldBase + index))).toNat < baseFieldModulus
   bytes : ∀ n, n < exceptionByteCount → (ram (word (exceptionBase + n))).toNat < 2 ^ 8
-  joins : ∀ n, n < 2 * joinCount → (ram (word (joinAddr n))).toNat < 2 ^ 128
-  pins : ∀ n, n < 2 * (pinCount * 128) → (ram (word (pinAddr n))).toNat < 2 ^ pinWidthAt (pinOf n)
+  joins : ∀ n, n < 2 * joinCount → (ram (word (joinAddr n))).toNat < 2 ^ labelBits
+  pins : ∀ n, n < 2 * (pinCount * laneCount) → (ram (word (pinAddr n))).toNat < 2 ^ pinWidthAt (pinOf n)
   digits : ∀ n, n < recordCount * moduliCount →
     (ram (word (digitAddr n))).toNat < modulusAt (n % moduliCount)
 
@@ -104,22 +104,25 @@ theorem convHolds_extract (ram : Word → Word) (valid : CellsValid ram) (κ : F
       unfold joinAddr
       rw [joinCount_eq] at inside ⊢
       congr 1 <;> omega
-    simp only [extract, sourceOf, blockWord]
+    simp only [extract, sourceOf, word]
     rw [total_apply _ _ _ n_in, BitVec.toNat_ofNat]
     simp only [readDraw]
     rw [addr, Nat.mod_eq_of_lt (by have := valid.joins _ n_in; rwa [addr] at this)]
     exact (CrtSerial.word_toNat_self _).symm
   pins k inside lane small := by
+    have active : laneCount = 104 := rfl
+    have laneSmall : lane < 104 := small
     have kSmall := κ.isLt
     have pins200 : pinCount = 200 := CrtConv.pinCount_eq
-    have n_in : (κ.val * pinCount + k) * 128 + lane < 2 * (pinCount * 128) := by
-      rw [pins200] at inside ⊢; omega
-    have pinIs : pinOf ((κ.val * pinCount + k) * 128 + lane) = k := by
-      unfold pinOf; rw [pins200] at inside ⊢; omega
-    have addr : pinAddr ((κ.val * pinCount + k) * 128 + lane) = Layout.sourcePin κ k lane := by
+    have n_in : (κ.val * pinCount + k) * laneCount + lane < 2 * (pinCount * laneCount) := by
+      rw [pins200] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
+    have pinIs : pinOf ((κ.val * pinCount + k) * laneCount + lane) = k := by
+      unfold pinOf; rw [pins200] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
+    have addr : pinAddr ((κ.val * pinCount + k) * laneCount + lane) = Layout.sourcePin κ k lane := by
       unfold pinAddr pinCoord
       rw [pinIs]
       rw [pins200] at inside ⊢
+      simp only [laneCount, Narrow.labelBits] at *
       congr 1 <;> omega
     have bound := valid.pins _ n_in
     rw [pinIs, pinWidthAt_eq k inside, addr] at bound

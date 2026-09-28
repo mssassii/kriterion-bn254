@@ -409,9 +409,9 @@ variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
 
 /-- **One slot of the body**: its pad, unless it is the hot slot. -/
 theorem agree_bodyEntry (bc : BodyCells) (m S q : Nat) (chain : BodyChain bc m S q)
-    (tagOf : Nat → Nat → Nat) (final : Fin m → Block) (hot : Nat) (hotLt : hot < m) (start : Memory)
+    (tagOf : Nat → Nat → Nat) (final : Fin m → Label) (hot : Nat) (hotLt : hot < m) (start : Memory)
     (hotCell : start.ram (word bc.hot) = word hot)
-    (vecCells : ∀ ρ : Fin m, start.ram (word (bc.vecBase + ρ.val)) = blockWord (final ρ))
+    (vecCells : ∀ ρ : Fin m, start.ram (word (bc.vecBase + ρ.val)) = labelWord (final ρ))
     (tagSmall : ∀ ρ j, ρ < m → j < q → tagOf ρ j < 2 ^ 127)
     (index : Fin m) (values : Vector (Fin S → Nat) index.val) (memory : Memory)
     (holds : BodyInv bc m S q hot start index.val values memory) :
@@ -463,7 +463,7 @@ theorem agree_bodyEntry (bc : BodyCells) (m S q : Nat) (chain : BodyChain bc m S
     unfold bodyPad padVectorM hlongM
     rw [tree_seq, TreeLaws.monad_bind, TreeLaws.monad_bind, liftHash_bind, liftHash_bind,
       liftHash_vector, TreeLaws.bind_assoc]
-    have labelNow : m1.ram (word (bc.slot index.val).label) = blockWord (final index) := by
+    have labelNow : m1.ram (word (bc.slot index.val).label) = labelWord (final index) := by
       show m1.ram (word (bc.vecBase + index.val)) = _
       rw [ram1, below _ (by omega)]
       exact vecCells index
@@ -471,7 +471,7 @@ theorem agree_bodyEntry (bc : BodyCells) (m S q : Nat) (chain : BodyChain bc m S
       (agree_ansQueries (bc.slot index.val) q (by show bc.ansBase + 2 * q < 2 ^ 256; omega)
         (by show bc.vecBase + index.val < 2 ^ 256; omega)
         (fun b bb => by show bc.vecBase + index.val ≠ bc.ansBase + b; omega) (tagOf index.val)
-        (final index) m1 labelNow (fun j jb => tagSmall _ _ ib jb))
+        (embed (final index)) m1 (by simpa only [blockWord_embed] using labelNow) (fun j jb => tagSmall _ _ ib jb))
     have invCopy := inv
     obtain ⟨_, frameQ, bitsQ, regsQ⟩ := inv
     have offAns : ∀ x, x < 2 ^ 256 → (x < bc.ansBase ∨ bc.ansBase + 2 * q ≤ x) →
@@ -703,10 +703,10 @@ variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
 ascending slot order (parts ascending), read by the fraction reading, accumulated, and the residues
 `L_e` in the output cells, under the frame of the schema. -/
 theorem agree_bodyBlock (bc : BodyCells) (m S q coord i : Nat) (chain : BodyChain bc m S q)
-    (final : Fin m → Block) (hot : Nat) (hotLt : hot < m) (joins : Fin S → Nat)
+    (final : Fin m → Label) (hot : Nat) (hotLt : hot < m) (joins : Fin S → Nat)
     (joinsLt : ∀ e, joins e < m) (memory : Memory)
     (hotCell : memory.ram (word bc.hot) = word hot)
-    (vecCells : ∀ ρ : Fin m, memory.ram (word (bc.vecBase + ρ.val)) = blockWord (final ρ))
+    (vecCells : ∀ ρ : Fin m, memory.ram (word (bc.vecBase + ρ.val)) = labelWord (final ρ))
     (joinCells : ∀ e : Fin S, memory.ram (word (bc.joinBase + e.val)) = word (joins e))
     (tagSmall : ∀ ρ j, ρ < m → j < q → bodyTag coord i ρ j < 2 ^ 127) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)

@@ -15,13 +15,13 @@ open Kriterion.ArgoMAC Finset
 /-! ### The cast input -/
 
 theorem exec_castInputBase (cells : StageCells) (start t base stride : Nat) (memory : Memory)
-    (slot : Nat) (label : Block) (slotCell : memory.ram (word cells.slot) = word slot)
-    (nodeCell : memory.ram (word (cells.nodeBase + (slot + 2 ^ start * t))) = blockWord label)
+    (slot : Nat) (label : Label) (slotCell : memory.ram (word cells.slot) = word slot)
+    (nodeCell : memory.ram (word (cells.nodeBase + (slot + 2 ^ start * t))) = labelWord label)
     (addrSmall : cells.nodeBase + (slot + 2 ^ start * t) < 2 ^ 256) (strideSmall : stride < 2 ^ 64)
     (tagSmall : base + stride * (slot + 2 ^ start * t) < 2 ^ 127) :
     ∃ after, (castInputBase cells start t base stride).exec memory = some after ∧
       after.ram = memory.ram ∧ after.bits = memory.bits ∧
-      after.registers rD = word (hashInput label (base + stride * (slot + 2 ^ start * t))) ∧
+      after.registers rD = word (hashInput (embed label) (base + stride * (slot + 2 ^ start * t))) ∧
       ∀ register, register ≠ rD → register ≠ rB → register ≠ rC → register ≠ rF → register ≠ rAddr →
         after.registers register = memory.registers register := by
   obtain ⟨m1, run1, ram1, bits1, rF1, regs1⟩ :=
@@ -33,7 +33,7 @@ theorem exec_castInputBase (cells : StageCells) (start t base stride : Nat) (mem
     calc x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
       _ < 2 ^ 128 * 2 ^ 127 := Nat.mul_lt_mul_of_pos_left this (by positivity)
       _ < 2 ^ 256 := by norm_num
-  have labelSmall := label.isLt
+  have labelSmall : label.toNat < 2 ^ 104 := label.isLt
   have sum1 : label.toNat + x * (2 ^ 128 * stride) < 2 ^ 256 := by
     have : stride * x < 2 ^ 127 := by omega
     have : x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
@@ -41,7 +41,7 @@ theorem exec_castInputBase (cells : StageCells) (start t base stride : Nat) (mem
   have sum2 : label.toNat + x * (2 ^ 128 * stride) + 2 ^ 128 * base < 2 ^ 256 := by
     have : x * (2 ^ 128 * stride) + 2 ^ 128 * base = 2 ^ 128 * (base + stride * x) := by ring
     omega
-  have nodeCell1 : m1.ram (word (cells.nodeBase + x)) = blockWord label := by rw [ram1]; exact nodeCell
+  have nodeCell1 : m1.ram (word (cells.nodeBase + x)) = labelWord label := by rw [ram1]; exact nodeCell
   unfold castInputBase
   rw [Prog.exec_seq_some _ _ memory m1 run1]
   refine ⟨_, rfl, ?_, ?_, ?_, fun register notD notB notC notF notAddr => ?_⟩
@@ -49,10 +49,11 @@ theorem exec_castInputBase (cells : StageCells) (start t base stride : Nat) (mem
   · simp only [bits_setReg, bits1]
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, rF1]
     rw [eval_add_word x cells.nodeBase (by omega), Nat.add_comm x cells.nodeBase, nodeCell1,
-      blockWord_eq_word, eval_mul_word x (2 ^ 128 * stride) prodSmall, eval_add_word _ _ sum1,
+      labelWord_eq_word, eval_mul_word x (2 ^ 128 * stride) prodSmall, eval_add_word _ _ sum1,
       eval_add_word _ _ sum2]
     congr 1
     unfold hashInput
+    simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
     ring
   · simp only [reg_setReg, if_neg notD, if_neg notB, if_neg notC, if_neg notAddr]
     exact regs1 register notF notB notAddr
@@ -68,8 +69,8 @@ variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
 
 /-- **One answer of a cast at a run-time tag**: the input `label + 2 ^ 128 · tag0` is in `rD`. -/
 theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayout cells w rb)
-    (label : Block) (tag0 : Nat) (start : Memory)
-    (inputReg : start.registers rD = word (hashInput label tag0))
+    (label : Label) (tag0 : Nat) (start : Memory)
+    (inputReg : start.registers rD = word (hashInput (embed label) tag0))
     (tagSmall : tag0 + castAnswers rb < 2 ^ 127)
     (index : Fin (castAnswers rb)) (values : Vector (Block × Block) index.val) (memory : Memory)
     (holds : CastInv cells.castCells (castAnswers rb) start index.val values memory) :
@@ -77,24 +78,25 @@ theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayo
       (fun (result : Block × Block) after =>
         CastInv cells.castCells (castAnswers rb) start (index.val + 1) (values.push result) after)
       ((castQueryDyn cells index.val).tree memory)
-      (liftHash (askN (hashInput label (tag0 + index.val)))) := by
+      (liftHash (askN (hashInput (embed label) (tag0 + index.val)))) := by
   obtain ⟨done, frame, bitsSame, regs⟩ := holds
   simp only [StageCells.castCells] at done frame
   have c11 := layout.c11; have c12 := layout.c12; have c13 := layout.c13; have c14 := layout.c14
   have c15 := layout.c15; have c16 := layout.c16
   have indexBound := index.isLt
-  have inputNow : memory.registers rD = word (hashInput label tag0) := by
+  have inputNow : memory.registers rD = word (hashInput (embed label) tag0) := by
     rw [regs rD (by unfold castClobbers Clobbers.ofList; decide)]; exact inputReg
-  have hashSmall : hashInput label (tag0 + index.val) < 2 ^ 256 := by
+  have hashSmall : hashInput (embed label) (tag0 + index.val) < 2 ^ 256 := by
     unfold hashInput
-    have := label.isLt
+    simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
+    have : label.toNat < 2 ^ 104 := label.isLt
     omega
-  have eq : hashInput label tag0 + 2 ^ 128 * index.val = hashInput label (tag0 + index.val) := by
+  have eq : hashInput (embed label) tag0 + 2 ^ 128 * index.val = hashInput (embed label) (tag0 + index.val) := by
     unfold hashInput; ring
   set m2 := setReg memory rB (word (2 ^ 128 * index.val)) with m2Def
-  set m3 := setReg m2 rInput (word (hashInput label (tag0 + index.val))) with m3Def
+  set m3 := setReg m2 rInput (word (hashInput (embed label) (tag0 + index.val))) with m3Def
   have run3 : (ar .add rInput rD rB).exec m2 = some m3 := by
-    rw [exec_ar_last _ _ _ _ m2 (word (hashInput label tag0)) (word (2 ^ 128 * index.val))
+    rw [exec_ar_last _ _ _ _ m2 (word (hashInput (embed label) tag0)) (word (2 ^ 128 * index.val))
       (by rw [m2Def, reg_setReg, if_neg (by decide)]; exact inputNow)
       (by rw [m2Def, reg_setReg, if_pos rfl]), eval_add_word _ _ (by rw [eq]; exact hashSmall), eq]
   unfold castQueryDyn
@@ -150,8 +152,8 @@ theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayo
 (`α = slot + 2 ^ start · t`): the lanes in the lane region; only the answer and lane cells change. -/
 theorem agree_castDyn (cells : StageCells) (w rb : Nat) (layout : StageLayout cells w rb)
     (rbPos : 0 < rb) (rbLe : rb ≤ 128) (start t base stride : Nat) (strideSmall : stride < 2 ^ 64)
-    (memory : Memory) (slot : Nat) (label : Block) (slotCell : memory.ram (word cells.slot) = word slot)
-    (nodeCell : memory.ram (word (cells.nodeBase + (slot + 2 ^ start * t))) = blockWord label)
+    (memory : Memory) (slot : Nat) (label : Label) (slotCell : memory.ram (word cells.slot) = word slot)
+    (nodeCell : memory.ram (word (cells.nodeBase + (slot + 2 ^ start * t))) = labelWord label)
     (xLt : slot + 2 ^ start * t < 2 ^ w)
     (tagSmall : base + stride * (slot + 2 ^ start * t) + castAnswers rb < 2 ^ 127) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
@@ -166,7 +168,7 @@ theorem agree_castDyn (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   obtain ⟨m1, run1, ram1, bits1, rD1, regs1⟩ := exec_castInputBase cells start t base stride memory slot
     label slotCell nodeCell (by omega) strideSmall (by omega)
   unfold castDyn castM hlongM
@@ -315,7 +317,7 @@ theorem exec_accLevel (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   have powj : 2 ^ j ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) (by omega)
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
@@ -436,7 +438,7 @@ theorem exec_leafSums (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   obtain ⟨final, run, sumsF, frameF, bitsF, regsF⟩ := Prog.exec_rep
     (fun k => accLevel cells rb start t (start + k))
     (fun k current =>
@@ -557,10 +559,10 @@ theorem agree_leafEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
     (castBase stride : Nat) (strideSmall : stride < 2 ^ 64) (castTag : Nat → Nat → Nat)
     (hCast : ∀ x part, castTag x part = castBase + stride * x + part)
     (castSmall : ∀ x, x < 2 ^ w → castBase + stride * x + castAnswers rb < 2 ^ 127)
-    (slot : Nat) (slotLt : slot < 2 ^ start) (labels : Fin (2 ^ (w - start)) → Block)
+    (slot : Nat) (slotLt : slot < 2 ^ start) (labels : Fin (2 ^ (w - start)) → Label)
     (cls cst : Nat → Lanes rb) (m0 : Memory) (slotCell : m0.ram (word cells.slot) = word slot)
     (nodeCells : ∀ t : Fin (2 ^ (w - start)),
-      m0.ram (word (cells.nodeBase + (slot + 2 ^ start * t.val))) = blockWord (labels t))
+      m0.ram (word (cells.nodeBase + (slot + 2 ^ start * t.val))) = labelWord (labels t))
     (index : Fin (2 ^ (w - start))) (values : Vector (Lanes rb) index.val) (memory : Memory)
     (holds : LeafInv cells w rb start slot cls cst m0 index.val values memory) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
@@ -572,7 +574,7 @@ theorem agree_leafEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have xLt : slot + 2 ^ start * index.val < 2 ^ w := by
     have := slotPos_lt slot start (w - start) index.val slotLt index.isLt
     rwa [Nat.add_sub_cancel' startLe] at this
@@ -583,7 +585,7 @@ theorem agree_leafEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
   have slotNow : memory.ram (word cells.slot) = word slot := by
     rw [offLeaf _ (Or.inr (by omega)) (by omega)]; exact slotCell
   have nodeNow : memory.ram (word (cells.nodeBase + (slot + 2 ^ start * index.val))) =
-      blockWord (labels index) := by
+      labelWord (labels index) := by
     rw [offLeaf _ (Or.inl (by omega)) (by omega)]; exact nodeCells index
   rw [show castTag (slot + 2 ^ start * index.val) =
       fun part => castBase + stride * (slot + 2 ^ start * index.val) + part from

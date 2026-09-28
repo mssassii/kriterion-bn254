@@ -103,7 +103,7 @@ theorem bytes_bits (ram : Word → Word) (source : Source) (holds : SourceHolds 
   simp only [Entry.publish, Vector.getElem_ofFn]
 
 theorem convVector_bits (pub : ConvPublic) :
-    (List.ofFn fun k : Fin convCount => lsbs 128 (Entry.convVector pub)[k.val].toNat).flatten =
+    (List.ofFn fun k : Fin convCount => lsbs labelBits (Entry.convVector pub)[k.val].toNat).flatten =
       blockBits (ConvPublic.flatten Entry.table pub) := by
   unfold blockBits
   refine congrArg List.flatten ?_

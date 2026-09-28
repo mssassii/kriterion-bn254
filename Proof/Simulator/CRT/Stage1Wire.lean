@@ -4,7 +4,7 @@
 `Wire.encoding`'s field, block, byte, entry, row, curve and record encoders are private to
 `Construction/CRT/Public.lean`; `encoding_eq` restates the encoding with public copies (`rfl`). `wire_bits`: the
 byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × 3 × 256`), the exception
-bytes (`91 × 12 × 8`), the two conversion vectors (`3412 × 128` bits each) and the records (`624` bits each), least
+bytes (`91 × 12 × 8`), the two conversion vectors (`3412 × 104` bits each) and the records (`624` bits each), least
 significant first.
 -/
 
@@ -28,16 +28,8 @@ def field : Kriterion.Encoding BaseField :=
     (fun value => value.val)
     (fun value => ZMod.natCast_zmod_val value)
 
-/-- A block, `16` bytes. -/
-def block : Kriterion.Encoding Block :=
-  (Kriterion.Encoding.natural 16).map
-    (fun value => ⟨value.toNat, by
-      have expand : (256 : Nat) ^ 16 = 2 ^ 128 := by norm_num
-      rw [expand]; exact value.isLt⟩)
-    (fun value => BitVec.ofNat 128 value.val)
-    (fun value => by
-      apply BitVec.eq_of_toNat_eq
-      rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt value.isLt])
+/-- A conversion label, `13` bytes. -/
+def block : Kriterion.Encoding Label := Narrow.labelEncoding
 
 /-- One gadget byte. -/
 def gadgetByte : Kriterion.Encoding (BitVec 8) :=
@@ -80,8 +72,8 @@ theorem encoding_eq : Entry.Wire.encoding = encoding := rfl
 theorem field_bits (value : BaseField) : byteBits (encodeOf field value) = lsbs 256 value.val :=
   natural_byteBits 32 _
 
-theorem block_bits (value : Block) : byteBits (encodeOf block value) = lsbs 128 value.toNat :=
-  natural_byteBits 16 _
+theorem block_bits (value : Label) : byteBits (encodeOf block value) = lsbs labelBits value.toNat :=
+  natural_byteBits 13 _
 
 theorem gadgetByte_bits (value : BitVec 8) :
     byteBits (encodeOf gadgetByte value) = lsbs 8 value.toNat := by
@@ -124,8 +116,8 @@ theorem wire_bits (value : Entry.Public) :
       (List.ofFn fun digit : Fin digitCount =>
           (List.ofFn fun index : Fin 12 =>
             lsbs 8 value.exception[digit.val][index.val].toNat).flatten).flatten ++
-      (List.ofFn fun k : Fin convCount => lsbs 128 value.crtX[k.val].toNat).flatten ++
-      (List.ofFn fun k : Fin convCount => lsbs 128 value.crtY[k.val].toNat).flatten ++
+      (List.ofFn fun k : Fin convCount => lsbs labelBits value.crtX[k.val].toNat).flatten ++
+      (List.ofFn fun k : Fin convCount => lsbs labelBits value.crtY[k.val].toNat).flatten ++
       (List.ofFn fun e : Fin xCount => lsbs 624 value.recX[e.val].val).flatten ++
       (List.ofFn fun e : Fin yCount => lsbs 624 value.recY[e.val].val).flatten := by
   rw [encoding_eq, encode_eq]

@@ -3,7 +3,7 @@
 
 `conv_bits`: when RAM holds a source's joins (one block per word) and pins (one lane per word), the machine's
 conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatten table (source.conv κ)`, block by
-block. A pin's `128` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
+block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
 `decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `3412` for every `ConvPublic`.
@@ -84,7 +84,7 @@ theorem pinWidthAt_eq (k : Nat) (inside : k < pinCount) : pinWidthAt k = pinWidt
 /-! ### Bits -/
 
 /-- The bits of a list of blocks. -/
-def blockBits (blocks : List Block) : List Bool := (blocks.map fun block => lsbs 128 block.toNat).flatten
+def blockBits (blocks : List Label) : List Bool := (blocks.map fun block => lsbs labelBits block.toNat).flatten
 
 /-- The mixed radix of modulus `i`. -/
 def radixAt (i : Nat) : Nat := ∏ j ∈ Finset.range i, modulusAt j
@@ -101,7 +101,7 @@ def pieceBits (ram : Word → Word) : Piece → List Bool
 /-- The bits of a list of pieces. -/
 def pieceListBits (ram : Word → Word) (pieces : List Piece) : List Bool := (pieces.map (pieceBits ram)).flatten
 
-theorem blockBits_append (first second : List Block) :
+theorem blockBits_append (first second : List Label) :
     blockBits (first ++ second) = blockBits first ++ blockBits second := by
   simp [blockBits]
 
@@ -109,7 +109,7 @@ theorem pieceListBits_append (ram : Word → Word) (first second : List Piece) :
     pieceListBits ram (first ++ second) = pieceListBits ram first ++ pieceListBits ram second := by
   simp [pieceListBits]
 
-theorem blockBits_flatMap {α : Type} (list : List α) (f : α → List Block) :
+theorem blockBits_flatMap {α : Type} (list : List α) (f : α → List Label) :
     blockBits (list.flatMap f) = (list.map fun a => blockBits (f a)).flatten := by
   induction list with
   | nil => rfl
@@ -125,13 +125,13 @@ theorem map_range_eq_ofFn {α : Type} (count : Nat) (g : Nat → α) :
     (List.range count).map g = List.ofFn fun index : Fin count => g index.val := by
   apply List.ext_getElem <;> simp
 
-/-- `w` consecutive 128-bit windows of a natural are its low `128 w` bits. -/
+/-- `w` consecutive 104-bit windows of a natural are its low `104 w` bits. -/
 theorem range_windows (value : Nat) : ∀ count : Nat,
-    ((List.range count).map fun b => lsbs 128 (value / 2 ^ (128 * b))).flatten = lsbs (128 * count) value
+    ((List.range count).map fun b => lsbs labelBits (value / 2 ^ (labelBits * b))).flatten = lsbs (labelBits * count) value
   | 0 => rfl
   | count + 1 => by
       rw [List.range_succ, List.map_append, List.flatten_append, range_windows value count,
-        show 128 * (count + 1) = 128 * count + 128 by ring, lsbs_add]
+        show labelBits * (count + 1) = labelBits * count + labelBits by ring, lsbs_add]
       simp
 
 /-! ### The source in RAM -/
@@ -139,12 +139,12 @@ theorem range_windows (value : Nat) : ∀ count : Nat,
 /-- **Coordinate `κ`'s joins and pins in RAM.** -/
 structure ConvHolds (ram : Word → Word) (source : Source) (κ : Fin 2) : Prop where
   joins : ∀ index (inside : index < joinCount),
-    ram (word (Layout.sourceJoin κ index)) = blockWord (source.joins κ ⟨index, inside⟩)
-  pins : ∀ k (inside : k < pinCount) lane (small : lane < 128),
+    ram (word (Layout.sourceJoin κ index)) = word (source.joins κ ⟨index, inside⟩).toNat
+  pins : ∀ k (inside : k < pinCount) lane (small : lane < labelBits),
     ram (word (Layout.sourcePin κ k lane)) = word (source.pins κ ⟨k, inside⟩ ⟨lane, small⟩).val
 
 theorem joins_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : ConvHolds ram source κ)
-    (start count : Nat) (inRange : start + count ≤ joinCount) (f : Nat → Block)
+    (start count : Nat) (inRange : start + count ≤ joinCount) (f : Nat → Label)
     (same : ∀ n, n < count → f n = source.joinAt κ (start + n)) :
     blockBits ((List.range count).map f) = pieceListBits ram (joinPieces κ start count) := by
   unfold blockBits pieceListBits joinPieces
@@ -154,7 +154,7 @@ theorem joins_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds :
   intro n member
   have small : n < count := List.mem_range.mp member
   simp only [Function.comp_apply, pieceBits]
-  rw [holds.joins (start + n) (by omega), same n small, Source.joinAt, atNat, dif_pos (by omega), blockWord,
+  rw [holds.joins (start + n) (by omega), same n small, Source.joinAt, atNat, dif_pos (by omega), word,
     bitRun_ofNat _ _ (by norm_num)]
 
 theorem pinWidth_small : ∀ k : Fin 200, pinWidthAt k ≤ 14 := by decide +kernel
@@ -162,7 +162,7 @@ theorem pinWidth_small : ∀ k : Fin 200, pinWidthAt k ≤ 14 := by decide +kern
 theorem pinCount_eq : pinCount = 200 := by decide +kernel
 
 theorem pin_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : ConvHolds ram source κ)
-    (k : Nat) (inside : k < pinCount) (f : Nat → Block)
+    (k : Nat) (inside : k < pinCount) (f : Nat → Label)
     (same : ∀ b, b < pinWidthAt k → f b = source.pinBlockAt κ k b) :
     blockBits ((List.range (pinWidthAt k)).map f) = pieceListBits ram (pinPieces κ k) := by
   set lanes := source.pins κ ⟨k, inside⟩ with lanesDef
@@ -170,7 +170,7 @@ theorem pin_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : C
   have widthIs := pinWidthAt_eq k inside
   have widthSmall : pinWidthAt k ≤ 256 :=
     le_trans (pinWidth_small ⟨k, by rw [← pinCount_eq]; exact inside⟩) (by norm_num)
-  have left : blockBits ((List.range (pinWidthAt k)).map f) = lsbs (128 * pinWidthAt k) (pinNat lanes) := by
+  have left : blockBits ((List.range (pinWidthAt k)).map f) = lsbs (labelBits * pinWidthAt k) (pinNat lanes) := by
     rw [← range_windows]
     unfold blockBits
     rw [List.map_map]
@@ -180,17 +180,17 @@ theorem pin_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : C
     have small : b < pinWidthAt k := List.mem_range.mp member
     simp only [Function.comp_apply]
     rw [same b small, Source.pinBlockAt, dif_pos inside, atNat, dif_pos (by rw [← widthIs]; exact small)]
-    simp only [pinBlocks, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
-    exact lsbs_mod 128 _
+    simp only [pinBlocks, Narrow.pinBlocks, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
+    exact lsbs_mod labelBits _
   have right : pieceListBits ram (pinPieces κ k) =
-      (List.ofFn fun lane : Fin 128 => lsbs (pinWidthAt k) (lanes lane).val).flatten := by
+      (List.ofFn fun lane : Fin labelBits => lsbs (pinWidthAt k) (lanes lane).val).flatten := by
     unfold pieceListBits pinPieces
     rw [List.map_map, map_range_eq_ofFn]
     congr 1
     refine congrArg List.ofFn (funext fun lane => ?_)
     simp only [Function.comp_apply, pieceBits]
     rw [holds.pins k inside lane lane.isLt, bitRun_ofNat _ _ widthSmall]
-  rw [left, right, widthIs, Nat.mul_comm, ← digitSum_bits (pinWidth ⟨k, inside⟩) 128 _
+  rw [left, right, widthIs, Nat.mul_comm, ← digitSum_bits (pinWidth ⟨k, inside⟩) labelBits _
     (fun lane => (lanes lane).val_lt)]
   rfl
 

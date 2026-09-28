@@ -5,7 +5,7 @@
 One fold at bit position `j` over a one-hot vector `h[ρ]`, `ρ < m`, with hot index `hot` (a run-time
 value in RAM) and compile-time shift `s = 2 ^ j mod m`:
 
-* `rD := 0`; for every `ρ < m` (`foldEntry`): unless `ρ = hot`, ask `u_ρ = (H(h[ρ] + 2 ^ 128 · tag_ρ)).1`,
+* `rD := 0`; for every `ρ < m` (`foldEntry`): unless `ρ = hot`, ask `u_ρ = clip (H(embed h[ρ] + 2 ^ 128 · tag_ρ)).1`,
   store it at `matBase + ρ` and add it into `rD` (the tree step's `entryHash`, reused);
 * `foldRecover`: `u_hot = rD ⊕ join ⊕ bitLabel` stored at `matBase + hot` (a run-time address);
 * `foldUpdate`: `h[ρ] := h[ρ] ⊕ u_ρ ⊕ u_((ρ + m - s) mod m)` in place (the source index is a

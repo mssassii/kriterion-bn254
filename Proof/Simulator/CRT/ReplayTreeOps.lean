@@ -37,7 +37,7 @@ variable [BN254.FieldCertificate]
 /-! ### The tree -/
 
 theorem treeOps_entryHash (cells : TreeCells) (tag s : Nat) : (entryHash cells tag s).OpsSatisfy TreeOp :=
-  ⟨⟨⟨trivial, trivial⟩, trivial, trivial⟩, trivial, ⟨⟨trivial, trivial⟩, trivial⟩⟩
+  ⟨⟨⟨trivial, trivial⟩, trivial, trivial⟩, trivial, ⟨trivial, trivial⟩, ⟨⟨trivial, trivial⟩, trivial⟩⟩
 
 theorem treeOps_treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n s : Nat) :
     (treeEntry cells tagOf n s).OpsSatisfy TreeOp :=
