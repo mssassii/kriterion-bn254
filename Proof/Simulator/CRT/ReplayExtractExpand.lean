@@ -33,12 +33,12 @@ theorem sw_levelSum {L : Nat} (bound : L < w) :
 theorem sw_class {j i : Nat} (jb : j ≤ w) (ib : i < laneCount) :
     stageWrites cells w rb (word (cells.classBase + 128 * j + i)) :=
   Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl
-    ⟨128 * j + i, by change i < 104 at ib; change 128 * j + i < 128 * (w + 1); omega, by rw [Nat.add_assoc]⟩
+    ⟨128 * j + i, by change i < 101 at ib; change 128 * j + i < 128 * (w + 1); omega, by rw [Nat.add_assoc]⟩
 
 theorem sw_cast {j i : Nat} (jb : j ≤ w) (ib : i < laneCount) :
     stageWrites cells w rb (word (cells.castSumBase + 128 * j + i)) :=
   Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl
-    ⟨128 * j + i, by change i < 104 at ib; change 128 * j + i < 128 * (w + 1); omega, by rw [Nat.add_assoc]⟩
+    ⟨128 * j + i, by change i < 101 at ib; change 128 * j + i < 128 * (w + 1); omega, by rw [Nat.add_assoc]⟩
 
 theorem sw_ans {b : Nat} (bound : b < 2 * castAnswers rb) :
     stageWrites cells w rb (word (cells.ansBase + b)) :=
@@ -127,7 +127,7 @@ theorem agree_expandReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes 
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have powSplit : 2 ^ (n + 1) * 2 ^ (w - (n + 1)) = 2 ^ w := by
     rw [← pow_add, Nat.add_sub_cancel' nLt]
   have powPos := Nat.two_pow_pos (n + 1)

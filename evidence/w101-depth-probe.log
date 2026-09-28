@@ -1,0 +1,9 @@
+$ lake env lean Scratch/OpusDepthProbe.lean
+# HEAD dc6aa07014645d3bc1a2846d4521c17b8c3d93af
+# tracked changes:
+ M Construction/CRT/Label.lean
+ M Construction/CRT/LabelEncoding.lean
+
+Scratch/OpusDepthProbe.lean:4:52: warning: exponent 36424 exceeds the threshold 256, exponentiation operation was not evaluated, use `set_option exponentiation.threshold <num>` to set a new threshold
+36424
+some (12345, 1)

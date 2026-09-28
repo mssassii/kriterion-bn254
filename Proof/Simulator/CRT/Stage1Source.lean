@@ -132,8 +132,8 @@ theorem convHolds_extract (ram : Word → Word) (valid : CellsValid ram) (κ : F
     rw [addr, Nat.mod_eq_of_lt (by have := valid.joins _ n_in; rwa [addr] at this)]
     exact (CrtSerial.word_toNat_self _).symm
   pins k inside lane small := by
-    have active : laneCount = 104 := rfl
-    have laneSmall : lane < 104 := small
+    have active : laneCount = 101 := rfl
+    have laneSmall : lane < 101 := small
     have kSmall := κ.isLt
     have pinsEq : pinCount = 198 := CrtConv.pinCount_eq
     have n_in : (κ.val * pinCount + k) * laneCount + lane < 2 * (pinCount * laneCount) := by

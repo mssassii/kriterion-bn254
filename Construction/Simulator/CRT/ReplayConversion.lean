@@ -14,7 +14,7 @@
 The bit label of position `j` is read where it lies (`convBit`): stage 0's bit cells for
 `j < w0`, stage 1's for `w0 ≤ j < w0 + w1`, the stage-2 cell otherwise.
 
-**Placement**, inside the modulus window `W` that the composer assigns. The inputs are the truth word's active lanes at `W + j` (`j < 104`) and `σ` at `W + 128`; the joins
+**Placement**, inside the modulus window `W` that the composer assigns. The inputs are the truth word's active lanes at `W + j` (`j < 101`) and `σ` at `W + 128`; the joins
 and pins stay in the source regions (below `W`). The block writes only cells of
 `[W + 256, W + 2 ^ 18)`:
 

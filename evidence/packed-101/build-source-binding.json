@@ -1,0 +1,15 @@
+{
+  "source_manifest": "3396d0568b3d7f061aafd9ba4a860668c115eac1e948d228c758fa4a0b9f99a9",
+  "file_count": 459,
+  "built_and_audited_source_identical": true,
+  "changes_after_build": "README and evidence documentation only; no source, configuration or audit changes",
+  "base_commit": "76f7589ed25f909373d11700f4c0ac4b2dd70f00",
+  "p1a_source": "cc221c36a4f8e991d2c983b4ec748d40805ea064",
+  "opus101_source": "2f7b9ca70f7a9c72ac4a24e98ddb97cb606e7ee8",
+  "checks": {
+    "build-first": 0,
+    "benchmark-build": 0,
+    "audit": 0,
+    "proof-audit": 0
+  }
+}

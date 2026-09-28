@@ -8,8 +8,8 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 |---|---|---|
 | `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row cells `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
 | `bytes` | `exceptionBase + index`, `index < 182` | independent exception nibbles (4 coins each) |
-| `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins (the chunk-join cells are drawn but neither serialized nor read) |
-| `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
+| `joins` | `sourceJoin κ index`, `index < joinCount` | 101 coins (the chunk-join cells are drawn but neither serialized nor read) |
+| `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 101` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 84` | bounded rejection below `m_i` over `digitWidth m_i` coins |
 | `zeros` | `keyBase + 2 j`, `j < 508` (`Z_j`) | 128 coins |
 | `deltas` | `deltaCell κ` | 128 coins |
@@ -84,7 +84,7 @@ def joins : Prog :=
   Prog.rep (2 * Entry.joinCount) fun n =>
     Stage1.wordCell labelBits (Layout.sourceJoin (n / Entry.joinCount) (n % Entry.joinCount))
 
-/-- The pin of lane word `n = (κ · pinCount + k) · 104 + lane`. -/
+/-- The pin of lane word `n = (κ · pinCount + k) · 101 + lane`. -/
 def pinOf (n : Nat) : Nat := n / laneCount % Entry.pinCount
 
 /-- The coordinate of lane word `n`. -/
@@ -138,7 +138,7 @@ deriving Inhabited
 def joinPieces (κ start count : Nat) : List Piece :=
   (List.range count).map fun n => .word (Layout.sourceJoin κ (start + n)) labelBits
 
-/-- Pin `k` of coordinate `κ`: its 104 active lanes (the reserved RAM stride remains 128). -/
+/-- Pin `k` of coordinate `κ`: its 101 active lanes (the reserved RAM stride remains 128). -/
 def pinPieces (κ k : Nat) : List Piece :=
   (List.range laneCount).map fun lane => .word (Layout.sourcePin κ k lane) (pinWidthAt k)
 

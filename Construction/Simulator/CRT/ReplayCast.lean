@@ -2,7 +2,7 @@
 **The replay of one cast** (the construction's parity `castM` in `Construction/CRT/Chunk.lean`).
 
 A cast of width `l` of a label `E` asks `castAnswers l` hash answers at the tags `tagOf 0, …`, in
-order, and reads its 104 lanes block-aligned: lane `i` is the `l` bits at offset
+order, and reads its 101 lanes block-aligned: lane `i` is the `l` bits at offset
 `l · (i mod per)` of block `i / per`, where `per = ⌊128 / l⌋` and block `2 j` (`2 j + 1`) is the
 first (second) half of answer `j`. The parity cast keeps the upper `l - 1` bits of that reading and
 replaces its low bit by bit `i` of the label `E` (`Parity.parityCastLanes`).
@@ -12,13 +12,13 @@ The machine block `castBlock cells l tagOf`:
 * `castQueries`: for each answer `j`, `rInput := E + 2 ^ 128 · tag_j`, one kind-4 query, and the
   two halves stored at `ansBase + 2 j` and `ansBase + 2 j + 1`;
 * `rD := E` (the label, reloaded from its cell);
-* `castLanesProg`: for each lane `i < 104`, `rSecond := bit i of rD`, then load block `i / per`, shift
+* `castLanesProg`: for each lane `i < 101`, `rSecond := bit i of rD`, then load block `i / per`, shift
   right by `l · (i mod per) + 1`, mask with `2 ^ (l - 1) - 1`, double, add `rSecond`, store at
   `laneBase + i`. The lane loop reads the label from `rD` only through its low 128 bits, so the
   extraction stage runs it with `rD` holding its query base `E + 2 ^ 128 · tag`.
 
 Frame (the schema of `Frame.lean`): it writes the answer region (`2 · castAnswers l` cells) and the
-lane region (104 active cells); the queries clobber `rA`, `rB`, `rAddr`, `rInput`, `rFirst`,
+lane region (101 active cells); the queries clobber `rA`, `rB`, `rAddr`, `rInput`, `rFirst`,
 `rSecond` (`castClobbers`) and the whole block also `rD` (`castBlockClobbers`).
 -/
 
@@ -37,7 +37,7 @@ structure CastCells where
   label : Nat
   /-- The answers' halves, `2 · castAnswers l` cells. -/
   ansBase : Nat
-  /-- The 104 lanes. -/
+  /-- The 101 lanes. -/
   laneBase : Nat
 
 /-- Answer `j`: ask at `label + 2 ^ 128 · tag`, store both halves. -/
@@ -74,7 +74,7 @@ def laneUpperProg (cells : CastCells) (l i : Nat) : Prog :=
 def laneExtract (cells : CastCells) (l i : Nat) : Prog :=
   .seq (laneBitProg i) (laneUpperProg cells l i)
 
-/-- The 104 lanes of a cast of width `l`. -/
+/-- The 101 lanes of a cast of width `l`. -/
 def castLanesProg (cells : CastCells) (l : Nat) : Prog :=
   Prog.rep Kriterion.CRT.laneCount (laneExtract cells l)
 
@@ -138,7 +138,7 @@ def solveLane (cc : ChunkCastCells) (width l i : Nat) : Prog :=
     (.seq (cst rB (cc.castBase + i))
     (.seq (ar .add rA rA rB) (.op (.store rA rD)))))))))
 
-/-- The pin solve: the 104 lanes of the hot cast. -/
+/-- The pin solve: the 101 lanes of the hot cast. -/
 def pinSolve (cc : ChunkCastCells) (width l : Nat) : Prog := Prog.rep laneCount (solveLane cc width l)
 
 /-- **The cast phase of one chunk** (after its tree). -/

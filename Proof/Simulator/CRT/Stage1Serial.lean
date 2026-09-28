@@ -50,7 +50,7 @@ theorem pinPieces_safe (κ k : Nat) (small : κ < 2) (inside : k < pinCount) :
   obtain ⟨lane, bound, same⟩ := member
   subst same
   have pins : pinCount = 198 := pinCount_eq
-  have active : laneCount = 104 := rfl
+  have active : laneCount = 101 := rfl
   exact ⟨by unfold Layout.sourcePin; omega, Or.inr (by unfold Layout.sourcePin tmpBase; omega),
     le_trans (pinWidthAt_le k) (by norm_num)⟩
 

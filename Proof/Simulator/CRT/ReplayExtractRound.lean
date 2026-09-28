@@ -171,7 +171,7 @@ theorem exec_lanePack {l : Nat} (base b : Nat) (memory : Memory) (lanes : Lanes 
       after.bits = memory.bits ∧ after.registers rD = labelWord (laneBit lanes b) ∧
       ∀ register, register ≠ rB → register ≠ rD → register ≠ rE → register ≠ rAddr →
         after.registers register = memory.registers register := by
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have powL : 2 ^ l ≤ 2 ^ 256 := Nat.pow_le_pow_right (by norm_num) lSmall
   set f : Nat → Bool := fun k => if h : k < laneCount then (lanes ⟨k, h⟩).val.testBit b else false
     with fDef
@@ -249,7 +249,7 @@ theorem exec_roundLanes (cells : StageCells) (w rb : Nat) (rbLe : rb ≤ 128) (w
         m1.registers register = m0.registers register := by
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   haveI : NeZero (2 ^ w) := ⟨by positivity⟩
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   have powRb : 2 ^ rb ≤ 2 ^ 128 := Nat.pow_le_pow_right (by norm_num) rbLe
   set A := sub - reduceTo w (materialize (R + scaleLanes q (pin - T))) with ADef
@@ -505,7 +505,7 @@ theorem not_sw_below (cells : StageCells) (w rb : Nat) (layout : StageLayout cel
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have hw := Nat.two_pow_pos w
   intro h
   simp only [stageWrites, Writes.union, Writes.region, Writes.cell, Region.Holds] at h
@@ -519,7 +519,7 @@ theorem StageInputs.at {cells : StageCells} {w rb value : Nat} {remainder : Lane
     (frame : Frame (stageWrites cells w rb) stageClobbers mStart m) :
     StageInputs cells w rb value remainder joins pin m := by
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   refine ⟨?_, fun i => ?_, fun n h1 h2 => ?_, fun i => ?_, inputs.pinEven⟩
   · rw [frame.ram _ (not_sw_below cells w rb layout c1)]; exact inputs.valueCell
   · rw [frame.ram _ (not_sw_below cells w rb layout (by have := i.isLt; omega))]
@@ -568,7 +568,7 @@ theorem exec_roundPrefix (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   have powN1 : 2 ^ (n + 1) ≤ 2 ^ w := Nat.pow_le_pow_right (by norm_num) nLt
   have slotLt := roundSlot_lt value n

@@ -3,7 +3,7 @@
 
 `conv_bits`: when RAM holds a source's joins (one block per word) and pins (one lane per word), the machine's
 conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatten table (source.conv κ)`, block by
-block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
+block. A pin's `101` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
 `decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2885` for every `ConvPublic` (no chunk
@@ -127,7 +127,7 @@ theorem map_range_eq_ofFn {α : Type} (count : Nat) (g : Nat → α) :
     (List.range count).map g = List.ofFn fun index : Fin count => g index.val := by
   apply List.ext_getElem <;> simp
 
-/-- `w` consecutive 104-bit windows of a natural are its low `104 w` bits. -/
+/-- `w` consecutive 101-bit windows of a natural are its low `101 w` bits. -/
 theorem range_windows (value : Nat) : ∀ count : Nat,
     ((List.range count).map fun b => lsbs labelBits (value / 2 ^ (labelBits * b))).flatten = lsbs (labelBits * count) value
   | 0 => rfl

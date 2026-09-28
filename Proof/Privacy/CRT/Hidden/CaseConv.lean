@@ -7,7 +7,7 @@ same tag, and at a hot tag the labels differ by `embed (clip (Δ_κ ⊕ Δ'_κ))
 once (its question run is tagged, `keyRun_tags`), so two such tapes that both ask the same input `N` at `τ` have the same
 `clip Δ_κ` (`delta_unique`): the projected delta is fixed by the fine view on the event.
 `DeltaView.delta_guess_clip_le` uses its `2^24`-element raw fibre to bound the event
-by `2^-104` given the stage-2 view.
+by `2^-101` given the stage-2 view.
 
 `convHot_case` discharges the two hypotheses with `coord_relational` (`Core/CoordRelational.lean`) and
 `tailRel` (`Hidden/DeltaTail.lean`).

@@ -1,9 +1,9 @@
 /-
-The 104-lane arithmetic labels and their dense pin codec.
+The 101-lane arithmetic labels and their dense pin codec.
 
 This module is a leaf: the existing 128-bit construction does not import it.
-The pin codec has exactly `ell` labels, with 104-bit stride. Its arithmetic
-input also has exactly 104 lanes. Both directions include `ell = 0`.
+The pin codec has exactly `ell` labels, with 101-bit stride. Its arithmetic
+input also has exactly 101 lanes. Both directions include `ell = 0`.
 -/
 
 import Construction.CRT.Label
@@ -36,15 +36,15 @@ def reduceTo {ell : Nat} (width : Nat) (lanes : LLanes ell) : LLanes width :=
 def pinNat {ell : Nat} (lanes : LLanes ell) : Nat :=
   ∑ lane : Fin labelBits, (lanes lane).val * 2 ^ (ell * lane.val)
 
-/-- The little-endian integer represented by `ell` consecutive 104-bit labels. -/
+/-- The little-endian integer represented by `ell` consecutive 101-bit labels. -/
 def pinBlocksNat {ell : Nat} (blocks : Fin ell → Label) : Nat :=
   ∑ index : Fin ell, (blocks index).toNat * 2 ^ (labelBits * index.val)
 
-/-- Pack 104 arithmetic lanes densely into exactly `ell` active labels. -/
+/-- Pack 101 arithmetic lanes densely into exactly `ell` active labels. -/
 def pinBlocks {ell : Nat} (lanes : LLanes ell) : Fin ell → Label :=
   fun index => BitVec.ofNat labelBits (pinNat lanes >>> (labelBits * index.val))
 
-/-- Unpack exactly `ell` active labels into 104 arithmetic lanes. -/
+/-- Unpack exactly `ell` active labels into 101 arithmetic lanes. -/
 def pinOfBlocks (ell : Nat) (blocks : Fin ell → Label) : LLanes ell :=
   fun lane => ((pinBlocksNat blocks >>> (ell * lane.val) : Nat) : ZMod (2 ^ ell))
 
@@ -111,7 +111,7 @@ private theorem bits_reassemble (stride N : Nat) :
     rw [ih, show stride * (c + 1) = stride * c + stride by ring, pow_add, Nat.mod_mul]
     ring
 
-/-- All 104 lane representatives occupy at most `104 * ell` bits. -/
+/-- All 101 lane representatives occupy at most `101 * ell` bits. -/
 theorem pinNat_lt {ell : Nat} (lanes : LLanes ell) :
     pinNat lanes < 2 ^ (labelBits * ell) := by
   have h := digits_lt (Nat.two_pow_pos ell) labelBits
@@ -122,7 +122,7 @@ theorem pinNat_lt {ell : Nat} (lanes : LLanes ell) :
     _ < (2 ^ ell) ^ labelBits := h
     _ = 2 ^ (labelBits * ell) := by rw [← pow_mul, Nat.mul_comm]
 
-/-- Exactly `ell` labels occupy at most `104 * ell` bits. -/
+/-- Exactly `ell` labels occupy at most `101 * ell` bits. -/
 theorem pinBlocksNat_lt {ell : Nat} (blocks : Fin ell → Label) :
     pinBlocksNat blocks < 2 ^ (labelBits * ell) := by
   have h := digits_lt (Nat.two_pow_pos labelBits) ell

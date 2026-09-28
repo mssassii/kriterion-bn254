@@ -4,7 +4,7 @@
 
 A stage-2 guess at a hidden conversion/body tag fixes `clip Δ_κ`; a hidden digest guess fixes the full `Δ_κ`.
 This file preserves a full raw residual, uniform and independent of a view finer than the stage-2 view.
-The downstream bounds are `2^-104` for the projected conversion guess and `2^-128` for the full digest guess:
+The downstream bounds are `2^-101` for the projected conversion guess and `2^-128` for the full digest guess:
 
 * the **fine view** `fine` of a tape: coordinate `κ`'s published conversion material, the coins with `κ`'s zero
   labels replaced by `u`'s labels `E_κ = Z_κ ⊕ u·Δ_κ` and `Δ_κ` by `0` (`eCoins`), the table outside the hot

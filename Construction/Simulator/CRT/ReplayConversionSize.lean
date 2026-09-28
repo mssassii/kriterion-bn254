@@ -39,7 +39,7 @@ theorem pow_le_65536 {n : Nat} (h : n ≤ 16) : 2 ^ n ≤ 65536 :=
   le_trans (Nat.pow_le_pow_right (by norm_num) h) (by norm_num)
 
 theorem castAnswers_le_128' (l : Nat) (h1 : 1 ≤ l) (h2 : l ≤ 128) : Kriterion.CRT.castAnswers l ≤ 128 := by
-  have lb : labelBits = 104 := rfl
+  have lb : labelBits = 101 := rfl
   unfold Kriterion.CRT.castAnswers Kriterion.CRT.castBlocks Kriterion.CRT.lanesPerBlock
   have p1 : 1 ≤ 128 / l := (Nat.le_div_iff_mul_le (by omega)).mpr (by omega)
   have : (labelBits + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
@@ -71,7 +71,7 @@ theorem size_castDyn_le (rb start t base stride : Nat) (rbPos : 1 ≤ rb) (rbLe 
     Prog.size_rep _ _ 14 fun _ _ => rfl]
   have := castAnswers_le_128' rb rbPos rbLe
   have e : (castInputBase cells start t base stride).size = 12 := rfl
-  have lc : Kriterion.CRT.laneCount = 104 := rfl
+  have lc : Kriterion.CRT.laneCount = 101 := rfl
   omega
 
 theorem size_accLevel (rb start t j : Nat) : (accLevel cells rb start t j).size = 6 + laneCount * 19 := by
@@ -268,7 +268,7 @@ theorem size_conversionReplay_le (coord i : Nat) (row : Kriterion.CRT.OddRow) (m
     rw [Prog.size_rep _ _ 9 fun _ _ => rfl]
     have e1 : (cst rD 0).size = 1 := rfl
     have e2 : (storeAt (W + 258) rD).size = 2 := rfl
-    have lc : Kriterion.CRT.laneCount = 104 := rfl
+    have lc : Kriterion.CRT.laneCount = 101 := rfl
     omega
   have h5 : (saveLeaves (convStage0 row W (joinBase 0) (pinBase 0)).nodeBase (W + 2 ^ 16) row.width0 0).size ≤
       4096 * 4 := by
@@ -283,7 +283,7 @@ theorem size_conversionReplay_le (coord i : Nat) (row : Kriterion.CRT.OddRow) (m
   have h9 := size_foldsLoop_le (convFoldCells row W joinBase pinBase foldJoin) m row.keep (row.ell - row.keep)
     (Kriterion.CRT.foldTag coord i) (by omega) mLe
   unfold stageBound expandBound at h2 h3
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   omega
 
 end Kriterion.CRT.SimMachine

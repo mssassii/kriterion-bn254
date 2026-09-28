@@ -23,7 +23,7 @@ level's other slots, which the evaluator reads and the view shows). The real sel
    `uniform Δ ⊗ view law`: `Δ` — all 256 bits of both coordinates' offsets — is uniform and independent of
    the fine view. `residual_guess`: any guess of any projection of `Δ` with uniform image (the full offset,
    one coordinate's, or its `clip`) from the view succeeds with probability `1 / |image|` exactly (`2^-128`,
-   resp. `2^-104`).
+   resp. `2^-101`).
 -/
 
 import Proof.Privacy.CRT.NoJoins.Hot
@@ -349,7 +349,7 @@ def lowHighEquiv : Block ≃ Label × {x : Block // clip x = 0} where
 
 instance highNonempty : Nonempty {x : Block // clip x = 0} := ⟨⟨0, Narrow.clip_zero⟩⟩
 
-/-- The low 104 bits of a uniform raw block are uniform. -/
+/-- The low 101 bits of a uniform raw block are uniform. -/
 theorem uniform_clip_block : (PMF.uniformOfFintype Block).map clip = PMF.uniformOfFintype Label := by
   classical
   have factor : (clip : Block → Label) = Prod.fst ∘ lowHighEquiv := funext fun _ => rfl
@@ -366,10 +366,10 @@ theorem uniform_eval (κ : Fin 2) :
   exact split
 
 /-- **Guessing one coordinate's projected offset from the fine view** (`clip Δ_κ`, the conversion's
-residual) succeeds with probability exactly `2^-104`. -/
+residual) succeeds with probability exactly `2^-101`. -/
 theorem clip_delta_guess {V : Type} (view : PMF V) (κ : Fin 2) (guess : V → Label) :
     ∑' x : (Fin 2 → Block) × V, ((PMF.uniformOfFintype (Fin 2 → Block)).bind fun d => view.map fun v => (d, v)) x *
-        (if clip (x.1 κ) = guess x.2 then 1 else 0) = ((2 : ℝ≥0∞) ^ 104)⁻¹ := by
+        (if clip (x.1 κ) = guess x.2 then 1 else 0) = ((2 : ℝ≥0∞) ^ 101)⁻¹ := by
   have proj : (PMF.uniformOfFintype (Fin 2 → Block)).map (fun Δ => clip (Δ κ)) = PMF.uniformOfFintype Label := by
     have factor : (fun Δ : Fin 2 → Block => clip (Δ κ)) = clip ∘ fun Δ => Δ κ := rfl
     rw [factor, ← PMF.map_comp, uniform_eval]

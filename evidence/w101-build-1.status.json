@@ -1,0 +1,27 @@
+{
+  "command": [
+    "lake",
+    "build"
+  ],
+  "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+  "tracked_changes": [
+    " M Construction/CRT/Label.lean",
+    " M Construction/CRT/LabelEncoding.lean",
+    " M Construction/CRT/Public.lean",
+    " M Construction/Simulator/CRT/Stage1.lean",
+    " M Proof/Privacy/CRT/Flags/Touch.lean",
+    " M Proof/Privacy/CRT/Glue/Budget.lean",
+    " M Proof/Privacy/CRT/Glue/BudgetData.lean",
+    " M Proof/Privacy/CRT/Hidden/StageTwoTable.lean",
+    " M Proof/Simulator/CRT/Stage1Conv.lean",
+    " M Proof/Simulator/CRT/Stage1Law.lean",
+    " M Proof/Simulator/CRT/Stage1Pieces.lean",
+    " M Proof/Simulator/CRT/Stage1Serial.lean",
+    " M Proof/Simulator/CRT/Stage1Size.lean",
+    " M Proof/Simulator/CRT/Stage1Wire.lean",
+    " M Scratch/opus_gen_budget.py"
+  ],
+  "exit": 1,
+  "seconds": 86.6,
+  "log": "evidence/w101-build-1.log"
+}

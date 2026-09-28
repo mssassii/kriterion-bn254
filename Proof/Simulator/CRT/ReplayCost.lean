@@ -70,13 +70,13 @@ theorem size_castBlock (cells : CastCells) (l : Nat) (tagOf : Nat → Nat) :
     (castBlock cells l tagOf).size = 9 * castAnswers l + 2 + 14 * laneCount := by
   simp only [castBlock, castQueries, castLanesProg, Prog.size_seq]
   rw [Prog.size_rep _ _ 9 (fun j _ => rfl), Prog.size_rep _ _ 14 (fun i _ => rfl), size_loadAt]
-  rw [show laneCount = 104 from rfl]
+  rw [show laneCount = 101 from rfl]
   ring
 
 theorem size_chunkCastPhase_le (cc : ChunkCastCells) (width l : Nat) (tagOf : Nat → Nat → Nat)
     (widthLe : width ≤ 8) (answersLe : castAnswers l ≤ 64) :
     (chunkCastPhase cc width l tagOf).size ≤ 2 ^ 21 := by
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have pw : 2 ^ width ≤ 2 ^ 8 := Nat.pow_le_pow_right (by norm_num) widthLe
   simp only [chunkCastPhase, castLoop, pinSolve, Prog.size_seq]
   have casts := size_rep_le (2 ^ width) (castEntry cc width l tagOf) (9 + 2 * (9 * 64 + 2048))
@@ -153,7 +153,7 @@ theorem size_bodyBlock_le (bc : BodyCells) (m S q : Nat) (tagOf : Nat → Nat �
 theorem size_truthWordBlock_le (castBase wordBase : Nat) (truthOf : Nat → Nat → Nat) (width : Nat → Nat)
     (count ell : Nat) (countLe : count ≤ 32) (widthLe : ∀ c, c < count → width c ≤ 8) :
     (truthWordBlock castBase wordBase truthOf width count ell).size ≤ 2 ^ 23 := by
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   unfold truthWordBlock
   have each := size_rep_le laneCount (wordLane castBase wordBase truthOf width count ell) (5 + 32 * (5 * 2 ^ 8))
     fun i _ => by

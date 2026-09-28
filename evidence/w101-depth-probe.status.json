@@ -1,0 +1,16 @@
+{
+  "command": [
+    "lake",
+    "env",
+    "lean",
+    "Scratch/OpusDepthProbe.lean"
+  ],
+  "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+  "tracked_changes": [
+    " M Construction/CRT/Label.lean",
+    " M Construction/CRT/LabelEncoding.lean"
+  ],
+  "exit": 0,
+  "seconds": 3.0,
+  "log": "evidence/w101-depth-probe.log"
+}

@@ -1,7 +1,7 @@
 /-
 The parity conversion layer is a bijection of its independent hidden data.
 
-Each hashed tree, growth, or fold level contributes one hidden 104-bit material.
+Each hashed tree, growth, or fold level contributes one hidden 101-bit material.
 Each cast contributes only its independent upper `l - 1` planes; its low plane is
 computed from the actual leaf label. The public tuple has the same shape: joins
 and half-pins whose omitted low plane is proved zero.

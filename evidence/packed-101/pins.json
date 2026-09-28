@@ -1,0 +1,11 @@
+{
+  "configuration_baseline": "e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05",
+  "byte_identical_files": [
+    "lakefile.toml",
+    "lake-manifest.json",
+    "lean-toolchain"
+  ],
+  "submission_comparison": "cc221c36a4f8e991d2c983b4ec748d40805ea064",
+  "submission_byte_identical": true,
+  "note": "Submission comments were updated historically at A1/H1; the file is unchanged throughout P1, P1a and this integration."
+}

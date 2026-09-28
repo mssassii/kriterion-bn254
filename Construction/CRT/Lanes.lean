@@ -1,12 +1,12 @@
 /-
 Arithmetic labels (Heath 2024): an arithmetic label of a value `σ` in
-`Z_{2^l}` is a vector of 104 lanes; the garbler holds the mask `A`, the evaluator `A + σ • Δ⃗`,
+`Z_{2^l}` is a vector of 101 lanes; the garbler holds the mask `A`, the evaluator `A + σ • Δ⃗`,
 where `Δ⃗` reads the global offset `Δ` lane by lane as 0 or 1. Sums and multiplication by public
 naturals are free.
 
 This file defines `Δ⃗` (`deltaLanes`), the boolean label of one bit plane (`laneBit`), the
 reduction to a smaller width (`reduceTo`, a ring hom when the width shrinks, L6), the exact peel
-(`peelDiv`, L11), scaling by a public natural, and `materialize`, the identity that stores the 104
+(`peelDiv`, L11), scaling by a public natural, and `materialize`, the identity that stores the 101
 lanes in an array (programs call it at stage boundaries so that the interpreter does not
 recompute a lane).
 -/
