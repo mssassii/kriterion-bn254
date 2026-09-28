@@ -231,14 +231,18 @@ theorem pinExpand_pinHalf (width : Nat) (pin : Lanes width) (even : EvenLanes pi
   | zero => rfl
   | succ width => exact doubleLanes_halfLanes pin even
 
+/-- Compression is injective on even full pins at every width. -/
+theorem pinHalf_injective_on_even (width : Nat) {a b : Lanes width}
+    (ha : EvenLanes a) (hb : EvenLanes b) (same : pinHalf width a = pinHalf width b) : a = b := by
+  rw [← pinExpand_pinHalf width a ha, ← pinExpand_pinHalf width b hb, same]
+
 /-- Every expanded stored pin has an omitted zero plane. -/
 @[simp] theorem evenLanes_pinExpand (width : Nat) (pin : Lanes (width - 1)) :
     EvenLanes (pinExpand width pin) := by
   cases width with
   | zero =>
     intro i
-    have h := ZMod.val_lt (pin i)
-    simp only [pow_zero] at h
+    have h : (pin i).val < 1 := ZMod.val_lt (pin i)
     have hz : (pin i).val = 0 := by omega
     simpa [pinExpand, hz]
   | succ width => exact evenLanes_doubleLanes pin
