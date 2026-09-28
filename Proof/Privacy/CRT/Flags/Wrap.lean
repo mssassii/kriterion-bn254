@@ -13,6 +13,7 @@ import Proof.Privacy.CRT.Core.ReplayDelivered
 import Proof.Privacy.CRT.Core.BmrFlags
 import Proof.Correctness.CRT.RealTable
 import Proof.Privacy.CRT.Glue.Budget
+import Proof.Privacy.CRT.Flags.NormFlag
 
 namespace Kriterion.CRT.Privacy.Flags
 
@@ -106,9 +107,9 @@ theorem wrap_one (u : AffineInput) (J : BMR.Joins Entry.table) (e : BMR.Enc) :
   refine ENNReal.div_le_div_right ?_ _
   exact_mod_cast (le_of_eq (Fintype.card_congr' rfl)).trans window_card
 
-/-- The wrap reveal is some encoding's `evalInt` in the window. -/
-theorem replayWraps_sub [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
-    {T | H8.replayWraps source u T} ⊆ ⋃ e : BMR.Enc,
+/-- The window event is some encoding's `evalInt` in the window. -/
+theorem replayWindow_sub [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
+    {T | H8.replayWindow source u T} ⊆ ⋃ e : BMR.Enc,
       {T | BMR.InWindow Entry.table (BMR.evalInt u (H8.bmrJoinsOf ((Instance.view).publish source)) (H8.bmrColdOf T u) e)} := by
   intro T wraps
   simp only [Set.mem_iUnion, Set.mem_ofPred_eq]
@@ -126,10 +127,10 @@ theorem replayWraps_sub [FieldCertificate] [GroupCertificate] (source : (Instanc
     rw [← same]
     exact window
 
-/-- **The wrap reveal at one source: at most `smudgeError`.** -/
-theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
-    (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWraps source u T} ≤ ENNReal.ofReal smudgeError := by
-  refine (MeasureTheory.measure_mono (replayWraps_sub source u)).trans ?_
+/-- **The window event at one source: at most `smudgeError`.** -/
+theorem window_source [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
+    (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWindow source u T} ≤ ENNReal.ofReal smudgeError := by
+  refine (MeasureTheory.measure_mono (replayWindow_sub source u)).trans ?_
   refine (MeasureTheory.measure_iUnion_fintype_le _ _).trans ?_
   refine (Finset.sum_le_sum fun e _ => wrap_one u _ e).trans ?_
   rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
@@ -148,9 +149,24 @@ theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.vi
 
 end Wrap
 
-open Wrap in
+open Classical in
+/-- **The wrap reveal at one source**: the window, or the source's normalization flag. -/
+theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
+    (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWraps source u T} ≤
+      ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0) := by
+  by_cases bad : H8.normBadSrc source
+  · rw [if_pos bad]
+    exact le_trans (PMF.toOuterMeasure_apply_le_one _ _) le_add_self
+  · rw [if_neg bad, add_zero]
+    have same : {T | H8.replayWraps source u T} = {T | H8.replayWindow source u T} := by
+      ext T
+      exact ⟨fun w => w.resolve_right bad, Or.inl⟩
+    rw [same]
+    exact Wrap.window_source source u
+
+open Classical in
 /-- **The wrap flag on the swapped table** (for `CrtFlagMass`): against every weight on the published value, the
-weighted mass of the wrap reveal is at most `smudgeError` times the total weight. -/
+weighted mass of the wrap reveal is at most `smudgeError + normError` times the total weight. -/
 theorem crtWrapTable_le [FieldCertificate] [GroupCertificate] (u : AffineInput)
     (weight : Instance.crtEntry.Public → ℝ≥0∞) :
     (letI := (PublicFirst.viewHere Instance.crtEntry).sourceFintype
@@ -158,18 +174,26 @@ theorem crtWrapTable_le [FieldCertificate] [GroupCertificate] (u : AffineInput)
      ∑' source, PMF.uniformOfFintype _ source *
        (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) *
          (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWraps source u T}))
-      ≤ ENNReal.ofReal smudgeError *
+      ≤ ENNReal.ofReal (smudgeError + normError) *
         (letI := (PublicFirst.viewHere Instance.crtEntry).sourceFintype
          haveI := (PublicFirst.viewHere Instance.crtEntry).sourceNonempty
          ∑' source, PMF.uniformOfFintype _ source * weight ((PublicFirst.viewHere Instance.crtEntry).publish source)) := by
   letI := (PublicFirst.viewHere Instance.crtEntry).sourceFintype
   haveI := (PublicFirst.viewHere Instance.crtEntry).sourceNonempty
-  rw [← ENNReal.tsum_mul_left]
-  refine ENNReal.tsum_le_tsum fun source => ?_
-  calc PMF.uniformOfFintype _ source * (weight _ * (swappedTableLaw crtLayout).toOuterMeasure _)
-      ≤ PMF.uniformOfFintype _ source * (weight _ * ENNReal.ofReal smudgeError) :=
-        by gcongr; exact wrap_source source u
-    _ = ENNReal.ofReal smudgeError * (PMF.uniformOfFintype _ source * weight _) := by ring
+  have smudgeNonneg : 0 ≤ smudgeError := frac_nonneg _ _
+  rw [ENNReal.ofReal_add smudgeNonneg normError_nonneg, add_mul]
+  calc _ ≤ ∑' source, PMF.uniformOfFintype Kriterion.CRT.Entry.Source source *
+          (weight (Kriterion.CRT.Entry.publish source) *
+            (ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0))) :=
+        ENNReal.tsum_le_tsum fun source => by gcongr; exact wrap_source source u
+    _ = ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype Kriterion.CRT.Entry.Source source *
+            weight (Kriterion.CRT.Entry.publish source) +
+          ∑' source, PMF.uniformOfFintype Kriterion.CRT.Entry.Source source *
+            (weight (Kriterion.CRT.Entry.publish source) * (if H8.normBadSrc source then 1 else 0)) := by
+        rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_add]
+        refine tsum_congr fun source => ?_
+        ring
+    _ ≤ _ := add_le_add le_rfl (NormFlag.normFlag_le weight)
 
 end
 
