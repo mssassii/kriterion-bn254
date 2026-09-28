@@ -1,20 +1,31 @@
-# Intuition: the sign row on psivesely's CRT-residue delivery of ArgoMAC
+# Intuition: narrow labels, parity pins, absorbed joins and normalized rows on the CRT-residue ArgoMAC entry
 
 This entry garbles BN254 scalar multiplication with **130,122 bytes** of public ciphertext.
-Garbling makes at most **964,502** oracle queries (gate 1,759,967) and evaluation at most
-**957,536** (gate 1,055,879). Both figures are the exact bounds in the types of
+Garbling makes at most **988,438** oracle queries (gate 1,759,967) and evaluation at most
+**981,506** (gate 1,055,879). Both figures are the exact bounds in the types of
 `garbleProgram` and `evaluateProgram`.
 
-It is psivesely's CRT entry (`psivesely/kriterion-bn254-crt`, commit `de8f397`, 182,936 bytes)
-with Lazar's sign row in the `Y` slot of every digit. The sign row reads three affine encodings
-instead of four and, with the coefficient cut, publishes one constant instead of two, so a digit
-reads 7 encodings and publishes 3 constants (section 1.1). It also vanishes at a second exceptional
-input, which the exception gadget covers with a one-byte entry per digit (sections 1.2 and 6).
-Sections 1.1, 1.2, 6 and 11.6 describe the sign-row change. This branch additionally retunes the
-first extraction width to 8 for 67 odd moduli, retaining width 7 for the other 17 (section 3.6), and
-absorbs the chunk-tree joins into the (unscored) Lamport labels: the actual zero label of coordinate bit
-`8c + n`, `n ≥ 1`, is `Z ⊕ embed(J_{c,n})`, the 222 chunk joins per coordinate are not published, and the
-evaluator runs its chunk trees on the join `0` (`Construction/CRT/Entry.lean`, `Proof/Correctness/CRT/Absorb.lean`).
+It starts from Lazar's entry (`Lazar955/bn254-planb`, `f79c96a`, 173,472 B): psivesely's CRT entry
+(`psivesely/kriterion-bn254-crt`, `de8f397`) with Lazar's sign row in the `Y` slot of every digit (a digit
+reads 7 affine encodings; section 1.1) and its second exceptional input (sections 1.2 and 6). On top of it,
+this entry makes six changes, summarised in `README.md` §1:
+
+1. **104-bit internal conversion labels** (`Kriterion.CRT.Narrow`): the challenge asks for about 100 bits of
+   security per unit of adversary work, so conversion labels, joins and arithmetic lanes are 104 bits while
+   external Lamport labels, digest/mask keys and raw oracle answers stay 128 bits; conversion queries are
+   related by the projected offset `embed (clip Δ)`, digest queries by the full `Δ` (section 11).
+2. **One-byte exception entries**: two 4-bit digit codes per digit, each masked by its own final hash
+   (section 6).
+3. **First extraction width 8 on every odd modulus** (section 3.6).
+4. **Parity casts**: a cast lane's low bit is its control label's bit, so every pin is even and is published
+   halved (sections 3 and 11).
+5. **No chunk joins**: the actual zero label of coordinate bit `8c + n`, `n ≥ 1`, is `Z ⊕ embed(J_{c,n})`; the
+   222 chunk joins per coordinate are not published and the evaluator runs its chunk trees on the join `0`
+   (`Construction/CRT/Entry.lean`, `Proof/Correctness/CRT/Absorb.lean`, `Proof/Privacy/CRT/NoJoins/`).
+6. **Normalized rows**: the Z and sign rows are scaled so that their published constants become flag bits
+   (`NormRow`: `xC0` and one flag byte per digit; `Proof/Privacy/CRT/Core/BmrNorm.lean`).
+
+The rest of this document describes the construction and the proof as they stand, with these changes.
 
 psivesely's entry keeps the ArgoMAC structure of xinshu's entry (`xinshudong/bn254-entry`, commit
 `bf53ea4`, 3,363,376 bytes): 91 digit MACs whose rows read affine encodings of the input
@@ -325,12 +336,14 @@ Correctness does not use this; privacy does (section 11).
 | **total** | | **130,122** |
 
 Every field has a fixed width and there is no tag, so every public value encodes to the same
-length (`Wire.encoding_length`). The conversion blocks are 58 percent of the total and do not depend
+length (`Wire.encoding_length`). The conversion blocks are 59 percent of the total and do not depend
 on the number of encodings; each further encoding would cost 78 bytes. Against psivesely's entry,
-the sign row saves 91 records (7,098 bytes) and one row constant per digit (2,912 bytes), and the
-second exceptional case adds 6 bytes per digit (546 bytes). The fallback schedule then saves
-another 4,288 bytes across the two coordinates. Compacting the exception entries saves another
-1,001 bytes, leaving the digest query schedule unchanged.
+Lazar's sign row saves 91 records (7,098 bytes) and one row constant per digit (2,912 bytes), and the
+second exceptional case adds 6 bytes per digit (546 bytes), giving Lazar's 173,472 bytes. This entry then
+saves 20,472 + 4,288 bytes with 104-bit labels and the first-stage width-8 schedule on 67 moduli
+(148,712), 1,001 bytes with one-byte exception entries (147,711), 884 bytes with width 8 on every odd
+modulus (146,827), 5,200 bytes with parity casts (141,627), 5,772 bytes by absorbing the chunk joins
+(135,855), and 5,733 bytes by normalizing the rows (130,122): 43,350 bytes in total.
 
 ---
 
@@ -342,9 +355,9 @@ the hot one:
 | Part | Garbling `x` | Garbling `y` | Evaluation `x` | Evaluation `y` |
 |---|---:|---:|---:|---:|
 | chunk trees and casts | 55,936 | 55,936 | 55,522 | 55,522 |
-| extraction, growth, folds (84 odd moduli) | 232,873 | 232,873 | 230,919 | 230,919 |
+| extraction, growth, folds (84 odd moduli) | 244,841 | 244,841 | 242,904 | 242,904 |
 | body pads (85 moduli) | 217,950 | 166,643 | 216,976 | 165,895 |
-| **coordinate** | **506,759** | **455,452** | **503,417** | **452,336** |
+| **coordinate** | **518,727** | **467,420** | **515,402** | **464,321** |
 
 | Fixed part | Garbling | Evaluation |
 |---|---:|---:|
@@ -352,7 +365,7 @@ the hot one:
 | masks | 1,092 | 1,092 |
 | exception digest | 1,198 | 690 |
 
-Totals: 964,502 garbling and 957,536 evaluation queries. The evaluation count is the same for every
+Totals: 988,438 garbling and 981,506 evaluation queries. The evaluation count is the same for every
 input, since every one-hot vector has exactly one hot slot. The budgets are sums over the 85 moduli
 in `Construction/CRT/Entry.lean`; their `decide +kernel` certificates in
 `Construction/CRT/BudgetFacts.lean` certify these sums.
@@ -393,7 +406,7 @@ G0 → G0T → G0U → G1U → HW → H → I → M
 
 - `G0 → G0T`: the mask key's input is a labelled query, so the real game is the game on an answer
   table indexed by tags. The budget conservatively retains `1,759,967/p`, using the fixed
-  garbler-query gate instead of the smaller actual count 964,502; the current table-hop proof
+  garbler-query gate instead of the smaller actual count 988,438; the current table-hop proof
   in fact establishes zero cost.
 - `G0T → G0U`: every pad vector and every mask, read from a uniform integer by a slightly biased
   reading, is swapped for an exactly uniform value (the pad-slack and `sampleFp` biases).
@@ -544,8 +557,7 @@ does not use are removed from the tree.
 
 ## 13. Status
 
-The following obligations have supplied proof terms, adapted from the verified baseline and
-awaiting a build and audit for the fallback schedule:
+Every obligation of `Kriterion.Solution` is proved:
 
 * computable garbling, with query programs at exact budgets and their equality proofs;
 * Lamport compatibility;
@@ -554,8 +566,9 @@ awaiting a build and audit for the fallback schedule:
 * the fixed byte count;
 * adaptive privacy, with the closed simulator machine and its `2^60` cost bound.
 
-The baseline `#print axioms Submission.solution` reported exactly `propext`, `Classical.choice`
-and `Quot.sound`; rerun this audit for the fallback branch after it builds.
+`#print axioms Submission.solution` reports exactly `propext`, `Classical.choice` and `Quot.sound`, and
+`Scratch/ProofAudit.lean` finds the same three axioms over all 23,735 declarations of the entry (clean
+build, 3,844 jobs, no `sorry`).
 
 ---
 

@@ -16,8 +16,8 @@ This branch introduces no admitted proof, but the updated tree must be rebuilt a
 
 | field | proved by | where |
 |---|---|---|
-| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (964,502); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
-| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (957,536); `Submission.evaluateProgramCorrect` | the same |
+| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (988,438); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
+| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (981,506); `Submission.evaluateProgramCorrect` | the same |
 | `ciphertextSize` | `Entry.Wire.encoding_length` (130,122) | `Construction/CRT/Public.lean` |
 | `lamportCompatible` | `Lamport.selectedLabels_eq` | `Proof/LamportCompatibility/Labels.lean` |
 | `functionCorrect` | `rfl` | `Submission.lean` |
