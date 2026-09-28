@@ -162,16 +162,18 @@ def fsContext (nctx : NContext) (s : Scales) : Context where
   rows d := Rows.scaled (s d).1 (s d).2 (nctx.rows d)
   rho _ := ⟨1, one_ne_zero_base⟩
 
-/-- **The conversion** of a fixed-context output to the normalized one: the published `X` constants with clear flags
-and the signs of the `κ̂`s. -/
+/-- A fixed-context digit's published row as normalized row data: its `X` constant, the flags clear, the sign of
+`κ̂`. -/
+def convRow (kappa : BaseField) (g : RowGamma) : NormRow :=
+  { xC0 := g.xC0, zFlag := false, sFlag := false, sign := Rows.signBit kappa }
+
+/-- **The conversion** of a fixed-context output to the normalized one. -/
 def conv (s : Scales) {u : AffineInput} (o : Out T u) : NOut T u :=
-  (((o.1.1.1, fun d => { xC0 := (o.1.1.2.1 d).xC0, zFlag := false, sFlag := false,
-      sign := Rows.signBit (s d).2 }, o.1.1.2.2), o.1.2), o.2)
+  (((o.1.1.1, fun d => convRow (s d).2 (o.1.1.2.1 d), o.1.1.2.2), o.1.2), o.2)
 
 /-- The conversion off the curve. -/
 def convOff (s : Scales) {u : AffineInput} (o : OutOff T u) : NOutOff T u :=
-  ((o.1.1.1, fun d => { xC0 := (o.1.1.2.1 d).xC0, zFlag := false, sFlag := false,
-      sign := Rows.signBit (s d).2 }, o.1.1.2.2), o.1.2), o.2)
+  (((o.1.1.1, fun d => convRow (s d).2 (o.1.1.2.1 d), o.1.1.2.2), o.1.2), o.2)
 
 section Real
 
@@ -197,11 +199,13 @@ theorem nSlope_eq (c : Coins T) (good : GoodScales (fsScales nctx c)) :
     nSlope nctx c = slope (fsContext nctx (fsScales nctx c)) c := by
   funext e
   rcases e with ((⟨d, x⟩ | x) | (⟨d, y⟩ | y))
-  · show Biquadratic.slopes (nRows nctx c d) _ _ _ _ (.inl x) = Biquadratic.slopes _ _ _ _ _ (.inl x)
+  · show nDigitSlopes nctx c d (.inl x) = digitSlopes (fsContext nctx (fsScales nctx c)) c d (.inl x)
+    unfold nDigitSlopes digitSlopes
     rw [nRows_eq nctx valid c good d]
     rfl
   · rfl
-  · show Biquadratic.slopes (nRows nctx c d) _ _ _ _ (.inr y) = Biquadratic.slopes _ _ _ _ _ (.inr y)
+  · show nDigitSlopes nctx c d (.inr y) = digitSlopes (fsContext nctx (fsScales nctx c)) c d (.inr y)
+    unfold nDigitSlopes digitSlopes
     rw [nRows_eq nctx valid c good d]
     rfl
   · rfl
@@ -219,17 +223,16 @@ theorem gamma_fs (c : Coins T) (d : Fin 91) :
   unfold gamma FieldMacToECMac.garbleRow Biquadratic.garbleX Biquadratic.garbleY Biquadratic.garbleZ
   simp only [fsContext, Rows.scaled, Rows.multiply, fsScales, RowGamma.mk.injEq, true_and]
   constructor
-  · rw [mul_comm, ← mul_assoc, mul_inv_cancel₀ (valid d).2, one_mul, sub_self]
-  · rw [mul_comm, ← mul_assoc, mul_inv_cancel₀ (valid d).1, one_mul, sub_self]
+  · rw [mul_assoc, inv_mul_cancel₀ (valid d).2, mul_one, sub_self]
+  · rw [mul_assoc, inv_mul_cancel₀ (valid d).1, mul_one, sub_self]
 
 /-- On the good event the published row data is the field-scale `X` constant, the flags clear, the sign of `κ̂`. -/
 theorem nGamma_eq (c : Coins T) (good : GoodScales (fsScales nctx c)) (d : Fin 91) :
-    nGamma nctx c d = { xC0 := (gamma (fsContext nctx (fsScales nctx c)) c d).xC0, zFlag := false,
-      sFlag := false, sign := Rows.signBit (fsScales nctx c d).2 } := by
+    nGamma nctx c d = convRow (fsScales nctx c d).2 (gamma (fsContext nctx (fsScales nctx c)) c d) := by
   have nz := ((fsScales_good_iff nctx valid c).mp good d)
   have rows := nRows_eq nctx valid c good d
   unfold nRows at rows
-  unfold nGamma Rows.garbleNormRow
+  unfold nGamma Rows.garbleNormRow convRow
   simp only [NormRow.mk.injEq]
   refine ⟨?_, ?_, ?_, ?_⟩
   · rw [rows]
