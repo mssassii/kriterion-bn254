@@ -42,7 +42,7 @@ theorem size_recordProg (κ e : Nat) : (recordProg κ e).size ≤ 6000 := by
     Prog.size_rep _ _ _ fun _ _ => by
       simp only [CrtStage1.hornerStep, Prog.seqList, Prog.size_seq, size_loadAt, size_setupConsts, size_mulSmallAdd,
         recordLimbCount, Prog.size]
-  have emit : emitRecord.size = (2 + 3 * 112) + 4 * (2 + 3 * 128) := by
+  have emit : emitRecord.size = (2 + 3 * 108) + 4 * (2 + 3 * 128) := by
     simp only [emitRecord, Prog.seqList, Prog.size_seq, size_emitWord, Prog.size]
   rw [clear, horner, emit]
   simp only [recordLimbCount, moduliCount]
@@ -68,8 +68,16 @@ theorem size_serializeList (list : List Piece) (safeAll : ∀ p ∈ list, CrtSer
   rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem index, Option.getD_some]
   exact size_pieceProg _ (safeAll _ (List.getElem_mem index))
 
-theorem size_serialize : serialize.size ≤ pieces.length * 6000 :=
-  size_serializeList pieces CrtSerial.pieces_safe
+/-- Bound the zero prefix over an abstract program, without expanding the concrete serializer. -/
+theorem size_zero_prefix (width bound : Nat) (program : Prog) (small : width ≤ 7)
+    (h : program.size ≤ bound) : (Prog.seq (emitZero width) program).size ≤ bound + 22 := by
+  rw [Prog.size_seq, size_emitZero]
+  omega
+
+theorem size_serialize : serialize.size ≤ pieces.length * 6000 + 22 :=
+  size_zero_prefix Entry.paddingBits _ _ (by
+    unfold Entry.paddingBits BitPacking.padding
+    omega) (size_serializeList pieces CrtSerial.pieces_safe)
 
 /-- One block off the front of a `seqList` (generic, so its kernel check never sees a big program). -/
 theorem size_cons (first : Prog) (rest : List Prog) :
@@ -125,7 +133,7 @@ theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a6' a7 a8 a9 a10 a11 : Nat)
     (eq : total = a0 + (a1 + (a2 + (a3 + (a4 + (a5 + (a6 + (a6' + (a7 + (a8 + (a9 + (a10 + a11))))))))))))
     (h0 : a0 ≤ fieldCount * 457231) (h1 : a1 ≤ exceptionCellCount * 34) (h2 : a2 ≤ 2 * Entry.joinCount * 734)
     (h3 : a3 ≤ 2 * (Entry.pinCount * laneCount) * 104) (h4 : a4 ≤ recordCount * moduliCount * 20000)
-    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h6' : a6' ≤ 91 * 13) (h7 : a7 ≤ 44579 * 6000)
+    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h6' : a6' ≤ 91 * 13) (h7 : a7 ≤ 44579 * 6000 + 22)
     (h8 : a8 ≤ labelCount * 7) (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) :
     total ≤ 2 ^ 55 := by
   rewrite [CrtStored.joinCount_eq] at h2
@@ -160,7 +168,7 @@ theorem size_program : CrtStage1.program.size ≤ 2 ^ 55 := by
       simp only [keyXor, Prog.seqList, Prog.size_seq, size_loadAt, size_storeAt, ar, Prog.size]; omega
   have clearSize : CrtStage1.clearLimbs.size = recordLimbCount * 3 :=
     Prog.size_rep _ _ _ fun _ _ => by simp only [Prog.size_seq, size_cst, size_storeAt]
-  have serialSize : CrtStage1.serialize.size ≤ 44579 * 6000 := by
+  have serialSize : CrtStage1.serialize.size ≤ 44579 * 6000 + 22 := by
     have bound := size_serialize
     rewrite [pieces_length] at bound
     exact bound

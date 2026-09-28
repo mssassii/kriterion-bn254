@@ -1,0 +1,144 @@
+{
+  "base": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+  "status": "locally verified; not published or submitted",
+  "ciphertext_bytes": 127875,
+  "garble_queries": 1061622,
+  "evaluate_queries": 1054788,
+  "public_bits": 1022997,
+  "padding_bits": 3,
+  "label_bits": 104,
+  "record_bits": 620,
+  "field_bits": 254,
+  "row_flag_bits": 3,
+  "audited_declarations": 23800,
+  "allowed_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "source_manifest": "ea76922a04a00ae3cf705bcf9f0b58d1db28ec65d5021a4a3c4b2798aa38063a",
+  "source_files": 453,
+  "checks": {
+    "build-fourth": {
+      "command": [
+        "env",
+        "LEAN_NUM_THREADS=6",
+        "lake",
+        "build"
+      ],
+      "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+      "tracked_changes": [
+        " M Construction/CRT/Entry.lean",
+        " M Construction/CRT/Public.lean",
+        " M Construction/Simulator/CRT/Stage1.lean",
+        " M Proof/Correctness/CRT/EntryDelivery.lean",
+        " M Proof/Correctness/CRT/Record.lean",
+        " M Proof/Correctness/CRT/SourceReads.lean",
+        " M Proof/Privacy/CRT/Core/BmrIdealOff.lean",
+        " M Proof/Simulator/CRT/Stage1Conv.lean",
+        " M Proof/Simulator/CRT/Stage1Law.lean",
+        " M Proof/Simulator/CRT/Stage1Pieces.lean",
+        " M Proof/Simulator/CRT/Stage1Record.lean",
+        " M Proof/Simulator/CRT/Stage1Serial.lean",
+        " M Proof/Simulator/CRT/Stage1Size.lean",
+        " M Proof/Simulator/CRT/Stage1Wire.lean",
+        " M README.md"
+      ],
+      "exit": 0,
+      "seconds": 24.4,
+      "log": "evidence/packed-public/build-fourth.log"
+    },
+    "benchmark-build": {
+      "command": [
+        "env",
+        "LEAN_NUM_THREADS=6",
+        "lake",
+        "build",
+        "Benchmark"
+      ],
+      "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+      "tracked_changes": [
+        " M Construction/CRT/Entry.lean",
+        " M Construction/CRT/Public.lean",
+        " M Construction/Simulator/CRT/Stage1.lean",
+        " M Proof/Correctness/CRT/EntryDelivery.lean",
+        " M Proof/Correctness/CRT/Record.lean",
+        " M Proof/Correctness/CRT/SourceReads.lean",
+        " M Proof/Privacy/CRT/Core/BmrIdealOff.lean",
+        " M Proof/Simulator/CRT/Stage1Conv.lean",
+        " M Proof/Simulator/CRT/Stage1Law.lean",
+        " M Proof/Simulator/CRT/Stage1Pieces.lean",
+        " M Proof/Simulator/CRT/Stage1Record.lean",
+        " M Proof/Simulator/CRT/Stage1Serial.lean",
+        " M Proof/Simulator/CRT/Stage1Size.lean",
+        " M Proof/Simulator/CRT/Stage1Wire.lean",
+        " M README.md"
+      ],
+      "exit": 0,
+      "seconds": 1.5,
+      "log": "evidence/packed-public/benchmark-build.log"
+    },
+    "audit-second": {
+      "command": [
+        "env",
+        "LEAN_NUM_THREADS=6",
+        "lake",
+        "env",
+        "lean",
+        "Scratch/PackedAudit.lean"
+      ],
+      "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+      "tracked_changes": [
+        " M Construction/CRT/Entry.lean",
+        " M Construction/CRT/Public.lean",
+        " M Construction/Simulator/CRT/Stage1.lean",
+        " M Proof/Correctness/CRT/EntryDelivery.lean",
+        " M Proof/Correctness/CRT/Record.lean",
+        " M Proof/Correctness/CRT/SourceReads.lean",
+        " M Proof/Privacy/CRT/Core/BmrIdealOff.lean",
+        " M Proof/Simulator/CRT/Stage1Conv.lean",
+        " M Proof/Simulator/CRT/Stage1Law.lean",
+        " M Proof/Simulator/CRT/Stage1Pieces.lean",
+        " M Proof/Simulator/CRT/Stage1Record.lean",
+        " M Proof/Simulator/CRT/Stage1Serial.lean",
+        " M Proof/Simulator/CRT/Stage1Size.lean",
+        " M Proof/Simulator/CRT/Stage1Wire.lean",
+        " M README.md"
+      ],
+      "exit": 0,
+      "seconds": 14.1,
+      "log": "evidence/packed-public/audit-second.log"
+    },
+    "proof-audit": {
+      "command": [
+        "env",
+        "LEAN_NUM_THREADS=6",
+        "lake",
+        "env",
+        "lean",
+        "Scratch/ProofAudit.lean"
+      ],
+      "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+      "tracked_changes": [
+        " M Construction/CRT/Entry.lean",
+        " M Construction/CRT/Public.lean",
+        " M Construction/Simulator/CRT/Stage1.lean",
+        " M Proof/Correctness/CRT/EntryDelivery.lean",
+        " M Proof/Correctness/CRT/Record.lean",
+        " M Proof/Correctness/CRT/SourceReads.lean",
+        " M Proof/Privacy/CRT/Core/BmrIdealOff.lean",
+        " M Proof/Simulator/CRT/Stage1Conv.lean",
+        " M Proof/Simulator/CRT/Stage1Law.lean",
+        " M Proof/Simulator/CRT/Stage1Pieces.lean",
+        " M Proof/Simulator/CRT/Stage1Record.lean",
+        " M Proof/Simulator/CRT/Stage1Serial.lean",
+        " M Proof/Simulator/CRT/Stage1Size.lean",
+        " M Proof/Simulator/CRT/Stage1Wire.lean",
+        " M README.md"
+      ],
+      "exit": 0,
+      "seconds": 43.4,
+      "log": "evidence/packed-public/proof-audit.log"
+    }
+  }
+}

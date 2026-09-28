@@ -1,28 +1,12 @@
 /-
-The public value of configuration E and its byte codec.
-
-| Field       | Encoding                         | Formula          | Bytes   |
-|-------------|----------------------------------|------------------|---------|
-| `curve`     | `3 * field`                      | `3 * 32`         | 96      |
-| `rows`      | `Vector normRow 91`              | `91 * 33`        | 3,003   |
-| `exception` | `Vector entry 91`                | `91 * 1`         | 91      |
-| `crtX`      | `Vector label 2885`              | `2885 * 13`      | 37,505  |
-| `crtY`      | `Vector label 2885`              | `2885 * 13`      | 37,505  |
-| `recX`      | `Vector (natural 78) 367`        | `367 * 78`       | 28,626  |
-| `recY`      | `Vector (natural 78) 275`        | `275 * 78`       | 21,450  |
-| **total**   |                                  |                  | **128,276** |
-
-Every field has a fixed width and there is no tag, so every inhabitant encodes to exactly
-`ciphertextBytes` bytes and the size theorem does not mention the garbler (xinshu's `SizedBy`
-pattern, `Construction/PGS/Encoding.lean`; the field, block, byte and row encoders are copies of
-his private ones).
-
-A record is stored as a 78-byte natural (`2 M < 2 ^ 620 ≤ 256 ^ 78`); that honest records are below
-`2 M` is a lemma about the garbler, not part of the type, so `M` never enters a type.
+The complete public value, packed into one little-endian bit stream. Field
+constants use 254 bits, row flags use three bits, and records use 620 bits.
+Only the final byte is padded. The codec round-trips every public value.
 -/
 
 import Construction.CRT.Coord
 import Construction.CRT.LabelEncoding
+import Construction.CRT.BitPacking
 import Construction.ArgoMAC.Public
 import Construction.ArgoMAC.ExceptionEncoding
 import Construction.ArgoMAC.NormRow
@@ -48,11 +32,11 @@ abbrev yCount : Nat := 275
 absorbed into the Lamport labels). -/
 abbrev convCount : Nat := 2885
 
-/-- Record width in bytes. -/
-abbrev recordBytes : Nat := 78
+/-- Exact record width. The independently proved honest bound is `2 M < 2^620`. -/
+abbrev recordBits : Nat := 620
 
-/-- A published record `h_e * M + Σ_i J_{e,i} * Π_{i' < i} m_{i'}`, a 78-byte natural. -/
-abbrev Record := Fin (256 ^ recordBytes)
+/-- A published record; every inhabitant fits its packed field. -/
+abbrev Record := Fin (2 ^ recordBits)
 
 /-- The row encodings, those with an Embryo mask: `x` 0 .. 363 and `y` 0 .. 272. -/
 abbrev RowEncoding := Fin pointElementCountX ⊕ Fin pointElementCountY
@@ -76,8 +60,16 @@ structure Public where
   /-- The records of `y`. -/
   recY : Vector Record yCount
 
-/-- The ciphertext size: `96 + 91 * 33 + 91 * 1 + 2 * 2885 * 13 + 642 * 78`. -/
-def ciphertextBytes : Nat := 128276
+/-- Exact bit count of the complete public value, before final byte padding. -/
+def publicBits : Nat := (254 + (254 + 254)) +
+  (digitCount * (254 + 3) + (digitCount * 8 + (convCount * labelBits +
+    (convCount * labelBits + (xCount * recordBits + yCount * recordBits)))))
+
+/-- Complete byte count, rounded once after all public components. -/
+def ciphertextBytes : Nat := (publicBits + 7) / 8
+
+/-- Canonical final zero padding. -/
+def paddingBits : Nat := BitPacking.padding publicBits
 
 /-- The flat blocks of one coordinate read back as the evaluator's conversion material. -/
 def convOf (blocks : Vector Label convCount) : ConvPublic := ConvPublic.unflatten table blocks.toArray
@@ -90,45 +82,47 @@ def curveOf (pub : Public) : BaseField × BaseField × BaseField := pub.curve
 
 namespace Wire
 
-/-- A field element, `32` bytes, no tag. -/
-private def field : Kriterion.Encoding BaseField :=
-  (Kriterion.Encoding.natural 32).map
+/-- Every field inhabitant is below the 254-bit bound. -/
+def field : BitPacking BaseField 254 :=
+  (BitPacking.natural 254).map
     (fun value => ⟨value.val, lt_trans value.val_lt (by decide)⟩)
     (fun value => value.val)
     (fun value => ZMod.natCast_zmod_val value)
 
-/-- A correlation block, `16` bytes. -/
-private def block : Kriterion.Encoding Block :=
-  (Kriterion.Encoding.natural 16).map
-    (fun value => ⟨value.toNat, by
-      have expand : (256 : Nat) ^ 16 = 2 ^ 128 := by norm_num
-      rw [expand]; exact value.isLt⟩)
-    (fun value => BitVec.ofNat 128 value.val)
-    (fun value => by
-      apply BitVec.eq_of_toNat_eq
-      rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt value.isLt])
+/-- All three flags, including values not produced by an honest source. -/
+def flags : BitPacking (Bool × Bool × Bool) 3 :=
+  (BitPacking.natural 3).map
+    (fun value => ⟨(NormRow.flagByte value.1 value.2.1 value.2.2).val, by
+      rcases value with ⟨z, s, sign⟩
+      cases z <;> cases s <;> cases sign <;> decide⟩)
+    (fun value => NormRow.flagsOf ⟨value.val, lt_trans value.isLt (by decide)⟩)
+    (fun value => by rcases value with ⟨z, s, sign⟩; cases z <;> cases s <;> cases sign <;> rfl)
 
-/-- One digit's exception entry, packed into one byte. -/
-private def entry : Kriterion.Encoding Exception.Entry := Exception.entryEncoding
+/-- Both exception nibbles. -/
+def entry : BitPacking Exception.Entry 8 :=
+  (BitPacking.natural 8).map
+    (fun value => ⟨(Exception.pack value).toNat, (Exception.pack value).isLt⟩)
+    (fun value => Exception.unpack (BitVec.ofFin value))
+    (fun value => Exception.unpack_pack value)
 
-/-- One digit's normalized row data: the `X` constant, then the flags byte, `32 + 1 = 33` bytes. -/
-private def normRow : Kriterion.Encoding NormRow :=
-  (field.pair NormRow.flagsEncoding).map
+def normRow : BitPacking NormRow (254 + 3) :=
+  (field.pair flags).map
     (fun value => (value.xC0, value.zFlag, value.sFlag, value.sign))
     (fun value => ⟨value.1, value.2.1, value.2.2.1, value.2.2.2⟩)
     (fun _ => rfl)
 
-/-- The curve constants, `3 * 32 = 96` bytes. -/
-private def curveTriple : Kriterion.Encoding (BaseField × BaseField × BaseField) :=
+def curveTriple : BitPacking (BaseField × BaseField × BaseField) (254 + (254 + 254)) :=
   field.pair (field.pair field)
 
-/-- One record, `78` bytes. -/
-private def record : Kriterion.Encoding Record := Kriterion.Encoding.natural recordBytes
+def label : BitPacking Label labelBits :=
+  (BitPacking.natural labelBits).map BitVec.toFin BitVec.ofFin (fun _ => rfl)
 
-/-- The complete public encoding, in the order curve, rows, exception, crtX, crtY, recX, recY. -/
-def encoding : Kriterion.Encoding Public :=
+def record : BitPacking Record recordBits := BitPacking.natural recordBits
+
+/-- Components are concatenated as bits, in the established public order. -/
+def packed : BitPacking Public publicBits :=
   (curveTriple.pair ((normRow.vector digitCount).pair ((entry.vector digitCount).pair
-    ((Narrow.labelEncoding.vector convCount).pair ((Narrow.labelEncoding.vector convCount).pair
+    ((label.vector convCount).pair ((label.vector convCount).pair
       ((record.vector xCount).pair (record.vector yCount))))))).map
     (fun value => (value.curve, value.rows, value.exception, value.crtX, value.crtY, value.recX,
       value.recY))
@@ -136,71 +130,12 @@ def encoding : Kriterion.Encoding Public :=
       value.2.2.2.2.2.1, value.2.2.2.2.2.2⟩)
     (fun _ => rfl)
 
-/-! ### Sizes -/
+/-- Complete byte encoding, with an all-public-value, arbitrary-tail inverse. -/
+def encoding : Kriterion.Encoding Public := packed.encoding
 
-/-- `encoding` emits exactly `size` bytes for every value. -/
-private def SizedBy {alpha : Type} (encoding : Kriterion.Encoding alpha) (size : Nat) : Prop :=
-  ∀ value, (encoding.encode value).length = size
-
-private theorem sizedBy_pair {alpha beta : Type} {first : Kriterion.Encoding alpha}
-    {second : Kriterion.Encoding beta} {left right : Nat} (hfirst : SizedBy first left)
-    (hsecond : SizedBy second right) : SizedBy (first.pair second) (left + right) := by
-  intro value
-  show ((first.encode value.1) ++ (second.encode value.2)).length = left + right
-  rw [List.length_append, hfirst, hsecond]
-
-private theorem sizedBy_map {alpha beta : Type} {base : Kriterion.Encoding alpha} {size : Nat}
-    (hbase : SizedBy base size) (encode : beta → alpha) (decode : alpha → beta)
-    (inverse : ∀ value, decode (encode value) = value) :
-    SizedBy (base.map encode decode inverse) size :=
-  fun value => hbase (encode value)
-
-private theorem sizedBy_vector {alpha : Type} {base : Kriterion.Encoding alpha} {size : Nat}
-    (hbase : SizedBy base size) (count : Nat) : SizedBy (base.vector count) (count * size) :=
-  fun value => Kriterion.Encoding.vector_length base size count value (fun _ => hbase _)
-
-private theorem sizedBy_natural (width : Nat) : SizedBy (Kriterion.Encoding.natural width) width :=
-  fun value => Kriterion.Encoding.natural_length width value
-
-private theorem sizedBy_byte : SizedBy Kriterion.Encoding.byte 1 := fun _ => rfl
-
-private theorem field_sized : SizedBy field 32 := sizedBy_map (sizedBy_natural 32) _ _ _
-
-private theorem block_sized : SizedBy block 16 := sizedBy_map (sizedBy_natural 16) _ _ _
-
-private theorem label_sized : SizedBy Narrow.labelEncoding 13 :=
-  Narrow.labelEncoding_length
-
-private theorem entry_sized : SizedBy entry 1 := Exception.entryEncoding_length
-
-private theorem normRow_sized : SizedBy normRow 33 :=
-  sizedBy_map (sizedBy_pair field_sized NormRow.flagsEncoding_length) _ _ _
-
-private theorem curveTriple_sized : SizedBy curveTriple 96 :=
-  sizedBy_pair field_sized (sizedBy_pair field_sized field_sized)
-
-private theorem record_sized : SizedBy record 78 := sizedBy_natural recordBytes
-
-private theorem encoding_sized :
-    SizedBy encoding (96 + (digitCount * 33 + (digitCount * 1 + (convCount * 13 +
-      (convCount * 13 + (xCount * 78 + yCount * 78)))))) :=
-  sizedBy_map (sizedBy_pair curveTriple_sized
-    (sizedBy_pair (sizedBy_vector normRow_sized digitCount)
-      (sizedBy_pair (sizedBy_vector entry_sized digitCount)
-        (sizedBy_pair (sizedBy_vector label_sized convCount)
-          (sizedBy_pair (sizedBy_vector label_sized convCount)
-            (sizedBy_pair (sizedBy_vector record_sized xCount)
-              (sizedBy_vector record_sized yCount))))))) _ _ _
-
-/-- The byte table as an arithmetic identity. -/
-theorem byteArithmetic :
-    96 + (digitCount * 33 + (digitCount * 1 + (convCount * 13 +
-      (convCount * 13 + (xCount * 78 + yCount * 78))))) = ciphertextBytes := by
-  simp only [digitCount, convCount, xCount, yCount, ciphertextBytes]
-
-/-- **Every** public value encodes to exactly `ciphertextBytes = 128,276` bytes. -/
-theorem encoding_length (value : Public) : (encoding.encode value).length = ciphertextBytes := by
-  rw [encoding_sized value, byteArithmetic]
+/-- Every public value occupies the same complete number of bytes. -/
+theorem encoding_length (value : Public) : (encoding.encode value).length = ciphertextBytes :=
+  BitPacking.encoding_length packed value
 
 end Wire
 

@@ -103,7 +103,8 @@ theorem noOracle_serializeList (list : List Piece) :
     (Prog.rep list.length fun n => pieceProg (list.getD (list.length - 1 - n) default)).NoOracle :=
   noOracle_rep _ _ fun n _ => noOracle_pieceProg (list.getD (list.length - 1 - n) default)
 
-theorem noOracle_serialize : CrtStage1.serialize.NoOracle := noOracle_serializeList pieces
+theorem noOracle_serialize : CrtStage1.serialize.NoOracle :=
+  ⟨noOracle_emitZero _, noOracle_serializeList pieces⟩
 
 /-- **Stage 1 has no oracle instruction.** -/
 theorem stage1_noOracle : CrtStage1.program.NoOracle := by

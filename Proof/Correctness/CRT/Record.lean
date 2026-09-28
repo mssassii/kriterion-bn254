@@ -163,6 +163,11 @@ theorem bn254Table_record_fits : 2 * bn254Table.product ≤ 256 ^ 78 := by
   rw [bn254Table_product]
   decide +kernel
 
+/-- The stronger bound used by the whole-public packed record type. -/
+theorem bn254Table_record_fits_bits : 2 * bn254Table.product ≤ 2 ^ 620 := by
+  rw [bn254Table_product]
+  decide +kernel
+
 theorem bn254Table_modulus_pos : ∀ i, 0 < bn254Table.modulus i := by
   decide +kernel
 

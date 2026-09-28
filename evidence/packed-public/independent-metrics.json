@@ -1,0 +1,33 @@
+{
+  "current104": {
+    "label_bits": 104,
+    "components_bits": {
+      "curve": 762,
+      "rows": 23387,
+      "exception": 728,
+      "conversion": 600080,
+      "records": 398040
+    },
+    "bits": 1022997,
+    "padding_bits": 3,
+    "ciphertext_bytes": 127875,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788
+  },
+  "modeled101": {
+    "label_bits": 101,
+    "components_bits": {
+      "curve": 762,
+      "rows": 23387,
+      "exception": 728,
+      "conversion": 582770,
+      "records": 398040
+    },
+    "bits": 1005687,
+    "padding_bits": 1,
+    "ciphertext_bytes": 125711,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788
+  },
+  "note": "Width101 is a model only until its independent proofs are integrated and checked."
+}

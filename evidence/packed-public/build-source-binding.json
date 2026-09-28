@@ -1,0 +1,8 @@
+{
+  "built_manifest": "78018973305aa58fad84909409de812f5cdfd649f4fe6dc1532ce2962f03aa12",
+  "final_manifest": "ea76922a04a00ae3cf705bcf9f0b58d1db28ec65d5021a4a3c4b2798aa38063a",
+  "changed_after_build": [
+    "Scratch/PackedAudit.lean"
+  ],
+  "explanation": "Only the separate audit file changed: replace brute-force exponent reduction in maximal Record witnesses with Nat.sub_lt, and add the derived simulator-piece count guard. Construction, Proof, Submission and all pins are byte-identical to the successful full build."
+}

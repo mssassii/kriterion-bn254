@@ -1,0 +1,6 @@
+Proof/Simulator/CRT/Stage1Law.lean:187:0: warning: automatically included section variable(s) unused in theorem `Kriterion.CRT.SimMachine.CrtStage1Law.off_far`:
+  [FieldCertificate]
+consider restructuring your `variable` declarations so that the variables are not in scope or explicitly omit them:
+  omit [FieldCertificate] in theorem ...
+
+Note: This linter can be disabled with `set_option linter.unusedSectionVars false`

@@ -45,18 +45,18 @@ structure SourceHolds (ram : Word → Word) (source : Source) : Prop where
 /-! ### The segments -/
 
 theorem curve_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
-    pieceListBits ram ((List.range curveCellCount).map fun index => Piece.word (fieldBase + index) 256) =
-      lsbs 256 source.curve.1.val ++ lsbs 256 source.curve.2.1.val ++ lsbs 256 source.curve.2.2.val := by
+    pieceListBits ram ((List.range curveCellCount).map fun index => Piece.word (fieldBase + index) 254) =
+      lsbs 254 source.curve.1.val ++ lsbs 254 source.curve.2.1.val ++ lsbs 254 source.curve.2.2.val := by
   unfold pieceListBits
   rw [List.map_map, map_range_eq_ofFn]
   have cell : ∀ index : Fin curveCellCount,
-      (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 256) index.val =
-        lsbs 256 (fieldOf source index.val).val := by
+      (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 254) index.val =
+        lsbs 254 (fieldOf source index.val).val := by
     intro index
     have small : index.val < 3 := index.isLt
     simp only [Function.comp_apply, pieceBits]
     rw [holds.fields index.val (by unfold fieldCount curveCellCount rowCellCount; omega), fieldWord,
-      bitRun_ofNat _ _ le_rfl]
+      bitRun_ofNat _ _ (by norm_num)]
   simp only [cell]
   simp only [curveCellCount, List.ofFn_succ, List.ofFn_zero, List.flatten_cons, List.flatten_nil, List.append_nil,
     Fin.val_zero, Fin.val_succ, fieldOf, List.append_assoc]
@@ -85,8 +85,8 @@ theorem publish_xC0 (source : Source) (d : Fin digitCount) :
 theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
     pieceListBits ram rowPieces =
       (List.ofFn fun digit : Fin digitCount =>
-          lsbs 256 (Entry.publish source).rows[digit.val].xC0.val ++
-            lsbs 8 (CrtWire.flagsOf (Entry.publish source).rows[digit.val])).flatten := by
+          lsbs 254 (Entry.publish source).rows[digit.val].xC0.val ++
+            lsbs 3 (CrtWire.flagsOf (Entry.publish source).rows[digit.val])).flatten := by
   unfold pieceListBits rowPieces
   rw [List.map_flatten, List.flatten_flatten, List.map_map, map_range_eq_ofFn, List.map_ofFn]
   refine congrArg List.flatten (congrArg List.ofFn (funext fun digit => ?_))
@@ -94,8 +94,8 @@ theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds r
   simp only [Function.comp_apply, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil,
     List.append_nil, pieceBits]
   rw [holds.fields (3 + 3 * digit.val) (by unfold fieldCount curveCellCount rowCellCount; omega), fieldWord,
-    bitRun_ofNat _ _ le_rfl, holds.signs digit, bitRun_ofNat _ _ (by norm_num)]
-  refine congrArg₂ (· ++ ·) (congrArg (lsbs 256) ?_) (congrArg (lsbs 8) (flagsOf_publish source digit).symm)
+    bitRun_ofNat _ _ (by norm_num), holds.signs digit, bitRun_ofNat _ _ (by norm_num)]
+  refine congrArg₂ (· ++ ·) (congrArg (lsbs 254) ?_) (congrArg (lsbs 3) (flagsOf_publish source digit).symm)
   rw [fieldOf_xC0 source digit, publish_xC0 source digit]
 
 theorem bytes_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
@@ -128,21 +128,21 @@ theorem convVector_bits (pub : ConvPublic) :
 
 theorem records_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) (κ : Nat)
     (small : κ < 2) (values : Fin (encCount κ) → Nat)
-    (same : ∀ e : Fin (encCount κ), lsbs 624 (recordOf source κ e) = lsbs 624 (values e)) :
-    pieceListBits ram (recordPieces κ) = (List.ofFn fun e => lsbs 624 (values e)).flatten := by
+    (same : ∀ e : Fin (encCount κ), lsbs 620 (recordOf source κ e) = lsbs 620 (values e)) :
+    pieceListBits ram (recordPieces κ) = (List.ofFn fun e => lsbs 620 (values e)).flatten := by
   unfold pieceListBits recordPieces
   rw [List.map_map, map_range_eq_ofFn]
   refine congrArg List.flatten (congrArg List.ofFn (funext fun e => ?_))
   simp only [Function.comp_apply, pieceBits]
   rw [holds.records κ e small e.isLt, same e]
 
-theorem record_mod (value : Nat) : lsbs 624 (value % 256 ^ 78) = lsbs 624 value := by
-  rw [show (256 : Nat) ^ 78 = 2 ^ 624 by rw [show (256 : Nat) = 2 ^ 8 by norm_num, ← pow_mul], lsbs_mod]
+theorem record_mod (value : Nat) : lsbs 620 (value % 2 ^ 620) = lsbs 620 value := lsbs_mod 620 value
 
 /-- **The pieces are the wire.** -/
 theorem pieces_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
-    pieceListBits ram pieces = byteBits (Entry.Wire.encoding.encode (Entry.publish source)) := by
+    pieceListBits ram pieces ++ List.replicate Entry.paddingBits false = byteBits (Entry.Wire.encoding.encode (Entry.publish source)) := by
   rw [CrtWire.wire_bits]
+  apply congrArg (fun bits => bits ++ List.replicate Entry.paddingBits false)
   unfold pieces
   simp only [pieceListBits_append]
   rw [curve_bits ram source holds, rows_bits ram source holds, bytes_bits ram source holds]

@@ -8,7 +8,7 @@ Ingredients: the evaluator reads only the labels of the coordinate's 254 bits
 conversion vector reads back as the garbler's material with zero chunk joins on every read cell
 (`FlatLayout.convAgree_unflatten` with `convVector_toArray`), and zero joins on the absorbed labels
 are the joins on the coins' labels (`Absorb.coordEvalM_absorb`); the published records are the
-garbler's records (`record_toRecord`, since `2 M < 256 ^ 78`).
+garbler's records (`record_toRecord`, since `2 M < 2 ^ 620`).
 -/
 
 import Proof.Correctness.CRT.Absorb
@@ -101,13 +101,13 @@ theorem convAgree_convOf (p : ConvPublic) : ConvAgree table (convOf (convVector 
   rw [convVector_toArray]
   exact convAgree_unflatten table p
 
-theorem toRecord_val (r : Nat) (small : r < 256 ^ recordBytes) : (toRecord r).val = r := by
+theorem toRecord_val (r : Nat) (small : r < 2 ^ recordBits) : (toRecord r).val = r := by
   simp [toRecord, Nat.mod_eq_of_lt small]
 
 theorem records_small {S : Nat} (g : CoordGarbled table S) (slopes : Fin S → Nat) (e : Fin S) :
-    g.records slopes e < 256 ^ recordBytes :=
+    g.records slopes e < 2 ^ recordBits :=
   lt_of_lt_of_le (CrtTable.records_roundtrip table g slopes e SliceC.bn254_modulus_pos).1
-    bn254Table_record_fits
+    bn254Table_record_fits_bits
 
 /-- **One coordinate delivers through the published material**: the flat conversion vector (no
 chunk joins) and the records as published, and any labels that agree on the coordinate's bits with

@@ -98,7 +98,7 @@ def recordValue (ram : Word → Word) (κ e : Nat) : Nat :=
 /-- The bits one piece puts on the wire. -/
 def pieceBits (ram : Word → Word) : Piece → List Bool
   | .word address width => bitRun (ram (word address)) 0 width
-  | .record κ e => lsbs 624 (recordValue ram κ e)
+  | .record κ e => lsbs 620 (recordValue ram κ e)
 
 /-- The bits of a list of pieces. -/
 def pieceListBits (ram : Word → Word) (pieces : List Piece) : List Bool := (pieces.map (pieceBits ram)).flatten

@@ -211,9 +211,9 @@ def slopesY (point : Fin digitCount → Biquadratic.Values) (curve : CurveMember
     Fin yCount → BaseField :=
   joinY (Pipeline.pointYAssemble point) (Pipeline.curveYAssemble curve)
 
-/-- A record natural as a 78-byte natural (honest records are below `2 M < 256 ^ 78`). -/
+/-- A record natural in its 620-bit public type (honest records are below `2 M < 2^620`). -/
 def toRecord (value : Nat) : Record :=
-  ⟨value % 256 ^ recordBytes, Nat.mod_lt _ (Nat.pow_pos (by decide))⟩
+  ⟨value % 2 ^ recordBits, Nat.mod_lt _ (Nat.pow_pos (by decide))⟩
 
 /-- A flat conversion vector from the garbler's material. -/
 def convVector (pub : ConvPublic) : Vector Label convCount :=

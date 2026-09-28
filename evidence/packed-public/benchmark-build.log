@@ -1,0 +1,98 @@
+$ env LEAN_NUM_THREADS=6 lake build Benchmark
+# HEAD dc6aa07014645d3bc1a2846d4521c17b8c3d93af
+# tracked changes:
+ M Construction/CRT/Entry.lean
+ M Construction/CRT/Public.lean
+ M Construction/Simulator/CRT/Stage1.lean
+ M Proof/Correctness/CRT/EntryDelivery.lean
+ M Proof/Correctness/CRT/Record.lean
+ M Proof/Correctness/CRT/SourceReads.lean
+ M Proof/Privacy/CRT/Core/BmrIdealOff.lean
+ M Proof/Simulator/CRT/Stage1Conv.lean
+ M Proof/Simulator/CRT/Stage1Law.lean
+ M Proof/Simulator/CRT/Stage1Pieces.lean
+ M Proof/Simulator/CRT/Stage1Record.lean
+ M Proof/Simulator/CRT/Stage1Serial.lean
+ M Proof/Simulator/CRT/Stage1Size.lean
+ M Proof/Simulator/CRT/Stage1Wire.lean
+ M README.md
+
+⚠ [3027/3406] Replayed BN254
+warning: formal/BN254.lean:178:2: Try this: 
+  haveI̵
+
+The goal is a proposition, so `have` is preferred over `haveI`.
+The difference between `have` and `haveI` is that `haveI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+⚠ [3383/3406] Replayed Cryptography.RandomOracle
+warning: formal/Cryptography/RandomOracle.lean:19:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/RandomOracle.lean:20:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/RandomOracle.lean:23:8: This simp argument is unused:
+  OptionT.lift
+
+Hint: Omit it from the simp argument list.
+  [apply] simp [PMF.map_bind, PMF.pure_map, PMF.bind_pure]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+⚠ [3395/3406] Replayed Cryptography.Primitives
+warning: formal/Cryptography/Primitives.lean:21:0: `OracleSpec`: universes `uAnswer`, `uQuery` only occur together. This usually means there is a `max` expression in the type where none of these universes appear on their own.
+
+Note: This linter can be disabled with `set_option linter.checkUnivs false`
+⚠ [3398/3406] Replayed Cryptography.Permutation
+warning: formal/Cryptography/Permutation.lean:131:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/Permutation.lean:134:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+⚠ [3399/3406] Replayed Cryptography.OperationalOracle
+warning: formal/Cryptography/OperationalOracle.lean:160:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/OperationalOracle.lean:161:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/OperationalOracle.lean:487:32: This simp argument is unused:
+  List.lookup
+
+Hint: Omit it from the simp argument list.
+  [apply] simp [program]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+Build completed successfully (3406 jobs).

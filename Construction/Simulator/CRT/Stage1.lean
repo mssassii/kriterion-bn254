@@ -21,7 +21,7 @@ independent and uniform below `m_i`, so the record is uniform below `M`.
 
 Serialization (`serialize`): `pieces` lists what the wire carries, in wire order, as words of RAM (`Piece.word
 address width`: the low `width` bits of the word, least significant first) and records (`Piece.record κ e`: the
-record's 624 bits, computed by Horner's rule into five 128-bit limbs at `recordLimb`, then emitted). The machine
+record's 620 bits, computed by Horner's rule into five 128-bit limbs at `recordLimb`, then emitted). The machine
 emits the pieces in reverse (the response stack is last in, first out), each piece's bits most significant first,
 so the stack reads the wire from the top.
 -/
@@ -57,7 +57,7 @@ def pinWidthAt (k : Nat) : Nat := Entry.pinWidths.getD k 0
 /-- The moduli. -/
 def moduliCount : Nat := 84
 
-/-- The limbs of a record under construction (five 128-bit limbs, `624` bits emitted; records are below
+/-- The limbs of a record under construction (five 128-bit limbs, `620` bits emitted; records are below
 `2 M < 2 ^ 620`). -/
 def recordLimb (k : Nat) : Nat := tmpBase + 64 + k
 
@@ -130,7 +130,7 @@ def keyTrue : Prog := Prog.rep labelCount keyXor
 inductive Piece
   /-- The low `width` bits of `RAM[address]`. -/
   | word (address width : Nat)
-  /-- The 624 bits of the record of encoding `e` of coordinate `κ`. -/
+  /-- The 620 bits of the record of encoding `e` of coordinate `κ`. -/
   | record (κ e : Nat)
 deriving Inhabited
 
@@ -163,11 +163,11 @@ def recordPieces (κ : Nat) : List Piece := (List.range (encCount κ)).map fun e
 /-- The rows: per digit its `X` constant (a field cell) and its flags byte, the sign bit's cell (both
 normalization flags clear). -/
 def rowPieces : List Piece :=
-  ((List.range 91).map fun d => [.word (fieldBase + (3 + 3 * d)) 256, .word (Layout.signCell d) 8]).flatten
+  ((List.range 91).map fun d => [.word (fieldBase + (3 + 3 * d)) 254, .word (Layout.signCell d) 3]).flatten
 
 /-- **The wire, piece by piece**: curve, rows, exception, `crtX`, `crtY`, `recX`, `recY`. -/
 def pieces : List Piece :=
-  (List.range curveCellCount).map (fun index => .word (fieldBase + index) 256) ++ rowPieces ++
+  (List.range curveCellCount).map (fun index => .word (fieldBase + index) 254) ++ rowPieces ++
   (List.range exceptionCellCount).map (fun index => .word (exceptionBase + index) 4) ++
   convPieces 0 ++ convPieces 1 ++ recordPieces 0 ++ recordPieces 1
 
@@ -180,9 +180,9 @@ def hornerStep (κ e i : Nat) : Prog :=
   Prog.seqList [loadAt rC (Layout.residueCell κ i e), setupConsts (modulusAt i),
     mulSmallAdd (recordLimb 0) recordLimbCount]
 
-/-- Emit the record's 624 bits: limb 4 (112 bits) first, limb 0 last. -/
+/-- Emit the record's 620 bits: limb 4 (108 bits) first, limb 0 last. -/
 def emitRecord : Prog :=
-  Prog.seqList [emitWord (recordLimb 4) 112, emitWord (recordLimb 3) 128, emitWord (recordLimb 2) 128,
+  Prog.seqList [emitWord (recordLimb 4) 108, emitWord (recordLimb 3) 128, emitWord (recordLimb 2) 128,
     emitWord (recordLimb 1) 128, emitWord (recordLimb 0) 128]
 
 /-- The record of encoding `e` of coordinate `κ`: Horner from the top digit, then its bits. -/
@@ -196,7 +196,8 @@ def pieceProg : Piece → Prog
 
 /-- **The serializer**: the pieces, the last first. -/
 def serialize : Prog :=
-  Prog.rep pieces.length fun n => pieceProg (pieces.getD (pieces.length - 1 - n) default)
+  .seq (emitZero Entry.paddingBits)
+    (Prog.rep pieces.length fun n => pieceProg (pieces.getD (pieces.length - 1 - n) default))
 
 /-- **Stage 1**: the draws, the wire, the true labels; then the record limbs and every register are cleared, so
 the retained configuration is a function of the draws. -/

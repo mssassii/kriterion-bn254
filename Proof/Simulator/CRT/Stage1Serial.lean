@@ -84,12 +84,12 @@ theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
     obtain ⟨index, bound, same⟩ := inFields
     subst same
     have : index < 3 := bound
-    exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), le_rfl⟩
+    exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), by norm_num⟩
   · simp only [rowPieces, List.mem_flatten, List.mem_map, List.mem_range] at inRows
     obtain ⟨list, ⟨d, bound, rfl⟩, inList⟩ := inRows
     simp only [List.mem_cons, List.not_mem_nil, or_false] at inList
     rcases inList with same | same <;> subst same
-    · exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), le_rfl⟩
+    · exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), by norm_num⟩
     · exact ⟨by unfold Layout.signCell fieldBase; omega, Or.inl (by unfold Layout.signCell fieldBase tmpBase; omega),
         by norm_num⟩
   · simp only [List.mem_map, List.mem_range] at inBytes
@@ -210,13 +210,28 @@ theorem memSem_serializeList (list : List Piece) (safeAll : ∀ p ∈ list, Piec
   refine ⟨after, run, off, ?_, others⟩
   rw [bitsIs, Nat.sub_self, List.drop_zero]
 
-/-- **The serializer**: the wire's bits on the response stack, RAM unchanged outside the limbs. -/
+/-- **The serializer**: the public bits and final zero padding, with bounded scratch use. -/
 theorem memSem_serialize (memory : Memory) (digits : DigitsSmall memory.ram) :
     ∃ after, serialize.memSem memory = PMF.pure (some after) ∧
       (∀ address, ¬ LimbCell address → after.ram address = memory.ram address) ∧
-      after.bits 3 = pieceListBits memory.ram pieces ++ memory.bits 3 ∧
-      ∀ stack, stack ≠ 3 → after.bits stack = memory.bits stack :=
-  memSem_serializeList pieces pieces_safe memory digits
+      after.bits 3 = (pieceListBits memory.ram pieces ++ List.replicate Entry.paddingBits false) ++ memory.bits 3 ∧
+      ∀ stack, stack ≠ 3 → after.bits stack = memory.bits stack := by
+  have padSmall : Entry.paddingBits ≤ 256 := by
+    unfold Entry.paddingBits BitPacking.padding
+    omega
+  obtain ⟨padded, padRun, padRam, padBits, padOthers⟩ := memSem_emitZero Entry.paddingBits padSmall memory
+  obtain ⟨after, run, off, bits, others⟩ :=
+    memSem_serializeList pieces pieces_safe padded (by rwa [padRam])
+  refine ⟨after, ?_, ?_, ?_, ?_⟩
+  · unfold serialize
+    rw [memSem_seq, padRun, PMF.pure_bind, kleisli, run]
+  · intro address outside
+    rw [off address outside, padRam]
+  · rw [bits, padRam, padBits]
+    simp only [bitRun, word, BitVec.getLsbD_ofNat, Nat.zero_testBit, Bool.and_false,
+      List.ofFn_const, List.append_assoc]
+  · intro stack other
+    rw [others stack other, padOthers stack other]
 
 end CrtSerial
 

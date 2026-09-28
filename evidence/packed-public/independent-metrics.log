@@ -1,0 +1,133 @@
+{
+  "status": "exact integer/rational model; Lean and hosted verification are separate",
+  "baseline": {
+    "ciphertext_bytes": 130122,
+    "garble_queries": 988438,
+    "evaluate_queries": 981506,
+    "conversion_labels_per_coordinate": 2956,
+    "coordinate_garble": [
+      518727,
+      467420
+    ],
+    "coordinate_evaluate": [
+      515402,
+      464321
+    ]
+  },
+  "a1": {
+    "ciphertext_bytes": 128822,
+    "garble_queries": 1062022,
+    "evaluate_queries": 1055144,
+    "conversion_labels_per_coordinate": 2906,
+    "coordinate_garble": [
+      555519,
+      504212
+    ],
+    "coordinate_evaluate": [
+      552221,
+      501140
+    ]
+  },
+  "h1": {
+    "ciphertext_bytes": 129628,
+    "garble_queries": 985094,
+    "evaluate_queries": 978204,
+    "conversion_labels_per_coordinate": 2937,
+    "coordinate_garble": [
+      517038,
+      465765
+    ],
+    "coordinate_evaluate": [
+      513735,
+      462686
+    ]
+  },
+  "combined": {
+    "ciphertext_bytes": 128276,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788,
+    "conversion_labels_per_coordinate": 2885,
+    "coordinate_garble": [
+      555302,
+      504029
+    ],
+    "coordinate_evaluate": [
+      552027,
+      500978
+    ]
+  },
+  "selected_moduli": [
+    59,
+    61,
+    257,
+    263,
+    269,
+    271,
+    277,
+    281,
+    283,
+    293,
+    307,
+    311,
+    313,
+    317,
+    331,
+    337,
+    347,
+    349,
+    353,
+    359,
+    367,
+    373,
+    379,
+    383,
+    389,
+    397
+  ],
+  "evaluate_headroom": 1091,
+  "cheapest_27_evaluate": 1057734,
+  "counts": {
+    "pins_per_coordinate": 198,
+    "pin_labels_per_coordinate": 1692,
+    "modulus_joins_per_coordinate": 1193,
+    "all_joins_per_coordinate": 1415,
+    "serialized_pieces": 44579
+  },
+  "reach_certificates_checked": 83,
+  "min_reach_slack": 112,
+  "constant_units_approx": 1.2718635395647524,
+  "product_bits": 619
+}
+{
+  "current104": {
+    "label_bits": 104,
+    "components_bits": {
+      "curve": 762,
+      "rows": 23387,
+      "exception": 728,
+      "conversion": 600080,
+      "records": 398040
+    },
+    "bits": 1022997,
+    "padding_bits": 3,
+    "ciphertext_bytes": 127875,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788
+  },
+  "modeled101": {
+    "label_bits": 101,
+    "components_bits": {
+      "curve": 762,
+      "rows": 23387,
+      "exception": 728,
+      "conversion": 582770,
+      "records": 398040
+    },
+    "bits": 1005687,
+    "padding_bits": 1,
+    "ciphertext_bytes": 125711,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788
+  },
+  "note": "Width101 is a model only until its independent proofs are integrated and checked."
+}

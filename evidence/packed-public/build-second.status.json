@@ -1,0 +1,27 @@
+{
+  "command": [
+    "env",
+    "LEAN_NUM_THREADS=6",
+    "lake",
+    "build"
+  ],
+  "head": "dc6aa07014645d3bc1a2846d4521c17b8c3d93af",
+  "tracked_changes": [
+    " M Construction/CRT/Entry.lean",
+    " M Construction/CRT/Public.lean",
+    " M Construction/Simulator/CRT/Stage1.lean",
+    " M Proof/Correctness/CRT/EntryDelivery.lean",
+    " M Proof/Correctness/CRT/Record.lean",
+    " M Proof/Correctness/CRT/SourceReads.lean",
+    " M Proof/Privacy/CRT/Core/BmrIdealOff.lean",
+    " M Proof/Simulator/CRT/Stage1Conv.lean",
+    " M Proof/Simulator/CRT/Stage1Pieces.lean",
+    " M Proof/Simulator/CRT/Stage1Record.lean",
+    " M Proof/Simulator/CRT/Stage1Serial.lean",
+    " M Proof/Simulator/CRT/Stage1Size.lean",
+    " M Proof/Simulator/CRT/Stage1Wire.lean"
+  ],
+  "exit": 1,
+  "seconds": 362.3,
+  "log": "evidence/packed-public/build-second.log"
+}
