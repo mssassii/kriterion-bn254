@@ -896,7 +896,7 @@ def qOff (u : AffineInput) (F : NOutOff T u → ℝ≥0∞) (s : Scales) : ℝ�
 /-- The mass of good field scales. -/
 def goodMass : ℝ≥0∞ := ∑' s : Scales, PMF.uniformOfFintype Scales s * (if GoodScales s then 1 else 0)
 
-theorem tsum_uniform_ite {A : Type*} [Fintype A] [Nonempty A] (P : Prop) (f : A → ℝ≥0∞) :
+theorem tsum_uniform_ite {A : Type*} [Fintype A] [Nonempty A] (P : Prop) [Decidable P] (f : A → ℝ≥0∞) :
     ∑' a, PMF.uniformOfFintype A a * (if P then f a else 0) = if P then ∑' a, PMF.uniformOfFintype A a * f a else 0 := by
   split_ifs <;> simp
 
@@ -948,14 +948,9 @@ theorem real_ge (u : AffineInput) (onCurve : OnCurve u) (F : NOut T u → ℝ≥
     · rw [nRealOut_eq_nG nctx valid facts u onCurve c g w]
     · exact zero_le
   refine le_trans (le_of_eq ?_) step
-  rw [show (fun c => PMF.uniformOfFintype (Coins T) c *
-      (if GoodScales (nForward nctx u c).1 then
-        (if CWindowOn (nForward nctx u c).2.1 then 0 else F (nG nctx u (nForward nctx u c).1 (nForward nctx u c).2.1))
-        else 0)) = fun c => PMF.uniformOfFintype (Coins T) c *
-      (fun x : NImage T u => if GoodScales x.1 then
-        (if CWindowOn x.2.1 then 0 else F (nG nctx u x.1 x.2.1)) else 0) (nEquiv T nctx valid u good c) from rfl,
-    tsum_uniform_equiv (nEquiv T nctx valid u good)]
-  exact (image_sum (fun s y => if CWindowOn y then 0 else F (nG nctx u s y))).symm
+  have reindex := tsum_uniform_equiv (nEquiv T nctx valid u good) (fun x : NImage T u => if GoodScales x.1 then
+    (if CWindowOn x.2.1 then 0 else F (nG nctx u x.1 x.2.1)) else 0)
+  exact (image_sum (fun s y => if CWindowOn y then 0 else F (nG nctx u s y))).symm.trans reindex.symm
 
 include facts valid in
 /-- The real side off the curve is at least the good scales' average. -/
@@ -972,14 +967,9 @@ theorem real_ge_off (u : AffineInput) (F : NOutOff T u → ℝ≥0∞) :
     · rw [nRealOutOff_eq_nGOff nctx valid facts u c g w]
     · exact zero_le
   refine le_trans (le_of_eq ?_) step
-  rw [show (fun c => PMF.uniformOfFintype (Coins T) c *
-      (if GoodScales (nForwardOff nctx u c).1 then
-        (if CWindow (nForwardOff nctx u c).2.1 then 0 else F (nGOff (nForwardOff nctx u c).1 (nForwardOff nctx u c).2.1))
-        else 0)) = fun c => PMF.uniformOfFintype (Coins T) c *
-      (fun x : NImageOff T u => if GoodScales x.1 then
-        (if CWindow x.2.1 then 0 else F (nGOff x.1 x.2.1)) else 0) (nEquivOff T nctx valid u c) from rfl,
-    tsum_uniform_equiv (nEquivOff T nctx valid u)]
-  exact (image_sum (fun s y => if CWindow y then 0 else F (nGOff s y))).symm
+  have reindex := tsum_uniform_equiv (nEquivOff T nctx valid u) (fun x : NImageOff T u => if GoodScales x.1 then
+    (if CWindow x.2.1 then 0 else F (nGOff x.1 x.2.1)) else 0)
+  exact (image_sum (fun s y => if CWindow y then 0 else F (nGOff s y))).symm.trans reindex.symm
 
 end Weighted
 
@@ -990,22 +980,36 @@ theorem cells_sum {Y : Type*} [Fintype Y] [Nonempty Y] (w : Y → (Fin 91 → Bo
       goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign *
         ∑' y, PMF.uniformOfFintype Y y * w y sign := by
   rw [tsum_uniform_prod, tsum_uniform_prod]
+  have each : ∀ (y : Y) (σ : Scales), ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign *
+      (if GoodScales σ then w y sign else 0) =
+      (if GoodScales σ then 1 else 0) * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign := by
+    intro y σ
+    rw [tsum_uniform_ite]
+    split_ifs <;> simp
   have inner : ∀ y : Y, ∑' σ : Scales, PMF.uniformOfFintype Scales σ *
       ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * (if GoodScales σ then w y sign else 0) =
       goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign := by
     intro y
+    simp only [each]
     unfold goodMass
     rw [← ENNReal.tsum_mul_right]
     refine tsum_congr fun σ => ?_
-    rw [tsum_uniform_ite]
-    split_ifs <;> simp
+    ring
   simp only [inner]
-  rw [ENNReal.tsum_mul_left, ENNReal.tsum_comm]
-  congr 1
-  refine tsum_congr fun sign => ?_
-  rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_mul_left]
-  refine tsum_congr fun y => ?_
-  ring
+  calc ∑' y, PMF.uniformOfFintype Y y * (goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign)
+      = goodMass * ∑' y, ∑' sign, PMF.uniformOfFintype Y y * (PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign) := by
+        rw [← ENNReal.tsum_mul_left]
+        refine tsum_congr fun y => ?_
+        rw [ENNReal.tsum_mul_left]
+        ring
+    _ = goodMass * ∑' sign, ∑' y, PMF.uniformOfFintype Y y * (PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign) := by
+        rw [ENNReal.tsum_comm]
+    _ = _ := by
+        congr 1
+        refine tsum_congr fun sign => ?_
+        rw [← ENNReal.tsum_mul_left]
+        refine tsum_congr fun y => ?_
+        ring
 
 section Weighted
 
@@ -1045,7 +1049,8 @@ theorem nCore_weighted (u : AffineInput) (onCurve : OnCurve u)
             rw [if_pos g, if_neg w, nIdealOut_eq_nG nctx sparse u rt cells]
       _ = ∑' x, PMF.uniformOfFintype (((CSource T × Visible T u) × Scales) × (Fin 91 → Bool)) x *
             (if GoodScales x.1.2 then (if CWindowOn x.1.1 then 0 else F (nG nctx u (kScales rt x.2) x.1.1)) else 0) :=
-          tsum_uniform_equiv (cellsEquiv u) _
+          tsum_uniform_equiv (cellsEquiv u) (fun x : ((CSource T × Visible T u) × Scales) × (Fin 91 → Bool) =>
+            if GoodScales x.1.2 then (if CWindowOn x.1.1 then 0 else F (nG nctx u (kScales rt x.2) x.1.1)) else 0)
       _ = _ := cells_sum fun y sign => if CWindowOn y then 0 else F (nG nctx u (kScales rt sign) y)
   calc _ ≤ ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
         (goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOn nctx u F (kScales rt sign)) :=
@@ -1087,6 +1092,7 @@ theorem nCoreOff_weighted (u : AffineInput) (flag : NSource T × Cold T u → Pr
       unfold srcRow convRow kScales
       rw [signBit_signed_sq (signs d) (one d).2.value (one d).2.nonzero]
     rw [pub]
+    rfl
   have signs : ∀ rt sign, qOff u F (kScales one sign) = qOff u F (kScales rt sign) := by
     intro rt sign
     unfold qOff
@@ -1111,7 +1117,8 @@ theorem nCoreOff_weighted (u : AffineInput) (flag : NSource T × Cold T u → Pr
           rw [if_pos g, if_neg w, ideal]
     _ = ∑' x, PMF.uniformOfFintype (((CSource T × Cold T u) × Scales) × (Fin 91 → Bool)) x *
           (if GoodScales x.1.2 then (if CWindow x.1.1 then 0 else F (nGOff (kScales one x.2) x.1.1)) else 0) :=
-        tsum_uniform_equiv (cellsEquivOff u) _
+        tsum_uniform_equiv (cellsEquivOff u) (fun x : ((CSource T × Cold T u) × Scales) × (Fin 91 → Bool) =>
+          if GoodScales x.1.2 then (if CWindow x.1.1 then 0 else F (nGOff (kScales one x.2) x.1.1)) else 0)
     _ = goodMass * ∑' sign, PMF.uniformOfFintype (Fin 91 → Bool) sign * qOff u F (kScales one sign) :=
         cells_sum fun y sign => if CWindow y then 0 else F (nGOff (kScales one sign) y)
     _ = goodMass * ∑' rt, PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) rt *
