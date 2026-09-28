@@ -426,7 +426,7 @@ of the published values that recovers every hidden answer.
 
 With no chunk joins the hot chunk-tree materials are not published: they are absorbed into the returned Lamport
 labels, so the privacy argument pairs them with the labels instead (an XOR bijection between the hot tree materials
-and the noninitial selected labels; `STATUS` of the no-joins port lists the lemmas this changes).
+and the noninitial selected labels, in the labels' factor of the core split).
 
 In the random-oracle model this replaces the circular correlation robustness that Duty-Free Bits
 assumes: the hidden answers are never installed, the view does not involve `Δ`, and a query at a
