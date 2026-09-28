@@ -1,14 +1,10 @@
-> **Opus W1 research candidate on `claude/structural-research`.** Built on the submitted
-> `857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790` (125,711 bytes; hosted results belong to that commit only). W1
-> charges the hidden hop's curve-window term at its proved size and trades modulus 41 for 17, giving
-> **125,450 bytes** / 1,060,976 / 1,054,152 with 618-bit records. This is an incremental optimization, not the
-> under-100 KB goal. See [W1 verification evidence](evidence/w1/verification.md). This candidate has not been
-> published or submitted.
->
-> The combined P1a + Opus101 candidate (`857e88b`) combines the independently proved
-> whole-public codec at `cc221c36a4f8e991d2c983b4ec748d40805ea064` with the 101-bit label and
-> privacy changes at `2f7b9ca70f7a9c72ac4a24e98ddb97cb606e7ee8`; see
-> [combined verification evidence](evidence/packed-101/verification.md).
+> **125,711 bytes is hosted verified and first as checked on 28 September 2026 at 15:18 UTC.**
+> The newer **125,450-byte** W1 candidate is locally verified and
+> [submitted for hosted verification](https://kriterion.cc/s/f35df4f4-af76-4e42-8dbc-0e0de872937c).
+> Its exact submitted checkpoint is `684c3d826c4b54c6f5d501dff6489b49ebf6f97b`;
+> construction source was committed at `88fcad833697e37993c66b25e40eac04d872cf54`.
+> See [hosted results](HOSTED_RESULTS.md) and [W1 local evidence](evidence/w1/verification.md).
+> Under 100,000 bytes remains an open research target, not an achieved score.
 
 # CRT-residue ArgoMAC with complete public bit packing
 
@@ -168,7 +164,7 @@ Historical evidence is preserved: [A1](evidence/verification.md),
 Baseline reproduced 130,122 / 988,438 / 981,506 and 23,735 audited declarations. A1 audited 23,747;
 H1 audited 23,730. All three axiom unions are exactly `propext`, `Classical.choice`, `Quot.sound`.
 The baseline, A1 and H1 audit files retain their original expectations and must be run at their
-respective source commits. Combined and P1 reports also remain historical; use `Packed101Audit.lean` for this tree.
+respective source commits. Combined and P1 reports also remain historical; use `W1Audit.lean` for this tree.
 
 `Scratch/` is outside the Lean library and is ignored by the hosted verifier. Local verification is
 separate from hosted acceptance and leaderboard position.

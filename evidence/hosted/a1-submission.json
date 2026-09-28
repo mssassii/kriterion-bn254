@@ -1,0 +1,111 @@
+{
+  "submission": {
+    "id": "dcdf2b68-3328-480f-8c1a-0a6f5a209476",
+    "challenge": "scalar-multiplication",
+    "author": "github:mssassii",
+    "createdAt": "2026-09-28T13:20:12.253Z",
+    "contentDigest": "962ad52e9bdc349754bc8eab3e9e973f23889b923de1da223257dc2c53a6e286",
+    "modelAttribution": "gpt-6-astra + claude-opus-5-5 (independent review); human direction by Souhail",
+    "intuitionNote": null,
+    "hasWallet": false,
+    "walletAddress": null,
+    "isBaseline": false
+  },
+  "evaluation": {
+    "id": "24f86dfc-f902-4232-b2e4-6f51445dd5da",
+    "state": "complete",
+    "stage": 1,
+    "challengeRevision": 16,
+    "verifierDigest": "sha256:f08bdb4e1933688675c3a5924a13c92440d993f81ad72bc9e7b0577a2c045555",
+    "reason": null,
+    "createdAt": "2026-09-28T13:20:12.262Z",
+    "startedAt": "2026-09-28T13:20:12.326Z",
+    "finishedAt": "2026-09-28T13:40:18.514Z"
+  },
+  "entry": {
+    "submissionId": "dcdf2b68-3328-480f-8c1a-0a6f5a209476",
+    "author": "github:mssassii",
+    "createdAt": "2026-09-28T13:20:12.253Z",
+    "repo": "https://github.com/mssassii/kriterion-bn254",
+    "commit": "719b09effea8b5ef544b8243dd9cd840636f963c",
+    "state": "SUPERSEDED",
+    "checks": [
+      {
+        "checkId": "axioms",
+        "result": "pass",
+        "status": "ok",
+        "detail": {
+          "axioms": [
+            "propext",
+            "Classical.choice",
+            "Quot.sound"
+          ]
+        }
+      },
+      {
+        "checkId": "build",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "layout",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "lint",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "obligation",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      }
+    ],
+    "sources": [
+      {
+        "source": "metric:ciphertext_bytes",
+        "value": 128822,
+        "contributed": "orders+gates",
+        "unit": "bytes",
+        "direction": "lower",
+        "baselineDeltaPct": -98.68630428726026
+      },
+      {
+        "source": "metric:garble_queries",
+        "value": 1062022,
+        "contributed": "gates",
+        "unit": "queries",
+        "direction": "lower",
+        "baselineDeltaPct": -39.656709472393516
+      },
+      {
+        "source": "metric:evaluate_queries",
+        "value": 1055144,
+        "contributed": "gates",
+        "unit": "queries",
+        "direction": "lower",
+        "baselineDeltaPct": -0.06961024890162604
+      }
+    ],
+    "review": {
+      "requestedModel": "openai/gpt-5",
+      "resolvedModel": "openai/gpt-5",
+      "provider": "openrouter",
+      "state": "filed",
+      "verdict": "CLEAR",
+      "reason": "The submission defines Submission.solution with concrete algorithms and proofs for all required fields. The scheme’s function is definitionally checkedScalarMultiplication, so functionCorrect := rfl is by construction. Garble/Evaluate programs are provided with correctness lemmas equating them to the scheme via FreeQuery.eval. Lamport compatibility uses explicit key-pair selection equality. Perfect correctness and adaptive privacy are proved by referenced theorems within the submission, not axioms. Query bounds and fixed-length encoding are established by the cited results. No bypass (e.g., sorry/axiom) is used in the solution record.",
+      "citation": null
+    },
+    "flags": []
+  },
+  "board": {
+    "total": 10
+  },
+  "canRerunReview": false
+}

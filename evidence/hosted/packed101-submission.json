@@ -1,0 +1,112 @@
+{
+  "submission": {
+    "id": "8e10e0d6-d6fe-4a45-969f-95c76cda5ce8",
+    "challenge": "scalar-multiplication",
+    "author": "github:mssassii",
+    "createdAt": "2026-09-28T14:57:11.998Z",
+    "contentDigest": "e3b0b5b81f2c0e28145030a56ea555e539fbe09019e14a809dea717fc3515d12",
+    "modelAttribution": "gpt-6-astra + claude-opus-5-5; human direction by Souhail",
+    "intuitionNote": null,
+    "hasWallet": false,
+    "walletAddress": null,
+    "isBaseline": false
+  },
+  "evaluation": {
+    "id": "0fa5602f-3174-4575-9066-56212dc89672",
+    "state": "complete",
+    "stage": 1,
+    "challengeRevision": 16,
+    "verifierDigest": "sha256:f08bdb4e1933688675c3a5924a13c92440d993f81ad72bc9e7b0577a2c045555",
+    "reason": null,
+    "createdAt": "2026-09-28T14:57:12.008Z",
+    "startedAt": "2026-09-28T14:57:12.059Z",
+    "finishedAt": "2026-09-28T15:17:34.910Z"
+  },
+  "entry": {
+    "submissionId": "8e10e0d6-d6fe-4a45-969f-95c76cda5ce8",
+    "author": "github:mssassii",
+    "createdAt": "2026-09-28T14:57:11.998Z",
+    "repo": "https://github.com/mssassii/kriterion-bn254",
+    "commit": "857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790",
+    "state": "ON_BOARD",
+    "checks": [
+      {
+        "checkId": "axioms",
+        "result": "pass",
+        "status": "ok",
+        "detail": {
+          "axioms": [
+            "propext",
+            "Classical.choice",
+            "Quot.sound"
+          ]
+        }
+      },
+      {
+        "checkId": "build",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "layout",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "lint",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "obligation",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      }
+    ],
+    "sources": [
+      {
+        "source": "metric:ciphertext_bytes",
+        "value": 125711,
+        "contributed": "orders+gates",
+        "unit": "bytes",
+        "direction": "lower",
+        "baselineDeltaPct": -98.71802951557788
+      },
+      {
+        "source": "metric:garble_queries",
+        "value": 1061622,
+        "contributed": "gates",
+        "unit": "queries",
+        "direction": "lower",
+        "baselineDeltaPct": -39.67943717126514
+      },
+      {
+        "source": "metric:evaluate_queries",
+        "value": 1054788,
+        "contributed": "gates",
+        "unit": "queries",
+        "direction": "lower",
+        "baselineDeltaPct": -0.10332623340363811
+      }
+    ],
+    "review": {
+      "requestedModel": "openai/gpt-5",
+      "resolvedModel": "openai/gpt-5",
+      "provider": "openrouter",
+      "state": "filed",
+      "verdict": "CLEAR",
+      "reason": "The submission defines Submission.solution with concrete algorithms and proofs that align with Kriterion.Solution. The scheme is fully specified (Entry.scheme), the query programs are provided with exact bounds and proven equal to the scheme (garbleProgramCorrect, evaluateProgramCorrect), Lamport compatibility is established (lamportCompatible), ciphertext size is fixed by construction (Wire.encoding_length), functionCorrect is definitional (rfl) against checkedScalarMultiplication, perfectCorrectness is imported from a dedicated proof, and adaptivePrivacy is provided via the CRT simulator proof chain (crtEntry_adaptivePrivacy). There is no evidence of bypassing obligations; the entry inhabits the type by construction.",
+      "citation": null
+    },
+    "flags": [],
+    "position": 1
+  },
+  "board": {
+    "total": 10
+  },
+  "canRerunReview": false
+}
