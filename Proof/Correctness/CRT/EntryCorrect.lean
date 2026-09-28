@@ -416,7 +416,7 @@ theorem homog_eq [FieldCertificate] (H : HashN) (scalar : NonZeroScalar) (coins 
     unfold FieldMacToECMac.delivered rowsOf normRowsVec
     rw [vector_get_ofFn]
     rfl
-  rw [e1, e2]
+  rewrite [e1, e2]
   have keyOn : OnCurve ((outputKeysOf scalar coins).get index).offset.coordinates :=
     ((outputKeysOf scalar coins).get index).offset.onCurve
   have zNe : (Rows.unscaledOf (outputKeysOf scalar coins) index).z.constant ≠ 0 :=
