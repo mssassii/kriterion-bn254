@@ -646,7 +646,7 @@ theorem exJoins_read (D : Exact) : exJoins (readSource D) = D.2.2.1 := by
     (n.val / Entry.joinCount * Entry.joinCount + n.val % Entry.joinCount))).toNat = (D.2.2.1 n).val
   rw [Nat.div_add_mod', total_apply _ _ _ n.isLt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (D.2.2.1 n).isLt]
 
-theorem pin_index (P m : Nat) : (m / (P * laneCount) * P + m / laneCount % P ) * laneCount + m % laneCount = m := by
+theorem pin_index (P m : Nat) : (m / (P * laneCount) * P + m / laneCount % P) * laneCount + m % laneCount = m := by
   rw [Nat.mul_comm P laneCount, ← Nat.div_div_eq_div_mul, Nat.div_add_mod', Nat.div_add_mod']
 
 theorem exPins_read (D : Exact) : exPins (readSource D) = D.2.2.2.1 := by
@@ -654,9 +654,9 @@ theorem exPins_read (D : Exact) : exPins (readSource D) = D.2.2.2.1 := by
   apply Fin.ext
   unfold exPins
   show ((((total 0 (fun m => (D.2.2.2.1 m).val)
-      ((pinCoord n.val * Entry.pinCount + pinOf n.val ) * laneCount + n.val % laneCount) : Nat)) :
+      ((pinCoord n.val * Entry.pinCount + pinOf n.val) * laneCount + n.val % laneCount) : Nat)) :
       ZMod (2 ^ Entry.pinWidth ⟨pinOf n.val, pinOf_lt n⟩))).val = (D.2.2.2.1 n).val
-  have idx : (pinCoord n.val * Entry.pinCount + pinOf n.val ) * laneCount + n.val % laneCount = n.val :=
+  have idx : (pinCoord n.val * Entry.pinCount + pinOf n.val) * laneCount + n.val % laneCount = n.val :=
     pin_index Entry.pinCount n.val
   rw [ZMod.val_natCast, idx, total_apply _ _ _ n.isLt]
   exact Nat.mod_eq_of_lt (lt_of_lt_of_eq (D.2.2.2.1 n).isLt (by rw [CrtConv.pinWidthAt_eq _ (pinOf_lt n)]))
