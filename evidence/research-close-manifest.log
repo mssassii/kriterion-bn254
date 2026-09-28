@@ -1,0 +1,5 @@
+$ python3 Scratch/opus_w1_manifest.py check ca29e53
+# HEAD ca29e538fb743ae4b9635d33699c5bd908a63c80
+# tracked changes:
+
+manifest matches 439 files (commit ca29e53): c896419cdca17c964b7da719362a7679cf3ea516242169fd16ef6b213b751ff7

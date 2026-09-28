@@ -1,0 +1,27 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--stat",
+    "684c3d8",
+    "ca29e53",
+    "--",
+    "Construction",
+    "Proof",
+    "Construction.lean",
+    "Proof.lean",
+    "Submission.lean",
+    "Benchmark",
+    "lakefile.toml",
+    "lake-manifest.json",
+    "lean-toolchain",
+    "README.md",
+    "Scratch/W1Audit.lean",
+    "Scratch/ProofAudit.lean"
+  ],
+  "head": "ca29e538fb743ae4b9635d33699c5bd908a63c80",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 0.0,
+  "log": "evidence/research-close-diff.log"
+}

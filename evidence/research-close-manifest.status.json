@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "Scratch/opus_w1_manifest.py",
+    "check",
+    "ca29e53"
+  ],
+  "head": "ca29e538fb743ae4b9635d33699c5bd908a63c80",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 4.8,
+  "log": "evidence/research-close-manifest.log"
+}
