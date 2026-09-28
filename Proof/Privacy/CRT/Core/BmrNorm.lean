@@ -512,21 +512,6 @@ theorem chi_signed (sign : Bool) (a : BaseField) : chi (Rows.signed sign a) = Ro
   · rw [signed_true, signed_true, show -a = -1 * a by ring, chi_mul, chi_neg_one]
     ring
 
-theorem signBit_eq (x : BaseField) : Rows.signBit x = decide (chi x = -1) := by
-  unfold Rows.signBit chi
-  rw [JacobianMixed.fieldPower_eq _ _ JacobianMixed.characterExponent_lt]
-
-/-- `[χ = −1]` of `(−1)^ν · 1` is `ν`. -/
-theorem decide_signed_one (sign : Bool) : decide (Rows.signed sign (1 : BaseField) = -1) = sign := by
-  cases sign
-  · exact decide_eq_false one_ne_neg_one
-  · exact decide_eq_true rfl
-
-/-- **`ν` of `(−1)^ν τ²` is `ν`.** -/
-theorem signBit_signed_sq (sign : Bool) (tau : BaseField) (ne : tau ≠ 0) :
-    Rows.signBit (Rows.signed sign (tau ^ 2)) = sign := by
-  rw [signBit_eq, chi_signed, chi_sq_ne tau ne]
-  exact decide_signed_one sign
 
 /-- The square root `x^((p+1)/4)`. -/
 def root (x : BaseField) : BaseField := x ^ Garbling.rootExponent
@@ -581,54 +566,86 @@ theorem nz_ext {a b : NonZeroBase} (h : a.value = b.value) : a = b := by
   subst h
   rfl
 
+/-- `[χ(x) = 1]`. -/
+def sqBit (x : BaseField) : Bool := decide (chi x = 1)
+
+/-- `[χ(x) = −1]`. -/
+def negBit (x : BaseField) : Bool := decide (chi x = -1)
+
+theorem sqBit_true (x : BaseField) (h : chi x = 1) : sqBit x = true := decide_eq_true h
+
+theorem sqBit_false (x : BaseField) (h : chi x ≠ 1) : sqBit x = false := decide_eq_false h
+
+theorem negBit_true (x : BaseField) (h : chi x = -1) : negBit x = true := decide_eq_true h
+
+theorem negBit_false (x : BaseField) (h : chi x ≠ -1) : negBit x = false := decide_eq_false h
+
+theorem negBit_signed_one (sign : Bool) (a : BaseField) (h : chi a = Rows.signed sign 1) : negBit a = sign := by
+  cases sign
+  · rw [signed_false] at h
+    exact negBit_false a (by rw [h]; exact one_ne_neg_one)
+  · rw [signed_true] at h
+    exact negBit_true a h
+
 /-- The sign split of one digit's sign scale: `(τ, ν) ↦ ((−1)^ν τ², [χ(τ) = 1])`. -/
 def signSplit (p : NonZeroBase × Bool) : NonZeroBase × Bool :=
-  (⟨Rows.signed p.2 (p.1.value ^ 2), signed_ne_zero _ _ (pow_ne_zero 2 p.1.nonzero)⟩, decide (chi p.1.value = 1))
+  (⟨Rows.signed p.2 (p.1.value ^ 2), signed_ne_zero _ _ (pow_ne_zero 2 p.1.nonzero)⟩, sqBit p.1.value)
 
 /-- Its inverse. -/
 def signJoin (q : NonZeroBase × Bool) : NonZeroBase × Bool :=
-  (⟨signedRoot q.2 (Rows.signed (decide (chi q.1.value = -1)) q.1.value),
-      signedRoot_ne_zero _ _ (signed_ne_zero _ _ q.1.nonzero)⟩, decide (chi q.1.value = -1))
+  (⟨signedRoot q.2 (Rows.signed (negBit q.1.value) q.1.value),
+      signedRoot_ne_zero _ _ (signed_ne_zero _ _ q.1.nonzero)⟩, negBit q.1.value)
 
 theorem signSplit_fst (p : NonZeroBase × Bool) :
     (signSplit p).1.value = Rows.signed p.2 (p.1.value ^ 2) := rfl
 
-theorem signSplit_snd (p : NonZeroBase × Bool) : (signSplit p).2 = decide (chi p.1.value = 1) := rfl
+theorem signSplit_snd (p : NonZeroBase × Bool) : (signSplit p).2 = sqBit p.1.value := rfl
 
 theorem signJoin_fst (q : NonZeroBase × Bool) :
-    (signJoin q).1.value = signedRoot q.2 (Rows.signed (decide (chi q.1.value = -1)) q.1.value) := rfl
+    (signJoin q).1.value = signedRoot q.2 (Rows.signed (negBit q.1.value) q.1.value) := rfl
 
-theorem signJoin_snd (q : NonZeroBase × Bool) : (signJoin q).2 = decide (chi q.1.value = -1) := rfl
+theorem signJoin_snd (q : NonZeroBase × Bool) : (signJoin q).2 = negBit q.1.value := rfl
 
 theorem signJoin_signSplit (p : NonZeroBase × Bool) : signJoin (signSplit p) = p := by
   obtain ⟨⟨tau, ne⟩, sign⟩ := p
-  have signEq : decide (chi (Rows.signed sign (tau ^ 2)) = -1) = sign := by
+  have signEq : negBit (Rows.signed sign (tau ^ 2)) = sign := by
+    refine negBit_signed_one sign _ ?_
     rw [chi_signed, chi_sq_ne tau ne]
-    exact decide_signed_one sign
   refine Prod.ext (nz_ext ?_) ?_
   · rw [signJoin_fst, signSplit_fst, signSplit_snd, signEq, signed_signed]
     rcases chi_cases tau ne with one | minus
-    · rw [show decide (chi tau = 1) = true from decide_eq_true one, signedRoot_true, root_sq_elem, one, one_mul]
-    · rw [show decide (chi tau = 1) = false from decide_eq_false (by rw [minus]; exact one_ne_neg_one.symm),
-        signedRoot_false, root_sq_elem, minus]
+    · rw [sqBit_true tau one, signedRoot_true, root_sq_elem, one, one_mul]
+    · rw [sqBit_false tau (by rw [minus]; exact one_ne_neg_one.symm), signedRoot_false, root_sq_elem, minus]
       ring
   · rw [signJoin_snd, signSplit_fst]
     exact signEq
 
 theorem signSplit_signJoin (q : NonZeroBase × Bool) : signSplit (signJoin q) = q := by
   obtain ⟨⟨kappa, ne⟩, b⟩ := q
-  have square : chi (Rows.signed (decide (chi kappa = -1)) kappa) = 1 := by
+  have square : chi (Rows.signed (negBit kappa) kappa) = 1 := by
     rw [chi_signed]
     rcases chi_cases kappa ne with one | minus
-    · rw [show decide (chi kappa = -1) = false from decide_eq_false (by rw [one]; exact one_ne_neg_one), one,
-        signed_false]
-    · rw [show decide (chi kappa = -1) = true from decide_eq_true minus, minus, signed_true, neg_neg]
+    · rw [negBit_false kappa (by rw [one]; exact one_ne_neg_one), one, signed_false]
+    · rw [negBit_true kappa minus, minus, signed_true, neg_neg]
   refine Prod.ext (nz_ext ?_) ?_
   · rw [signSplit_fst, signJoin_fst, signJoin_snd, signedRoot_sq _ _ square, signed_signed]
-  · rw [signSplit_snd, signJoin_fst, chi_signedRoot _ _ square]
+  · rw [signSplit_snd, signJoin_fst, chi_signedRoot _ _ square] at *
     cases b
-    · exact decide_eq_false (by rw [Bool.not_false, signed_true]; exact one_ne_neg_one.symm)
-    · exact decide_eq_true (by rw [Bool.not_true, signed_false])
+    · rw [signSplit_snd, signJoin_fst]
+      exact sqBit_false _ (by rw [chi_signedRoot _ _ square, Bool.not_false, signed_true]; exact one_ne_neg_one.symm)
+    · rw [signSplit_snd, signJoin_fst]
+      exact sqBit_true _ (by rw [chi_signedRoot _ _ square, Bool.not_true, signed_false])
+
+theorem signBit_eq_negBit (x : BaseField) : Rows.signBit x = negBit x := by
+  unfold Rows.signBit negBit chi
+  rw [JacobianMixed.fieldPower_eq _ _ JacobianMixed.characterExponent_lt]
+
+/-- **`ν` of `(−1)^ν τ²` is `ν`.** -/
+theorem signBit_signed_sq (sign : Bool) (tau : BaseField) (ne : tau ≠ 0) :
+    Rows.signBit (Rows.signed sign (tau ^ 2)) = sign := by
+  rw [signBit_eq_negBit]
+  refine negBit_signed_one sign _ ?_
+  rw [chi_signed, chi_sq_ne tau ne]
 
 /-- **The sign split is a bijection.** -/
 def signEquiv : NonZeroBase × Bool ≃ NonZeroBase × Bool :=
