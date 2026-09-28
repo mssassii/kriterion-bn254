@@ -185,48 +185,38 @@ theorem agree_castDyn (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   simp only [StageCells.castCells] at halves
   obtain ⟨_, frameQ, bitsQ, regsQ⟩ := inv
   simp only [StageCells.castCells] at frameQ
+  set S := hashInput (embed label) (base + stride * (slot + 2 ^ start * t)) with SDef
+  have SSmall : S < 2 ^ 256 := by
+    rw [SDef]
+    unfold hashInput
+    simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
+    have : label.toNat < 2 ^ 104 := label.isLt
+    omega
+  have low : S % 2 ^ 128 = label.toNat := by
+    rw [SDef]
+    unfold hashInput
+    simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
+    have : label.toNat < 2 ^ 104 := label.isLt
+    rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt (by omega)]
+  have dNow : after.registers rD = word S := by
+    rw [regsQ rD (by unfold castClobbers Clobbers.ofList; decide)]
+    exact rD1
   rw [tree_eq_exec _ (det_castLanesProg cells.castCells rb)]
-  obtain ⟨final, run, lanes, frameL, bitsL, regsL⟩ := Prog.exec_rep (laneExtract cells.castCells rb)
-    (fun i current =>
-      (∀ i', i' < i → current.ram (word (cells.laneBase + i')) =
-          word (halvesOf values (i' / lanesPerBlock rb) >>> (rb * (i' % lanesPerBlock rb)) % 2 ^ rb)) ∧
-        (∀ address, (∀ i', i' < laneCount → address ≠ word (cells.laneBase + i')) →
-          current.ram address = after.ram address) ∧
-        current.bits = after.bits ∧
-        ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr →
-          current.registers register = after.registers register)
-    laneCount (fun i bound current holds => by
-      obtain ⟨done, frame, bits, regs⟩ := holds
-      have blockBound := laneBlock_lt rb rbPos rbLe i bound
-      have blockNow : current.ram (word (cells.ansBase + i / lanesPerBlock rb)) =
-          word (halvesOf values (i / lanesPerBlock rb)) := by
-        rw [frame _ fun i' ib => word_ne (by omega) (by omega) (by omega)]
-        exact halves _ blockBound
-      obtain ⟨next, step, ram, bitsN, regsN⟩ := exec_laneExtract cells.castCells rb i current _ blockNow
-        (lt_trans (halvesOf_lt values _) (by norm_num)) rbPos rbLe
-      simp only [StageCells.castCells] at ram
-      have laneSmall : cells.laneBase + i < 2 ^ 256 := by omega
-      refine ⟨next, step, fun i' ib => ?_, fun address off => ?_, by rw [bitsN, bits],
-        fun register notA notB notAddr => by rw [regsN register notA notB notAddr,
-          regs register notA notB notAddr]⟩
-      · rw [ram, Nat.shiftRight_eq_div_pow]
-        by_cases last : i' = i
-        · subst last
-          rw [Function.update_self]
-        · rw [Function.update_of_ne (word_ne (by omega) laneSmall (by omega)), done i' (by omega),
-            Nat.shiftRight_eq_div_pow]
-      · rw [ram, Function.update_of_ne (off i bound)]
-        exact frame address off)
-    after ⟨fun i' ib => absurd ib (Nat.not_lt_zero _), fun _ _ => rfl, rfl, fun _ _ _ _ => rfl⟩
-  rw [show castLanesProg cells.castCells rb = Prog.rep laneCount (laneExtract cells.castCells rb) from rfl,
-    run]
+  obtain ⟨final, run, lanes, frameL, bitsL, regsL⟩ := exec_castLanesProg cells.castCells rb rbPos rbLe values
+    label S after (fun b bb => halves b bb) dNow SSmall low (by simp only [StageCells.castCells]; omega)
+    (by simp only [StageCells.castCells]; omega)
+    (fun b bb i ib => by simp only [StageCells.castCells]; omega)
+  rw [run]
   refine .leaf ⟨fun i => ?_, fun address offAns offLane => ?_, ?_, fun register outside => ?_⟩
-  · rw [lanes i.val i.isLt, materialize_eq,
-      castLanes_val rb rbPos rbLe values i (laneBlock_lt rb rbPos rbLe i.val i.isLt)]
-  · rw [frameL address offLane, frameQ address offAns, ram1]
+  · have lane := lanes i
+    simp only [StageCells.castCells] at lane
+    rw [lane, materialize_eq]
+  · have frameL' := frameL address
+    simp only [StageCells.castCells] at frameL'
+    rw [frameL' offLane, frameQ address offAns, ram1]
   · rw [bitsL, bitsQ, bits1]
   · rw [regsL register (ne_of_not_stage outside rA (by simp)) (ne_of_not_stage outside rB (by simp))
-      (ne_of_not_stage outside rAddr (by simp)),
+      (ne_of_not_stage outside rAddr (by simp)) (ne_of_not_stage outside rSecond (by simp)),
       regsQ register (fun inside => outside (by
         unfold castClobbers Clobbers.ofList at inside
         unfold stageClobbers Clobbers.ofList
