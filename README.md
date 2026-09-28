@@ -1,6 +1,6 @@
-> **125,711 bytes is hosted verified and first as checked on 28 September 2026 at 15:18 UTC.**
-> The newer **125,450-byte** W1 candidate is locally verified and
-> [submitted for hosted verification](https://kriterion.cc/s/f35df4f4-af76-4e42-8dbc-0e0de872937c).
+> **125,450 bytes is hosted verified and first as checked on 28 September 2026 at 15:42 UTC.**
+> The [W1 submission](https://kriterion.cc/s/f35df4f4-af76-4e42-8dbc-0e0de872937c)
+> passed all five hosted checks; automated review is CLEAR.
 > Its exact submitted checkpoint is `684c3d826c4b54c6f5d501dff6489b49ebf6f97b`;
 > construction source was committed at `88fcad833697e37993c66b25e40eac04d872cf54`.
 > See [hosted results](HOSTED_RESULTS.md) and [W1 local evidence](evidence/w1/verification.md).
@@ -59,7 +59,7 @@ The independently proved checkpoints are:
 
 The combined schedule widens `59, 61, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317,
 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397`. Each widening removes one join and one
-half-pin label per coordinate, saving 52 bytes. Dropping modulus 17 removes 494 bytes and frees query
+half-pin label per coordinate, saving 52 bytes in the earlier byte-aligned 104-bit format. Dropping modulus 17 removes 494 bytes and frees query
 budget for the 26th widening. The word widths, chunk width, 128-bit external Lamport labels, 120-bit pad slack and 642 records are retained. P1a replaces the full public byte codec; Opus101 narrows internal labels to 101 bits.
 
 **W1 (Opus).** The hidden hop's window term `hiddenWindowError` was charged at `smudgeError`, about 86 times its
@@ -70,7 +70,7 @@ has 84 moduli, all 26 width-9 widenings are unchanged, and the only reach-certif
 (from `de8f397`) and removes 41's. The construction is otherwise unchanged. `Scratch/opus_window_model.py` evaluated
 single swaps: 43, 47 and 49 → 17 give the same bytes; 37 → 17 gives 125,530.
 
-`Scratch/check_combined.py` reproduces baseline, A1 and H1 before computing this combination. It
+For the historical pre-W1 combination, `Scratch/check_combined.py` reproduces baseline, A1 and H1. It
 selects the cheapest 26 widenings by evaluation cost, replays all 83 remaining reach certificates,
 and independently computes the privacy constants. A 27th widening would cost at least 1,057,734
 evaluation queries and violate the gate. This is a result for the explored width-8/9 family, not a
@@ -94,7 +94,7 @@ P1 refines the hidden/touch charge to `1/2^104 + 1/(p−1)` with complete generi
 Opus101 generalizes that charge to `1/2^labelBits + 1/(p−1)` and sets `labelBits = 101`.
 Its scaled charge is at most `1/2 + 2^-152`. For fewer than `2^100` adversary queries,
 the accumulated excess fits inside the second constant unit: `1.408 + 2^-51 < 2`. Under W1 the constant is
-`1.5516` (smudge `≤ 77/50`, window `≤ 1/50`, all others `≤ 8/1000`), still `< 2 − 2^-51`.
+approximately `1.551578`; its proved upper bound is `1.568` (smudge `≤ 77/50`, window `≤ 1/50`, all others `≤ 8/1000`), still `< 2 − 2^-51`.
 The target security definition, 508 selected external 128-bit labels and both query budgets are unchanged.
 
 The product still satisfies the universal wrap bound. P1a proves every honest record is below
@@ -119,7 +119,7 @@ privacy remain fields of `Submission.solution` with proof terms.
 
 `BitPacking` composes fixed-width vectors of bits, proves an all-values inverse, and converts to
 bytes once. Its generic width supports the integrated 101-bit labels without per-label or per-vector padding. `CrtWire.wire_bits` proves exact
-bit equality, including final padding. The finite machine emits field254/flags3/record620 and the
+bit equality, including final padding. The finite machine emits 254-bit fields, 3-bit flags and 618-bit records and the
 same final zero run; its unchanged fuel bounds are proved again. No per-field byte padding remains.
 
 | part | garbling | evaluation |
@@ -148,12 +148,14 @@ python3 -B Scratch/opus_w1_manifest.py check
 `Scratch/Packed101Audit.lean` and `Scratch/check_packed101.py` keep their 125,711-byte expectations and must be
 run at `857e88b`.
 
-Combined verification and source binding are recorded in
-[combined evidence](evidence/packed-101/verification.md). The audit measures the actual complete
-ciphertext, checks zero and maximal public values, and checks exact decode/re-encode with a byte tail.
-The universal inverse covers every public value, including arbitrary 620-bit records.
-Only `propext`, `Classical.choice`, and `Quot.sound` are permitted. The source manifest covers
-459 Lean source, configuration and audit/model files and is checked after commit.
+Current verification and source binding are recorded in [W1 evidence](evidence/w1/verification.md).
+The audit measures the actual complete ciphertext, checks zero and maximal public values, and checks exact
+decode/re-encode with a byte tail. The universal inverse covers every public value, including arbitrary
+618-bit records. Only `propext`, `Classical.choice` and `Quot.sound` are permitted. The current manifest
+covers 439 production/configuration and selected audit/model files. The coordinator also checked all
+459 inherited files against Astra's independently reviewed snapshot; historical Scratch audits outside
+the current manifest remain unchanged. The earlier [packed-101 evidence](evidence/packed-101/verification.md)
+refers to its own immutable 125,711-byte source.
 
 The exact P1a checkpoint and its [report](evidence/packed-public/verification.md) remain immutable.
 The independent Opus101 checkpoint and [report](evidence/width101/verification.md) describe its
@@ -218,3 +220,14 @@ the curve window at the size the inherited `CurveWindow` proof (psivesely `de8f3
 AI involvement is explicit: OpenAI GPT-6 Astra and Anthropic Claude Opus 5.5 assisted under Souhail's
 direction. The original entry disclosed Claude and GPT assistance as well. The pinned verifier checks
 the proof terms, permitted axioms and metrics independently of those attributions.
+
+## Research toward fewer than 100,000 bytes
+
+This target remains unresolved. Research is preserved separately from the submitted entry:
+
+- [Astra's isolated algebra and 9-bit chunk feasibility](https://github.com/mssassii/kriterion-bn254/tree/codex/structural-research/evidence): mathematical experiments and migration requirements; the projected new formats are not complete entries.
+- [Claude's carry-range and joint cost models](https://github.com/mssassii/kriterion-bn254/tree/claude/structural-research/Scratch): conditional arithmetic models; they do not establish a construction, its query totals or its privacy.
+
+Promising questions concern larger scalar-digit alphabets and cheaper authenticated carry reduction.
+Their combined cost budgets can fall below 100,000 bytes under unproved assumptions. Those projections are
+not scores, and no global lower bound is claimed. W1 still needs another 25,451-byte reduction to reach 99,999 bytes.

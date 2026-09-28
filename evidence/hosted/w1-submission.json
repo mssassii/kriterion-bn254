@@ -13,14 +13,14 @@
   },
   "evaluation": {
     "id": "4cf45486-e1bc-4130-af37-d8ce3750cb10",
-    "state": "running",
+    "state": "complete",
     "stage": 1,
     "challengeRevision": 16,
-    "verifierDigest": null,
+    "verifierDigest": "sha256:f08bdb4e1933688675c3a5924a13c92440d993f81ad72bc9e7b0577a2c045555",
     "reason": null,
     "createdAt": "2026-09-28T15:21:28.961Z",
     "startedAt": "2026-09-28T15:21:29.000Z",
-    "finishedAt": null
+    "finishedAt": "2026-09-28T15:41:43.932Z"
   },
   "entry": {
     "submissionId": "f35df4f4-af76-4e42-8dbc-0e0de872937c",
@@ -28,41 +28,82 @@
     "createdAt": "2026-09-28T15:21:28.948Z",
     "repo": "https://github.com/mssassii/kriterion-bn254",
     "commit": "684c3d826c4b54c6f5d501dff6489b49ebf6f97b",
-    "state": "PENDING",
-    "checks": [],
+    "state": "ON_BOARD",
+    "checks": [
+      {
+        "checkId": "axioms",
+        "result": "pass",
+        "status": "ok",
+        "detail": {
+          "axioms": [
+            "propext",
+            "Classical.choice",
+            "Quot.sound"
+          ]
+        }
+      },
+      {
+        "checkId": "build",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "layout",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "lint",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      },
+      {
+        "checkId": "obligation",
+        "result": "pass",
+        "status": "ok",
+        "detail": {}
+      }
+    ],
     "sources": [
       {
         "source": "metric:ciphertext_bytes",
-        "value": null,
+        "value": 125450,
         "contributed": "orders+gates",
         "unit": "bytes",
-        "direction": "lower"
+        "direction": "lower",
+        "baselineDeltaPct": -98.72069113068265
       },
       {
         "source": "metric:garble_queries",
-        "value": null,
+        "value": 1060976,
         "contributed": "gates",
         "unit": "queries",
-        "direction": "lower"
+        "direction": "lower",
+        "baselineDeltaPct": -39.71614240494282
       },
       {
         "source": "metric:evaluate_queries",
-        "value": null,
+        "value": 1054152,
         "contributed": "gates",
         "unit": "queries",
-        "direction": "lower"
+        "direction": "lower",
+        "baselineDeltaPct": -0.16356040796341248
       }
     ],
     "review": {
       "requestedModel": "openai/gpt-5",
-      "resolvedModel": null,
-      "provider": null,
-      "state": "queued",
-      "verdict": null,
-      "reason": null,
+      "resolvedModel": "openai/gpt-5",
+      "provider": "openrouter",
+      "state": "filed",
+      "verdict": "CLEAR",
+      "reason": "The entry defines Submission.solution as an explicit Kriterion.Solution populated with the concrete executable scheme (@Entry.scheme), programs (Entry.garbleProgram / Entry.evaluateProgram), and proofs tying the programs to the scheme (garbleProgramCorrect/evaluateProgramCorrect). Lamport compatibility, ciphertext size, perfect correctness, and adaptive privacy are provided by concrete theorems referencing constructed components, not axioms. This inhabits the obligation by construction rather than bypassing it.",
       "citation": null
     },
-    "flags": []
+    "flags": [],
+    "position": 1
   },
   "board": {
     "total": 10
