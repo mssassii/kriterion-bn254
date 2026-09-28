@@ -150,7 +150,7 @@ theorem window_source [FieldCertificate] [GroupCertificate] (source : (Instance.
 end Wrap
 
 /-- **The wrap reveal at one source**: the window, or the source's normalization flag. -/
-theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
+theorem wrap_source [FieldCertificate] [GroupCertificate] (source : Kriterion.CRT.Entry.Source) (u : AffineInput) :
     (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWraps source u T} ≤
       ENNReal.ofReal smudgeError + NormFlag.badInd source := by
   by_cases bad : H8.normBadSrc source
