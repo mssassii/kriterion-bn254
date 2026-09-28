@@ -357,7 +357,7 @@ def normRandomness (keys : FieldMacToECMac.OutputKeys) (K : FieldMacToECMac.Digi
     tau := nonZeroOf (Rows.tauOf (Rows.kappaOf (Rows.unscaledOf keys index) (K index))) }
 
 theorem normRandomness_get (keys : FieldMacToECMac.OutputKeys) (K : FieldMacToECMac.DigitValues)
-    (base : FieldMacToECMac.Randomness) (index : Fin digitCount) :
+    (base : FieldMacToECMac.Randomness) (index : Fin FieldMacToECMac.outputMacCount) :
     (FieldMacToECMac.rowsForOutputKeys keys (normRandomness keys K base)).get index =
       Coordinates.rows (keys.get index).offset.coordinates (digitEndomorphismBase (keys.get index).digit)
         (nonZeroOf (Rows.rhoOf (Rows.unscaledOf keys index) (K index))).value
@@ -369,7 +369,8 @@ theorem normRandomness_get (keys : FieldMacToECMac.OutputKeys) (K : FieldMacToEC
 /-- **A corrected value decodes as the old row** at the corrected randomness. -/
 theorem corrected_decode [FieldCertificate] [GroupCertificate] (keys : FieldMacToECMac.OutputKeys)
     (K : FieldMacToECMac.DigitValues) (base : FieldMacToECMac.Randomness) (input : AffineInput)
-    (onCurve : OnCurve input) (index : Fin digitCount) (exceptionDigit tripleDigit : Digit) (inputPoint : Point) :
+    (onCurve : OnCurve input) (index : Fin FieldMacToECMac.outputMacCount) (exceptionDigit tripleDigit : Digit)
+    (inputPoint : Point) :
     Garbling.decodeHomogeneous (Rows.corrected (Rows.unscaledOf keys index) (K index) input) exceptionDigit
         tripleDigit inputPoint =
       Garbling.decodeHomogeneous (FieldMacToECMac.evaluateRow
@@ -401,8 +402,7 @@ theorem homog_eq [FieldCertificate] (H : HashN) (scalar : NonZeroScalar) (coins 
         (KOf H coins index) input := by
   rw [rowValues_delivered H scalar coins input out hX hY hmasks, pubOf_rows]
   unfold Rows.evaluateNormRows
-  congr 1
-  funext index
+  refine congrArg Vector.ofFn (funext fun index => ?_)
   rw [vector_get_ofFn]
   unfold FieldMacToECMac.delivered rowsOf normRowsVec
   rw [vector_get_ofFn]
@@ -428,8 +428,9 @@ theorem decodeSame [FieldCertificate] [GroupCertificate] (H : HashN) (scalar : N
           exceptionDigits := Vector.ofFn fun o => (digits o).1
           tripleDigits := Vector.ofFn fun o => (digits o).2 } := by
   have onCurve : OnCurve input := (decodePoint_defined input).mp (by simp [decoded])
-  simp only [Garbling.decodeResult, decoded]
-  congr 1
+  unfold Garbling.decodeResult
+  simp only [decoded]
+  refine congrArg (Option.map (pointHorner radix)) ?_
   unfold Garbling.decodePointMacs FieldMacToECMac.evaluateRows
   simp only [Vector.toList_ofFn, zipOfFn_eq]
   exact mapM_ofFn_congr _ _ _ _ fun index b =>
