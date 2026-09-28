@@ -32,12 +32,12 @@ run_cmd do
       Lean.throwError m!"disallowed axioms in {name}: {illegal}"
   Lean.logInfo "Phase-A axiom check passed: only propext, Classical.choice, Quot.sound"
 
-/-- Recompute from the construction definitions, not a copied score record. -/
+/- Recompute from the construction definitions, not a copied score record. -/
 set_option maxRecDepth 100000 in
 example : ciphertextBytes = 148712 ∧ garbleBudget = 964502 ∧ evaluateBudget = 957536 := by
   decide +kernel
 
-/-- Both query gates have at least 500 queries of headroom. -/
+/- Both query gates have at least 500 queries of headroom. -/
 example : garbleBudget + 500 ≤ 1759967 ∧ evaluateBudget + 500 ≤ 1055879 := by
   rw [garbleBudget_eq, evaluateBudget_eq]
   decide +kernel
