@@ -334,6 +334,8 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
         refine ⟨c, p, ?_⟩
         rw [labelsOf_honest H coins u c p, ← designed]
         simp
+        -- the garbler's digest zero labels are `keyZero H coins` (the absorbed chunk joins)
+        rfl
       · subst same
         obtain ⟨hf, hcoord, hslot, hpart⟩ := digestLabelTag_fields (b := 1) c.isLt (lt_of_lt_of_le p.isLt (by decide))
           (by norm_num)
@@ -342,6 +344,8 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
         refine ⟨c, p, ?_⟩
         rw [labelsOf_honest H coins u c p, ← designed]
         simp
+        -- the garbler's digest zero labels are `keyZero H coins` (the absorbed chunk joins)
+        rfl
     · -- a final: designed only at the digit's exceptional input
       right
       rw [asked_tableM] at inFinals

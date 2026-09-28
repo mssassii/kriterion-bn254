@@ -227,8 +227,9 @@ theorem flatten_chunkJoin (T : CrtTable) (p : ConvPublic) (f : ℕ → ℕ → L
 
 /-- The published flat vector of the source's material is that of its full material. -/
 theorem convVector_srcConv (x : JP) : convVector (srcConv x) = convVector (srcConvFull x) := by
-  unfold convVector srcConvFull
-  rw [flatten_chunkJoin]
+  unfold convVector
+  rw [show ConvPublic.flatten table (srcConvFull x) = ConvPublic.flatten table (srcConv x) from
+    flatten_chunkJoin table (srcConv x) _]
 
 /-- **The in-range reading of the source's full conversion material.** -/
 def phi (x : JP) : ConvVals table := readPub table (srcConvFull x)
