@@ -187,10 +187,12 @@ theorem clip_fibre_ratio :
 theorem bind_map_uniform_clip {View : Type*} (view : PMF View) :
     (view.bind fun v => (PMF.uniformOfFintype RawBlock).map fun delta => (v, clip delta))
       = view.bind fun v => (PMF.uniformOfFintype Label).map fun label => (v, label) := by
-  congr 1
-  funext v
-  change (PMF.uniformOfFintype RawBlock).map ((Prod.mk v) ∘ clip) = _
-  rw [← PMF.map_comp, uniform_clip]
+  have inner : (fun v => (PMF.uniformOfFintype RawBlock).map fun delta => (v, clip delta))
+      = fun v => (PMF.uniformOfFintype Label).map fun label => (v, label) := by
+    funext v
+    change (PMF.uniformOfFintype RawBlock).map ((Prod.mk v) ∘ clip) = _
+    rw [← PMF.map_comp, uniform_clip]
+  rw [inner]
 
 /-- A single projection fibre has probability 2^-104 even when its event is
 weighted by an arbitrary nonnegative (possibly infinite) constant. -/
@@ -204,7 +206,10 @@ theorem weighted_clip_fibre (label : Label) (weight : ℝ≥0∞) :
       rw [PMF.map_apply, ← ENNReal.tsum_mul_left]
       apply tsum_congr
       intro delta
-      by_cases same : clip delta = label <;> simp [same, eq_comm, mul_comm]
+      by_cases same : clip delta = label
+      · simp [same, mul_comm]
+      · have other : label ≠ clip delta := fun h => same h.symm
+        simp [same, other]
     _ = _ := by rw [uniform_clip_apply]
 
 /-- The weighted fibre form used for conditional guessing: the guess and weight
