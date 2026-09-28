@@ -79,8 +79,8 @@ section Trees
 
 variable (H : HashN) (cold : ℕ → Prop)
 
-theorem evalStep_cold (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Block)
-    (parent : Fin (2 ^ n) → Block) (h : ∀ s : Fin (2 ^ n), s ≠ active → cold (tagOf s.val)) :
+theorem evalStep_cold (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Label)
+    (parent : Fin (2 ^ n) → Label) (h : ∀ s : Fin (2 ^ n), s ≠ active → cold (tagOf s.val)) :
     AllCold cold (asked H (evalStepM n tagOf active bitLabel join parent)) := by
   rw [asked_evalStepM]
   refine allCold_flatMap cold _ _ fun s _ => ?_
@@ -92,7 +92,7 @@ theorem evalStep_cold (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bi
 theorem ne_active {n value : ℕ} {s : Fin (2 ^ n)} (hs : s ≠ activeAt value n) : s.val ≠ value % 2 ^ n :=
   fun e => hs (Fin.ext e)
 
-theorem treeEval_cold (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) :
+theorem treeEval_cold (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) :
     ∀ levels, (∀ n, 1 ≤ n → n < levels → ∀ s : Fin (2 ^ n), s.val ≠ value % 2 ^ n → cold (tagOf n s.val)) →
       AllCold cold (asked H (treeEvalM tagOf value bitLabel join levels))
   | 0, _ => allCold_nil cold
@@ -108,8 +108,8 @@ theorem treeEval_cold (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join
         exact evalStep_cold H cold n (tagOf n) (activeAt value n) _ _ _ fun s hs =>
           h n (by omega) (by omega) s (ne_active hs)
 
-theorem growEval_cold (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) (start : ℕ)
-    (labels : Fin (2 ^ start) → Block) :
+theorem growEval_cold (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) (start : ℕ)
+    (labels : Fin (2 ^ start) → Label) :
     ∀ count, (∀ k < count, ∀ s : Fin (2 ^ (start + k)), s.val ≠ value % 2 ^ (start + k) →
         cold (tagOf (start + k) s.val)) →
       AllCold cold (asked H (growEvalM tagOf value bitLabel join start labels count))
@@ -123,8 +123,8 @@ end Trees
 
 /-! ### Chunks -/
 
-theorem chunkEval_cold (H : HashN) (cold : ℕ → Prop) (T : CrtTable) (coord : ℕ) (labels : ℕ → Block) (v : ℕ)
-    (joins : ℕ → Block) (pin : Lanes T.castWidth) (c : ℕ)
+theorem chunkEval_cold (H : HashN) (cold : ℕ → Prop) (T : CrtTable) (coord : ℕ) (labels : ℕ → Label) (v : ℕ)
+    (joins : ℕ → Label) (pin : Lanes T.castWidth) (c : ℕ)
     (htree : ∀ n, 1 ≤ n → n < T.chunkWidth c → ∀ s : Fin (2 ^ n), s.val ≠ T.chunkValue v c % 2 ^ n →
       cold (chunkTreeTag coord c n s.val))
     (hcast : ∀ leaf : Fin (2 ^ T.chunkWidth c), ¬ leaf.val = T.chunkValue v c → ∀ j < castAnswers T.castWidth,
@@ -141,14 +141,14 @@ section Stage
 
 variable (H : HashN) (cold : ℕ → Prop) {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ)
 
-theorem subtree_cold (start slot : ℕ) (label : Block) (d : ℕ)
+theorem subtree_cold (start slot : ℕ) (label : Label) (d : ℕ)
     (h : ∀ d' < d, ∀ t : Fin (2 ^ d'), cold (treeTag (start + d') (slot + 2 ^ start * t.val))) :
     AllCold cold (asked H (subtreeM treeTag start slot label d)) := by
   rw [asked_subtreeM_list]
   exact allCold_flatMap cold _ _ fun d' hd' => allCold_flatMap cold _ _ fun t _ =>
     allCold_single cold _ _ (h d' (List.mem_range.mp hd') t)
 
-theorem expand_cold (start slot : ℕ) (label : Block) (state : StageState rb)
+theorem expand_cold (start slot : ℕ) (label : Label) (state : StageState rb)
     (htree : ∀ d' < w - start, ∀ t : Fin (2 ^ d'), cold (treeTag (start + d') (slot + 2 ^ start * t.val)))
     (hcast : ∀ t : Fin (2 ^ (w - start)), ∀ j < castAnswers rb, cold (castTag (slot + 2 ^ start * t.val) j)) :
     AllCold cold (asked H (expandM w treeTag castTag start slot label state)) := by
@@ -168,7 +168,7 @@ stage value `s`. -/
 theorem closed_expand_cold (s : ℕ)
     (htreeS : ∀ ℓ y, 1 ≤ ℓ → ℓ < w → y < 2 ^ ℓ → y ≠ s % 2 ^ ℓ → cold (treeTag ℓ y))
     (hcastS : ∀ α < 2 ^ w, α ≠ s → ∀ j < castAnswers rb, cold (castTag α j))
-    (k : ℕ) (hk : k < w) (slot : ℕ) (hslot : slot = closedSlot s k) (label : Block) (state : StageState rb) :
+    (k : ℕ) (hk : k < w) (slot : ℕ) (hslot : slot = closedSlot s k) (label : Label) (state : StageState rb) :
     AllCold cold (asked H (expandM w treeTag castTag (k + 1) slot label state)) := by
   subst hslot
   have hlt := closedSlot_lt s k
@@ -192,7 +192,7 @@ theorem closed_expand_cold (s : ℕ)
 theorem stageRound_cold (s : ℕ)
     (htreeS : ∀ ℓ y, 1 ≤ ℓ → ℓ < w → y < 2 ^ ℓ → y ≠ s % 2 ^ ℓ → cold (treeTag ℓ y))
     (hcastS : ∀ α < 2 ^ w, α ≠ s → ∀ j < castAnswers rb, cold (castTag α j))
-    (sub : Lanes w) (joins : ℕ → Block) (pin : Lanes rb) (n : ℕ) (hn : n < w) (state : StageState rb) :
+    (sub : Lanes w) (joins : ℕ → Label) (pin : Lanes rb) (n : ℕ) (hn : n < w) (state : StageState rb) :
     AllCold cold (asked H (stageRoundM w treeTag castTag sub s joins pin n state)) := by
   unfold stageRoundM
   dsimp only
@@ -205,7 +205,7 @@ theorem stageRound_cold (s : ℕ)
 theorem stageRounds_cold (s : ℕ)
     (htreeS : ∀ ℓ y, 1 ≤ ℓ → ℓ < w → y < 2 ^ ℓ → y ≠ s % 2 ^ ℓ → cold (treeTag ℓ y))
     (hcastS : ∀ α < 2 ^ w, α ≠ s → ∀ j < castAnswers rb, cold (castTag α j))
-    (sub : Lanes w) (joins : ℕ → Block) (pin : Lanes rb) :
+    (sub : Lanes w) (joins : ℕ → Label) (pin : Lanes rb) :
     ∀ remaining n (state : StageState rb), n + remaining ≤ w →
       AllCold cold (asked H (stageRoundsM w treeTag castTag sub s joins pin remaining n state))
   | 0, _, _, _ => by
@@ -218,7 +218,7 @@ theorem stageRounds_cold (s : ℕ)
 
 /-- **A fused extraction stage asks only cold tags**, at the stage value `s < 2 ^ w`, on any remainder, joins, pin
 and hash. -/
-theorem extStageEval_cold (hw1 : 1 ≤ w) (R : Lanes rb) (s : ℕ) (joins : ℕ → Block) (pin : Lanes rb)
+theorem extStageEval_cold (hw1 : 1 ≤ w) (R : Lanes rb) (s : ℕ) (joins : ℕ → Label) (pin : Lanes rb)
     (htreeS : ∀ ℓ y, 1 ≤ ℓ → ℓ < w → y < 2 ^ ℓ → y ≠ s % 2 ^ ℓ → cold (treeTag ℓ y))
     (hcastS : ∀ α < 2 ^ w, α ≠ s → ∀ j < castAnswers rb, cold (castTag α j)) :
     AllCold cold (asked H (extStageEvalM w treeTag castTag R s joins pin)) := by
@@ -237,8 +237,8 @@ section FoldsBody
 
 variable (H : HashN) (cold : ℕ → Prop)
 
-theorem foldsEval_cold (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) :
-    ∀ count position hot (labels : Fin m → Block), hot = value % 2 ^ position % m →
+theorem foldsEval_cold (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) :
+    ∀ count position hot (labels : Fin m → Label), hot = value % 2 ^ position % m →
       (∀ j, position ≤ j → j < position + count → ∀ r : Fin m, r.val ≠ value % 2 ^ j % m → cold (tagOf j r.val)) →
       AllCold cold (asked H (foldsEvalM m tagOf value bitLabel join count position hot labels))
   | 0, _, _, _, _, _ => by
@@ -254,7 +254,7 @@ theorem foldsEval_cold (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (val
       · have step := SliceC.foldHot_eq m value hm 1 position hot hhot
         simpa [SliceC.foldHot] using step
 
-theorem bodyEval_cold (m S q coord i : ℕ) (final : Fin m → Block) (hot : ℕ) (joins : Fin S → ℕ)
+theorem bodyEval_cold (m S q coord i : ℕ) (final : Fin m → Label) (hot : ℕ) (joins : Fin S → ℕ)
     (h : ∀ r : Fin m, ¬ r.val = hot → ∀ j < q, cold (bodyTag coord i r.val j)) :
     AllCold cold (asked H (bodyEvalM m S q coord i final hot joins)) := by
   rw [asked_bodyEvalM]
@@ -311,7 +311,7 @@ theorem modEval_cold (T : CrtTable) (hT : SliceC.CorrectTable T) (S coord : ℕ)
 
 /-- **A coordinate's evaluator asks only cold tags**, on any published material, records, labels and hash. -/
 theorem coordEval_cold (T : CrtTable) (hT : SliceC.CorrectTable T) (S coord : ℕ) (pub : ConvPublic)
-    (records : Fin S → ℕ) (v : ℕ) (hv : v < 2 ^ T.inputBits) (labels : ℕ → Block)
+    (records : Fin S → ℕ) (v : ℕ) (hv : v < 2 ^ T.inputBits) (labels : ℕ → Label)
     (tags : CoordTags cold T S coord v) :
     AllCold cold (asked H (coordEvalM T S coord pub records v labels)) := by
   unfold coordEvalM

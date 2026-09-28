@@ -1,19 +1,19 @@
 /-
 **H6 for the CRT entry: the 30 never-hot casts**.
 
-`StageOneProof.neverCase : OneCase NeverHotCast (2^128)⁻¹`. The casts `49 .. 63` of chunk 31 (width 6) are hot at no
+`StageOneProof.neverCase : OneCase NeverHotCast (2^104)⁻¹`. The casts `49 .. 63` of chunk 31 (width 6) are hot at no
 input, so the stage-2 case `convHot` does not cover them; they are bounded directly.
 
 * **The label** (`never_input`): a garbler input at a never-hot cast tag of coordinate `κ` and leaf `α` is labelled by
   the right child `α` of chunk 31's tree, which is the level-5 material at slot `α − 32`, a table answer: the label is
-  the first block of the table at `P = treePos κ (α − 32)`.
+  the zero-embedded low 104 bits of the table at `P = treePos κ (α − 32)`.
 * **The symmetry** (`pub_shift`): shifting the first blocks of the table at `P` and at a second level-5 slot `Q` of the
   same tree by the same `d` keeps the published value. On the tag reading the table enters the published value only
   through answers by tag; the two materials enter only the level-5 join (their XOR is unchanged), the leaf labels they
   feed are only hash labels (casts read the table by tag), and every other block reads neither position.
 * **The count** (`outer_family_le`, `count_le`): under the swapped table law the answers at `P` and `Q` are uniform and
-  independent of the rest (`indep_swapped_family`); the shifts pair the fibres of the first block at `P` within each
-  view, so each fibre carries `2^-128` of the view's mass.
+  independent of the rest (`indep_swapped_family`); the shifts pair the fibres of the clipped first block at `P` within each
+  view, so each fibre carries `2^-104` of the view's mass.
 -/
 
 import Proof.Privacy.CRT.Hidden.StageOneTable
@@ -35,9 +35,9 @@ open scoped ENNReal
 
 noncomputable section
 
-theorem xz (a : Block) : a ^^^ (0 : Block) = a := BitVec.xor_zero
+theorem xz {width : ℕ} (a : BitVec width) : a ^^^ (0 : BitVec width) = a := BitVec.xor_zero
 
-theorem zx (a : Block) : (0 : Block) ^^^ a = a := BitVec.zero_xor
+theorem zx {width : ℕ} (a : BitVec width) : (0 : BitVec width) ^^^ a = a := BitVec.zero_xor
 
 /-! ### 1. The positions of chunk 31's level-5 materials -/
 
@@ -122,7 +122,7 @@ end Shifted
 
 /-! ### 3. XOR folds -/
 
-theorem xorFold_xor {count : ℕ} (f g : Fin count → Block) :
+theorem xorFold_xor {count : ℕ} (f g : Fin count → Label) :
     xorFold (fun r => f r ^^^ g r) = xorFold f ^^^ xorFold g := by
   induction count with
   | zero =>
@@ -137,12 +137,12 @@ theorem xorFold_xor {count : ℕ} (f g : Fin count → Block) :
       rw [this]
       ac_rfl
 
-theorem xorFold_zero {count : ℕ} : xorFold (fun _ : Fin count => (0 : Block)) = 0 := by
-  have h := xorFold_xor (fun _ : Fin count => (0 : Block)) (fun _ => 0)
+theorem xorFold_zero {count : ℕ} : xorFold (fun _ : Fin count => (0 : Label)) = 0 := by
+  have h := xorFold_xor (fun _ : Fin count => (0 : Label)) (fun _ => 0)
   simp only [BitVec.xor_self] at h
   exact h
 
-theorem xorFold_single {count : ℕ} (s : ℕ) (hs : s < count) (d : Block) :
+theorem xorFold_single {count : ℕ} (s : ℕ) (hs : s < count) (d : Label) :
     xorFold (fun t : Fin count => if t.val = s then d else 0) = d := by
   induction count with
   | zero => exact absurd hs (Nat.not_lt_zero _)
@@ -154,8 +154,8 @@ theorem xorFold_single {count : ℕ} (s : ℕ) (hs : s < count) (d : Block) :
         simp only [Fin.val_castSucc, Fin.val_last] at first ⊢
         rw [first, if_neg (by omega), xz]
       · subst eq
-        have zero : (fun (acc : Block) (t : Fin s) => acc ^^^ if (Fin.castSucc t).val = s then d else 0) =
-            fun acc (t : Fin s) => acc ^^^ (fun _ : Fin s => (0 : Block)) t := by
+        have zero : (fun (acc : Label) (t : Fin s) => acc ^^^ if (Fin.castSucc t).val = s then d else 0) =
+            fun acc (t : Fin s) => acc ^^^ (fun _ : Fin s => (0 : Label)) t := by
           funext acc t
           rw [if_neg (by simp only [Fin.val_castSucc]; omega)]
         simp only [Fin.val_last, if_true]
@@ -165,8 +165,8 @@ theorem xorFold_single {count : ℕ} (s : ℕ) (hs : s < count) (d : Block) :
         rw [this, zx]
 
 /-- **Shifting two entries of a XOR fold by the same block keeps it.** -/
-theorem xorFold_shift2 {count : ℕ} (f : Fin count → Block) {s s' : ℕ} (hs : s < count) (hs' : s' < count)
-    (ne : s ≠ s') (d : Block) :
+theorem xorFold_shift2 {count : ℕ} (f : Fin count → Label) {s s' : ℕ} (hs : s < count) (hs' : s' < count)
+    (ne : s ≠ s') (d : Label) :
     xorFold (fun t => f t ^^^ (if t.val = s ∨ t.val = s' then d else 0)) = xorFold f := by
   have split : (fun t : Fin count => if t.val = s ∨ t.val = s' then d else 0) =
       fun t => (if t.val = s then d else 0) ^^^ (if t.val = s' then d else 0) := by
@@ -182,24 +182,24 @@ theorem xorFold_shift2 {count : ℕ} (f : Fin count → Block) {s s' : ℕ} (hs 
 /-! ### 4. The garbler's pieces on two hashes -/
 
 /-- A cast on the tag reading reads the table by tag only (its label does not matter). -/
-theorem castM_tagHash (A : TagTable) (l : ℕ) (label : Block) (tagOf : ℕ → ℕ) :
+theorem castM_tagHash (A : TagTable) (l : ℕ) (label : Label) (tagOf : ℕ → ℕ) :
     (castM l label tagOf).eval (H8.tagHash A) =
       materialize (castLanes l (packAnswers (castAnswers l) fun j => A (Conv.tag40 (tagOf j.val)))) := by
   simp only [castM, FreeQuery.eval_bind, eval_hlongM, FreeQuery.eval_pure, hlong, BmrEntry.tagHash_hashInput]
   rfl
 
 /-- A one-block hash on the tag reading. -/
-theorem h128_tagHash (A : TagTable) (label : Block) (tag : ℕ) :
-    h128 (H8.tagHash A) label tag = (A (Conv.tag40 tag)).1 := by
-  unfold h128
+theorem hLabel_tagHash (A : TagTable) (label : Label) (tag : ℕ) :
+    hLabel (H8.tagHash A) label tag = clip (A (Conv.tag40 tag)).1 := by
+  unfold hLabel h128
   rw [BmrEntry.tagHash_hashInput]
   rfl
 
 /-- The joins of a tree whose levels below `n` agree and whose level-`n` XOR agrees. -/
-theorem tree_snd (H H' : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (L n : ℕ) (hL : L = n + 1) (hn : n ≠ 0)
+theorem tree_snd (H H' : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (L n : ℕ) (hL : L = n + 1) (hn : n ≠ 0)
     (prev : (treeGarbleM tagOf Δ b0 n).eval H = (treeGarbleM tagOf Δ b0 n).eval H')
-    (level : ∀ parent : Fin (2 ^ n) → Block, xorFold (fun slot => h128 H (parent slot) (tagOf n slot.val)) =
-      xorFold (fun slot => h128 H' (parent slot) (tagOf n slot.val))) :
+    (level : ∀ parent : Fin (2 ^ n) → Label, xorFold (fun slot => hLabel H (parent slot) (tagOf n slot.val)) =
+      xorFold (fun slot => hLabel H' (parent slot) (tagOf n slot.val))) :
     ((treeGarbleM tagOf Δ b0 L).eval H).2 = ((treeGarbleM tagOf Δ b0 L).eval H').2 := by
   subst hL
   rw [SliceC.eval_treeGarbleM_succ H tagOf Δ b0 n hn, SliceC.eval_treeGarbleM_succ H' tagOf Δ b0 n hn]
@@ -208,28 +208,28 @@ theorem tree_snd (H H' : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (L
   rw [prev, level]
 
 /-- The right half of the last level of a tree is its last level's materials. -/
-theorem tree_right (H : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (L n : ℕ) (hL : L = n + 1) (hn : n ≠ 0)
+theorem tree_right (H : HashN) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (L n : ℕ) (hL : L = n + 1) (hn : n ≠ 0)
     (leaf : Fin (2 ^ L)) (big : 2 ^ n ≤ leaf.val) :
-    ∃ label, ((treeGarbleM tagOf Δ b0 L).eval H).1 leaf = h128 H label (tagOf n (leaf.val - 2 ^ n)) := by
+    ∃ label, ((treeGarbleM tagOf Δ b0 L).eval H).1 leaf = hLabel H label (tagOf n (leaf.val - 2 ^ n)) := by
   subst hL
   rw [SliceC.eval_treeGarbleM_succ H tagOf Δ b0 n hn]
   simp only [extendLevel, dif_neg (not_lt.mpr big)]
   exact ⟨_, rfl⟩
 
 /-- The fields of a chunk that the rest of the coordinate reads. -/
-theorem chunk_joins (T : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block) (c : ℕ) (H : HashN) :
+theorem chunk_joins (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) (H : HashN) :
     ((chunkGarbleM T coord Δ Z c).eval H).joins = fun n =>
       ((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval H).2 n ^^^
         Z (T.chunkOffset c + n) := by
   simp only [chunkGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure]
 
-theorem chunk_casts (T : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block) (c : ℕ) (H : HashN) :
+theorem chunk_casts (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) (H : HashN) :
     ((chunkGarbleM T coord Δ Z c).eval H).casts = atNat (fun leaf : Fin (2 ^ T.chunkWidth c) =>
       (castM T.castWidth (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval
         H).1 leaf) (chunkCastTag coord c leaf.val)).eval H) 0 := by
   simp only [chunkGarbleM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure]
 
-theorem chunk_pin (T : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block) (c : ℕ) (H : HashN) :
+theorem chunk_pin (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) (H : HashN) :
     ((chunkGarbleM T coord Δ Z c).eval H).pin = materialize ((sumLanes fun leaf : Fin (2 ^ T.chunkWidth c) =>
       (castM T.castWidth (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval
         H).1 leaf) (chunkCastTag coord c leaf.val)).eval H) + deltaLanes T.castWidth Δ) := by
@@ -240,14 +240,14 @@ def ChunkAgree (c : ℕ) {L : ℕ} (g g' : ChunkGarbled L) : Prop :=
   g.joins = g'.joins ∧ g.pin = g'.pin ∧ g.casts = g'.casts ∧ (c = 0 → g.leaves = g'.leaves)
 
 /-- **A chunk whose tree agrees below level `n`, whose level-`n` XOR agrees and whose casts read the same answers.** -/
-theorem chunk_agree (T : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block) (c n : ℕ) (H H' : HashN)
+theorem chunk_agree (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c n : ℕ) (H H' : HashN)
     (hw : T.chunkWidth c = n + 1) (hn : n ≠ 0) (c0 : c ≠ 0)
     (prev : (treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) n).eval H =
       (treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) n).eval H')
-    (level : ∀ parent : Fin (2 ^ n) → Block,
-      xorFold (fun slot => h128 H (parent slot) (chunkTreeTag coord c n slot.val)) =
-        xorFold (fun slot => h128 H' (parent slot) (chunkTreeTag coord c n slot.val)))
-    (casts : ∀ (label label' : Block) (leaf : ℕ), leaf < 2 ^ T.chunkWidth c →
+    (level : ∀ parent : Fin (2 ^ n) → Label,
+      xorFold (fun slot => hLabel H (parent slot) (chunkTreeTag coord c n slot.val)) =
+        xorFold (fun slot => hLabel H' (parent slot) (chunkTreeTag coord c n slot.val)))
+    (casts : ∀ (label label' : Label) (leaf : ℕ), leaf < 2 ^ T.chunkWidth c →
       (castM T.castWidth label (chunkCastTag coord c leaf)).eval H =
         (castM T.castWidth label' (chunkCastTag coord c leaf)).eval H') :
     ChunkAgree c ((chunkGarbleM T coord Δ Z c).eval H) ((chunkGarbleM T coord Δ Z c).eval H') := by
@@ -264,14 +264,14 @@ theorem chunk_agree (T : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block
   · rw [chunk_casts, chunk_casts, hcasts]
 
 /-- A modulus's garbler reads its chunks only through their casts and the leaves of chunk 0. -/
-theorem mod_congr (T : CrtTable) (S coord : ℕ) (Δ : Block) (X X' : ℕ → ChunkGarbled T.castWidth)
+theorem mod_congr (T : CrtTable) (S coord : ℕ) (Δ : Label) (X X' : ℕ → ChunkGarbled T.castWidth)
     (hcasts : ∀ c, (X c).casts = (X' c).casts) (hleaves : (X 0).leaves = (X' 0).leaves) (i : Fin T.count) :
     modGarbleM T S coord Δ X i = modGarbleM T S coord Δ X' i := by
   unfold modGarbleM
   cases h : T.kind i <;> simp only [hcasts, hleaves]
 
 /-- **A coordinate on two hashes**: chunks that agree on what the rest reads, and moduli that read the same answers. -/
-theorem coord_congr_of (T : CrtTable) (S coord : ℕ) (Δ : Block) (Z : ℕ → Block) (H H' : HashN)
+theorem coord_congr_of (T : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ → Label) (H H' : HashN)
     (chunks : ∀ c : Fin T.chunkCount,
       ChunkAgree c.val ((chunkGarbleM T coord Δ Z c.val).eval H) ((chunkGarbleM T coord Δ Z c.val).eval H'))
     (mods : ∀ (X : ℕ → ChunkGarbled T.castWidth) (i : Fin T.count),
@@ -321,7 +321,7 @@ theorem pub_shift (scalar : NonZeroScalar) (coins : Entry.Coins) {κ s s' : ℕ}
     EntryCorrect.pubOf (H8.tagHash A') scalar coins = EntryCorrect.pubOf (H8.tagHash A) scalar coins := by
   have hs6 : s < 65536 := by omega
   have hs6' : s' < 65536 := by omega
-  have coordEq : ∀ (S coord : ℕ), S ≤ 1000 → coord < 2 → ∀ (Δ : Block) (Z : ℕ → Block),
+  have coordEq : ∀ (S coord : ℕ), S ≤ 1000 → coord < 2 → ∀ (Δ : Label) (Z : ℕ → Label),
       (coordGarbleM table S coord Δ Z).eval (H8.tagHash A') =
         (coordGarbleM table S coord Δ Z).eval (H8.tagHash A) := by
     intro S coord hS hc Δ Z
@@ -337,17 +337,19 @@ theorem pub_shift (scalar : NonZeroScalar) (coins : Entry.Coins) {κ s s' : ℕ}
               simp only [Paths.treeKeys, Set.mem_ofPred_eq] at member
               exact absurd h5.2.2.2 (by omega)) label).1
         · intro parent
-          simp only [h128_tagHash]
+          simp only [hLabel_tagHash]
           have hpos : ∀ slot : Fin (2 ^ 5), Conv.tag40 (chunkTreeTag coord c.val 5 slot.val) = treePos κ slot.val := by
             intro slot
             rw [hcκ, c31]
             rfl
           simp only [hpos]
-          have each : ∀ slot : Fin (2 ^ 5), (A' (treePos κ slot.val)).1 =
-              (A (treePos κ slot.val)).1 ^^^ (if slot.val = s ∨ slot.val = s' then d else 0) :=
-            fun slot => shift_at hκ hs6 hs6' shift (by have := slot.isLt; omega)
+          have each : ∀ slot : Fin (2 ^ 5), clip (A' (treePos κ slot.val)).1 =
+              clip (A (treePos κ slot.val)).1 ^^^ (if slot.val = s ∨ slot.val = s' then clip d else 0) := by
+            intro slot
+            rw [shift_at hκ hs6 hs6' shift (by have := slot.isLt; omega), Narrow.clip_xor]
+            split_ifs <;> simp only [Narrow.clip_zero]
           simp only [each]
-          exact xorFold_shift2 _ (by norm_num; omega) (by norm_num; omega) ne d
+          exact xorFold_shift2 _ (by norm_num; omega) (by norm_num; omega) ne (clip d)
         · intro label label' leaf hleaf
           rw [castM_tagHash, castM_tagHash]
           have leafLt : leaf < 256 := lt_of_lt_of_le hleaf
@@ -415,10 +417,10 @@ theorem pub_shift (scalar : NonZeroScalar) (coins : Entry.Coins) {κ s s' : ℕ}
 first block of the table at the level-5 material `α − 32`. -/
 def NeverFacts (A : TagTable) (N : ℕ) : Prop :=
   tagCoord (N / 2 ^ 128) < 2 ∧ 49 ≤ tagSlot (N / 2 ^ 128) ∧ tagSlot (N / 2 ^ 128) < 64 ∧
-    BitVec.ofNat 128 N = (A (treePos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32))).1
+    BitVec.ofNat 128 N = embed (clip (A (treePos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32))).1)
 
 /-- **One coordinate's never-hot inputs.** -/
-theorem coord_never (A : TagTable) (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Block) (Z : ℕ → Block)
+theorem coord_never (A : TagTable) (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
     (N : ℕ) (inside : N ∈ asked (H8.tagHash A) (coordGarbleM table S coord Δ Z))
     (never : NeverHotCast (N / 2 ^ 128)) : NeverFacts A N := by
   have ranges := Paths.bn254_ranges S hS
@@ -456,10 +458,10 @@ theorem coord_never (A : TagTable) (S coord : ℕ) (hS : S ≤ 1000) (hc : coord
       · rw [hashInput_tag, hcoord]; exact hc
       · rw [hashInput_tag, hslot]; exact slot49
       · rw [hashInput_tag, hslot]; exact leaf64
-      · rw [label_of_hashInput, hlabel, h128_tagHash, hashInput_tag, hcoord, hslot]
+      · rw [label_of_hashInput, hlabel, hLabel_tagHash, hashInput_tag, hcoord, hslot]
         have same : ∀ x, chunkTreeTag coord c.val 5 x = chunkTreeTag coord 31 5 x := fun x => by rw [idx31]
-        show (A (Conv.tag40 (chunkTreeTag coord c.val 5 (leaf.val - 2 ^ 5)))).1 =
-          (A (Conv.tag40 (chunkTreeTag coord 31 5 (leaf.val - 32)))).1
+        show embed (clip (A (Conv.tag40 (chunkTreeTag coord c.val 5 (leaf.val - 2 ^ 5)))).1) =
+          embed (clip (A (Conv.tag40 (chunkTreeTag coord 31 5 (leaf.val - 32)))).1)
         rw [same, show (2 : ℕ) ^ 5 = 32 by norm_num]
   · obtain ⟨k, member, range, label, rfl⟩ := asked_of_tagged
       (Paths.modGarbleM_tagged table S coord ranges hc Δ _ i) _ _ inM
@@ -643,15 +645,15 @@ theorem shift2_fill {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 65536) (hs' : s' < 
     rfl
 
 set_option linter.constructorNameAsVariable false in
-/-- **The count**: the refills that give the view `v` and the first block `g` at `P` are `2^-128` of those that
+/-- **The count**: the refills that give the view `v` and the clipped first block `g` at `P` are `2^-104` of those that
 give `v`. -/
 theorem count_le (scalar : NonZeroScalar) {κ s s' : ℕ} (hκ : κ < 2) (hs : s < 32) (hs' : s' < 32) (ne : s ≠ s')
-    (g : Block) (c : Entry.Coins) (T : TagTable) (v : Instance.crtEntry.Public)
+    (g : Label) (c : Entry.Coins) (T : TagTable) (v : Instance.crtEntry.Public)
     (inst : DecidablePred fun f => pubT scalar c (fillAt (pairPos κ s s') f T) = v ∧
-      (fillAt (pairPos κ s s') f T (treePos κ s)).1 = g)
+      clip (fillAt (pairPos κ s s') f T (treePos κ s)).1 = g)
     (inst' : DecidablePred fun f => pubT scalar c (fillAt (pairPos κ s s') f T) = v) :
     ((@Finset.filter _ _ inst Finset.univ).card : ℝ≥0∞) ≤
-      ((2 : ℝ≥0∞) ^ 128)⁻¹ * (@Finset.filter _ _ inst' Finset.univ).card := by
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ * (@Finset.filter _ _ inst' Finset.univ).card := by
   classical
   have hs6 : s < 65536 := by omega
   have hs6' : s' < 65536 := by omega
@@ -663,8 +665,8 @@ theorem count_le (scalar : NonZeroScalar) {κ s s' : ℕ} (hκ : κ < 2) (hs : s
     intro f
     rw [← pairPos_zero κ s s', fill_at _ inj f T 0]
   set S := @Finset.filter _ _ inst' Finset.univ with hS
-  let fib : Block → Finset (Fin 2 → Block × Block) := fun y => S.filter fun f => (f 0).1 = y
-  have mem_fib : ∀ y f, f ∈ fib y ↔ pubT scalar c (fillAt (pairPos κ s s') f T) = v ∧ (f 0).1 = y := by
+  let fib : Label → Finset (Fin 2 → Block × Block) := fun y => S.filter fun f => clip (f 0).1 = y
+  have mem_fib : ∀ y f, f ∈ fib y ↔ pubT scalar c (fillAt (pairPos κ s s') f T) = v ∧ clip (f 0).1 = y := by
     intro y f
     simp only [fib, hS, Finset.mem_filter, Finset.mem_univ, true_and]
   have first : @Finset.filter _ _ inst Finset.univ = fib g := by
@@ -673,21 +675,23 @@ theorem count_le (scalar : NonZeroScalar) {κ s s' : ℕ} (hκ : κ < 2) (hs : s
     simp only [Finset.mem_univ, true_and]
   have each : ∀ y, (fib y).card = (fib g).card := by
     intro y
-    refine Finset.card_nbij' (shiftF (y ^^^ g)) (shiftF (y ^^^ g)) (fun f hf => ?_) (fun f hf => ?_)
+    refine Finset.card_nbij' (shiftF (embed (y ^^^ g))) (shiftF (embed (y ^^^ g))) (fun f hf => ?_) (fun f hf => ?_)
       (fun f _ => shiftF_shiftF _ f) (fun f _ => shiftF_shiftF _ f)
     · rw [Finset.mem_coe, mem_fib] at hf ⊢
       refine ⟨by rw [inv]; exact hf.1, ?_⟩
-      show (f 0).1 ^^^ (y ^^^ g) = g
+      show clip ((f 0).1 ^^^ embed (y ^^^ g)) = g
+      rw [Narrow.clip_xor_embed]
       rw [hf.2, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
     · rw [Finset.mem_coe, mem_fib] at hf ⊢
       refine ⟨by rw [inv]; exact hf.1, ?_⟩
-      show (f 0).1 ^^^ (y ^^^ g) = y
+      show clip ((f 0).1 ^^^ embed (y ^^^ g)) = y
+      rw [Narrow.clip_xor_embed]
       rw [hf.2, BitVec.xor_comm y g, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
-  have total : S.card = 2 ^ 128 * (fib g).card := by
-    rw [Finset.card_eq_sum_card_fiberwise (f := fun f => (f 0).1) (t := Finset.univ)
+  have total : S.card = 2 ^ labelBits * (fib g).card := by
+    rw [Finset.card_eq_sum_card_fiberwise (f := fun f => clip (f 0).1) (t := Finset.univ)
       (fun _ _ => Finset.mem_univ _)]
     rw [Finset.sum_congr rfl fun y _ => each y, Finset.sum_const, Finset.card_univ,
-      Kriterion.ArgoMAC.Security.PGS.card_block, smul_eq_mul]
+      Narrow.card_label, smul_eq_mul]
   rw [first, total, Nat.cast_mul, Nat.cast_pow, Nat.cast_ofNat, ← mul_assoc,
     ENNReal.inv_mul_cancel (pow_ne_zero _ two_ne_zero) (ENNReal.pow_ne_top ENNReal.ofNat_ne_top), one_mul]
 
@@ -698,7 +702,7 @@ end
 open Kriterion.CRT.Privacy.CastNever in
 /-- **The 30 never-hot casts.** -/
 theorem _root_.Kriterion.CRT.Privacy.StageOneProof.neverCase :
-    StageOneProof.OneCase StageOneProof.NeverHotCast ((2 : ℝ≥0∞) ^ 128)⁻¹ := by
+    StageOneProof.OneCase StageOneProof.NeverHotCast ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by
   intro field group parameter scalar view N never
   by_cases asked : ∃ tape, N ∈ gAsked scalar tape
   · obtain ⟨tape0, h0⟩ := asked
@@ -717,18 +721,20 @@ theorem _root_.Kriterion.CRT.Privacy.StageOneProof.neverCase :
         · rw [h]; exact treePos_family hκ (by norm_num)
       exact away_of_family _ (by rw [fam]; decide) (by rw [fam]; decide) site mem
     let E : Instance.crtEntry.Coins → TagTable → Prop := fun _ T =>
-      (T (treePos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32))).1 = BitVec.ofNat 128 N
+      clip (T (treePos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32))).1 = clip (BitVec.ofNat 128 N)
     have sub : {tape | stageOneView Instance.crtEntry parameter scalar tape = view ∧ N ∈ gAsked scalar tape} ⊆
         {ω : TableTape Instance.crtEntry | pubT scalar ω.1 ω.2 = view ∧ E ω.1 ω.2} := by
       rintro tape ⟨hv, hN⟩
       rw [stageOneView_pubT] at hv
       rw [gAsked_eq] at hN
-      exact ⟨hv, (never_input scalar tape.1 tape.2 N hN never).2.2.2.symm⟩
+      refine ⟨hv, ?_⟩
+      have label := congrArg clip (never_input scalar tape.1 tape.2 N hN never).2.2.2.symm
+      simpa only [Narrow.clip_embed] using label
     refine le_trans (MeasureTheory.measure_mono sub) ?_
     rw [viewSet_eq, swappedTableTape_eq]
     exact outer_family_le _ (swappedTableLaw crtLayout) (pairPos (tagCoord (N / 2 ^ 128)) (tagSlot (N / 2 ^ 128) - 32) 0)
       (indep_swapped_family crtLayout _ (pairPos_inj hκ hs6 (by norm_num) ne) away) (pubT scalar) E _
-      (fun c T v inst inst' => count_le scalar hκ hs (by norm_num) ne (BitVec.ofNat 128 N) c T v inst inst') view
+      (fun c T v inst inst' => count_le scalar hκ hs (by norm_num) ne (clip (BitVec.ofNat 128 N)) c T v inst inst') view
   · have empty : {tape | stageOneView Instance.crtEntry parameter scalar tape = view ∧ N ∈ gAsked scalar tape} = ∅ := by
       ext tape
       simp only [Set.mem_ofPred_eq, Set.mem_empty_iff_false, iff_false, not_and]

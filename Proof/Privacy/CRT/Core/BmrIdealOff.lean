@@ -207,7 +207,7 @@ def srcOf (s : Kriterion.CRT.Entry.Source) : Source Tb :=
   (H8.bmrJoinsOf (Kriterion.CRT.Entry.publish s), s.rows, s.curve)
 
 /-- The source's cells other than P45's: the exception entries, the conversion joins and pins. -/
-abbrev RestCells := (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Kriterion.CRT.Entry.joinCount → Block) ×
+abbrev RestCells := (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Kriterion.CRT.Entry.joinCount → Label) ×
   (Fin 2 → (k : Fin Kriterion.CRT.Entry.pinCount) → Lanes (Kriterion.CRT.Entry.pinWidth k))
 
 /-- **A source's published cells are P45's cells and the rest.** -/

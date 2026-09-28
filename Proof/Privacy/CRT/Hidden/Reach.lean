@@ -76,7 +76,7 @@ def pairFine (treeFam castFam coord idx stage width l : ℕ) : Set TagKey :=
 theorem treeCasts_keysIn {α : Type} (treeFam castFam coord idx stage width l : ℕ)
     (treeFields : Paths.Fields treeFam coord idx stage) (castFields : Paths.Fields castFam coord idx stage)
     (widthSmall : width ≤ 16) (answers : castAnswers l ≤ 64)
-    (delta bit0 : Block) (finish : _ → (Fin (2 ^ width) → Lanes l) → α) :
+    (delta bit0 : Label) (finish : _ → (Fin (2 ^ width) → Lanes l) → α) :
     KeysIn (pairFine treeFam castFam coord idx stage width l)
       (treeGarbleM (fun level slot => tagCode treeFam coord idx stage level slot 0) delta bit0 width >>= fun tree =>
         CRT.tableM (2 ^ width) (fun leaf => castM l (tree.1 leaf) fun part =>
@@ -88,7 +88,7 @@ theorem treeCasts_keysIn {α : Type} (treeFam castFam coord idx stage width l : 
 /-- The keys of chunk `c`: its tree (family 0) and its casts (family 1). -/
 def chunkFine (T : CrtTable) (coord c : ℕ) : Set TagKey := pairFine 0 1 coord c 0 (T.chunkWidth c) T.castWidth
 
-theorem chunk_keysIn (T : CrtTable) (coord : ℕ) (delta : Block) (zeroLabel : ℕ → Block) (c : ℕ)
+theorem chunk_keysIn (T : CrtTable) (coord : ℕ) (delta : Label) (zeroLabel : ℕ → Label) (c : ℕ)
     (coordLt : coord < 2) (cLt : c < 128) (widthSmall : T.chunkWidth c ≤ 16)
     (answers : castAnswers T.castWidth ≤ 64) :
     KeysIn (chunkFine T coord c) (chunkGarbleM T coord delta zeroLabel c) :=
@@ -97,7 +97,7 @@ theorem chunk_keysIn (T : CrtTable) (coord : ℕ) (delta : Block) (zeroLabel : �
     ⟨by norm_num, coordLt, cLt, by norm_num, by norm_num, by norm_num⟩ widthSmall answers _ _ _
 
 theorem stage_keysIn {rb : ℕ} (coord idx stage w : ℕ) (coordLt : coord < 2) (idxLt : idx < 128)
-    (stageLt : stage < 4) (widthSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (delta : Block)
+    (stageLt : stage < 4) (widthSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (delta : Label)
     (remainder : Lanes rb) :
     KeysIn (pairFine 2 3 coord idx stage w rb)
       (extStageGarbleM w (fun level slot => tagCode 2 coord idx stage level slot 0)
@@ -113,7 +113,7 @@ def convFine (coord idx : ℕ) (row : OddRow) (m : ℕ) : Set TagKey :=
       Paths.foldKeys coord idx row.keep (row.ell - row.keep) m))
 
 theorem conversion_keysIn (coord idx : ℕ) (row : OddRow) (m : ℕ) (coordLt : coord < 2) (idxLt : idx < 128)
-    (ranges : Paths.RowRanges row) (mSmall : m ≤ 65536) (delta : Block) (word : Lanes row.ell) :
+    (ranges : Paths.RowRanges row) (mSmall : m ≤ 65536) (delta : Label) (word : Lanes row.ell) :
     KeysIn (convFine coord idx row m) (conversionGarbleM coord idx row m delta word) := by
   unfold conversionGarbleM convFine
   obtain ⟨w0, w1, keep, ell, cast0, cast1⟩ := ranges
@@ -134,7 +134,7 @@ def modFine (T : CrtTable) (S coord : ℕ) (i : Fin T.count) : Set TagKey :=
     {k | ∃ row, T.kind i = .odd row ∧ k ∈ convFine coord i.val row (T.modulus i)}
 
 theorem mod_keysIn (T : CrtTable) (S coord : ℕ) (ranges : Paths.TableRanges T S) (coordLt : coord < 2)
-    (delta : Block) (chunks : ℕ → ChunkGarbled T.castWidth) (i : Fin T.count) :
+    (delta : Label) (chunks : ℕ → ChunkGarbled T.castWidth) (i : Fin T.count) :
     KeysIn (modFine T S coord i) (modGarbleM T S coord delta chunks i) := by
   have idxLt : i.val < 128 := lt_of_lt_of_le i.isLt ranges.count
   unfold modGarbleM
@@ -156,7 +156,7 @@ def coordFine (T : CrtTable) (S coord : ℕ) : Set TagKey :=
   {k | ∃ c : Fin T.chunkCount, k ∈ chunkFine T coord c.val} ∪ {k | ∃ i : Fin T.count, k ∈ modFine T S coord i}
 
 theorem coord_keysIn (T : CrtTable) (S coord : ℕ) (ranges : Paths.TableRanges T S) (coordLt : coord < 2)
-    (delta : Block) (zeroLabel : ℕ → Block) :
+    (delta : Label) (zeroLabel : ℕ → Label) :
     KeysIn (coordFine T S coord) (coordGarbleM T S coord delta zeroLabel) := by
   unfold coordGarbleM coordFine
   refine KeysIn.bind (KeysIn.tableM (S := fun c => chunkFine T coord c.val) fun c =>

@@ -5,7 +5,7 @@ Two tapes with the same fine view (`DeltaView.fine`: coordinate `κ`'s published
 `u`'s labels, the table off the hot conversion tags of `κ`) have
 
 * related garbler question lists (`gAsked_rel`): position by position the same tag, the same input off the `Shifted`
-  tags, labels shifted by `Δ_κ ⊕ Δ'_κ` on them (coordinate `κ` from `coord_relational`, the other
+  tags, labels shifted by the tag-dependent `queryShift (Δ_κ ⊕ Δ'_κ)` on them (coordinate `κ` from `coord_relational`, the other
   coordinate by congruence, the tail from `TailRel`);
 * the same stage-2 view (`view_fd`): the same published value, the same labels, the same designed entries (a designed
   tag is never `Shifted`, so its input is the same, and it is not a hot conversion tag, so its answer is the same).

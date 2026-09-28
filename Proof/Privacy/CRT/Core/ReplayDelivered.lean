@@ -47,7 +47,7 @@ theorem tagHash_hashInput (table : TagTable) (label : Block) (tag : ℕ) :
 def padsAt (table : TagTable) (m S q coord i ρ : ℕ) : Fin S → ZMod m :=
   padVector m S q fun j => table ⟨bodyTag coord i ρ j.val % 2 ^ 40, Nat.mod_lt _ (Nat.two_pow_pos 40)⟩
 
-theorem eval_padVectorM_tag (table : TagTable) (m S q : ℕ) (label : Block) (coord i ρ : ℕ) (e : Fin S) :
+theorem eval_padVectorM_tag (table : TagTable) (m S q : ℕ) (label : Label) (coord i ρ : ℕ) (e : Fin S) :
     ((((padVectorM m S q label (bodyTag coord i ρ)).eval (H8.tagHash table)) e : ℕ) : ZMod m) =
       padsAt table m S q coord i ρ e := by
   have := congrFun (padVectorM_eq_padVector (H8.tagHash table) m S q label (bodyTag coord i ρ)) e
@@ -55,11 +55,11 @@ theorem eval_padVectorM_tag (table : TagTable) (m S q : ℕ) (label : Block) (co
   unfold padsAt
   congr 1
   funext j
-  exact tagHash_hashInput table label _
+  exact tagHash_hashInput table (embed label) _
 
 /-! ### The body on a tag table -/
 
-theorem eval_bodyEvalM_tag (table : TagTable) (m S q coord i : ℕ) (final : Fin m → Block) (hot : ℕ)
+theorem eval_bodyEvalM_tag (table : TagTable) (m S q coord i : ℕ) (final : Fin m → Label) (hot : ℕ)
     (joins : Fin S → ℕ) (e : Fin S) :
     ((bodyEvalM m S q coord i final hot joins).eval (H8.tagHash table)) e =
       ((∑ ρ : Fin m, if ρ.val = hot then 0 else (ρ.val : ZMod m) * padsAt table m S q coord i ρ.val e) +
@@ -82,8 +82,8 @@ theorem eval_bodyEvalM_tag (table : TagTable) (m S q coord i : ℕ) (final : Fin
 
 /-! ### The hot index is the coordinate value's residue -/
 
-theorem eval_foldsEvalM_hot (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) :
-    ∀ (count start hot : ℕ) (labels : Fin m → Block),
+theorem eval_foldsEvalM_hot (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) :
+    ∀ (count start hot : ℕ) (labels : Fin m → Label),
       ((foldsEvalM m tagOf value bitLabel join count start hot labels).eval H).2 =
         SliceC.foldHot m value count start hot
   | 0, _, _, _ => rfl
@@ -134,7 +134,7 @@ theorem eval_modEvalM_tag (table : TagTable) (T : CrtTable) (hT : SliceC.Correct
 /-! ### One coordinate -/
 
 theorem coord_crtValue (table : TagTable) (T : CrtTable) (hT : SliceC.CorrectTable T) (S coord : ℕ)
-    (pub : ConvPublic) (records : Fin S → ℕ) (v : ℕ) (hv : v < 2 ^ T.inputBits) (labels : ℕ → Block) (e : Fin S) :
+    (pub : ConvPublic) (records : Fin S → ℕ) (v : ℕ) (hv : v < 2 ^ T.inputBits) (labels : ℕ → Label) (e : Fin S) :
     ((coordEvalM T S coord pub records v labels).eval (H8.tagHash table)).crtValue e =
       T.crt fun i => residueAt table T S coord
         (fun i e => recordJoin T T.product T.radix (records e) i) v i e := by
@@ -147,7 +147,7 @@ theorem coord_crtValue (table : TagTable) (T : CrtTable) (hT : SliceC.CorrectTab
 
 theorem coord_decoded (table : TagTable) (T : CrtTable) (hT : SliceC.CorrectTable T) (S coord : ℕ)
     (pub : ConvPublic) (records : Fin S → ℕ) (recLt : ∀ e, records e < T.product) (v : ℕ)
-    (hv : v < 2 ^ T.inputBits) (labels : ℕ → Block) (e : Fin S) :
+    (hv : v < 2 ^ T.inputBits) (labels : ℕ → Label) (e : Fin S) :
     ((coordEvalM T S coord pub records v labels).eval (H8.tagHash table)).decoded e =
       T.crt fun i => residueAt table T S coord
         (fun i e => recordJoin T T.product T.radix (records e) i) v i e := by
@@ -299,7 +299,7 @@ source and tag table. -/
 theorem crtValue_x (source : (view).Source) (u : AffineInput) (table : TagTable) (x : BMR.XEnc) :
     ((coordEvalM Entry.table Entry.xCount 0 (Entry.convOf ((view).publish source).crtX)
         (fun e => (((view).publish source).recX.get e).val) u.x.val
-        (Entry.labelX ((view).labels source u))).eval (tagHash table)).crtValue (BMR.xFlat x) =
+        (fun j => clip (Entry.labelX ((view).labels source u) j))).eval (tagHash table)).crtValue (BMR.xFlat x) =
       BMR.evalInt u (bmrJoinsOf ((view).publish source)) (bmrColdOf table u) (.inl x) := by
   rw [coord_crtValue table Entry.table SliceC.bn254_correctTable Entry.xCount 0 _ _ u.x.val
     (val_lt_inputBits u.x) _ (BMR.xFlat x)]
@@ -309,7 +309,7 @@ theorem crtValue_x (source : (view).Source) (u : AffineInput) (table : TagTable)
 theorem crtValue_y (source : (view).Source) (u : AffineInput) (table : TagTable) (y : BMR.YEnc) :
     ((coordEvalM Entry.table Entry.yCount 1 (Entry.convOf ((view).publish source).crtY)
         (fun e => (((view).publish source).recY.get e).val) u.y.val
-        (Entry.labelY ((view).labels source u))).eval (tagHash table)).crtValue (BMR.yFlat y) =
+        (fun j => clip (Entry.labelY ((view).labels source u) j))).eval (tagHash table)).crtValue (BMR.yFlat y) =
       BMR.evalInt u (bmrJoinsOf ((view).publish source)) (bmrColdOf table u) (.inr y) := by
   rw [coord_crtValue table Entry.table SliceC.bn254_correctTable Entry.yCount 1 _ _ u.y.val
     (val_lt_inputBits u.y) _ (BMR.yFlat y)]

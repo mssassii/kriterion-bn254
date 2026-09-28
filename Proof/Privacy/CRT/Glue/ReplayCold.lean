@@ -22,7 +22,7 @@ import Proof.Correctness.CRT.RealTable
 namespace Kriterion.CRT.Privacy.Contain
 
 open BN254 Cryptography Kriterion.ArgoMAC Kriterion.CRT
-open Kriterion.CRT.Privacy.Align (asked asked_bind asked_pure asked_askN asked_h128M asked_tableM asked_hlongM
+open Kriterion.CRT.Privacy.Align (asked asked_bind asked_pure asked_askN asked_h128M asked_hLabelM asked_tableM asked_hlongM
   asked_castM asked_padVectorM asked_materializeM asked_evalStepM asked_expandM asked_subtreeM_list hashInput_div
   closedSlot closedSlot_lt closedSlot_mod closedSlot_testBit closedSlot_zero CoordTags ConvTags coordTags_cold
   slot_lt slot_mod_start)
@@ -83,19 +83,25 @@ theorem h128M {label : Block} {tag : ℕ} (holds : P (hashInput label tag)) : Al
     rw [inside]
     exact holds
 
+theorem hLabelM {label : Label} {tag : ℕ} (holds : P (hashInput (embed label) tag)) :
+    AllAsked P (Kriterion.CRT.hLabelM label tag) := fun H x inside => by
+  rw [asked_hLabelM, List.mem_singleton] at inside
+  rw [inside]
+  exact holds
+
 theorem hlongM {label : Block} {tagOf : ℕ → ℕ} {count : ℕ} (holds : ∀ j < count, P (hashInput label (tagOf j))) :
     AllAsked P (Kriterion.CRT.hlongM label tagOf count) := fun H x inside => by
   rw [asked_hlongM] at inside
   obtain ⟨j, _, rfl⟩ := List.mem_map.mp inside
   exact holds j.val j.isLt
 
-theorem castM {l : ℕ} {label : Block} {tagOf : ℕ → ℕ} (holds : ∀ j < castAnswers l, P (hashInput label (tagOf j))) :
+theorem castM {l : ℕ} {label : Label} {tagOf : ℕ → ℕ} (holds : ∀ j < castAnswers l, P (hashInput (embed label) (tagOf j))) :
     AllAsked P (Kriterion.CRT.castM l label tagOf) := fun H x inside => by
   rw [asked_castM] at inside
   obtain ⟨j, _, rfl⟩ := List.mem_map.mp inside
   exact holds j.val j.isLt
 
-theorem padVectorM {m S q : ℕ} {label : Block} {tagOf : ℕ → ℕ} (holds : ∀ j < q, P (hashInput label (tagOf j))) :
+theorem padVectorM {m S q : ℕ} {label : Label} {tagOf : ℕ → ℕ} (holds : ∀ j < q, P (hashInput (embed label) (tagOf j))) :
     AllAsked P (Kriterion.CRT.padVectorM m S q label tagOf) := fun H x inside => by
   rw [asked_padVectorM] at inside
   obtain ⟨j, _, rfl⟩ := List.mem_map.mp inside
@@ -119,8 +125,8 @@ section Trees
 
 variable (P : ℕ → Prop)
 
-theorem evalStepM_all (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Block)
-    (parent : Fin (2 ^ n) → Block) (off : ∀ s : Fin (2 ^ n), s ≠ active → ∀ label, P (hashInput label (tagOf s.val))) :
+theorem evalStepM_all (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Label)
+    (parent : Fin (2 ^ n) → Label) (off : ∀ s : Fin (2 ^ n), s ≠ active → ∀ label, P (hashInput label (tagOf s.val))) :
     AllAsked P (evalStepM n tagOf active bitLabel join parent) := fun H x inside => by
   rw [asked_evalStepM] at inside
   obtain ⟨s, _, x_in⟩ := List.mem_flatMap.mp inside
@@ -132,7 +138,7 @@ theorem evalStepM_all (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bi
     exact off s hot _
 
 /-- **The tree** with the value `value`: every hashed level `n` asks only slots other than `value mod 2 ^ n`. -/
-theorem treeEvalM_all (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) (total : ℕ)
+theorem treeEvalM_all (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) (total : ℕ)
     (off : ∀ n, 1 ≤ n → n < total → ∀ s : Fin (2 ^ n), s.val ≠ value % 2 ^ n → ∀ label,
       P (hashInput label (tagOf n s.val))) :
     ∀ levels, levels ≤ total → AllAsked P (treeEvalM tagOf value bitLabel join levels)
@@ -145,8 +151,8 @@ theorem treeEvalM_all (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join
         off n (Nat.one_le_iff_ne_zero.mpr nonzero) (by omega) s (fun same => ne (Fin.ext same)) label
 
 /-- **The growth** at levels `start, ..., start + count - 1`. -/
-theorem growEvalM_all (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) (start : ℕ)
-    (labels : Fin (2 ^ start) → Block) (total : ℕ)
+theorem growEvalM_all (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) (start : ℕ)
+    (labels : Fin (2 ^ start) → Label) (total : ℕ)
     (off : ∀ k < total, ∀ s : Fin (2 ^ (start + k)), s.val ≠ value % 2 ^ (start + k) → ∀ label,
       P (hashInput label (tagOf (start + k) s.val))) :
     ∀ count, count ≤ total → AllAsked P (growEvalM tagOf value bitLabel join start labels count)
@@ -162,7 +168,7 @@ end Trees
 
 /-! ### A chunk -/
 
-theorem chunkEvalM_all (P : ℕ → Prop) (T : CrtTable) (coord : ℕ) (labels : ℕ → Block) (v : ℕ) (joins : ℕ → Block)
+theorem chunkEvalM_all (P : ℕ → Prop) (T : CrtTable) (coord : ℕ) (labels : ℕ → Label) (v : ℕ) (joins : ℕ → Label)
     (pin : Lanes T.castWidth) (c : ℕ)
     (tree : ∀ n, 1 ≤ n → n < T.chunkWidth c → ∀ s : Fin (2 ^ n), s.val ≠ T.chunkValue v c % 2 ^ n → ∀ label,
       P (hashInput label (chunkTreeTag coord c n s.val)))
@@ -183,7 +189,7 @@ variable (P : ℕ → Prop) {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ 
 
 /-- **An expansion off the path**: at a slot of level `start` other than the value's, the subtree's nodes and leaves
 are off the path. -/
-theorem expandM_all (start slot : ℕ) (label : Block) (state : StageState rb) (hstart : 1 ≤ start) (hw : start ≤ w)
+theorem expandM_all (start slot : ℕ) (label : Label) (state : StageState rb) (hstart : 1 ≤ start) (hw : start ≤ w)
     (hslot : slot < 2 ^ start) (away : slot ≠ value % 2 ^ start)
     (tree : ∀ ℓ, 1 ≤ ℓ → ℓ < w → ∀ y < 2 ^ ℓ, y ≠ value % 2 ^ ℓ → ∀ lbl, P (hashInput lbl (treeTag ℓ y)))
     (cast : ∀ α < 2 ^ w, α ≠ value → ∀ j < castAnswers rb, ∀ lbl, P (hashInput lbl (castTag α j))) :
@@ -216,7 +222,7 @@ theorem closedSlot_ne (n : ℕ) : closedSlot value n ≠ value % 2 ^ (n + 1) := 
   rw [same, Nat.testBit_mod_two_pow] at bit
   simp at bit
 
-theorem stageRoundM_all (sub : Lanes w) (joins : ℕ → Block) (pin : Lanes rb) (n : ℕ) (state : StageState rb)
+theorem stageRoundM_all (sub : Lanes w) (joins : ℕ → Label) (pin : Lanes rb) (n : ℕ) (state : StageState rb)
     (hn : n < w)
     (tree : ∀ ℓ, 1 ≤ ℓ → ℓ < w → ∀ y < 2 ^ ℓ, y ≠ value % 2 ^ ℓ → ∀ lbl, P (hashInput lbl (treeTag ℓ y)))
     (cast : ∀ α < 2 ^ w, α ≠ value → ∀ j < castAnswers rb, ∀ lbl, P (hashInput lbl (castTag α j))) :
@@ -239,7 +245,7 @@ theorem stageRoundM_all (sub : Lanes w) (joins : ℕ → Block) (pin : Lanes rb)
     exact expandM_all P w treeTag castTag value (n + 1) _ _ _ (by omega) (by omega) (closedSlot_lt value n)
       (closedSlot_ne value n) tree cast
 
-theorem stageRoundsM_all (sub : Lanes w) (joins : ℕ → Block) (pin : Lanes rb)
+theorem stageRoundsM_all (sub : Lanes w) (joins : ℕ → Label) (pin : Lanes rb)
     (tree : ∀ ℓ, 1 ≤ ℓ → ℓ < w → ∀ y < 2 ^ ℓ, y ≠ value % 2 ^ ℓ → ∀ lbl, P (hashInput lbl (treeTag ℓ y)))
     (cast : ∀ α < 2 ^ w, α ≠ value → ∀ j < castAnswers rb, ∀ lbl, P (hashInput lbl (castTag α j))) :
     ∀ remaining n (state : StageState rb), n + remaining ≤ w →
@@ -251,7 +257,7 @@ theorem stageRoundsM_all (sub : Lanes w) (joins : ℕ → Block) (pin : Lanes rb
         fun next => stageRoundsM_all sub joins pin tree cast r (n + 1) next (by omega)
 
 /-- **A fused extraction stage** at the stage value `value`. -/
-theorem extStageEvalM_all (remainder : Lanes rb) (joins : ℕ → Block) (pin : Lanes rb) (hw : 1 ≤ w)
+theorem extStageEvalM_all (remainder : Lanes rb) (joins : ℕ → Label) (pin : Lanes rb) (hw : 1 ≤ w)
     (tree : ∀ ℓ, 1 ≤ ℓ → ℓ < w → ∀ y < 2 ^ ℓ, y ≠ value % 2 ^ ℓ → ∀ lbl, P (hashInput lbl (treeTag ℓ y)))
     (cast : ∀ α < 2 ^ w, α ≠ value → ∀ j < castAnswers rb, ∀ lbl, P (hashInput lbl (castTag α j))) :
     AllAsked P (extStageEvalM w treeTag castTag remainder value joins pin) := by
@@ -269,20 +275,20 @@ end Stage
 
 section Folds
 
-variable (P : ℕ → Prop) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block)
+variable (P : ℕ → Prop) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label)
 
-theorem foldEvalM_all (tag : ℕ → ℕ) (shift hot : ℕ) (bitLabel' join' : Block) (labels : Fin m → Block)
+theorem foldEvalM_all (tag : ℕ → ℕ) (shift hot : ℕ) (bitLabel' join' : Label) (labels : Fin m → Label)
     (off : ∀ r : Fin m, r.val ≠ hot → ∀ label, P (hashInput label (tag r.val))) :
     AllAsked P (foldEvalM m tag shift hot bitLabel' join' labels) := by
   unfold foldEvalM
   refine AllAsked.bind (AllAsked.tableM fun r => ?_) fun _ => AllAsked.pure' _
-  exact AllAsked.ite (fun _ => AllAsked.pure' _) fun ne => AllAsked.h128M (off r ne _)
+  exact AllAsked.ite (fun _ => AllAsked.pure' _) fun ne => AllAsked.hLabelM (off r ne _)
 
 /-- **The folds**, from the hot index `value mod 2 ^ position mod m`. -/
 theorem foldsEvalM_all (hm : 0 < m) (total start : ℕ)
     (off : ∀ j, start ≤ j → j < start + total → ∀ r : Fin m, r.val ≠ value % 2 ^ j % m → ∀ label,
       P (hashInput label (tagOf j r.val))) :
-    ∀ count position hot (labels : Fin m → Block), start ≤ position → position + count ≤ start + total →
+    ∀ count position hot (labels : Fin m → Label), start ≤ position → position + count ≤ start + total →
       hot = value % 2 ^ position % m → AllAsked P (foldsEvalM m tagOf value bitLabel join count position hot labels)
   | 0, _, _, _, _, _, _ => AllAsked.pure' _
   | count + 1, position, hot, labels, lower, upper, hotEq => by
@@ -295,7 +301,7 @@ theorem foldsEvalM_all (hm : 0 < m) (total start : ℕ)
 
 /-- The hot index the folds end at does not depend on the labels or the hash. -/
 theorem foldsEvalM_snd (H : HashN) :
-    ∀ count position hot (labels : Fin m → Block),
+    ∀ count position hot (labels : Fin m → Label),
       ((foldsEvalM m tagOf value bitLabel join count position hot labels).eval H).2 =
         SliceC.foldHot m value count position hot
   | 0, _, _, _ => rfl
@@ -349,7 +355,7 @@ theorem conversionEvalM_snd (H : HashN) (coord i : ℕ) (row : OddRow) (m σ : �
   simp only [FreeQuery.eval_bind]
   rw [foldsEvalM_snd, SliceC.foldHot_eq m σ hm _ _ _ rfl, show row.keep + (row.ell - row.keep) = row.ell by omega]
 
-theorem bodyEvalM_all (m S q coord i : ℕ) (final : Fin m → Block) (hot : ℕ) (joins : Fin S → ℕ)
+theorem bodyEvalM_all (m S q coord i : ℕ) (final : Fin m → Label) (hot : ℕ) (joins : Fin S → ℕ)
     (off : ∀ r : Fin m, r.val ≠ hot → ∀ j < q, ∀ label, P (hashInput label (bodyTag coord i r.val j))) :
     AllAsked P (bodyEvalM m S q coord i final hot joins) := by
   unfold bodyEvalM
@@ -391,7 +397,7 @@ theorem modEvalM_all (T : CrtTable) (S coord : ℕ) (pub : ConvPublic) (joins : 
     exact bodyEvalM_all P _ _ _ _ _ _ _ _ (fun r ne j hj label => off.body i r ne j hj label) H x inside
 
 theorem coordEvalM_all (T : CrtTable) (S coord : ℕ) (pub : ConvPublic) (records : Fin S → ℕ) (v : ℕ)
-    (labels : ℕ → Block) (hT : SliceC.CorrectTable T) (hv : v < 2 ^ T.inputBits) (off : CoordOff P T S coord v) :
+    (labels : ℕ → Label) (hT : SliceC.CorrectTable T) (hv : v < 2 ^ T.inputBits) (off : CoordOff P T S coord v) :
     AllAsked P (coordEvalM T S coord pub records v labels) := by
   unfold coordEvalM
   dsimp only
@@ -444,7 +450,7 @@ theorem coordValue_lt (u : AffineInput) (κ : ℕ) : coordValue u κ < 2 ^ Krite
 
 /-- **One coordinate of the replay asks only cold inputs**, whatever the published material, records and labels. -/
 theorem coordEvalM_cold (u : AffineInput) (S κ : ℕ) (hκ : κ < 2) (small : S ≤ 1000) (pub : ConvPublic)
-    (records : Fin S → ℕ) (labels : ℕ → Block) :
+    (records : Fin S → ℕ) (labels : ℕ → Label) :
     AllAsked (ColdInput u) (coordEvalM Kriterion.CRT.Entry.table S κ pub records (coordValue u κ) labels) :=
   coordEvalM_all (ColdInput u) Kriterion.CRT.Entry.table S κ pub records _ labels SliceC.bn254_correctTable (coordValue_lt u κ)
     (coordOff_cold u S κ hκ small)

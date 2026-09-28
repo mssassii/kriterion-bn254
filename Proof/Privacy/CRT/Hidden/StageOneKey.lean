@@ -89,7 +89,7 @@ def keyEps : ℝ≥0∞ := ENNReal.ofReal (2 / 2 ^ 128 + 1 / ((BN254.baseFieldMo
 theorem keyEps_le : keyEps ≤ ENNReal.ofReal crtHiddenCharge := by
   refine ENNReal.ofReal_le_ofReal ?_
   rw [crtHiddenCharge_eq]
-  have two : (2 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ 128 := by norm_num
+  have two : (2 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ labelBits := by norm_num [labelBits]
   linarith
 
 /-! ### P2. The pad positions and what reads them -/
@@ -167,7 +167,7 @@ theorem entries_congr (scalar : NonZeroScalar) (c : Entry.Coins) {T T' : TagTabl
   rw [h.at _ (by rw [DigestSplit.family_final _ h0]; decide), h.at _ (by rw [DigestSplit.family_final _ h1]; decide)]
 
 /-- **A coordinate's published conversion material reads no pad position.** -/
-theorem convVector_congr (S coord : ℕ) (hc : coord < 2) (small : S ≤ 1000) (Δ : Block) (Z : ℕ → Block)
+theorem convVector_congr (S coord : ℕ) (hc : coord < 2) (small : S ≤ 1000) (Δ : Label) (Z : ℕ → Label)
     {T T' : TagTable} (h : OffPads T T') :
     convVector ((coordGarbleM table S coord Δ Z).eval (H8.tagHash T)).pub =
       convVector ((coordGarbleM table S coord Δ Z).eval (H8.tagHash T')).pub := by

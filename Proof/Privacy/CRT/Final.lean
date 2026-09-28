@@ -105,7 +105,7 @@ theorem h7_of {εKey : ℝ≥0∞} (keyCase : StageTwo.GuessCase StageTwo.keyOff
     CrtStageTwoGuess Instance.crtEntry Entry.table (ENNReal.ofReal crtHiddenCharge)
       (ENNReal.ofReal hiddenWindowError) :=
   StageTwo.crtEntry_stageTwoGuess_of DeltaView.convHot_case digestCase keyCase
-    ⟨DeltaView.inv_le_charge, DeltaView.inv_le_charge, keyLe⟩ window
+    ⟨DeltaView.inv_le_charge, StageTwo.CaseDigest.inv_le_charge, keyLe⟩ window
 
 /-- H6 from the reach, the never-hot cast and the bridge-key case. -/
 theorem h6_of {εNever εKey : ℝ≥0∞} (reach : StageOneProof.ConvTagsReachable)
@@ -115,7 +115,7 @@ theorem h6_of {εNever εKey : ℝ≥0∞} (reach : StageOneProof.ConvTagsReacha
     CrtStageOneGuess Instance.crtEntry (ENNReal.ofReal crtHiddenCharge) :=
   StageOneProof.crtEntry_stageOneGuess_of DeltaView.convHot_case reach never StageOneProof.maskCase digestCase
     StageOneProof.finalCase key
-    ⟨DeltaView.inv_le_charge, neverLe, DeltaView.inv_le_charge, DeltaView.inv_le_charge, DeltaView.inv_le_charge,
+    ⟨DeltaView.inv_le_charge, neverLe, StageTwo.CaseDigest.inv_le_charge, StageTwo.CaseDigest.inv_le_charge, StageTwo.CaseDigest.inv_le_charge,
       keyLe⟩
 
 /-- H8's coincidence guess from the stage-one factors and the final coincidence. -/

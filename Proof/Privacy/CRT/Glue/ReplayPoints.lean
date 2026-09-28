@@ -207,7 +207,7 @@ theorem padCount_eq (κ : ℕ) (hκ : κ < 2) (S : ℕ) (hS : S = padS κ) (i : 
 
 /-- **A body's pad vectors are whole pad sites.** -/
 theorem bodyEvalM_closed (κ : ℕ) (hκ : κ < 2) (S : ℕ) (hS : S = padS κ) (i : Fin Kriterion.CRT.Entry.table.count)
-    (final : Fin (Kriterion.CRT.Entry.table.modulus i) → Block) (hot : ℕ) (joins : Fin S → ℕ) :
+    (final : Fin (Kriterion.CRT.Entry.table.modulus i) → Label) (hot : ℕ) (joins : Fin S → ℕ) :
     SiteClosed (bodyEvalM (Kriterion.CRT.Entry.table.modulus i) S (Kriterion.CRT.Entry.table.padAnswers S i) κ i.val
       final hot joins) := by
   have hi : i.val < 128 := lt_of_lt_of_le i.isLt (by decide)
@@ -280,7 +280,7 @@ theorem modEvalM_closed (κ : ℕ) (hκ : κ < 2) (S : ℕ) (hS : S = padS κ) (
     omega
 
 theorem coordEvalM_closed (κ : ℕ) (hκ : κ < 2) (S : ℕ) (hS : S = padS κ) (pub : ConvPublic) (records : Fin S → ℕ)
-    (v : ℕ) (labels : ℕ → Block) :
+    (v : ℕ) (labels : ℕ → Label) :
     SiteClosed (coordEvalM Kriterion.CRT.Entry.table S κ pub records v labels) := by
   have ranges := Paths.bn254_ranges S (by rw [hS]; unfold padS; split <;> norm_num)
   unfold coordEvalM

@@ -8,7 +8,7 @@ Two runs of `coordGarbleM T S coord` with coins `(Z₁, Δ₁)` and `(Z₂, Δ�
 * the hashes agree, whatever the labels, at every tag that is not a hot conversion tag of `coord` (families `0` to
   `5`) at `u`,
 ask the same tags in the same order; at a cold tag they ask the same input, at a hot tag (families `0` to `6`) the
-labels differ by `Δ₁ ⊕ Δ₂`; and their residues, pad sums, offsets and hints agree.
+labels differ by `embed (Δ₁ ⊕ Δ₂)` for narrow deltas; and their residues, pad sums, offsets and hints agree.
 -/
 
 import Proof.Privacy.CRT.Hidden.Align

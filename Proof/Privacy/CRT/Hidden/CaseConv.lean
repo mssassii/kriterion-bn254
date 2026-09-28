@@ -3,11 +3,11 @@
 
 A stage-2 guess at a tag `τ` of family at most 6 that is hot at `u` touches the garbler's input there. On two tapes
 with the same fine view the garbler's question lists are related (`DeltaView.garbler_rel`): at the same position the
-same tag, and at a hot tag the labels differ by `Δ_κ ⊕ Δ'_κ` (`κ` the tag's coordinate). The garbler asks each tag
+same tag, and at a hot tag the labels differ by `embed (clip (Δ_κ ⊕ Δ'_κ))` (`κ` the tag's coordinate). The garbler asks each tag
 once (its question run is tagged, `keyRun_tags`), so two such tapes that both ask the same input `N` at `τ` have the same
 `clip Δ_κ` (`delta_unique`): the projected delta is fixed by the fine view on the event.
 `DeltaView.delta_guess_clip_le` uses its `2^24`-element raw fibre to bound the event
-by `2^-128` given the stage-2 view.
+by `2^-104` given the stage-2 view.
 
 `convHot_case` discharges the two hypotheses with `coord_relational` (`Core/CoordRelational.lean`) and
 `tailRel` (`Hidden/DeltaTail.lean`).

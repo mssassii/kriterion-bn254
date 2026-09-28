@@ -71,10 +71,10 @@ theorem queriesAlong_replayConv (H : HashN) (published : Kriterion.CRT.Entry.Pub
     queriesAlong H (Kriterion.CRT.Entry.replayConv published u labels) =
       queriesAlong H (coordEvalM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.xCount 0
           (Kriterion.CRT.Entry.convOf published.crtX) (fun e => (published.recX.get e).val) u.x.val
-          (Kriterion.CRT.Entry.labelX labels)) ++
+          (fun j => clip (Kriterion.CRT.Entry.labelX labels j))) ++
         queriesAlong H (coordEvalM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.yCount 1
           (Kriterion.CRT.Entry.convOf published.crtY) (fun e => (published.recY.get e).val) u.y.val
-          (Kriterion.CRT.Entry.labelY labels)) := by
+          (fun j => clip (Kriterion.CRT.Entry.labelY labels j))) := by
   unfold Kriterion.CRT.Entry.replayConv
   exact queriesAlong_bind_bind_pure H _ _ _
 

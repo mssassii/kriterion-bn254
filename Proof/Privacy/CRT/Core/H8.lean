@@ -281,9 +281,9 @@ def replayCrtValues (source : (view).Source) (u : AffineInput) (table : TagTable
   let published := (view).publish source
   let labels := (view).labels source u
   (((coordEvalM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.xCount 0 (Kriterion.CRT.Entry.convOf published.crtX)
-      (fun e => (published.recX.get e).val) u.x.val (Kriterion.CRT.Entry.labelX labels)).eval (tagHash table)).crtValue,
+      (fun e => (published.recX.get e).val) u.x.val (fun i => clip (Kriterion.CRT.Entry.labelX labels i))).eval (tagHash table)).crtValue,
     ((coordEvalM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.yCount 1 (Kriterion.CRT.Entry.convOf published.crtY)
-      (fun e => (published.recY.get e).val) u.y.val (Kriterion.CRT.Entry.labelY labels)).eval (tagHash table)).crtValue)
+      (fun e => (published.recY.get e).val) u.y.val (fun i => clip (Kriterion.CRT.Entry.labelY labels i))).eval (tagHash table)).crtValue)
 
 /-- A CRT value in the two-sided wrap window `[0, B − 1) ∪ (M − B, M)`: the image, under the smudge bijection, of every
 real offset with the hint set (`O > M − B` gives `w = O + a v ∈ (M − B, M)` or `w = O + a v − M < a v ≤ B − 1`). -/

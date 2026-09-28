@@ -121,7 +121,7 @@ theorem digest_keys (u : AffineInput) :
 /-! ### 3. The coordinate garbler reads the family-6 answers only for its residues -/
 
 /-- A body asks the same inputs on every hash. -/
-theorem asked_bodyGarbleM (H H' : HashN) (m S q coord i : ℕ) (final : Fin m → Block) :
+theorem asked_bodyGarbleM (H H' : HashN) (m S q coord i : ℕ) (final : Fin m → Label) :
     asked H (bodyGarbleM m S q coord i final) = asked H' (bodyGarbleM m S q coord i final) := by
   simp only [bodyGarbleM, asked_bind, asked_tableM, asked_padVectorM, asked_pure]
 
@@ -139,7 +139,7 @@ theorem conv_keys (coord idx : ℕ) : ∀ k ∈ Paths.convKeys coord idx, k.InRa
   omega
 
 /-- **A modulus asks the same inputs on two hashes that agree at families 0 to 5.** -/
-theorem asked_modGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Block)
+theorem asked_modGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label)
     (chunks : ℕ → ChunkGarbled Entry.table.castWidth) (i : Fin Entry.table.count) {H H' : HashN}
     (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
     asked H (modGarbleM Entry.table S coord Δ chunks i) = asked H' (modGarbleM Entry.table S coord Δ chunks i) := by
@@ -157,7 +157,7 @@ theorem asked_modGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ 
     rw [(conv _).1, (conv _).2, asked_bodyGarbleM H H']
 
 /-- **A coordinate's garbler asks the same inputs on two hashes that agree at families 0 to 5.** -/
-theorem asked_coordGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Block) (Z : ℕ → Block)
+theorem asked_coordGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
     {H H' : HashN} (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
     asked H (coordGarbleM Entry.table S coord Δ Z) = asked H' (coordGarbleM Entry.table S coord Δ Z) := by
   have ranges := Paths.bn254_ranges S hS
@@ -180,7 +180,7 @@ theorem asked_coordGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (�
     modAsk]
 
 /-- **A coordinate's published conversion material** is the same on two hashes that agree at families 0 to 5. -/
-theorem convVector_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Block) (Z : ℕ → Block)
+theorem convVector_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
     {H H' : HashN} (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
     Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H).pub =
       Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
@@ -420,12 +420,12 @@ theorem keyOff_case : GuessCase keyOff notNearEdge BmrOff.keyError := by
   exact KeyOffEntry.keyLabel_entry scalar u notOn _ (CaseKeyOff.stageTwoView_fd parameter scalar u off) view
     (N % 2 ^ 128)
 
-/-- The key case's error is within the hidden charge: `2/2^128 + 1/(p − 1) ≤ 4/2^128 + 1/(p − 1)`. -/
+/-- The key case's error is within the hidden charge: `2/2^128 + 1/(p − 1) ≤ 4/2^104 + 1/(p − 1)`. -/
 theorem keyOff_error_le : BmrOff.keyError ≤ ENNReal.ofReal crtHiddenCharge := by
   unfold BmrOff.keyError
   refine ENNReal.ofReal_le_ofReal ?_
   rw [crtHiddenCharge_eq]
-  have two : (2 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ 128 := by norm_num
+  have two : (2 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ labelBits := by norm_num [labelBits]
   linarith
 
 end Kriterion.CRT.Privacy.StageTwo
