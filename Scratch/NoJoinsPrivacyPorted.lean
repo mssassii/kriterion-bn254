@@ -21,6 +21,26 @@ import Lean
 
 open Kriterion Kriterion.CRT Kriterion.CRT.Entry
 
+#check @Kriterion.CRT.Privacy.Conv.conversion_law_fill
+#check @Kriterion.CRT.Privacy.Flat.phi_uniform
+#check @Kriterion.CRT.Privacy.Flat.source_crt_law
+#check @Kriterion.CRT.Privacy.ConvSplit.crtConvSplit
+#check @Kriterion.CRT.EntrySplit.publish_labels_split
+#check @Kriterion.CRT.Privacy.KeyZero.keyOf_congr
+#check @Kriterion.CRT.Privacy.BmrReal.realGarbled_pair
+#check @Kriterion.CRT.Privacy.Align.replayConv_aligned
+#check @Kriterion.CRT.Privacy.Align.garble_designed_reached
+#check @Kriterion.CRT.Privacy.Align.crtEntry_designedReached
+#check @Kriterion.CRT.Paths.crtEntry_sameVisible
+#check @Kriterion.CRT.Privacy.Flags.crtConvNever
+#check @Kriterion.CRT.Privacy.StageTwo.digestOther_case_of
+#check @Kriterion.CRT.Privacy.StageTwo.maskOff_case
+#check @Kriterion.CRT.Privacy.StageTwo.final_case
+#check @Kriterion.CRT.Privacy.StageTwo.keyOff_case
+#check @Kriterion.CRT.Privacy.StageOneProof.finalCase
+#check @Kriterion.CRT.Privacy.StageOneProof.neverCase
+#check @Kriterion.CRT.Privacy.StageOneProof.keyCase
+
 run_cmd do
   for name in [`Kriterion.CRT.Privacy.Conv.conversion_law_fill,
       `Kriterion.CRT.Privacy.Flat.phi_uniform,
@@ -40,7 +60,7 @@ run_cmd do
       `Kriterion.CRT.Privacy.StageTwo.keyOff_case,
       `Kriterion.CRT.Privacy.StageOneProof.finalCase,
       `Kriterion.CRT.Privacy.StageOneProof.neverCase,
-      `Kriterion.CRT.Privacy.StageOneKey.keyCase] do
+      `Kriterion.CRT.Privacy.StageOneProof.keyCase] do
     let illegal := (← Lean.collectAxioms name).filter fun axiomName =>
       !#[`propext, `Classical.choice, `Quot.sound].contains axiomName
     unless illegal.isEmpty do
