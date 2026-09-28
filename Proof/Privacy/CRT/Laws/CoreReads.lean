@@ -134,7 +134,7 @@ theorem realBmr_congr (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInpu
 theorem realRest_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (c : crtEntry.Coins)
     (t : TagTable) :
     Laws.realRest Tb parameter scalar u (c, t) =
-      ((crtEntry.scheme inferInstance inferInstance).encode c.inputMacKey u,
+      ((crtEntry.scheme inferInstance inferInstance).encode (EntryCorrect.keyOf (tagHash t) c) u,
         fun tag : RestTags Tb u => t tag.1.1) := by
   unfold Laws.realRest
   rw [show realGarbled crtEntry parameter scalar (c, t) = _ from BmrReal.realGarbled_pair parameter scalar c t]
