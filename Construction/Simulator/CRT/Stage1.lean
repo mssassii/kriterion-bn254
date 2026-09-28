@@ -8,8 +8,8 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 |---|---|---|
 | `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row cells `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
 | `bytes` | `exceptionBase + index`, `index < 182` | independent exception nibbles (4 coins each) |
-| `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins (the chunk-join cells are drawn but neither serialized nor read) |
-| `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
+| `joins` | `sourceJoin κ index`, `index < joinCount` | 101 coins (the chunk-join cells are drawn but neither serialized nor read) |
+| `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 101` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 84` | bounded rejection below `m_i` over `digitWidth m_i` coins |
 | `zeros` | `keyBase + 2 j`, `j < 508` (`Z_j`) | 128 coins |
 | `deltas` | `deltaCell κ` | 128 coins |
@@ -84,7 +84,7 @@ def joins : Prog :=
   Prog.rep (2 * Entry.joinCount) fun n =>
     Stage1.wordCell labelBits (Layout.sourceJoin (n / Entry.joinCount) (n % Entry.joinCount))
 
-/-- The pin of lane word `n = (κ · pinCount + k) · 104 + lane`. -/
+/-- The pin of lane word `n = (κ · pinCount + k) · 101 + lane`. -/
 def pinOf (n : Nat) : Nat := n / laneCount % Entry.pinCount
 
 /-- The coordinate of lane word `n`. -/
@@ -132,13 +132,18 @@ inductive Piece
   | word (address width : Nat)
   /-- The 624 bits of the record of encoding `e` of coordinate `κ`. -/
   | record (κ e : Nat)
+  /-- `width` zero bits (the byte padding of a packed conversion vector). -/
+  | zeros (width : Nat)
 deriving Inhabited
+
+/-- The zero bits that complete a packed conversion vector to whole bytes (`8 · 36424 − 101 · 2885 = 7`). -/
+def convPad : Nat := 8 * Narrow.packedBytes Entry.convCount - labelBits * Entry.convCount
 
 /-- `count` joins of coordinate `κ` from index `start`. -/
 def joinPieces (κ start count : Nat) : List Piece :=
   (List.range count).map fun n => .word (Layout.sourceJoin κ (start + n)) labelBits
 
-/-- Pin `k` of coordinate `κ`: its 104 active lanes (the reserved RAM stride remains 128). -/
+/-- Pin `k` of coordinate `κ`: its 101 active lanes (the reserved RAM stride remains 128). -/
 def pinPieces (κ k : Nat) : List Piece :=
   (List.range laneCount).map fun lane => .word (Layout.sourcePin κ k lane) (pinWidthAt k)
 
@@ -165,11 +170,12 @@ normalization flags clear). -/
 def rowPieces : List Piece :=
   ((List.range 91).map fun d => [.word (fieldBase + (3 + 3 * d)) 256, .word (Layout.signCell d) 8]).flatten
 
-/-- **The wire, piece by piece**: curve, rows, exception, `crtX`, `crtY`, `recX`, `recY`. -/
+/-- **The wire, piece by piece**: curve, rows, exception, `crtX` and its byte padding, `crtY` and its padding,
+`recX`, `recY`. -/
 def pieces : List Piece :=
   (List.range curveCellCount).map (fun index => .word (fieldBase + index) 256) ++ rowPieces ++
   (List.range exceptionCellCount).map (fun index => .word (exceptionBase + index) 4) ++
-  convPieces 0 ++ convPieces 1 ++ recordPieces 0 ++ recordPieces 1
+  convPieces 0 ++ [.zeros convPad] ++ convPieces 1 ++ [.zeros convPad] ++ recordPieces 0 ++ recordPieces 1
 
 /-- Clear the record limbs. -/
 def clearLimbs : Prog :=
@@ -193,6 +199,7 @@ def recordProg (κ e : Nat) : Prog :=
 def pieceProg : Piece → Prog
   | .word address width => emitWord address width
   | .record κ e => recordProg κ e
+  | .zeros width => emitZero width
 
 /-- **The serializer**: the pieces, the last first. -/
 def serialize : Prog :=

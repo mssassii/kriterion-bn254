@@ -274,7 +274,7 @@ theorem exec_entryInput (cells : TreeCells) (tag s : Nat) (memory : Memory) (lab
       ∀ register, register ≠ rInput → register ≠ rB → register ≠ rAddr →
         after.registers register = memory.registers register := by
   have sum : label.toNat + 2 ^ 128 * tag < 2 ^ 256 := by
-    have : label.toNat < 2 ^ 104 := label.isLt
+    have : label.toNat < 2 ^ 101 := label.isLt
     omega
   refine ⟨_, rfl, rfl, rfl, ?_, fun register notI notB notAddr => ?_⟩
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, labelCell]
@@ -503,7 +503,7 @@ theorem agree_treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) (nSm
     have hashSmall : hashInput (embed (parent index)) (tagOf index.val) < 2 ^ 256 := by
       unfold hashInput
       simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-      have : (parent index).toNat < 2 ^ 104 := (parent index).isLt
+      have : (parent index).toNat < 2 ^ 101 := (parent index).isLt
       have := tagSmall _ index.isLt
       omega
     unfold entryHash

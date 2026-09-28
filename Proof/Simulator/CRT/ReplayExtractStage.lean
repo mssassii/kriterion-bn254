@@ -51,7 +51,7 @@ theorem exec_subLanes (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c10 := layout.c10; have c11 := layout.c11; have c12 := layout.c12; have c13 := layout.c13
   have c14 := layout.c14; have c15 := layout.c15
   have hw := Nat.two_pow_pos w
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   have powRb : 2 ^ rb ≤ 2 ^ 128 := Nat.pow_le_pow_right (by norm_num) rbLe
   obtain ⟨final, run, subs, frame, bits, regs⟩ := Prog.exec_rep (subLane cells w)
@@ -179,7 +179,7 @@ theorem exec_stagePrefix (cells : StageCells) (w rb value : Nat) (remainder : La
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   have two : 2 ≤ 2 ^ w := le_trans (by norm_num : 2 ≤ 2 ^ 1) (Nat.pow_le_pow_right (by norm_num) wPos)
   have slotLt : value % 2 ^^^ 1 < 2 := by
@@ -349,7 +349,7 @@ theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   set m0 := setReg (setReg m rAddr (word cells.value)) rF (m.ram (word cells.value)) with m0Def
@@ -564,7 +564,7 @@ theorem agree_stageReplay (cells : StageCells) (w rb value : Nat) (remainder : L
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have rbPos : 0 < rb := by omega
   have slotLt : value % 2 ^^^ 1 < 2 := by
     rcases Nat.mod_two_eq_zero_or_one value with h | h <;> rw [h] <;> decide

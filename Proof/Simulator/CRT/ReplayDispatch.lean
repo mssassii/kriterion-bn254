@@ -123,7 +123,7 @@ theorem agree_modOdd (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
         (T.truth (T.modulus i)) T.chunkOffset T.chunkWidth convProg vec hot (bodyTag coord i.val)).tree
         memory)
       (liftHash (modEvalM T S coord pub joins v chunks i)) := by
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   -- the truth-word lanes
   let X : Nat → Nat → Nat → Nat := fun j c leaf =>
     if jb : j < laneCount then (((chunks c).casts leaf) ⟨j, jb⟩).val else 0

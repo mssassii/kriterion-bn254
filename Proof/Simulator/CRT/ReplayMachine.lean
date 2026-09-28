@@ -170,7 +170,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
   have joinBase := IndexFacts.modJoinBase_le i.val
   have pinBase := IndexFacts.modPinBase_le i.val
   have mLe := TableFacts.modulus_le i
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   -- every source cell is below the replay's scratch
   have memEq : ∀ x, x < 2 ^ 60 → m0.ram (word x) = memory.ram (word x) := fun x xb =>
     below x (by simp only [coordCells, R]; omega)
@@ -271,7 +271,7 @@ theorem CoordReads.transport {κ S : Nat} {conv : ConvPublic} {records : Fin S �
     (agree : ∀ x, x < 2 ^ 56 → m1.ram (word x) = memory.ram (word x)) :
     CoordReads κ S conv records v labelsOf m1 := by
   have cntMod : Entry.table.count = 84 := TableFacts.count
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have rowFacts : ∀ i : Nat, (Entry.rowAt i).width0 ≤ 12 ∧ (Entry.rowAt i).width1 ≤ 12 ∧
       (Entry.rowAt i).keep ≤ 14 := fun i => by
     obtain ⟨ell, w0, w1, keep, _⟩ := IndexFacts.rowAt_bounds i

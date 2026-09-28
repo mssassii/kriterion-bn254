@@ -58,6 +58,7 @@ theorem noOracle_pieceProg : ∀ piece : Piece, (pieceProg piece).NoOracle
   | .record κ e => ⟨noOracle_of_det _ det_clearLimbs, noOracle_of_det _ (det_horner κ e),
       ⟨noOracle_emitWord _ _, noOracle_emitWord _ _, noOracle_emitWord _ _, noOracle_emitWord _ _,
         noOracle_emitWord _ _, trivial⟩, trivial⟩
+  | .zeros width => noOracle_emitZero width
 
 theorem noOracle_signs : CrtStage1.signs.NoOracle := by
   unfold CrtStage1.signs

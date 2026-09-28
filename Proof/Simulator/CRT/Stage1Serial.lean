@@ -26,6 +26,7 @@ namespace CrtSerial
 def PieceSafe : Piece → Prop
   | .word address width => address < 2 ^ 256 ∧ (address < tmpBase ∨ tmpBase + 2 ^ 20 ≤ address) ∧ width ≤ 256
   | .record κ e => κ < 2 ∧ e < encCount κ
+  | .zeros width => width ≤ 256
 
 theorem pinWidthAt_le (k : Nat) : pinWidthAt k ≤ 14 := by
   by_cases inside : k < 198
@@ -50,7 +51,7 @@ theorem pinPieces_safe (κ k : Nat) (small : κ < 2) (inside : k < pinCount) :
   obtain ⟨lane, bound, same⟩ := member
   subst same
   have pins : pinCount = 198 := pinCount_eq
-  have active : laneCount = 104 := rfl
+  have active : laneCount = 101 := rfl
   exact ⟨by unfold Layout.sourcePin; omega, Or.inr (by unfold Layout.sourcePin tmpBase; omega),
     le_trans (pinWidthAt_le k) (by norm_num)⟩
 
@@ -79,7 +80,8 @@ theorem convPieces_safe (κ : Nat) (small : κ < 2) : ∀ p ∈ convPieces κ, P
 theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
   intro p member
   simp only [pieces, List.mem_append] at member
-  rcases member with (((((inFields | inRows) | inBytes) | inConv0) | inConv1) | inRec0) | inRec1
+  rcases member with (((((((inFields | inRows) | inBytes) | inConv0) | inPad0) | inConv1) | inPad1) | inRec0) |
+    inRec1
   · simp only [List.mem_map, List.mem_range] at inFields
     obtain ⟨index, bound, same⟩ := inFields
     subst same
@@ -98,7 +100,15 @@ theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
     have : index < 182 := bound
     exact ⟨by unfold exceptionBase; omega, Or.inl (by unfold exceptionBase tmpBase; omega), by norm_num⟩
   · exact convPieces_safe 0 (by decide) p inConv0
+  · rw [List.mem_singleton] at inPad0
+    subst inPad0
+    show convPad ≤ 256
+    decide
   · exact convPieces_safe 1 (by decide) p inConv1
+  · rw [List.mem_singleton] at inPad1
+    subst inPad1
+    show convPad ≤ 256
+    decide
   · simp only [recordPieces, List.mem_map, List.mem_range] at inRec0
     obtain ⟨e, bound, same⟩ := inRec0
     subst same
@@ -136,6 +146,7 @@ theorem pieceBits_congr (p : Piece) (safe : PieceSafe p) (ram ram' : Word → Wo
           rw [same _ (residue_not_limb κ e i safe.1 safe.2 (Finset.mem_range.mp member))]
       simp only [pieceBits]
       rw [value]
+  | zeros width => rfl
 
 theorem word_toNat_self (value : Word) : word value.toNat = value := by
   apply BitVec.eq_of_toNat_eq
@@ -162,6 +173,9 @@ theorem memSem_pieceProg (p : Piece) (safe : PieceSafe p) (memory : Memory) (dig
       refine ⟨after, run, off, ?_, others⟩
       rw [bitsIs, hornerSuffix_zero]
       rfl
+  | zeros width =>
+      obtain ⟨after, run, emits⟩ := memSem_emitZero width safe memory
+      exact ⟨after, run, fun address _ => by rw [emits.1], emits.2.1, emits.2.2⟩
 
 /-- A deterministic loop under an invariant. -/
 theorem memSem_rep_inv (body : Nat → Prog) (Inv : Nat → Memory → Prop) :

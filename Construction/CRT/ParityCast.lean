@@ -63,7 +63,7 @@ def ofFull {width : Nat} (pin : Lanes (width + 1)) : HalfPin width :=
 def expand {width : Nat} (pin : HalfPin width) : Lanes (width + 1) :=
   doubleLanes pin.upper
 
-/-- Exactly `width` narrow labels encode the `104 * width` stored bits. -/
+/-- Exactly `width` narrow labels encode the `101 * width` stored bits. -/
 def blocks {width : Nat} (pin : HalfPin width) : Fin width → Label := pinBlocks pin.upper
 
 /-- Every string of `width` narrow labels decodes to a public half-pin. -/

@@ -33,7 +33,7 @@ theorem exec_castInputBase (cells : StageCells) (start t base stride : Nat) (mem
     calc x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
       _ < 2 ^ 128 * 2 ^ 127 := Nat.mul_lt_mul_of_pos_left this (by positivity)
       _ < 2 ^ 256 := by norm_num
-  have labelSmall : label.toNat < 2 ^ 104 := label.isLt
+  have labelSmall : label.toNat < 2 ^ 101 := label.isLt
   have sum1 : label.toNat + x * (2 ^ 128 * stride) < 2 ^ 256 := by
     have : stride * x < 2 ^ 127 := by omega
     have : x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
@@ -89,7 +89,7 @@ theorem agree_castQueryDyn (cells : StageCells) (w rb : Nat) (layout : StageLayo
   have hashSmall : hashInput (embed label) (tag0 + index.val) < 2 ^ 256 := by
     unfold hashInput
     simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-    have : label.toNat < 2 ^ 104 := label.isLt
+    have : label.toNat < 2 ^ 101 := label.isLt
     omega
   have eq : hashInput (embed label) tag0 + 2 ^ 128 * index.val = hashInput (embed label) (tag0 + index.val) := by
     unfold hashInput; ring
@@ -168,7 +168,7 @@ theorem agree_castDyn (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   obtain ⟨m1, run1, ram1, bits1, rD1, regs1⟩ := exec_castInputBase cells start t base stride memory slot
     label slotCell nodeCell (by omega) strideSmall (by omega)
   unfold castDyn castM hlongM
@@ -190,13 +190,13 @@ theorem agree_castDyn (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
     rw [SDef]
     unfold hashInput
     simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-    have : label.toNat < 2 ^ 104 := label.isLt
+    have : label.toNat < 2 ^ 101 := label.isLt
     omega
   have low : S % 2 ^ 128 = label.toNat := by
     rw [SDef]
     unfold hashInput
     simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-    have : label.toNat < 2 ^ 104 := label.isLt
+    have : label.toNat < 2 ^ 101 := label.isLt
     rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt (by omega)]
   have dNow : after.registers rD = word S := by
     rw [regsQ rD (by unfold castClobbers Clobbers.ofList; decide)]
@@ -307,7 +307,7 @@ theorem exec_accLevel (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   have powj : 2 ^ j ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) (by omega)
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
@@ -428,7 +428,7 @@ theorem exec_leafSums (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   obtain ⟨final, run, sumsF, frameF, bitsF, regsF⟩ := Prog.exec_rep
     (fun k => accLevel cells rb start t (start + k))
     (fun k current =>
@@ -564,7 +564,7 @@ theorem agree_leafEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have xLt : slot + 2 ^ start * index.val < 2 ^ w := by
     have := slotPos_lt slot start (w - start) index.val slotLt index.isLt
     rwa [Nat.add_sub_cancel' startLe] at this

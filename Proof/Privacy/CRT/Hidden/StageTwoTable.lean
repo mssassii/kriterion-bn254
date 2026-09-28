@@ -584,7 +584,8 @@ theorem invPow128_le_charge : ((2 : ℝ≥0∞) ^ 128)⁻¹ ≤ ENNReal.ofReal c
     have pos : 0 ≤ 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
       unfold BN254.baseFieldModulus
       norm_num
-    have hashBound : (1 : ℝ) / 2 ^ 128 ≤ 1 / 2 ^ 104 := by norm_num
+    have hashBound : (1 : ℝ) / 2 ^ 128 ≤ 1 / 2 ^ Kriterion.CRT.Narrow.labelBits := by
+      norm_num [Kriterion.CRT.Narrow.labelBits]
     linarith
   calc ((2 : ℝ≥0∞) ^ 128)⁻¹ = ENNReal.ofReal (1 / 2 ^ 128) := by
         rw [one_div, ENNReal.ofReal_inv_of_pos (by positivity), ENNReal.ofReal_pow (by norm_num)]

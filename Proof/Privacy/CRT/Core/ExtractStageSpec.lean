@@ -29,7 +29,7 @@ open Kriterion.CRT.ExtractSpec (StageParams stepMat gNode gBit0 gLeaf gCast gRes
 
 variable {rb : ℕ}
 
-/-! ### The shared definitions agree at 104 lanes -/
+/-! ### The shared definitions agree at 101 lanes -/
 
 theorem laneBit_eq_crt {l : ℕ} (A : Lanes labelBits l) (n : ℕ) : laneBit A n = Kriterion.CRT.laneBit A n := rfl
 

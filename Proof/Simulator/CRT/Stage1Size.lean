@@ -55,10 +55,15 @@ theorem size_pieceProg (p : Piece) (safe : CrtSerial.PieceSafe p) : (pieceProg p
       have := safe.2.2
       omega
   | record κ e => exact size_recordProg κ e
+  | zeros width =>
+      simp only [pieceProg, size_emitZero]
+      have : width ≤ 256 := safe
+      omega
 
--- The concrete material list has 1,009 non-conversion pieces, 2,386 joins (no chunk joins), and 41,184 pin lanes.
+-- The concrete material list has 1,009 non-conversion pieces, 2,386 joins (no chunk joins), 39,996 pin lanes
+-- (2 · 198 pins · 101 lanes), and the two byte paddings of the packed conversion vectors.
 set_option maxRecDepth 200000 in
-theorem pieces_length : pieces.length = 44579 := by decide +kernel
+theorem pieces_length : pieces.length = 43393 := by decide +kernel
 
 theorem size_serializeList (list : List Piece) (safeAll : ∀ p ∈ list, CrtSerial.PieceSafe p) :
     (Prog.rep list.length fun n => pieceProg (list.getD (list.length - 1 - n) default)).size ≤
@@ -125,7 +130,7 @@ theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a6' a7 a8 a9 a10 a11 : Nat)
     (eq : total = a0 + (a1 + (a2 + (a3 + (a4 + (a5 + (a6 + (a6' + (a7 + (a8 + (a9 + (a10 + a11))))))))))))
     (h0 : a0 ≤ fieldCount * 457231) (h1 : a1 ≤ exceptionCellCount * 34) (h2 : a2 ≤ 2 * Entry.joinCount * 734)
     (h3 : a3 ≤ 2 * (Entry.pinCount * laneCount) * 104) (h4 : a4 ≤ recordCount * moduliCount * 20000)
-    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h6' : a6' ≤ 91 * 13) (h7 : a7 ≤ 44579 * 6000)
+    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h6' : a6' ≤ 91 * 13) (h7 : a7 ≤ 43393 * 6000)
     (h8 : a8 ≤ labelCount * 7) (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) :
     total ≤ 2 ^ 55 := by
   rewrite [CrtStored.joinCount_eq] at h2
@@ -160,7 +165,7 @@ theorem size_program : CrtStage1.program.size ≤ 2 ^ 55 := by
       simp only [keyXor, Prog.seqList, Prog.size_seq, size_loadAt, size_storeAt, ar, Prog.size]; omega
   have clearSize : CrtStage1.clearLimbs.size = recordLimbCount * 3 :=
     Prog.size_rep _ _ _ fun _ _ => by simp only [Prog.size_seq, size_cst, size_storeAt]
-  have serialSize : CrtStage1.serialize.size ≤ 44579 * 6000 := by
+  have serialSize : CrtStage1.serialize.size ≤ 43393 * 6000 := by
     have bound := size_serialize
     rewrite [pieces_length] at bound
     exact bound

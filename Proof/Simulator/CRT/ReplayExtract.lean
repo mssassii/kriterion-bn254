@@ -50,7 +50,7 @@ theorem exec_nodeInput (cells : StageCells) (base stride : Nat) (memory : Memory
     calc x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
       _ < 2 ^ 128 * 2 ^ 127 := Nat.mul_lt_mul_of_pos_left this (by positivity)
       _ < 2 ^ 256 := by norm_num
-  have labelSmall : label.toNat < 2 ^ 104 := label.isLt
+  have labelSmall : label.toNat < 2 ^ 101 := label.isLt
   have sum1 : label.toNat + x * (2 ^ 128 * stride) < 2 ^ 256 := by
     have : stride * x < 2 ^ 127 := by omega
     have : x * (2 ^ 128 * stride) = 2 ^ 128 * (stride * x) := by ring
@@ -262,7 +262,7 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
       2 ^ 256 := by
     unfold hashInput
     simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
-    have : (parent index).toNat < 2 ^ 104 := (parent index).isLt
+    have : (parent index).toNat < 2 ^ 101 := (parent index).isLt
     have := tagSmall _ tLt
     omega
   unfold hashEntry

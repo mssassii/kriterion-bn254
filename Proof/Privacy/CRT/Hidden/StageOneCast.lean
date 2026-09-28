@@ -6,7 +6,7 @@ The conversion split at input zero hides a disjoint hot set. Its public vector
 is uniform independently of these cold materials and of the remaining public
 fields. Those fields ignore conversion positions altogether (for this
 coordinate), since tag-table records read only the body pads. A one-position
-uniform refill therefore gives the same 2^-104 conditional guessing bound.
+uniform refill therefore gives the same 2^-101 conditional guessing bound.
 This proof does not assume that casts are independent of their label bits.
 -/
 

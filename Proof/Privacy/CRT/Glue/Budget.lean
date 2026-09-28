@@ -5,7 +5,7 @@
 |---|---|---|
 | `G0 → G0T` | `tCollisionError = 1,759,967 / p` (`t` equal to a labelled garbler input) | `2^-232.85` |
 | `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `637 δ₃` | `2^-113.5` |
-| `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (1/2^104 + 1/(p − 1))` | linear |
+| `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (1/2^101 + 1/(p − 1))` | linear |
 | `G0U → G1U` | `hiddenWindowError = smudgeError` (the curve encodings' wrap window) | `2^-100.65` |
 | `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-100.65` + ... |
 | `HW → H` | `outputKernelError = 455/(r − 1)` | `2^-244.8` |
@@ -15,9 +15,12 @@
 Every term is a fraction of two naturals (`frac`), so its share of the unit reduces to one closed `Nat.ble` of
 the generated `BudgetData` (decided by `decide +kernel`, no axiom), and the readable forms
 (`crtHiddenCharge_eq`, ...) are separate lemmas. `chainError_budget` closes with every constant below a thousandth
-of its unit except the smudge term and the hidden window (seven tenths each), and every per-query coefficient below a
-third. The constant part is closed against **two** units: the challenge's allowance is
-`steps + 1 = size + 2 + firstFuel + secondFuel ≥ q₁ + q₂ + 2` (`BoundedMachine.Adversary.steps`).
+of its unit except the smudge term and the hidden window (seven tenths each). The per-query charge
+`1/2^101 + 1/(p − 1)` (101-bit conversion labels) is at most `1/2 + 2^-152` of the unit, so a stage-1 query (hidden
++ touch) costs at most `1 + 2^-151` and a stage-2 query `1/2 + 2^-152`. The allowance is **two** units plus one per
+query: the challenge's `steps + 1 = size + 2 + firstFuel + secondFuel ≥ q₁ + q₂ + 2`
+(`BoundedMachine.Adversary.steps`); the excess over one unit per stage-1 query, below `2^101 · 2^-152` in total for
+fewer than `2^100` queries, is paid from the constant's spare room.
 -/
 
 import Proof.Privacy.CRT.Glue.BudgetFacts
@@ -97,18 +100,21 @@ the wrap window, where its hint could pin the curve mask; charged once, outside 
 smudge term (five encodings against its 642-encoding union bound). -/
 def hiddenWindowError : ℝ := smudgeError
 
-/-- The per-query charge of the hidden hop, `1/2^104 + 1/(p − 1)`. -/
-def crtHiddenCharge : ℝ := frac (1 * (BudgetData.p - 1) + 2 ^ 104) (2 ^ 104 * (BudgetData.p - 1))
+/-- The per-query charge of the hidden hop, `1/2^w + 1/(p − 1)` at the conversion-label width `w = labelBits`
+(101): every case of the hop is at most this (conversion `2^-w`, full-width cases `2^-128`, key
+`2/2^128 + 1/(p − 1)`). -/
+def crtHiddenCharge : ℝ :=
+  frac (1 * (BudgetData.p - 1) + 2 ^ Narrow.labelBits) (2 ^ Narrow.labelBits * (BudgetData.p - 1))
 
-/-- `G0U → G1U`: `q · (1/2^104 + 1/(p − 1))`. -/
+/-- `G0U → G1U`: `q · (1/2^w + 1/(p − 1))`. -/
 def hiddenPointError (queries : ℕ) : ℝ := (queries : ℝ) * crtHiddenCharge
 
 /-- The per-query charge of a stage-1 touch of a designed-visible garbler point: the hidden hop's charge
-`1/2^104 + 1/(p − 1)` (`M'`'s touch is bounded through the core by the real touch of a garbler
+`1/2^w + 1/(p − 1)` (`M'`'s touch is bounded through the core by the real touch of a garbler
 entry, `CrtStageOneGuess E crtHiddenCharge`). -/
 def stageOneTouchCharge : ℝ := crtHiddenCharge
 
-/-- The stage-1 touch flag of `G1U → HW`: `q₁ · (1/2^104 + 1/(p − 1))`. -/
+/-- The stage-1 touch flag of `G1U → HW`: `q₁ · (1/2^w + 1/(p − 1))`. -/
 def stageOneTouchError (first : ℕ) : ℝ := (first : ℝ) * stageOneTouchCharge
 
 /-- The digit doublings, `364/(r − 1)` (route M's doubling flag covers `T = K`, `T = −K` and the sign row's
@@ -141,7 +147,7 @@ def chainError (first second : ℕ) : ℝ :=
 /-! ### Readable forms -/
 
 theorem crtHiddenCharge_eq :
-    crtHiddenCharge = 1 / 2 ^ 104 + 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
+    crtHiddenCharge = 1 / 2 ^ Narrow.labelBits + 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
   have hp : (1 : ℝ) < (BudgetData.p : ℝ) := by exact_mod_cast one_lt_p
   have cast : ((BudgetData.p - 1 : ℕ) : ℝ) = (BudgetData.p : ℝ) - 1 := by
     rw [Nat.cast_sub one_lt_p.le, Nat.cast_one]
@@ -150,7 +156,6 @@ theorem crtHiddenCharge_eq :
   rw [baseFieldModulus_eq]
   push_cast [cast]
   field_simp
-  ring
 
 theorem exceptionalError_eq : exceptionalError = 546 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
   unfold exceptionalError frac
@@ -167,7 +172,7 @@ theorem machineCutoffError_eq : machineCutoffError = 1 / 2 ^ 128 := by
   norm_num
 
 theorem stageOneTouchCharge_eq :
-    stageOneTouchCharge = 1 / 2 ^ 104 + 1 / ((BN254.baseFieldModulus : ℝ) - 1) :=
+    stageOneTouchCharge = 1 / 2 ^ Narrow.labelBits + 1 / ((BN254.baseFieldModulus : ℝ) - 1) :=
   crtHiddenCharge_eq
 
 /-! ### The shares, decided by the kernel (the inequalities of `BudgetData`, section "Each term") -/
@@ -206,9 +211,11 @@ theorem coincidence_share : 185 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kerne
 
 theorem machineCutoff_share : 1 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kernel
 
-theorem hiddenCharge_share : (1 * (BudgetData.p - 1) + 2 ^ 104) * 2 ^ 100 * 3 ≤ 2 ^ 104 * (BudgetData.p - 1) := by decide +kernel
-
-theorem stageOneTouch_share : 1 * 2 ^ 100 * 3 ≤ 2 ^ 104 := by decide +kernel
+/-- At `w = 101` the charge is `2^-101 + 1/(p − 1)`, i.e. `1/2 + 2^100/(p − 1) ≤ 1/2 + 1/2^152` units: the share
+`a · 2^100 · 2^152 ≤ (2^151 + 1) · b` reduces to `2^252 ≤ p − 1`. -/
+theorem hiddenCharge_share :
+    (1 * (BudgetData.p - 1) + 2 ^ Narrow.labelBits) * 2 ^ 100 * 2 ^ 152 ≤
+      (2 ^ 151 + 1) * (2 ^ Narrow.labelBits * (BudgetData.p - 1)) := by decide +kernel
 
 /-! ### Each term against its share of the unit -/
 
@@ -254,23 +261,29 @@ theorem hiddenWindowError_nonneg : 0 ≤ hiddenWindowError := by
   unfold hiddenWindowError smudgeError
   exact frac_nonneg _ _
 
-theorem crtHiddenCharge_le : crtHiddenCharge * 2 ^ 100 ≤ 1 / 3 := by
-  have pos : 0 < 2 ^ 104 * (BudgetData.p - 1) :=
-    Nat.mul_pos (Nat.two_pow_pos 104) (Nat.sub_pos_of_lt one_lt_p)
-  have := frac_share (c := 3) hiddenCharge_share pos (by norm_num)
+/-- **The per-query charge**: `crtHiddenCharge · 2^100 ≤ 1/2 + 1/2^152` (at `w = 101`, exactly
+`1/2 + 2^100/(p − 1)`). -/
+theorem crtHiddenCharge_le : crtHiddenCharge * 2 ^ 100 ≤ 1 / 2 + 1 / 2 ^ 152 := by
+  have pos : 0 < 2 ^ Narrow.labelBits * (BudgetData.p - 1) :=
+    Nat.mul_pos (Nat.two_pow_pos _) (Nat.sub_pos_of_lt one_lt_p)
+  have share := frac_share_le (c := 2 ^ 151 + 1) (d := 2 ^ 152) hiddenCharge_share pos (by positivity)
   unfold crtHiddenCharge
-  exact this
+  calc _ ≤ ((2 ^ 151 + 1 : ℕ) : ℝ) / ((2 ^ 152 : ℕ) : ℝ) := share
+    _ = 1 / 2 + 1 / 2 ^ 152 := by norm_num
 
-theorem stageOneTouchCharge_le : stageOneTouchCharge * 2 ^ 100 ≤ 1 / 3 :=
+theorem stageOneTouchCharge_le : stageOneTouchCharge * 2 ^ 100 ≤ 1 / 2 + 1 / 2 ^ 152 :=
   crtHiddenCharge_le
 
 /-! ### The closing inequality -/
 
-/-- **The closing inequality.** Below `2^100` queries the whole chain costs at most `(q₁ + q₂ + 2) / 2^100`: the
+/-- **The closing inequality.** Below `2^100` queries the whole chain costs at most `(q₁ + q₂ + 2) / 2^100`. The
 constant part (three swaps, the smudge term, the hidden hop's window term, the collision, the doubling, the kernel,
-the coincidences, the cutoff) is below `1408/1000` of one unit and the linear part below `2/3` of a unit per query.
-The second unit is the challenge's: `steps + 1 = size + 2 + firstFuel + secondFuel` (`Shapes.lean`). -/
-theorem chainError_budget (first second : ℕ) (_small : first + second < 2 ^ 100) :
+the coincidences, the cutoff) is below `1408/1000` of one unit. The linear part is `(q₁ + q₂)·c + q₁·c` with
+`c · 2^100 ≤ 1/2 + 2^-152`, i.e. at most `q₁ + q₂/2 + (2q₁ + q₂)·2^-152`: a stage-1 query costs slightly more than
+one unit, and the excess `(2q₁ + q₂)·2^-152 < 2^101·2^-152` over fewer than `2^100` queries is absorbed by the
+constant's spare room. The second unit is the challenge's: `steps + 1 = size + 2 + firstFuel + secondFuel`
+(`Shapes.lean`). -/
+theorem chainError_budget (first second : ℕ) (small : first + second < 2 ^ 100) :
     chainError first second * 2 ^ 100 ≤ (first : ℝ) + (second : ℝ) + 2 := by
   have c0 := tCollisionError_le
   have c1 := padSwapError_le
@@ -284,15 +297,22 @@ theorem chainError_budget (first second : ℕ) (_small : first + second < 2 ^ 10
   have l2 := stageOneTouchCharge_le
   have firstNonneg : (0 : ℝ) ≤ first := Nat.cast_nonneg _
   have secondNonneg : (0 : ℝ) ≤ second := Nat.cast_nonneg _
-  have hidden : hiddenPointError (first + second) * 2 ^ 100 ≤ ((first : ℝ) + second) / 3 := by
+  have hidden : hiddenPointError (first + second) * 2 ^ 100 ≤
+      ((first : ℝ) + second) * (1 / 2 + 1 / 2 ^ 152) := by
     unfold hiddenPointError
     push_cast
-    rw [mul_assoc, div_eq_mul_one_div ((first : ℝ) + second) 3]
+    rw [mul_assoc]
     exact mul_le_mul_of_nonneg_left l1 (by positivity)
-  have touch : stageOneTouchError first * 2 ^ 100 ≤ (first : ℝ) / 3 := by
+  have touch : stageOneTouchError first * 2 ^ 100 ≤ (first : ℝ) * (1 / 2 + 1 / 2 ^ 152) := by
     unfold stageOneTouchError
-    rw [mul_assoc, div_eq_mul_one_div (first : ℝ) 3]
+    rw [mul_assoc]
     exact mul_le_mul_of_nonneg_left l2 firstNonneg
+  have queries : (first : ℝ) + second ≤ 2 ^ 100 := by exact_mod_cast small.le
+  have excess : (2 * (first : ℝ) + second) * (1 / 2 ^ 152) ≤ 1 / 1000 := by
+    have le : 2 * (first : ℝ) + second ≤ 2 ^ 101 := by nlinarith
+    calc (2 * (first : ℝ) + second) * (1 / 2 ^ 152) ≤ 2 ^ 101 * (1 / 2 ^ 152) :=
+          mul_le_mul_of_nonneg_right le (by positivity)
+      _ ≤ 1 / 1000 := by norm_num
   unfold chainError
   nlinarith
 

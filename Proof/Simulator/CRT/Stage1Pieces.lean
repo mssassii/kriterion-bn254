@@ -146,6 +146,13 @@ theorem pieces_bits (ram : Word → Word) (source : Source) (holds : SourceHolds
   unfold pieces
   simp only [pieceListBits_append]
   rw [curve_bits ram source holds, rows_bits ram source holds, bytes_bits ram source holds]
+  have pad : pieceListBits ram [Piece.zeros convPad] =
+      lsbs (8 * Narrow.packedBytes convCount - labelBits * convCount) 0 := by
+    simp only [pieceListBits, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil, List.append_nil,
+      pieceBits]
+    rw [show (word 0 : Word) = BitVec.ofNat 256 0 from rfl, bitRun_ofNat _ _ (by decide)]
+    rfl
+  rw [pad]
   have conv0 := conv_bits ram source 0 (holds.conv 0)
   have conv1 := conv_bits ram source 1 (holds.conv 1)
   rw [show ((0 : Fin 2) : Nat) = 0 from rfl] at conv0

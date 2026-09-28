@@ -697,10 +697,9 @@ theorem outputKernelError_le : Nat.ble (455 * 2 ^ 100 * 1000) (r - 1) = true := 
 theorem coincidenceError_le : Nat.ble (185 * 2 ^ 100 * 1000) (2 ^ 128) = true := by decide +kernel
 theorem machineCutoffError_le : Nat.ble (1 * 2 ^ 100 * 1000) (2 ^ 128) = true := by decide +kernel
 
-/-- Hidden plus touch per stage-1 query is at most `2/3` of the unit;
-the stage-2 hidden charge alone is at most `1/3`. Both field charges are counted at stage 1. -/
-theorem stageOneQuery_le : Nat.ble ((8 * (p - 1) + 2 * 2 ^ 104) * 2 ^ 100 * 3) (2 * 2 ^ 104 * (p - 1)) = true := by decide +kernel
-theorem stageTwoQuery_le : Nat.ble ((4 * (p - 1) + 2 ^ 104) * 2 ^ 100 * 3) (2 ^ 104 * (p - 1)) = true := by decide +kernel
+/-- The per-query charge at 101-bit conversion labels, `1/2^101 + 1/(p − 1)`, is at most `1/2 + 1/2^152` of the
+unit (`2^252 ≤ p − 1`); a stage-1 query (hidden + touch) costs at most `1 + 2/2^152`, a stage-2 query `1/2 + 1/2^152`. -/
+theorem hiddenQuery_le : Nat.ble ((1 * (p - 1) + 2 ^ 101) * 2 ^ 100 * 2 ^ 152) ((2 ^ 151 + 1) * (2 ^ 101 * (p - 1))) = true := by decide +kernel
 
 /-! ### The closing inequality for the constant, exactly
 

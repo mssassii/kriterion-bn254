@@ -111,10 +111,10 @@ def castLanes (width : Nat) (value : Nat) : Lanes width :=
 
 /-! ### The dense pin codec -/
 
-/-- The pin natural: 104 lane representatives of `width` bits each. -/
+/-- The pin natural: 101 lane representatives of `width` bits each. -/
 def pinNat {width : Nat} (lanes : Lanes width) : Nat := Narrow.pinNat lanes
 
-/-- Exactly `width` narrow labels, densely packed at 104-bit stride. -/
+/-- Exactly `width` narrow labels, densely packed at 101-bit stride. -/
 def pinBlocks {width : Nat} (lanes : Lanes width) : Fin width → Label := Narrow.pinBlocks lanes
 
 /-- Read a pin back from its narrow labels. -/

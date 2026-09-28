@@ -277,7 +277,7 @@ theorem div_pow_mod_two_of_testBit {a b i : Nat} (same : a.testBit i = b.testBit
   rcases Nat.mod_two_eq_zero_or_one (a / 2 ^ i) with ha | ha <;>
     rcases Nat.mod_two_eq_zero_or_one (b / 2 ^ i) with hb | hb <;> simp_all
 
-/-- The low 128 bits of a word carry the label: bit `i < 104` of `S` is bit `i` of the label. -/
+/-- The low 128 bits of a word carry the label: bit `i < 101` of `S` is bit `i` of the label. -/
 theorem label_bit_of_low (label : Label) (S i : Nat) (low : S % 2 ^ 128 = label.toNat) (iSmall : i < 128) :
     S / 2 ^ i % 2 = label.toNat / 2 ^ i % 2 := by
   apply div_pow_mod_two_of_testBit
@@ -386,7 +386,7 @@ theorem det_castLanesProg (cells : CastCells) (l : Nat) : (castLanesProg cells l
       trivial, ⟨trivial, trivial⟩⟩
 
 /-- **The lane loop of a cast**: with the answers' halves in the answer region and a word whose low
-128 bits are the label in `rD`, the 104 parity lanes land in the lane region. -/
+128 bits are the label in `rD`, the 101 parity lanes land in the lane region. -/
 theorem exec_castLanesProg (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l ≤ 128)
     (values : Vector (Block × Block) (castAnswers l)) (label : Label) (S : Nat) (memory : Memory)
     (halves : ∀ b, b < 2 * castAnswers l → memory.ram (word (cells.ansBase + b)) = word (halvesOf values b))
@@ -401,7 +401,7 @@ theorem exec_castLanesProg (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall 
       after.bits = memory.bits ∧
       ∀ register, register ≠ rA → register ≠ rB → register ≠ rAddr → register ≠ rSecond →
         after.registers register = memory.registers register := by
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   obtain ⟨final, run, lanes, frameL, bitsL, regsL⟩ := Prog.exec_rep (laneExtract cells l)
     (fun i current =>
       (∀ i', i' < i → current.ram (word (cells.laneBase + i')) =
@@ -440,7 +440,7 @@ theorem exec_castLanesProg (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall 
   rw [lanes i.val i.isLt, parityCastLanes_val l lPos lSmall values label i
     (laneBlock_lt l lPos lSmall i.val i.isLt), label_bit_of_low label S i.val low (by omega)]
 
-/-- **One cast** against the evaluator's parity `castM`: the same answers in the same order, the 104
+/-- **One cast** against the evaluator's parity `castM`: the same answers in the same order, the 101
 parity lanes in the lane region, and the frame of the schema. -/
 theorem agree_castBlock (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l ≤ 128)
     (layout : CastLayout cells l) (tagOf : Nat → Nat) (label : Label) (memory : Memory)
@@ -452,7 +452,7 @@ theorem agree_castBlock (cells : CastCells) (l : Nat) (lPos : 0 < l) (lSmall : l
           Frame (castWrites cells l) castBlockClobbers memory after)
       ((castBlock cells l tagOf).tree memory) (liftHash (castM l label tagOf)) := by
   have ansFits := layout.ansFits
-  have laneFits : cells.laneBase + 104 < 2 ^ 256 := layout.laneFits
+  have laneFits : cells.laneBase + 101 < 2 ^ 256 := layout.laneFits
   unfold castBlock castM hlongM
   rw [tree_seq, TreeLaws.monad_bind, TreeLaws.monad_bind, liftHash_bind, liftHash_bind,
     liftHash_vector, TreeLaws.bind_assoc]
@@ -786,7 +786,7 @@ theorem det_pinSolve (cc : ChunkCastCells) (width l : Nat) : (pinSolve cc width 
   det_rep _ _ fun i _ => ⟨⟨trivial, trivial⟩, trivial, det_rep _ _ (fun leaf _ => det_solveTerm cc width l i leaf),
     ⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, trivial⟩
 
-/-- **The pin solve**: all 104 lanes of the hot cast. -/
+/-- **The pin solve**: all 101 lanes of the hot cast. -/
 theorem exec_pinSolve (cc : ChunkCastCells) (width l : Nat) (memory : Memory) (value : Nat)
     (values : Vector (Lanes l) (2 ^ width)) (pin : Lanes l) (widthSmall : width < 20)
     (lPos : 0 < l) (lSmall : l ≤ 128) (layout : ChunkCastLayout cc width l)

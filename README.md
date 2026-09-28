@@ -1,10 +1,36 @@
-> **P1 research branch — byte-neutral proof refinement.** This branch tests the tighter hidden/touch
-> charge `1/2^104 + 1/(p−1)` on the submitted combined source `32f1fb34884ca33a84ac9dd4db687ca30187aeed`.
-> Labels remain 104 bits; construction, encoding and all three metrics are unchanged. The full build
-> and both audits passed locally. The remainder of this README describes the submitted combined construction.
-> See [P1 evidence](evidence/privacy-charge-p1/verification.md). No P1 publication or submission is planned.
+> **Width-101 research branch (P1b, Opus), locally verified, not submitted.** On Astra's refined-charge commit
+> `dc6aa07` (itself on the submitted combined `32f1fb3`), the internal conversion labels narrow from 104 to
+> **101 bits** and the two conversion vectors are published as contiguous bit-packed naturals:
+> **126,114 bytes / 1,061,622 / 1,054,788** (−2,162 bytes; queries unchanged). See §0 and
+> [the width-101 report](evidence/width101/verification.md). Sections 1–2 describe the combined construction this
+> builds on; its metrics there are the combined commit's.
 
-# CRT-residue ArgoMAC with selected width-9 extraction and 84 moduli
+# CRT-residue ArgoMAC with selected width-9 extraction, 84 moduli and 101-bit conversion labels
+
+## 0. This branch: 101-bit conversion labels (step 9)
+
+| metric | value | rule |
+|---|---|---|
+| `ciphertextBytes` | **126,114** | ranked, lower is better |
+| `garbleQueries` | **1,061,622** `≤ 1,759,967` | acceptance gate |
+| `evaluateQueries` | **1,054,788** `≤ 1,055,879` | acceptance gate; 1,091 headroom |
+
+* **Privacy.** Astra's P1 refined the per-query hidden/touch charge to `1/2^w + 1/(p−1)` (all disjoint cases are
+  at most that; idea from Opus's `coordination/next-ideas.md`). At `w = 101` the charge is at most `1/2 + 2^-152` of
+  the unit, so a stage-1 query costs at most `1 + 2^-151` units and a stage-2 query `1/2 + 2^-152`.
+  `chainError_budget` closes against the challenge's allowance `steps + 1 ≥ q₁ + q₂ + 2`: the constant (1.2719 exact,
+  ≤ 1.408 as proved) plus the linear excess `(2q₁ + q₂)·2^-152 ≤ 2^101·2^-152` for `q₁ + q₂ < 2^100` stays below 2.
+  The security statement, target, external 128-bit Lamport labels and digest/mask keys are unchanged.
+* **Codec.** At 101 bits the 13-byte label codec would pad every label with 3 zero bits, which the simulator's
+  lane-major pin serialization cannot produce, so `crtX`/`crtY` use `Narrow.packedLabels`: one little-endian natural
+  of `101 · 2885` bits in `⌈101·2885/8⌉ = 36,424` bytes each (`Construction/CRT/PackedLabels.lean`). The simulator
+  emits the same bits and a `Piece.zeros 7` byte padding per coordinate (`Stage1Wire.packed_bits`,
+  `Stage1Pieces.pieces_bits`). Records, fields, flags and exception bytes keep their codecs.
+* **Queries** are unchanged: cast answers per leaf are identical for 101…104 lanes at every ring width used (checked by
+  the `decide +kernel` budgets). The simulator now has 101 lanes per pin and 43,393 serialized pieces.
+* **Checks** (local): full build (3,845 jobs), `Scratch/Width101Audit.lean`, and `Scratch/ProofAudit.lean`
+  (23,777 declarations, only `propext`, `Classical.choice`, `Quot.sound`). Implementation: Claude Opus 5.5 under
+  Souhail's direction; Astra's packed-public codec work is separate and may subsume the vector codec.
 
 This entry implements garbled BN254 scalar multiplication for Kriterion's `scalar-multiplication`
 challenge. The challenge, Lean toolchain and dependency lock remain pinned to

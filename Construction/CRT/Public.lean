@@ -6,11 +6,11 @@ The public value of configuration E and its byte codec.
 | `curve`     | `3 * field`                      | `3 * 32`         | 96      |
 | `rows`      | `Vector normRow 91`              | `91 * 33`        | 3,003   |
 | `exception` | `Vector entry 91`                | `91 * 1`         | 91      |
-| `crtX`      | `Vector label 2885`              | `2885 * 13`      | 37,505  |
-| `crtY`      | `Vector label 2885`              | `2885 * 13`      | 37,505  |
+| `crtX`      | `packedLabels 2885` (101 bits each) | `⌈2885 * 101 / 8⌉` | 36,424  |
+| `crtY`      | `packedLabels 2885` (101 bits each) | `⌈2885 * 101 / 8⌉` | 36,424  |
 | `recX`      | `Vector (natural 78) 367`        | `367 * 78`       | 28,626  |
 | `recY`      | `Vector (natural 78) 275`        | `275 * 78`       | 21,450  |
-| **total**   |                                  |                  | **128,276** |
+| **total**   |                                  |                  | **126,114** |
 
 Every field has a fixed width and there is no tag, so every inhabitant encodes to exactly
 `ciphertextBytes` bytes and the size theorem does not mention the garbler (xinshu's `SizedBy`
@@ -23,6 +23,7 @@ A record is stored as a 78-byte natural (`2 M < 2 ^ 620 ≤ 256 ^ 78`); that hon
 
 import Construction.CRT.Coord
 import Construction.CRT.LabelEncoding
+import Construction.CRT.PackedLabels
 import Construction.ArgoMAC.Public
 import Construction.ArgoMAC.ExceptionEncoding
 import Construction.ArgoMAC.NormRow
@@ -76,8 +77,8 @@ structure Public where
   /-- The records of `y`. -/
   recY : Vector Record yCount
 
-/-- The ciphertext size: `96 + 91 * 33 + 91 * 1 + 2 * 2885 * 13 + 642 * 78`. -/
-def ciphertextBytes : Nat := 128276
+/-- The ciphertext size: `96 + 91 * 33 + 91 * 1 + 2 * ⌈2885 * 101 / 8⌉ + 642 * 78`. -/
+def ciphertextBytes : Nat := 126114
 
 /-- The flat blocks of one coordinate read back as the evaluator's conversion material. -/
 def convOf (blocks : Vector Label convCount) : ConvPublic := ConvPublic.unflatten table blocks.toArray
@@ -128,7 +129,7 @@ private def record : Kriterion.Encoding Record := Kriterion.Encoding.natural rec
 /-- The complete public encoding, in the order curve, rows, exception, crtX, crtY, recX, recY. -/
 def encoding : Kriterion.Encoding Public :=
   (curveTriple.pair ((normRow.vector digitCount).pair ((entry.vector digitCount).pair
-    ((Narrow.labelEncoding.vector convCount).pair ((Narrow.labelEncoding.vector convCount).pair
+    ((Narrow.packedLabels convCount).pair ((Narrow.packedLabels convCount).pair
       ((record.vector xCount).pair (record.vector yCount))))))).map
     (fun value => (value.curve, value.rows, value.exception, value.crtX, value.crtY, value.recX,
       value.recY))
@@ -168,8 +169,8 @@ private theorem field_sized : SizedBy field 32 := sizedBy_map (sizedBy_natural 3
 
 private theorem block_sized : SizedBy block 16 := sizedBy_map (sizedBy_natural 16) _ _ _
 
-private theorem label_sized : SizedBy Narrow.labelEncoding 13 :=
-  Narrow.labelEncoding_length
+private theorem packed_sized : SizedBy (Narrow.packedLabels convCount) (Narrow.packedBytes convCount) :=
+  Narrow.packedLabels_length convCount
 
 private theorem entry_sized : SizedBy entry 1 := Exception.entryEncoding_length
 
@@ -182,23 +183,23 @@ private theorem curveTriple_sized : SizedBy curveTriple 96 :=
 private theorem record_sized : SizedBy record 78 := sizedBy_natural recordBytes
 
 private theorem encoding_sized :
-    SizedBy encoding (96 + (digitCount * 33 + (digitCount * 1 + (convCount * 13 +
-      (convCount * 13 + (xCount * 78 + yCount * 78)))))) :=
+    SizedBy encoding (96 + (digitCount * 33 + (digitCount * 1 + (Narrow.packedBytes convCount +
+      (Narrow.packedBytes convCount + (xCount * 78 + yCount * 78)))))) :=
   sizedBy_map (sizedBy_pair curveTriple_sized
     (sizedBy_pair (sizedBy_vector normRow_sized digitCount)
       (sizedBy_pair (sizedBy_vector entry_sized digitCount)
-        (sizedBy_pair (sizedBy_vector label_sized convCount)
-          (sizedBy_pair (sizedBy_vector label_sized convCount)
+        (sizedBy_pair packed_sized
+          (sizedBy_pair packed_sized
             (sizedBy_pair (sizedBy_vector record_sized xCount)
               (sizedBy_vector record_sized yCount))))))) _ _ _
 
-/-- The byte table as an arithmetic identity. -/
+/-- The byte table as an arithmetic identity (`packedBytes 2885 = (101 · 2885 + 7) / 8 = 36424`). -/
 theorem byteArithmetic :
-    96 + (digitCount * 33 + (digitCount * 1 + (convCount * 13 +
-      (convCount * 13 + (xCount * 78 + yCount * 78))))) = ciphertextBytes := by
-  simp only [digitCount, convCount, xCount, yCount, ciphertextBytes]
+    96 + (digitCount * 33 + (digitCount * 1 + (Narrow.packedBytes convCount +
+      (Narrow.packedBytes convCount + (xCount * 78 + yCount * 78))))) = ciphertextBytes := by
+  simp only [digitCount, convCount, xCount, yCount, ciphertextBytes, Narrow.packedBytes, Narrow.labelBits]
 
-/-- **Every** public value encodes to exactly `ciphertextBytes = 128,276` bytes. -/
+/-- **Every** public value encodes to exactly `ciphertextBytes = 126,114` bytes. -/
 theorem encoding_length (value : Public) : (encoding.encode value).length = ciphertextBytes := by
   rw [encoding_sized value, byteArithmetic]
 

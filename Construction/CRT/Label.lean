@@ -8,12 +8,13 @@ probability infrastructure.  Hash answers, hash-input strides, external input
 labels, and digest labels remain raw blocks.
 
 This module has no existing consumers yet.  It deliberately does not assert
-`embed (clip x) = x`: the upper 24 bits of a raw block are discarded.
+`embed (clip x) = x`: the upper 27 bits of a raw block are discarded (101-bit conversion labels; the privacy
+charge per hidden-label guess is `2^-101`, closed against the challenge's two units of work).
 -/
 
 namespace Kriterion.CRT.Narrow
 
-abbrev labelBits : Nat := 104
+abbrev labelBits : Nat := 101
 abbrev RawBlock := BitVec 128
 abbrev Label := BitVec labelBits
 

@@ -4,7 +4,7 @@ import Mathlib.Probability.Distributions.Uniform
 import Mathlib.Tactic.NormNum
 
 /-!
-Uniformity of the low 104 bits of a raw, uniformly distributed 128-bit answer.
+Uniformity of the low 101 bits of a raw, uniformly distributed 128-bit answer.
 
 The weighted statements keep the residual raw block independent of the frozen
 view.  They do not assert uniformity after arbitrary conditioning on that block.
@@ -194,7 +194,7 @@ theorem bind_map_uniform_clip {View : Type*} (view : PMF View) :
     rw [← PMF.map_comp, uniform_clip]
   rw [inner]
 
-/-- A single projection fibre has probability 2^-104 even when its event is
+/-- A single projection fibre has probability 2^-101 even when its event is
 weighted by an arbitrary nonnegative (possibly infinite) constant. -/
 theorem weighted_clip_fibre (label : Label) (weight : ℝ≥0∞) :
     (∑' delta : RawBlock, PMF.uniformOfFintype RawBlock delta *

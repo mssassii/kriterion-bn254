@@ -76,10 +76,10 @@ end Agreement
 
 theorem castAnswers_le_128 (l : Nat) (h1 : 1 ≤ l) (h2 : l ≤ 128) : castAnswers l ≤ 128 := by
   unfold castAnswers castBlocks lanesPerBlock
-  have lb : labelBits = 104 := rfl
+  have lb : labelBits = 101 := rfl
   rw [lb]
   have p1 : 1 ≤ 128 / l := (Nat.le_div_iff_mul_le (by omega)).mpr (by omega)
-  have : (104 + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
+  have : (101 + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
   omega
 
 theorem stageChain_layout (S w rb value remBase joinBase pinBase : Nat) (wPos : 1 ≤ w) (wLe : w ≤ 12)
@@ -100,7 +100,7 @@ theorem sw_chain_in (S w rb value remBase joinBase pinBase : Nat) (wLe : w ≤ 1
   have ca := castAnswers_le_128 rb rbPos rbLe
   have pw : 2 ^ w ≤ 2 ^ 12 := Nat.pow_le_pow_right (by norm_num) wLe
   have hw := Nat.two_pow_pos w
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   simp only [stageWrites, Writes.union, Writes.region, Writes.cell, Region.Holds, stageChain] at h
   rcases h with ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ |
     ⟨j, jb, h⟩ | ⟨j, jb, h⟩ | h | h | ⟨j, jb, h⟩ | ⟨j, jb, h⟩ <;>
@@ -391,7 +391,7 @@ theorem agree_conversionReplay (coord i : Nat) (row : OddRow) (m value : Nat) (l
   have pw1 : 2 ^ row.width1 ≤ 2 ^ 12 := Nat.pow_le_pow_right (by norm_num) w1Le
   have pkeep : 2 ^ (row.width0 + (row.keep - row.width0)) ≤ 2 ^ 16 :=
     Nat.pow_le_pow_right (by norm_num) (by omega)
-  have lc : laneCount = 104 := rfl
+  have lc : laneCount = 101 := rfl
   have ellLe : row.ell ≤ 128 := by omega
   have valueSmall : value < 2 ^ 256 :=
     lt_of_lt_of_le valueLt (Nat.pow_le_pow_right (by norm_num) (by omega))

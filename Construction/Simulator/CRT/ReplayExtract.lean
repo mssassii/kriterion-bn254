@@ -297,7 +297,7 @@ def subLane (cells : StageCells) (w i : Nat) : Prog :=
 def packLane (base b i : Nat) : Prog :=
   .seq (loadAt rE (base + i)) (bitInsert b i)
 
-/-- **The lane-bit pack**: `rD := laneBit lanes b` for the 104 active lanes at `base .. base + 103`
+/-- **The lane-bit pack**: `rD := laneBit lanes b` for the 101 active lanes at `base .. base + 100`
 (clobbers `rB`, `rD`, `rE`, `rAddr`). -/
 def lanePack (base b : Nat) : Prog :=
   .seq (cst rD 0) (Prog.rep Kriterion.CRT.laneCount (packLane base b))

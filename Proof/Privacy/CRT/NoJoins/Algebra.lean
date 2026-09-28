@@ -3,7 +3,7 @@
 
 Standalone: imports only the narrow label boundary and Mathlib's `Equiv`; no privacy-chain module.
 
-A raw 128-bit block is a low 104-bit conversion part (`clip`) and a high part. `setLow x l` keeps the high
+A raw 128-bit block is a low 101-bit conversion part (`clip`) and a high part. `setLow x l` keeps the high
 part of `x` and installs the low part `l`. With no chunk joins, the actual zero label of a non-first chunk
 bit is `setLow Z (levelSum)`: the coins' zero label `Z` with its low part replaced by the XOR of the
 level's tree materials (`Key.lean`). With the level sum split as `hot ⊕ cold` (hot material at the
@@ -41,7 +41,7 @@ theorem label_zero_xor (x : Label) : (0 : Label) ^^^ x = x := BitVec.zero_xor
 
 /-! ### Low and high parts of a raw block -/
 
-/-- Keep the high `128 − 104` bits of `x` and install the low part `l`. -/
+/-- Keep the high `128 − 101` bits of `x` and install the low part `l`. -/
 def setLow (x : RawBlock) (l : Label) : RawBlock := x ^^^ embed (clip x) ^^^ embed l
 
 @[simp] theorem clip_setLow (x : RawBlock) (l : Label) : clip (setLow x l) = l := by

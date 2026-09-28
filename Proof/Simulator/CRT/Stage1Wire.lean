@@ -5,8 +5,8 @@
 `Construction/CRT/Public.lean`; `encoding_eq` restates the encoding with public copies (`rfl`). `wire_bits`: the
 byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × (256 + 8)`: the `X` constant
 and the flags byte), the exception
-nibbles (`91 × 2 × 4`), the two conversion vectors (`3178 × 104` bits each) and the records (`624` bits each), least
-significant first.
+nibbles (`91 × 2 × 4`), the two packed conversion vectors (`2885 × 101` bits each, then 7 zero bits to whole bytes)
+and the records (`624` bits each), least significant first.
 -/
 
 import Proof.Simulator.Stage1Wire
@@ -58,7 +58,7 @@ def record : Kriterion.Encoding Record := Kriterion.Encoding.natural recordBytes
 /-- The encoding with the public copies. -/
 def encoding : Kriterion.Encoding Entry.Public :=
   (curveTriple.pair ((normRow.vector digitCount).pair ((entry.vector digitCount).pair
-    ((block.vector convCount).pair ((block.vector convCount).pair
+    ((Narrow.packedLabels convCount).pair ((Narrow.packedLabels convCount).pair
       ((record.vector xCount).pair (record.vector yCount))))))).map
     (fun value => (value.curve, value.rows, value.exception, value.crtX, value.crtY, value.recX,
       value.recY))
@@ -73,8 +73,32 @@ theorem encoding_eq : Entry.Wire.encoding = encoding := rfl
 theorem field_bits (value : BaseField) : byteBits (encodeOf field value) = lsbs 256 value.val :=
   natural_byteBits 32 _
 
-theorem block_bits (value : Label) : byteBits (encodeOf block value) = lsbs labelBits value.toNat :=
-  natural_byteBits 13 _
+/-- `n` consecutive `labelBits` windows of a natural are its low `labelBits · n` bits. -/
+theorem label_windows (value : Nat) : ∀ n : Nat,
+    (List.ofFn fun k : Fin n => lsbs labelBits (value / 2 ^ (labelBits * k.val))).flatten =
+      lsbs (labelBits * n) value
+  | 0 => rfl
+  | n + 1 => by
+      rw [List.ofFn_succ_last, List.flatten_append]
+      simp only [Fin.val_castSucc, Fin.val_last, List.flatten_cons, List.flatten_nil, List.append_nil]
+      rw [label_windows value n, show labelBits * (n + 1) = labelBits * n + labelBits by ring, lsbs_add]
+
+/-- **The bits of a packed label vector**: the labels' `labelBits`-bit runs, then the zero padding to whole bytes. -/
+theorem packed_bits (n : Nat) (labels : Vector Label n) :
+    byteBits (encodeOf (Narrow.packedLabels n) labels) =
+      (List.ofFn fun k : Fin n => lsbs labelBits labels[k.val].toNat).flatten ++
+        lsbs (8 * Narrow.packedBytes n - labelBits * n) 0 := by
+  unfold Narrow.packedLabels
+  rw [encodeOf_map, ← encode_eq, natural_byteBits]
+  have le := Narrow.labelBits_le_packed n
+  rw [show 8 * Narrow.packedBytes n = labelBits * n + (8 * Narrow.packedBytes n - labelBits * n) by omega,
+    lsbs_add, Nat.div_eq_of_lt (Narrow.packNat_lt labels), Nat.add_sub_cancel_left, ← label_windows]
+  congr 1
+  refine congrArg List.flatten (congrArg List.ofFn (funext fun k => ?_))
+  have same := congrArg BitVec.toNat (Narrow.unpackAt_packNat labels k)
+  simp only [Narrow.unpackAt, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow] at same
+  rw [← lsbs_mod labelBits (Narrow.packNat labels / 2 ^ (labelBits * k.val)), same]
+  rfl
 
 theorem gadgetByte_bits (value : BitVec 8) :
     byteBits (encodeOf gadgetByte value) = lsbs 8 value.toNat := by
@@ -137,7 +161,9 @@ theorem wire_bits (value : Entry.Public) :
           (List.ofFn fun index : Fin 2 =>
             lsbs 4 value.exception[digit.val][index.val].toNat).flatten).flatten ++
       (List.ofFn fun k : Fin convCount => lsbs labelBits value.crtX[k.val].toNat).flatten ++
+      lsbs (8 * Narrow.packedBytes convCount - labelBits * convCount) 0 ++
       (List.ofFn fun k : Fin convCount => lsbs labelBits value.crtY[k.val].toNat).flatten ++
+      lsbs (8 * Narrow.packedBytes convCount - labelBits * convCount) 0 ++
       (List.ofFn fun e : Fin xCount => lsbs 624 value.recX[e.val].val).flatten ++
       (List.ofFn fun e : Fin yCount => lsbs 624 value.recY[e.val].val).flatten := by
   rw [encoding_eq, encode_eq]
@@ -147,9 +173,8 @@ theorem wire_bits (value : Entry.Public) :
   rw [show curveTriple = field.pair (field.pair field) from rfl, encodeOf_pair, encodeOf_pair]
   simp only [byteBits_append]
   rw [field_bits, field_bits, field_bits]
-  rw [byteBits_vector, byteBits_vector, byteBits_vector, byteBits_vector, byteBits_vector,
-    byteBits_vector]
-  simp only [normRow_bits, entry_bits, block_bits, record_bits, List.append_assoc]
+  rw [byteBits_vector, byteBits_vector, byteBits_vector, byteBits_vector, packed_bits, packed_bits]
+  simp only [normRow_bits, entry_bits, record_bits, List.append_assoc]
 
 end CrtWire
 
