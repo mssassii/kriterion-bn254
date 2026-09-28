@@ -675,7 +675,7 @@ theorem crtWrapGuess_of
         ∑' source, PMF.uniformOfFintype (viewHere crtEntry).Source source *
             (weight ((viewHere crtEntry).publish source) *
               (swappedTableLaw crtLayout).toOuterMeasure {T | replayWraps source u T})
-          ≤ ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype (viewHere crtEntry).Source source *
+          ≤ ENNReal.ofReal (smudgeError + normError) * ∑' source, PMF.uniformOfFintype (viewHere crtEntry).Source source *
               weight ((viewHere crtEntry).publish source)) :
     CrtWrapGuess := by
   intro field group scalar u

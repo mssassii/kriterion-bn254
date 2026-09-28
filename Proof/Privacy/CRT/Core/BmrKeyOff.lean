@@ -403,6 +403,115 @@ theorem keyLabel_weighted (facts : TableFacts T) (ctx : Context) (u : AffineInpu
 
 end Weighted
 
+/-! ### The normalized layer: the key label given the normalized output
+
+The normalized rows of a digit are the unscaled rows at the scales `(ρ, κ)` read off its two collector offsets
+`(K_z, K_c)` (`rowKey`), so at a fixed key the normalized output is a conversion of P45's output at the fixed context
+of those scales (`nRealOutOff_key`), and the key itself is read back from that output's row cells (`recoverKey_real`).
+Summing over the keys, `keyLabel_weighted` applies at each fixed context (`nKeyLabel_weighted`). -/
+
+section Normalized
+
+variable {T : CrtTable} [∀ i, NeZero (T.modulus i)]
+
+/-- The two collector offsets `(K_z, K_c)` of each digit. -/
+def rowKey (c : Coins T) : Scales := fun d => (rowOffset c (d, .inl .rowZ_x9), rowOffset c (d, .inl .rowY_cubic))
+
+/-- The normalizing scales `(ρ, κ)` of a key. -/
+def keyScales (nctx : NContext) (k : Scales) : Scales := fun d =>
+  (Rows.scaleOf (nctx.rows d).z.constant (k d).1, Rows.scaleOf (nctx.rows d).y.xSquared (k d).2)
+
+/-- The published row data of a fixed-context row at a key: its `X` constant, the key's flags, the sign of `κ`. -/
+def keyRow (nctx : NContext) (k : Scales) (d : Fin 91) (g : RowGamma) : NormRow :=
+  { xC0 := g.xC0, zFlag := Rows.zeroFlag (k d).1, sFlag := Rows.zeroFlag (k d).2,
+    sign := Rows.signBit (keyScales nctx k d).2 }
+
+/-- The conversion of a fixed-context off-curve output at a key. -/
+def keyConvOff (nctx : NContext) (k : Scales) {u : AffineInput} (o : OutOff T u) : NOutOff T u :=
+  (((o.1.1.1, fun d => keyRow nctx k d (o.1.1.2.1 d), o.1.1.2.2), o.1.2), o.2)
+
+/-- The key read back from a fixed-context output at scales `s`: `K_z = ρ z₀ − zC0`, `K_c = κ s₄ − yC4`. -/
+def recoverKey (nctx : NContext) (s : Scales) {u : AffineInput} (o : OutOff T u) : Scales := fun d =>
+  ((s d).1 * (nctx.rows d).z.constant - (o.1.1.2.1 d).zC0,
+    (s d).2 * (nctx.rows d).y.xSquared - (o.1.1.2.1 d).yC4)
+
+/-- The window-free curve encodings of a normalized off-curve output. -/
+def nFree (u : AffineInput) (o : NOutOff T u) : Prop :=
+  ∀ element, ¬ InWindow T (evalInt u o.1.1.1 o.2 (curveEnc element))
+
+theorem nSlope_key (nctx : NContext) (c : Coins T) :
+    nSlope nctx c = slope (fsContext nctx (keyScales nctx (rowKey c))) c := by
+  funext e
+  rcases e with ((⟨d, x⟩ | x) | (⟨d, y⟩ | y)) <;> rfl
+
+theorem nJoin_key (nctx : NContext) (c : Coins T) :
+    nJoin nctx c = join (fsContext nctx (keyScales nctx (rowKey c))) c := by
+  funext e i
+  unfold nJoin join
+  rw [nSlope_key]
+
+theorem nGamma_key (nctx : NContext) (c : Coins T) (d : Fin 91) :
+    nGamma nctx c d = keyRow nctx (rowKey c) d (gamma (fsContext nctx (keyScales nctx (rowKey c))) c d) := rfl
+
+/-- **The normalized output is the converted output at the fixed context of its key.** -/
+theorem nRealOutOff_key (nctx : NContext) (u : AffineInput) (c : Coins T) :
+    nRealOutOff nctx u c =
+      keyConvOff nctx (rowKey c) (realOutOff (fsContext nctx (keyScales nctx (rowKey c))) u c) := by
+  unfold nRealOutOff keyConvOff realOutOff
+  rw [nJoin_key]
+  rfl
+
+/-- **The key is read back from the fixed-context output**, at any scales. -/
+theorem recoverKey_real (nctx : NContext) (s : Scales) (u : AffineInput) (c : Coins T) :
+    recoverKey nctx s (realOutOff (fsContext nctx s) u c) = rowKey c := by
+  funext d
+  unfold recoverKey realOutOff gamma FieldMacToECMac.garbleRow Biquadratic.garbleY Biquadratic.garbleZ fsContext
+    Rows.scaled Rows.multiply rowKey
+  simp only [Prod.mk.injEq]
+  constructor <;> ring
+
+variable [FieldCertificate]
+
+open Classical in
+/-- **The key label is rare given the normalized off-curve output**, at window-free curve encodings. -/
+theorem nKeyLabel_weighted (facts : TableFacts T) (nctx : NContext) (u : AffineInput) (off : ¬ OnCurve u)
+    (F : NOutOff T u → ℝ≥0∞) (ℓ : ℕ) :
+    ∑ c : Coins T, F (nRealOutOff nctx u c) *
+        (if nFree u (nRealOutOff nctx u c) ∧ (c.bridge).val % 2 ^ 128 = ℓ then 1 else 0) ≤
+      keyError * ∑ c : Coins T, F (nRealOutOff nctx u c) := by
+  have part : ∀ G : Coins T → ℝ≥0∞, ∑ c, G c = ∑ k : Scales, ∑ c, (if rowKey c = k then G c else 0) := by
+    intro G
+    rw [Finset.sum_comm]
+    refine Finset.sum_congr rfl fun c _ => ?_
+    simp
+  rw [part, part, Finset.mul_sum]
+  refine Finset.sum_le_sum fun k _ => ?_
+  have eachL : ∀ c, (if rowKey c = k then F (nRealOutOff nctx u c) *
+      (if nFree u (nRealOutOff nctx u c) ∧ (c.bridge).val % 2 ^ 128 = ℓ then 1 else 0) else 0) =
+      (fun o : OutOff T u => if recoverKey nctx (keyScales nctx k) o = k then F (keyConvOff nctx k o) else 0)
+          (realOutOff (fsContext nctx (keyScales nctx k)) u c) *
+        (if CurveWindowFree u (cellsOfOut (realOutOff (fsContext nctx (keyScales nctx k)) u c)) ∧
+          (c.bridge).val % 2 ^ 128 = ℓ then 1 else 0) := by
+    intro c
+    simp only [recoverKey_real]
+    by_cases hk : rowKey c = k
+    · rw [if_pos hk, if_pos hk, nRealOutOff_key, hk]
+      rfl
+    · rw [if_neg hk, if_neg hk, zero_mul]
+  have eachR : ∀ c, (if rowKey c = k then F (nRealOutOff nctx u c) else 0) =
+      (fun o : OutOff T u => if recoverKey nctx (keyScales nctx k) o = k then F (keyConvOff nctx k o) else 0)
+          (realOutOff (fsContext nctx (keyScales nctx k)) u c) := by
+    intro c
+    simp only [recoverKey_real]
+    by_cases hk : rowKey c = k
+    · rw [if_pos hk, if_pos hk, nRealOutOff_key, hk]
+    · rw [if_neg hk, if_neg hk]
+  rw [Finset.sum_congr rfl fun c _ => eachL c, Finset.sum_congr rfl fun c _ => eachR c]
+  exact keyLabel_weighted facts (fsContext nctx (keyScales nctx k)) u off
+    (fun o : OutOff T u => if recoverKey nctx (keyScales nctx k) o = k then F (keyConvOff nctx k o) else 0) ℓ
+
+end Normalized
+
 end
 
 end Kriterion.CRT.Privacy.BmrOff

@@ -143,16 +143,20 @@ theorem count_le_frac (c : ℕ) :
 end RowsDoubling
 
 open RowsDoubling in
-/-- **The doubling flag of the true rows** (for `CrtFlagMass`): at a valid input, the rows kernel of `crtEntry` draws
-rows with some `z = 0` or `y = 0` with probability at most `exceptionalError = 364/(r − 1)`. -/
+/-- **The doubling flag of the normalized rows** (for `CrtFlagMass`): at a valid input, the rows kernel of `crtEntry`
+(`NormRows.normRealRows`) draws rows with some `z = 0` or `y = 0` with probability at most
+`doublingError = 364/(r − 1)`. Digit zero's normalized sign row `τ² b x²` never vanishes on the curve
+(`NormRows.normDoubling_points`), so the three targets per digit are the old ones. -/
 theorem crtRowsDoubling_le [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar) (u : AffineInput)
     (Q : Point) (valid : (Instance.crtEntry.scheme inferInstance inferInstance).function scalar u = some Q) :
     ((PublicFirst.viewHere Instance.crtEntry).realRows scalar u Q).toOuterMeasure
         {r | ∃ targets, r = some targets ∧ H8.rowsDoubling targets}
-      ≤ ENNReal.ofReal exceptionalError := by
+      ≤ ENNReal.ofReal doublingError := by
   classical
   change (decodePoint u).map (scalarMultiplication scalar.value) = some Q at valid
   obtain ⟨point, decoded, rfl⟩ := Option.map_eq_some_iff.mp valid
+  have inputOnCurve : OnCurve u := (decodePoint_defined u).mp (by simp [decoded])
+  have xNe := Security.Phase3.onCurve_x_ne_zero u inputOnCurve
   set multiples := multiplesOf scalar point with hmultiples
   have hits : horner radixMap 91 multiples = scalar.value • point := horner_multiplesOf scalar point
   have := noHitNonempty multiples _ hits
@@ -161,14 +165,16 @@ theorem crtRowsDoubling_le [FieldCertificate] [GroupCertificate] (scalar : NonZe
   let hit : Set (Fin 91 → Point) :=
     {points | ∃ digit, Exceptional (multiples digit) (points digit) ∨ points digit = 0}
   have inside : (fun sample : GoodTails × (Fin 91 → NonZeroBase × NonZeroBase) =>
-      some (realRowsOf multiples sample)) ⁻¹' flagged
+      some (NormRows.normRealRowsOf multiples (NormRows.zeros scalar) u.x sample)) ⁻¹' flagged
       ⊆ Prod.fst ⁻¹' ((fun tail : GoodTails => realPoints radixMap multiples tail.1) ⁻¹' hit) := by
     rintro sample ⟨targets, same, flag⟩
     cases same
-    exact doubling_points multiples sample flag
-  have mass : (Security.Phase3.realRows scalar u (scalarMultiplication scalar.value point)).toOuterMeasure flagged
+    exact NormRows.normDoubling_points multiples (NormRows.zeros scalar) u.x xNe sample flag
+  have mass : ((PublicFirst.viewHere Instance.crtEntry).realRows scalar u
+      (scalarMultiplication scalar.value point)).toOuterMeasure flagged
       ≤ (364 : ℝ≥0∞) * (Fintype.card Point : ℝ≥0∞)⁻¹ := by
-    rw [realRows_law scalar u point decoded]
+    show (NormRows.normRealRows scalar u (scalarMultiplication scalar.value point)).toOuterMeasure flagged ≤ _
+    rw [NormRows.normRealRows_law scalar u point decoded]
     erw [PMF.toOuterMeasure_map_apply]
     refine le_trans (MeasureTheory.measure_mono inside) ?_
     rw [← PMF.toOuterMeasure_map_apply, productPMF_map_fst, ← PMF.toOuterMeasure_map_apply]
@@ -176,7 +182,7 @@ theorem crtRowsDoubling_le [FieldCertificate] [GroupCertificate] (scalar : NonZe
   have finite : (364 : ℝ≥0∞) * (Fintype.card Point : ℝ≥0∞)⁻¹ ≠ ⊤ :=
     ENNReal.mul_ne_top (by norm_num) (ENNReal.inv_ne_top.mpr (Nat.cast_ne_zero.mpr Fintype.card_ne_zero))
   refine le_trans mass ?_
-  rw [ENNReal.le_ofReal_iff_toReal_le finite (show 0 ≤ exceptionalError from frac_nonneg _ _)]
+  rw [ENNReal.le_ofReal_iff_toReal_le finite (show 0 ≤ doublingError from frac_nonneg _ _)]
   exact count_le_frac 364
 
 end

@@ -8,8 +8,10 @@
 `crtFlagGuess_crt`: `CrtFlagGuess crtEntry crtShadow (smudgeError + exceptionalError)` from
 * no abort (`CrtNoAbort`: the rows, preimage and fourth-block kernels always return, and a private collector program
   never fails; the last is a query-structure fact of the replay);
-* the doubling bound in the form (`realRows`' mass of `rowsDoubling`, at most `exceptionalError`);
-* the wrap bound on `M'`'s private run in the weight form (`CrtWrapGuess`, at most `smudgeError`).
+* the doubling bound in the form (`realRows`' mass of `rowsDoubling`, at most `doublingError`);
+* the wrap bound on `M'`'s private run in the weight form (`CrtWrapGuess`, at most `smudgeError + normError`: the
+  window and the row normalization's flag);
+and `doublingError + normError ≤ exceptionalError` (`doubling_add_norm_le`).
 -/
 
 import Proof.Privacy.CRT.Flags.FlagSplit
@@ -51,7 +53,8 @@ def CrtNoAbort : Prop :=
       source u = 0
 
 /-- **The wrap guess** (P8): at every input, against every weight on the published value, `M'`'s unflagged final
-private state has the wrap event with mass at most `smudgeError`. -/
+private state has the wrap event (the window, or the normalization flag) with mass at most
+`smudgeError + normError`. -/
 def CrtWrapGuess : Prop :=
   ∀ (field : FieldCertificate) (group : @GroupCertificate field) (scalar : NonZeroScalar) (u : AffineInput),
     letI := field
@@ -64,15 +67,15 @@ def CrtWrapGuess : Prop :=
       ∑' source, PMF.uniformOfFintype (viewHere crtEntry).Source source *
           (weight ((viewHere crtEntry).publish source) *
             wrapAt crtEntry crtShadow (tableRun (swappedTableLaw crtEntry.layout)) scalar source u crtWrapOn)
-        ≤ ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype (viewHere crtEntry).Source source *
+        ≤ ENNReal.ofReal (smudgeError + normError) * ∑' source, PMF.uniformOfFintype (viewHere crtEntry).Source source *
             weight ((viewHere crtEntry).publish source)
 
 /-- The doubling mass from the bound on the rows kernel. -/
 theorem doublingAt_le [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar) (u : AffineInput)
     (rows : ∀ Q, (crtEntry.scheme inferInstance inferInstance).function scalar u = some Q →
       ((viewHere crtEntry).realRows scalar u Q).toOuterMeasure
-          {r | ∃ targets, r = some targets ∧ rowsDoubling targets} ≤ ENNReal.ofReal exceptionalError) :
-    doublingAt crtEntry scalar u rowsZero ≤ ENNReal.ofReal exceptionalError := by
+          {r | ∃ targets, r = some targets ∧ rowsDoubling targets} ≤ ENNReal.ofReal doublingError) :
+    doublingAt crtEntry scalar u rowsZero ≤ ENNReal.ofReal doublingError := by
   classical
   unfold doublingAt
   cases valid : (crtEntry.scheme inferInstance inferInstance).function scalar u with
@@ -98,13 +101,13 @@ theorem crtFlagGuess_crt (noAbort : CrtNoAbort)
       letI := group
       ∀ Q : Point, (crtEntry.scheme inferInstance inferInstance).function scalar u = some Q →
         ((viewHere crtEntry).realRows scalar u Q).toOuterMeasure
-          {r | ∃ targets, r = some targets ∧ rowsDoubling targets} ≤ ENNReal.ofReal exceptionalError)
+          {r | ∃ targets, r = some targets ∧ rowsDoubling targets} ≤ ENNReal.ofReal doublingError)
     (wrap : CrtWrapGuess) :
     CrtFlagGuess crtEntry crtShadow (ENNReal.ofReal (smudgeError + exceptionalError)) := by
   have split := crtFlagGuess_of crtEntry crtShadow rowsZero @crtWrapOn
     (fun _ _ _ _ _ => Iff.rfl) (fun _ _ _ _ => Iff.rfl)
     (fun source u state => by unfold crtWrapOn; rw [stateTable_merge_empty])
-    (ENNReal.ofReal exceptionalError) (ENNReal.ofReal smudgeError)
+    (ENNReal.ofReal doublingError) (ENNReal.ofReal (smudgeError + normError))
     (fun field group scalar source u => noAbort field group scalar source u)
     (fun field group scalar u => by
       letI := field
@@ -112,9 +115,14 @@ theorem crtFlagGuess_crt (noAbort : CrtNoAbort)
       exact doublingAt_le scalar u fun Q valid => rows field group scalar u Q valid)
     (fun field group scalar u => wrap field group scalar u)
   have nonnegS : 0 ≤ smudgeError := by unfold smudgeError; exact frac_nonneg _ _
-  have nonnegE : 0 ≤ exceptionalError := by unfold exceptionalError; exact frac_nonneg _ _
-  rw [ENNReal.ofReal_add nonnegS nonnegE, add_comm]
-  convert split using 1
+  have bound : ENNReal.ofReal doublingError + ENNReal.ofReal (smudgeError + normError) ≤
+      ENNReal.ofReal (smudgeError + exceptionalError) := by
+    rw [← ENNReal.ofReal_add doublingError_nonneg (add_nonneg nonnegS normError_nonneg)]
+    refine ENNReal.ofReal_le_ofReal ?_
+    have := doubling_add_norm_le
+    linarith
+  intro field group scalar u weight
+  exact le_trans (split field group scalar u weight) (mul_le_mul' bound le_rfl)
 
 end
 

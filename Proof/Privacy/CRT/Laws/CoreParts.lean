@@ -35,7 +35,7 @@ abbrev RestPart (T : CrtTable) (u : AffineInput) := LamportSignature × (RestTag
 
 /-- The P45 part's type. -/
 abbrev BmrPartT (T : CrtTable) (u : AffineInput) :=
-  (BaseField × BaseField × BaseField) × Vector RowGamma digitCount ×
+  (BaseField × BaseField × BaseField) × Vector NormRow digitCount ×
     Vector Kriterion.CRT.Entry.Record Kriterion.CRT.Entry.xCount ×
     Vector Kriterion.CRT.Entry.Record Kriterion.CRT.Entry.yCount × (BmrTags T u → Block × Block)
 
