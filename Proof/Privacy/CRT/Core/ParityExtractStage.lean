@@ -339,7 +339,9 @@ theorem liftUpper_pinHalf_of_low {rb : ℕ} (A : Kriterion.CRT.Lanes rb) (G : La
   cases rb with
   | zero => rfl
   | succ rb =>
-      simpa only [low] using Parity.parityLift_halfLanes_laneBit A
+      show Parity.parityLift (Parity.halfLanes A) G = A
+      rw [← low]
+      exact Parity.parityLift_halfLanes_laneBit A
 
 /-- Only the tree-material component influences tree nodes. -/
 theorem gNode_upperOverrideHot {rb : ℕ} (sp : StageParams rb) (b0 Δ : Label) (s : ℕ)
@@ -371,7 +373,11 @@ theorem gCast_upper_override_self {rb : ℕ} (sp : StageParams rb)
   rw [gNode_override_self sp R Δ s sp.w le_rfl α]
   split_ifs with hα
   · subst α
-    exact liftUpper_pinHalf_of_low (gCast sp R Δ s) _ (cold s _)
+    have hnode : gNode (overrideHot sp s ((upperHiddenOfSpec sp R Δ s).1, gCast sp R Δ s)) (gBit0 sp R) Δ sp.w s =
+        gLeaf sp R Δ s :=
+      gNode_override_self sp R Δ s sp.w le_rfl s
+    rw [hnode]
+    exact liftUpper_pinHalf_of_low (gCast sp R Δ s) (gLeaf sp R Δ s) (cold s (gLeaf sp R Δ s))
   · rfl
 
 /-- The stage's class sums are unchanged at its own hot upper data. -/
@@ -389,6 +395,7 @@ theorem gNext_upper_override_self {rb : ℕ} (sp : StageParams rb)
   show Kriterion.CRT.peelDiv R
     (gRes (upperOverrideHot sp s (upperHiddenOfSpec sp R Δ s)) R Δ sp.w) sp.w = _
   rw [gRes_upper_override_self sp cold R Δ s sp.w]
+  rfl
 
 theorem gBit_upper_override_self {rb : ℕ} (sp : StageParams rb)
     (cold : ∀ α G, Kriterion.CRT.laneBit (sp.castF α G) 0 = G)
@@ -412,17 +419,25 @@ theorem upperSpecPublish_self {rb : ℕ} (sp : StageParams rb) (hw : 1 ≤ sp.w)
           gLeaf sp R Δ s := by
         have nodes := gNode_override sp R Δ s (hiddenOfSpec sp R Δ s) (sp.w - 1) s
           (by simpa only [Nat.sub_add_cancel hw] using hs)
-        rw [Nat.sub_add_cancel hw, gNode_override_self sp R Δ s sp.w le_rfl s] at nodes
+        rw [Nat.sub_add_cancel hw,
+          show gBit0 (overrideHot sp s (hiddenOfSpec sp R Δ s)) R = gBit0 sp R from rfl,
+          gNode_override_self sp R Δ s sp.w le_rfl s] at nodes
         exact nodes.symm
       have hidden : embedParityHidden (specFrame sp R Δ) s (upperHiddenOfSpec sp R Δ s) =
           hiddenOfSpec sp R Δ s := by
-        apply Prod.ext rfl
+        refine Prod.ext rfl ?_
         change Parity.parityLift (Parity.halfLanes (gCast sp R Δ s))
           (level (specFrame sp R Δ) s (hiddenOfSpec sp R Δ s).1 (sp.w - 1) s) = gCast sp R Δ s
         rw [leaf]
         exact liftUpper_pinHalf_of_low (gCast sp R Δ s) _ (cold s _)
-      unfold parityPublish
-      rw [hidden, ← spec_garbler_eq_publish sp R Δ s hw]
-      rfl
+      show ((publish (specFrame sp R Δ) s
+          (embedParityHidden (specFrame sp R Δ) s (upperHiddenOfSpec sp R Δ s))).1,
+        Parity.halfLanes (pin (specFrame sp R Δ) s
+          (embedParityHidden (specFrame sp R Δ) s (upperHiddenOfSpec sp R Δ s)))) = _
+      rw [hidden]
+      have full := spec_garbler_eq_publish sp R Δ s hw
+      refine Prod.ext ?_ ?_
+      · exact (congrArg Prod.fst full).symm
+      · exact congrArg Parity.halfLanes (congrArg Prod.snd full.symm)
 
 end Kriterion.CRT.Privacy.ExtractStage

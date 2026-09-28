@@ -147,6 +147,7 @@ theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label) (Z :
     by_cases hx : x.val = s
     · rw [if_pos hx, if_pos hx]
     · simp only [if_neg hx, xor_zero_block]
+      rfl
   simp only [key]
   refine ⟨fun α hα => ?_, fun α hα => ?_⟩
   · rw [atNat_of_lt _ _ hα, atNat_of_lt _ _ hα]
@@ -171,6 +172,7 @@ theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label) (Z :
     · rw [if_neg has, if_neg has, atNat_of_lt _ _ hα, atNat_of_lt _ _ hα, add_zero]
       simp only
       simp only [if_neg has, xor_zero_block]
+      rfl
 
 /-- Every chunk pin is even, with no nonzero-offset or oracle assumptions. -/
 theorem chunkGarbleM_pin_even (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label)
