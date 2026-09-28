@@ -13,6 +13,7 @@ import Proof.Privacy.CRT.Core.BmrFlags
 import Proof.Privacy.CRT.Swap.PadBridge
 import Proof.Privacy.CRT.Core.ExtractStageHash
 import Proof.Correctness.CRT.EntryCorrect
+import Proof.Privacy.CRT.NormRows
 
 namespace Kriterion.CRT.Privacy.BmrEntry
 
@@ -50,7 +51,7 @@ theorem sign_double [FieldCertificate] (offset : AffineInput) (onCurve : OnCurve
 
 /-- **Doubling shows in the true rows**: at `u = exc_s` the row of digit `s / 2` has `Z = 0` (kind 0, the doubling
 input, `Coordinates.exceptionalZ`) or `S = 0` (kind 1, the sign row's zero at `2K`, `sign_double`). -/
-theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
+theorem rowsDoubling_of_doubling_old [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
     (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
     (doubling : ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u) :
     H8.rowsDoubling (Security.Phase3.trueRows scalar coins u) := by
@@ -85,6 +86,69 @@ theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar :
       unfold Exception.tripleInput
       rw [Exception.exceptionalInput_transform phi six,
         sign_double _ key.offset.onCurve (JacobianMixed.noAffineYZero _ key.offset.onCurve), mul_zero]
+
+/-- At a nonzero digit the corrected true row is the old true row. -/
+theorem normTrueRows_some [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
+    (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput) (d : Fin 91) (phi : BaseField)
+    (selected : digitEndomorphismBase ((Entry.outputKeysOf scalar coins).get d).digit = some phi) :
+    NormRows.normTrueRows scalar coins u d = Security.Phase3.trueRows scalar coins u d := by
+  unfold NormRows.normTrueRows BMR.nTargets Security.Phase3.trueRows
+  simp only [NormRows.nctxOf, NormRows.scalesOf, Rows.unscaledOf]
+  rw [FieldMacToECMac.rowsForOutputKeys, Vector.get_ofFn]
+  show _ = FieldMacToECMac.evaluateRow (Coordinates.rows ((Entry.outputKeysOf scalar coins).get d).offset.coordinates
+    (digitEndomorphismBase ((Entry.outputKeysOf scalar coins).get d).digit) _ _) u
+  rw [selected]
+  rw [← NormRows.nTargets_some]
+  rfl
+
+/-- **Doubling shows in the corrected true rows** (the exceptional digits are nonzero, where they are the old rows). -/
+theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
+    (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
+    (doubling : ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u) :
+    H8.rowsDoubling (NormRows.normTrueRows scalar coins u) := by
+  obtain ⟨o, hexc⟩ := doubling
+  obtain ⟨inRange, phi, selected, _⟩ := Entry.exceptional_cases scalar coins o u hexc
+  obtain ⟨d, zero⟩ := rowsDoubling_of_doubling_old scalar coins u ⟨o, hexc⟩
+  refine ⟨d, ?_⟩
+  -- the old flag's digit is the exceptional one; it is nonzero, so the corrected row is the old row
+  by_cases same : d = ⟨o / 2, inRange⟩
+  · subst same
+    rw [normTrueRows_some scalar coins u _ phi selected]
+    exact zero
+  · -- a digit other than the exceptional one flagged by the old rows: also nonzero or not, read through its own key
+    cases sel : digitEndomorphismBase ((Entry.outputKeysOf scalar coins).get d).digit with
+    | some psi =>
+      rw [normTrueRows_some scalar coins u d psi sel]
+      exact zero
+    | none =>
+      exfalso
+      have rowsNone : Security.Phase3.trueRows scalar coins u d =
+          FieldMacToECMac.evaluateRow (Coordinates.rows ((Entry.outputKeysOf scalar coins).get d).offset.coordinates
+            none (coins.pointRandomness.get d).rho.value (coins.pointRandomness.get d).tau.value) u := by
+        unfold Security.Phase3.trueRows
+        rw [FieldMacToECMac.rowsForOutputKeys, Vector.get_ofFn, ← sel]
+        rfl
+      rw [rowsNone, FieldMacToECMac.evaluateRowsNone] at zero
+      have onK := ((Entry.outputKeysOf scalar coins).get d).offset.onCurve
+      rcases zero with z | y
+      · exact (coins.pointRandomness.get d).rho.nonzero z
+      · exact mul_ne_zero (pow_ne_zero 2 (coins.pointRandomness.get d).tau.nonzero)
+          (JacobianMixed.noAffineYZero _ onK) y
+
+/-- **Doubling shows in the corrected targets of every scales**: at an exceptional input the exceptional digit's
+unscaled `Z` or sign row vanishes, whatever the scales. -/
+theorem rowsDoubling_nTargets [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
+    (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
+    (doubling : ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u)
+    (s : Fin 91 → NonZeroBase × NonZeroBase) :
+    H8.rowsDoubling (BMR.nTargets (NormRows.nctxOf scalar coins) u s) := by
+  let coins' : Kriterion.ArgoMAC.Scheme.Coins :=
+    { coins with pointRandomness := Security.Phase3.setRho coins.pointRandomness s }
+  have flagged := rowsDoubling_of_doubling scalar coins' u doubling
+  have scales : NormRows.scalesOf coins' = s := Security.Phase3.rhoOf_setRho _ _
+  unfold NormRows.normTrueRows at flagged
+  rw [scales] at flagged
+  exact flagged
 
 /-! ### The real reading: pads and offsets -/
 
@@ -265,10 +329,9 @@ theorem offsetsY_eq (table : TagTable) (delta : Label) (zero : ℕ → Label) (K
 
 /-! ### The real reading: the coins, the element values, the curve and the rows -/
 
-/-- P45's context of the scheme's coins: the row coefficients and `ρ` of each digit. -/
-def bmrContextOf (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) : BMR.Context where
-  rows d := (FieldMacToECMac.rowsForOutputKeys (Entry.outputKeysOf scalar coins) coins.pointRandomness).get d
-  rho d := (coins.pointRandomness.get d).rho
+/-- The normalized layer's context of the scheme's coins: the unscaled rows of each digit. -/
+abbrev bmrContextOf (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) : BMR.NContext :=
+  NormRows.nctxOf scalar coins
 
 /-- **P45's coins of a table tape**: pads and masks from the table; `r4`, the unused randomizers and the curve coins
 from the scheme's coins. -/
@@ -339,7 +402,7 @@ theorem curve_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
 /-- **The published row constants are P45's.** -/
 theorem rows_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (d : Fin 91) :
     (EntryCorrect.pubOf (H8.tagHash table) scalar coins).rows.get d =
-      BMR.gamma (bmrContextOf scalar coins) (bmrCoinsOf coins table) d := by
+      BMR.nGamma (bmrContextOf scalar coins) (bmrCoinsOf coins table) d := by
   rw [EntryCorrect.pubOf_rows]
   erw [Vector.get_ofFn]
   have values : EntryCorrect.KOf (H8.tagHash table) coins d =
@@ -353,7 +416,7 @@ theorem rows_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins
 theorem slXOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable)
     (x : BMR.XEnc) :
     EntryCorrect.slXOf (H8.tagHash table) scalar coins (BMR.xFlat x) =
-      BMR.slope (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inl x) := by
+      BMR.nSlope (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inl x) := by
   unfold EntryCorrect.slXOf Entry.slopesX Entry.joinX
   rcases x with ⟨d, element⟩ | element
   · have low : (BMR.xFlat (.inl (d, element))).val < pointElementCountX := (xElementIndex d element).isLt
@@ -361,9 +424,10 @@ theorem slXOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
     rw [show (⟨(BMR.xFlat (.inl (d, element))).val, low⟩ : Fin pointElementCountX) = xElementIndex d element
       from rfl]
     erw [Pipeline.pointXAssemble_digit]
-    unfold EntryCorrect.pointOf Entry.pointSlopes
-    have values : EntryCorrect.KOf (H8.tagHash table) coins d =
-        fun element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) := funext (KOf_eq coins table d)
+    unfold EntryCorrect.pointOf Entry.pointSlopes EntryCorrect.rowsOf
+    have values : EntryCorrect.KOf (H8.tagHash table) coins =
+        fun d element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) :=
+      funext fun d => funext (KOf_eq coins table d)
     rw [values]
     rfl
   · have high : ¬ (BMR.xFlat (.inr element)).val < pointElementCountX := by
@@ -382,7 +446,7 @@ theorem slXOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
 theorem slYOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable)
     (y : BMR.YEnc) :
     EntryCorrect.slYOf (H8.tagHash table) scalar coins (BMR.yFlat y) =
-      BMR.slope (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inr y) := by
+      BMR.nSlope (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inr y) := by
   unfold EntryCorrect.slYOf Entry.slopesY Entry.joinY
   rcases y with ⟨d, element⟩ | element
   · have low : (BMR.yFlat (.inl (d, element))).val < pointElementCountY := (yElementIndex d element).isLt
@@ -390,9 +454,10 @@ theorem slYOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
     rw [show (⟨(BMR.yFlat (.inl (d, element))).val, low⟩ : Fin pointElementCountY) = yElementIndex d element
       from rfl]
     erw [Pipeline.pointYAssemble_digit]
-    unfold EntryCorrect.pointOf Entry.pointSlopes
-    have values : EntryCorrect.KOf (H8.tagHash table) coins d =
-        fun element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) := funext (KOf_eq coins table d)
+    unfold EntryCorrect.pointOf Entry.pointSlopes EntryCorrect.rowsOf
+    have values : EntryCorrect.KOf (H8.tagHash table) coins =
+        fun d element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) :=
+      funext fun d => funext (KOf_eq coins table d)
     rw [values]
     rfl
   · have high : ¬ (BMR.yFlat (.inr element)).val < pointElementCountY := by
@@ -512,10 +577,10 @@ theorem recX_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins
     ((EntryCorrect.pubOf (H8.tagHash table) scalar coins).recX.get (BMR.xFlat x)).val =
       (if BMR.hint (bmrCoinsOf coins table) (.inl x) then Entry.table.product else 0) +
         ∑ i : Fin Entry.table.count,
-          (BMR.join (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inl x) i).val * Entry.table.radix i := by
+          (BMR.nJoin (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inl x) i).val * Entry.table.radix i := by
   rw [EntryCorrect.pubOf_recX, records_formula, gxOf_hint]
   refine congrArg (HAdd.hAdd _) (Finset.sum_congr rfl fun i _ => ?_)
-  rw [gxOf_padSum, slXOf_eq, BMR.join, join_val]
+  rw [gxOf_padSum, slXOf_eq, BMR.nJoin, join_val]
 
 theorem gyOf_unfold_offset (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) (y : BMR.YEnc) :
     (EntryCorrect.gyOf (H8.tagHash table) coins).offset (BMR.yFlat y) =
@@ -563,10 +628,10 @@ theorem recY_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins
     ((EntryCorrect.pubOf (H8.tagHash table) scalar coins).recY.get (BMR.yFlat y)).val =
       (if BMR.hint (bmrCoinsOf coins table) (.inr y) then Entry.table.product else 0) +
         ∑ i : Fin Entry.table.count,
-          (BMR.join (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inr y) i).val * Entry.table.radix i := by
+          (BMR.nJoin (bmrContextOf scalar coins) (bmrCoinsOf coins table) (.inr y) i).val * Entry.table.radix i := by
   rw [EntryCorrect.pubOf_recY, records_formula, gyOf_hint]
   refine congrArg (HAdd.hAdd _) (Finset.sum_congr rfl fun i _ => ?_)
-  rw [gyOf_padSum, slYOf_eq, BMR.join, join_val]
+  rw [gyOf_padSum, slYOf_eq, BMR.nJoin, join_val]
 
 end
 
