@@ -50,14 +50,14 @@ theorem convPub_one : convPub s ⟨1, by decide⟩ = convOf (publish s).crtY := 
 /-- A join cell holds the source's join at that flat index. -/
 theorem joinAt_cell (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) (index : Nat)
     (inside : index < joinCount) :
-    ram (word (Layout.sourceJoin κ index)) = blockWord (s.joinAt ⟨κ, hκ⟩ index) := by
+    ram (word (Layout.sourceJoin κ index)) = labelWord (s.joinAt ⟨κ, hκ⟩ index) := by
   rw [holds.joins index inside]
   simp only [Source.joinAt, atNat, dif_pos inside]
 
 theorem chunkJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ c, c < 32 → ∀ n, 1 ≤ n → n < Entry.table.chunkWidth c →
       ram (word (Layout.sourceJoin κ (chunkJoinBase c + (n - 1)))) =
-        blockWord ((convPub s ⟨κ, hκ⟩).chunkJoin c n) := by
+        labelWord ((convPub s ⟨κ, hκ⟩).chunkJoin c n) := by
   intro c hc n lower upper
   have bound : chunkJoinBase c + (Entry.table.chunkWidth c - 1) ≤ joinCount := (CrtConv.chunkFacts ⟨c, hc⟩).1
   have hc' : c < Entry.table.chunkCount := by rw [CrtConv.chunkCount_eq]; exact hc
@@ -80,7 +80,7 @@ theorem chunkPins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨
 theorem stageJoins0 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
       ∀ n, 1 ≤ n → n < row.width0 →
-        ram (word (Machine.stageJoin κ i.val 0 + n)) = blockWord ((convPub s ⟨κ, hκ⟩).stageJoin i.val 0 n) := by
+        ram (word (Machine.stageJoin κ i.val 0 + n)) = labelWord ((convPub s ⟨κ, hκ⟩).stageJoin i.val 0 n) := by
   intro i row kind n lower upper
   have facts := (CrtConv.modFacts_of i row kind).1
   have addr : Machine.stageJoin κ i.val 0 + n = Layout.sourceJoin κ (modJoinBase i + (n - 1)) := by
@@ -92,7 +92,7 @@ theorem stageJoins0 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
 theorem stageJoins1 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
       ∀ n, 1 ≤ n → n < row.width1 →
-        ram (word (Machine.stageJoin κ i.val 1 + n)) = blockWord ((convPub s ⟨κ, hκ⟩).stageJoin i.val 1 n) := by
+        ram (word (Machine.stageJoin κ i.val 1 + n)) = labelWord ((convPub s ⟨κ, hκ⟩).stageJoin i.val 1 n) := by
   intro i row kind n lower upper
   have facts := (CrtConv.modFacts_of i row kind).1
   have rowEq := CrtConv.rowAt_of i row kind
@@ -141,7 +141,7 @@ theorem stagePins1 (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
 theorem growJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
       ∀ n, row.width0 ≤ n → n < row.keep →
-        ram (word (Machine.growJoin κ i.val n)) = blockWord ((convPub s ⟨κ, hκ⟩).growJoin i.val n) := by
+        ram (word (Machine.growJoin κ i.val n)) = labelWord ((convPub s ⟨κ, hκ⟩).growJoin i.val n) := by
   intro i row kind n lower upper
   have facts := (CrtConv.modFacts_of i row kind).1
   obtain ⟨-, -, -, -, keepLe, ellLe, -⟩ := TableFacts.odd_facts i row kind
@@ -157,7 +157,7 @@ theorem growJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨
 theorem foldJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
       ∀ n, row.keep ≤ n → n < row.ell →
-        ram (word (Machine.foldJoin κ i.val n)) = blockWord ((convPub s ⟨κ, hκ⟩).foldJoin i.val n) := by
+        ram (word (Machine.foldJoin κ i.val n)) = labelWord ((convPub s ⟨κ, hκ⟩).foldJoin i.val n) := by
   intro i row kind n lower upper
   have facts := (CrtConv.modFacts_of i row kind).1
   obtain ⟨-, -, -, -, keepLe, ellLe, -⟩ := TableFacts.odd_facts i row kind

@@ -52,7 +52,7 @@ theorem agree_modZero (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
     (leafBelow : leafBase + T.modulus i ≤ W) (windowFits : W + 2 ^ 20 < 2 ^ 256)
     (memory : Memory) (coordVal : memory.ram (word coordCell) = word v)
     (leafCells : ∀ ρ, ρ < T.modulus i →
-      memory.ram (word (leafBase + ρ)) = blockWord ((chunks 0).leaves ρ))
+      memory.ram (word (leafBase + ρ)) = labelWord ((chunks 0).leaves ρ))
     (joinCells : ∀ e : Fin S, memory.ram (word (joinBase + e.val)) = word (joins i e))
     (joinsLt : ∀ e, joins i e < T.modulus i)
     (tagSmall : ∀ ρ j, ρ < T.modulus i → j < T.padAnswers S i → bodyTag coord i.val ρ j < 2 ^ 127) :
@@ -108,8 +108,8 @@ theorem agree_modOdd (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
       m0.ram (word (W + 128)) = word (T.wordValue (T.modulus i) v) →
       (∀ x, x < W → m0.ram (word x) = memory.ram (word x)) →
       Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-        (fun (conv : (Fin (T.modulus i) → Block) × Nat) after =>
-          (∀ ρ : Fin (T.modulus i), after.ram (word (vec + ρ.val)) = blockWord (conv.1 ρ)) ∧
+        (fun (conv : (Fin (T.modulus i) → Label) × Nat) after =>
+          (∀ ρ : Fin (T.modulus i), after.ram (word (vec + ρ.val)) = labelWord (conv.1 ρ)) ∧
             after.ram (word hot) = word conv.2 ∧ conv.2 < T.modulus i ∧
             Frame (convRegion W) convClobbers m0 after)
         (convProg.tree m0)
@@ -123,7 +123,7 @@ theorem agree_modOdd (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
         (T.truth (T.modulus i)) T.chunkOffset T.chunkWidth convProg vec hot (bodyTag coord i.val)).tree
         memory)
       (liftHash (modEvalM T S coord pub joins v chunks i)) := by
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   -- the truth-word lanes
   let X : Nat → Nat → Nat → Nat := fun j c leaf =>
     if jb : j < laneCount then (((chunks c).casts leaf) ⟨j, jb⟩).val else 0
@@ -135,8 +135,8 @@ theorem agree_modOdd (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
     omega
   obtain ⟨m1, run1, lanes1, frame1, bits1, regs1⟩ := exec_truthWordBlock castBase W
     (T.truth (T.modulus i)) T.chunkWidth T.chunkCount row.ell memory X ellSmall (by omega)
-    (fun c cb leaf lb j jb j' jb' => by have := castIn c cb leaf lb j jb; omega)
-    (fun c cb leaf lb j jb => by have := castIn c cb leaf lb j jb; omega)
+    (fun c cb leaf lb j jb j' jb' => by have := castIn c cb leaf lb j (by omega); omega)
+    (fun c cb leaf lb j jb => by have := castIn c cb leaf lb j (by omega); omega)
     (fun c cb leaf lb j jb => by
       simp only [X, dif_pos (show j < laneCount from jb)]
       exact castCells c cb leaf lb j jb)
@@ -254,8 +254,8 @@ theorem modContract_of (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
       m0.ram (word (modBase + 2 ^ 20 * i.val + 128)) = word (T.wordValue (T.modulus i) v) →
       (∀ x, x < cc.alpha → m0.ram (word x) = memory0.ram (word x)) →
       Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-        (fun (conv : (Fin (T.modulus i) → Block) × Nat) after =>
-          (∀ ρ : Fin (T.modulus i), after.ram (word (vecOf i.val + ρ.val)) = blockWord (conv.1 ρ)) ∧
+        (fun (conv : (Fin (T.modulus i) → Label) × Nat) after =>
+          (∀ ρ : Fin (T.modulus i), after.ram (word (vecOf i.val + ρ.val)) = labelWord (conv.1 ρ)) ∧
             after.ram (word (hotOf i.val)) = word conv.2 ∧ conv.2 < T.modulus i ∧
             Frame (convRegion (modBase + 2 ^ 20 * i.val)) convClobbers m0 after)
         ((convProgOf i.val).tree m0)
@@ -318,7 +318,7 @@ theorem modContract_of (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
           have w8 := widthSmall c cb
           have : 2 ^ T.chunkWidth c ≤ 2 ^ 8 := Nat.pow_le_pow_right (by norm_num) w8
           have : 32768 * c + 32768 ≤ 32768 * T.chunkCount := by omega
-          have jb' : j < 128 := jb
+          have jb' : j < 128 := lt_of_lt_of_le jb (by decide : laneCount ≤ 128)
           rw [agrees _ (by omega) (Or.inl (by omega)), chunkAt c cb]
           exact casts c cb leaf lb j jb)
         joinsNow (joinsLt _) (tagSmall _)

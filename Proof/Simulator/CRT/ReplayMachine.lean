@@ -26,16 +26,16 @@ structure CoordReads (κ S : Nat) (conv : ConvPublic) (records : Fin S → Nat) 
   coordVal : memory.ram (word (coordCellOf κ)) = word v
   labelCells : ∀ j, j < 254 → memory.ram (word (labelBase + 254 * κ + j)) = blockWord (labelsOf j)
   chunkJoins : ∀ c, c < 32 → ∀ n, 1 ≤ n → n < Entry.table.chunkWidth c →
-    memory.ram (word (Layout.sourceJoin κ (Entry.chunkJoinBase c + (n - 1)))) = blockWord (conv.chunkJoin c n)
+    memory.ram (word (Layout.sourceJoin κ (Entry.chunkJoinBase c + (n - 1)))) = labelWord (conv.chunkJoin c n)
   chunkPins : ∀ c, c < 32 → ∀ i (ib : i < laneCount),
     memory.ram (word (Layout.sourcePin κ 0 0 + 128 * c + i)) =
       word ((pinOfBlocks 14 fun k => conv.chunkPin c k.val) ⟨i, ib⟩).val
   stageJoins0 : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ n, 1 ≤ n → n < row.width0 →
-      memory.ram (word (stageJoin κ i.val 0 + n)) = blockWord (conv.stageJoin i.val 0 n)
+      memory.ram (word (stageJoin κ i.val 0 + n)) = labelWord (conv.stageJoin i.val 0 n)
   stageJoins1 : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ n, 1 ≤ n → n < row.width1 →
-      memory.ram (word (stageJoin κ i.val 1 + n)) = blockWord (conv.stageJoin i.val 1 n)
+      memory.ram (word (stageJoin κ i.val 1 + n)) = labelWord (conv.stageJoin i.val 1 n)
   stagePins0 : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ j : Fin laneCount, memory.ram (word (stagePin κ i.val 0 + j.val)) =
       word ((pinOfBlocks row.ell fun k => conv.stagePin i.val 0 k.val) j).val
@@ -44,10 +44,10 @@ structure CoordReads (κ S : Nat) (conv : ConvPublic) (records : Fin S → Nat) 
       word ((pinOfBlocks (row.ell - row.width0) fun k => conv.stagePin i.val 1 k.val) j).val
   growJoins : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ n, row.width0 ≤ n → n < row.keep →
-      memory.ram (word (growJoin κ i.val n)) = blockWord (conv.growJoin i.val n)
+      memory.ram (word (growJoin κ i.val n)) = labelWord (conv.growJoin i.val n)
   foldJoins : ∀ (i : Fin Entry.table.count) (row : OddRow), Entry.table.kind i = .odd row →
     ∀ n, row.keep ≤ n → n < row.ell →
-      memory.ram (word (foldJoin κ i.val n)) = blockWord (conv.foldJoin i.val n)
+      memory.ram (word (foldJoin κ i.val n)) = labelWord (conv.foldJoin i.val n)
   residues : ∀ (i : Fin Entry.table.count) (e : Fin S),
     memory.ram (word (Layout.residueCell κ i.val 0 + e.val)) = word (recordJoins Entry.table records i e)
   hints : ∀ e : Fin S, memory.ram (word (Layout.hintCell κ 0 + e.val)) =
@@ -83,7 +83,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
           fieldWord ((ce.decoded e : Nat) : BaseField)) ∧
           Frame (coordWrites κ S) coordClobbers memory after)
       ((coordProg κ S).tree memory)
-      (liftHash (coordEvalM Entry.table S κ conv records v labelsOf)) := by
+      (liftHash (coordEvalM Entry.table S κ conv records v (fun j => clip (labelsOf j)))) := by
   have cc32 : Entry.table.chunkCount = 32 := TableFacts.chunkCount
   have cnt85 : Entry.table.count = 85 := TableFacts.count
   have ca := TableFacts.castAnswers_le
@@ -169,7 +169,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
   have joinBase := IndexFacts.modJoinBase_le i.val
   have pinBase := IndexFacts.modPinBase_le i.val
   have mLe := TableFacts.modulus_le i
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   -- every source cell is below the replay's scratch
   have memEq : ∀ x, x < 2 ^ 60 → m0.ram (word x) = memory.ram (word x) := fun x xb =>
     below x (by simp only [coordCells, R]; omega)
@@ -270,7 +270,7 @@ theorem CoordReads.transport {κ S : Nat} {conv : ConvPublic} {records : Fin S �
     (agree : ∀ x, x < 2 ^ 56 → m1.ram (word x) = memory.ram (word x)) :
     CoordReads κ S conv records v labelsOf m1 := by
   have cnt85 : Entry.table.count = 85 := TableFacts.count
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have rowFacts : ∀ i : Nat, (Entry.rowAt i).width0 ≤ 12 ∧ (Entry.rowAt i).width1 ≤ 12 ∧
       (Entry.rowAt i).keep ≤ 14 := fun i => by
     obtain ⟨ell, w0, w1, keep, _⟩ := IndexFacts.rowAt_bounds i

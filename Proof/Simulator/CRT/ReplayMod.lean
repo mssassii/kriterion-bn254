@@ -39,7 +39,7 @@ theorem agree_mod256Block (T : CrtTable) (S coord : Nat) (pub : ConvPublic)
     (coordCell : Nat) (bc : BodyCells) (chain : BodyChain bc (T.modulus i) S (T.padAnswers S i))
     (memory : Memory) (coordVal : memory.ram (word coordCell) = word v)
     (leafCells : ∀ ρ, ρ < T.modulus i →
-      memory.ram (word (bc.vecBase + ρ)) = blockWord ((chunks 0).leaves ρ))
+      memory.ram (word (bc.vecBase + ρ)) = labelWord ((chunks 0).leaves ρ))
     (joinCells : ∀ e : Fin S, memory.ram (word (bc.joinBase + e.val)) = word (joins i e))
     (joinsLt : ∀ e, joins i e < T.modulus i)
     (tagSmall : ∀ ρ j, ρ < T.modulus i → j < T.padAnswers S i → bodyTag coord i.val ρ j < 2 ^ 127) :
