@@ -913,6 +913,7 @@ theorem image_sum {Y R : Type*} [Fintype Y] [Nonempty Y] [Fintype R] [Nonempty R
     rw [tsum_uniform_ite, tsum_uniform_prod]
     congr 1
     refine tsum_congr fun y => ?_
+    dsimp only
     rw [tsum_uniform_const]
   simp only [inner]
   exact tsum_uniform_restrict GoodScales _
@@ -1003,7 +1004,8 @@ theorem cells_sum {Y : Type*} [Fintype Y] [Nonempty Y] (w : Y → (Fin 91 → Bo
         rw [ENNReal.tsum_mul_left]
         ring
     _ = goodMass * ∑' sign, ∑' y, PMF.uniformOfFintype Y y * (PMF.uniformOfFintype (Fin 91 → Bool) sign * w y sign) := by
-        rw [ENNReal.tsum_comm]
+        congr 1
+        exact ENNReal.tsum_comm
     _ = _ := by
         congr 1
         refine tsum_congr fun sign => ?_
