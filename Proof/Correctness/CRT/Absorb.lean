@@ -114,11 +114,13 @@ theorem coordEvalM_absorb (T : CrtTable) (hk : 0 < T.chunkBits) (S coord : Nat) 
       (fun n lower upper => ?_)
     · have inRange := chunkOffset_add_lt T c.val 0 positive
       rw [Nat.add_zero] at inRange
-      rw [absorbed _ inRange, chunkShift_first, BitVec.xor_zero]
+      rw [absorbed _ inRange, chunkShift_first]
+      simp only [BitVec.xor_zero]
     · rw [absorbed _ (chunkOffset_add_lt T c.val n upper), chunkShift_at T hk _ c.val n lower upper]
       show (0 : Label) ^^^ (labels (T.chunkOffset c.val + n) ^^^ pub.chunkJoin c.val n) =
         pub.chunkJoin c.val n ^^^ labels (T.chunkOffset c.val + n)
-      rw [BitVec.zero_xor, BitVec.xor_comm]
+      simp only [BitVec.zero_xor]
+      exact BitVec.xor_comm _ _
   have mods : ∀ joins chunks, modEvalM T S coord pub.dropChunkJoins joins v chunks =
       modEvalM T S coord pub joins v chunks :=
     fun joins chunks => funext fun i => modEvalM_congr T S coord _ _ joins v chunks i
