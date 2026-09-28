@@ -129,20 +129,20 @@ private theorem exec_wordLane (castBase wordBase : Nat) (truthOf : Nat → Nat �
   · simp only [reg_storeRam, reg_setReg, if_neg n1, if_neg n2, if_neg n4]
     exact regs1 register n1 n2 n3 n4
 
-/-- **The word block**: lane `i < 128` holds `(Σ_c Σ_α X_{c,α,i} · T_{c,α}) mod 2 ^ ell`. -/
+/-- **The word block**: lane `i < laneCount` holds `(Σ_c Σ_α X_{c,α,i} · T_{c,α}) mod 2 ^ ell`. -/
 theorem exec_truthWordBlock (castBase wordBase : Nat) (truthOf : Nat → Nat → Nat) (width : Nat → Nat)
     (count ell : Nat) (memory : Memory) (X : Nat → Nat → Nat → Nat) (ellSmall : ell ≤ 256)
-    (wordFits : wordBase + 128 < 2 ^ 256)
-    (apart : ∀ c, c < count → ∀ leaf, leaf < 2 ^ width c → ∀ i, i < 128 → ∀ i', i' < 128 →
+    (wordFits : wordBase + laneCount < 2 ^ 256)
+    (apart : ∀ c, c < count → ∀ leaf, leaf < 2 ^ width c → ∀ i, i < laneCount → ∀ i', i' < laneCount →
       castBase + 32768 * c + 128 * leaf + i ≠ wordBase + i')
-    (castFits : ∀ c, c < count → ∀ leaf, leaf < 2 ^ width c → ∀ i, i < 128 →
+    (castFits : ∀ c, c < count → ∀ leaf, leaf < 2 ^ width c → ∀ i, i < laneCount →
       castBase + 32768 * c + 128 * leaf + i < 2 ^ 256)
-    (cells : ∀ c, c < count → ∀ leaf, leaf < 2 ^ width c → ∀ i, i < 128 →
+    (cells : ∀ c, c < count → ∀ leaf, leaf < 2 ^ width c → ∀ i, i < laneCount →
       memory.ram (word (castBase + 32768 * c + 128 * leaf + i)) = word (X i c leaf)) :
     ∃ after, (truthWordBlock castBase wordBase truthOf width count ell).exec memory = some after ∧
-      (∀ i, i < 128 → after.ram (word (wordBase + i)) =
+      (∀ i, i < laneCount → after.ram (word (wordBase + i)) =
         word (wordSum (X i) truthOf width count % 2 ^ ell)) ∧
-      (∀ address, (∀ i, i < 128 → address ≠ word (wordBase + i)) → after.ram address = memory.ram address) ∧
+      (∀ address, (∀ i, i < laneCount → address ≠ word (wordBase + i)) → after.ram address = memory.ram address) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rA → register ≠ rB → register ≠ rC → register ≠ rAddr →
         after.registers register = memory.registers register := by
@@ -150,11 +150,11 @@ theorem exec_truthWordBlock (castBase wordBase : Nat) (truthOf : Nat → Nat →
     (wordLane castBase wordBase truthOf width count ell)
     (fun k current =>
       (∀ i, i < k → current.ram (word (wordBase + i)) = word (wordSum (X i) truthOf width count % 2 ^ ell)) ∧
-      (∀ address, (∀ i, i < 128 → address ≠ word (wordBase + i)) → current.ram address = memory.ram address) ∧
+      (∀ address, (∀ i, i < laneCount → address ≠ word (wordBase + i)) → current.ram address = memory.ram address) ∧
       current.bits = memory.bits ∧
       ∀ register, register ≠ rA → register ≠ rB → register ≠ rC → register ≠ rAddr →
         current.registers register = memory.registers register)
-    128 (fun k kb current holds => by
+    laneCount (fun k kb current holds => by
       obtain ⟨done, frame, bits, regs⟩ := holds
       obtain ⟨next, step, ram, bitsN, regsN⟩ := exec_wordLane castBase wordBase truthOf width count ell k
         current (X k) ellSmall (by omega)
@@ -194,7 +194,7 @@ theorem cost_wordLane (castBase wordBase : Nat) (truthOf : Nat → Nat → Nat) 
 theorem cost_truthWordBlock (castBase wordBase : Nat) (truthOf : Nat → Nat → Nat) (width : Nat → Nat)
     (count ell : Nat) :
     (truthWordBlock castBase wordBase truthOf width count ell).cost =
-      128 * (5 + ∑ c ∈ range count, 5 * 2 ^ width c) := by
+      laneCount * (5 + ∑ c ∈ range count, 5 * 2 ^ width c) := by
   rw [truthWordBlock, Prog.cost_rep _ _ _ (fun i _ => cost_wordLane castBase wordBase truthOf width count ell i)]
 
 /-! ### The link with `truthWord` -/

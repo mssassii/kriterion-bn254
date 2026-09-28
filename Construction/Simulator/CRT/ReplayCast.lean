@@ -2,7 +2,7 @@
 **The replay of one cast** (the construction's `castM` in `Construction/CRT/Chunk.lean`).
 
 A cast of width `l` of a label `E` asks `castAnswers l` hash answers at the tags `tagOf 0, …`, in
-order, and reads its 128 lanes block-aligned: lane `i` is the `l` bits at offset
+order, and reads its 104 lanes block-aligned: lane `i` is the `l` bits at offset
 `l · (i mod per)` of block `i / per`, where `per = ⌊128 / l⌋` and block `2 j` (`2 j + 1`) is the
 first (second) half of answer `j`.
 
@@ -10,11 +10,11 @@ The machine block `castBlock cells l tagOf`:
 
 * `castQueries`: for each answer `j`, `rInput := E + 2 ^ 128 · tag_j`, one kind-4 query, and the
   two halves stored at `ansBase + 2 j` and `ansBase + 2 j + 1`;
-* `castLanesProg`: for each lane `i < 128`, load block `i / per`, shift right by `l · (i mod per)`,
+* `castLanesProg`: for each lane `i < 104`, load block `i / per`, shift right by `l · (i mod per)`,
   mask with `2 ^ l - 1`, store at `laneBase + i`.
 
 Frame (the schema of `Frame.lean`): it writes the answer region (`2 · castAnswers l` cells) and the
-lane region (128 cells), and clobbers `rA`, `rB`, `rAddr`, `rInput`, `rFirst`, `rSecond`.
+lane region (104 active cells), and clobbers `rA`, `rB`, `rAddr`, `rInput`, `rFirst`, `rSecond`.
 -/
 
 import Construction.Simulator.CRT.Arith
@@ -32,7 +32,7 @@ structure CastCells where
   label : Nat
   /-- The answers' halves, `2 · castAnswers l` cells. -/
   ansBase : Nat
-  /-- The 128 lanes. -/
+  /-- The 104 lanes. -/
   laneBase : Nat
 
 /-- Answer `j`: ask at `label + 2 ^ 128 · tag`, store both halves. -/
@@ -55,7 +55,7 @@ def laneExtract (cells : CastCells) (l i : Nat) : Prog :=
     (.seq (cst rB (2 ^ l - 1))
     (.seq (ar .and rA rA rB) (storeAt (cells.laneBase + i) rA)))))
 
-/-- The 128 lanes of a cast of width `l`. -/
+/-- The 104 lanes of a cast of width `l`. -/
 def castLanesProg (cells : CastCells) (l : Nat) : Prog :=
   Prog.rep Kriterion.CRT.laneCount (laneExtract cells l)
 
@@ -116,7 +116,7 @@ def solveLane (cc : ChunkCastCells) (width l i : Nat) : Prog :=
     (.seq (cst rB (cc.castBase + i))
     (.seq (ar .add rA rA rB) (.op (.store rA rD))))))))
 
-/-- The pin solve: the 128 lanes of the hot cast. -/
+/-- The pin solve: the 104 lanes of the hot cast. -/
 def pinSolve (cc : ChunkCastCells) (width l : Nat) : Prog := Prog.rep laneCount (solveLane cc width l)
 
 /-- **The cast phase of one chunk** (after its tree). -/
@@ -153,7 +153,7 @@ theorem cost_castQuery (cells : CastCells) (tag j : Nat) : (castQuery cells tag 
 theorem cost_laneExtract (cells : CastCells) (l i : Nat) : (laneExtract cells l i).cost = 8 := rfl
 
 theorem cost_castBlock (cells : CastCells) (l : Nat) (tagOf : Nat → Nat) :
-    (castBlock cells l tagOf).cost = 9 * Kriterion.CRT.castAnswers l + 8 * 128 := by
+    (castBlock cells l tagOf).cost = 9 * Kriterion.CRT.castAnswers l + 8 * laneCount := by
   simp only [castBlock, castQueries, castLanesProg, Prog.cost]
   rw [Prog.cost_rep _ _ 9 (fun j _ => cost_castQuery cells (tagOf j) j),
     Prog.cost_rep _ _ 8 (fun i _ => cost_laneExtract cells l i)]

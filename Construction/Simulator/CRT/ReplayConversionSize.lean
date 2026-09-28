@@ -41,7 +41,7 @@ theorem pow_le_65536 {n : Nat} (h : n ≤ 16) : 2 ^ n ≤ 65536 :=
 theorem castAnswers_le_128' (l : Nat) (h1 : 1 ≤ l) (h2 : l ≤ 128) : Kriterion.CRT.castAnswers l ≤ 128 := by
   unfold Kriterion.CRT.castAnswers Kriterion.CRT.castBlocks Kriterion.CRT.lanesPerBlock
   have p1 : 1 ≤ 128 / l := (Nat.le_div_iff_mul_le (by omega)).mpr (by omega)
-  have : (128 + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
+  have : (labelBits + 128 / l - 1) / (128 / l) ≤ 128 := Nat.div_le_of_le_mul (by omega)
   omega
 
 /-! ### One stage -/
@@ -51,14 +51,14 @@ section Stage
 variable (cells : StageCells)
 
 theorem size_subtreeLevel (start d base stride : Nat) :
-    (subtreeLevel cells start d base stride).size = 2 ^ d * 20 + 2 ^ d * 14 := by
+    (subtreeLevel cells start d base stride).size = 2 ^ d * 22 + 2 ^ d * 14 := by
   unfold subtreeLevel
-  rw [Prog.size_seq, Prog.size_rep _ _ 20 fun _ _ => rfl, Prog.size_rep _ _ 14 fun _ _ => rfl]
+  rw [Prog.size_seq, Prog.size_rep _ _ 22 fun _ _ => rfl, Prog.size_rep _ _ 14 fun _ _ => rfl]
 
 theorem size_subtreeReplay_le (start depth : Nat) (treeBase : Nat → Nat) (stride : Nat) (small : depth ≤ 12) :
-    (subtreeReplay cells start depth treeBase stride).size ≤ 12 * (4096 * 34) := by
+    (subtreeReplay cells start depth treeBase stride).size ≤ 12 * (4096 * 36) := by
   unfold subtreeReplay
-  refine le_trans (size_rep_le _ _ (4096 * 34) fun d bound => ?_) (Nat.mul_le_mul_right _ small)
+  refine le_trans (size_rep_le _ _ (4096 * 36) fun d bound => ?_) (Nat.mul_le_mul_right _ small)
   rw [size_subtreeLevel]
   have := pow_le_4096 (n := d) (by omega)
   omega
@@ -70,10 +70,10 @@ theorem size_castDyn_le (rb start t base stride : Nat) (rbPos : 1 ≤ rb) (rbLe 
     Prog.size_rep _ _ 8 fun _ _ => rfl]
   have := castAnswers_le_128' rb rbPos rbLe
   have e : (castInputBase cells start t base stride).size = 12 := rfl
-  have lc : Kriterion.CRT.laneCount = 128 := rfl
+  have lc : Kriterion.CRT.laneCount = 104 := rfl
   omega
 
-theorem size_accLevel (rb start t j : Nat) : (accLevel cells rb start t j).size = 6 + 128 * 19 := by
+theorem size_accLevel (rb start t j : Nat) : (accLevel cells rb start t j).size = 6 + laneCount * 19 := by
   unfold accLevel
   rw [Prog.size_seq, Prog.size_seq, Prog.size_seq, Prog.size_rep _ _ 19 fun _ _ => rfl]
   have e1 : (absSlot cells start t).size = 4 := rfl
@@ -84,15 +84,15 @@ theorem size_accLevel (rb start t j : Nat) : (accLevel cells rb start t j).size 
 
 theorem size_leafEntry_le (w rb start base stride t : Nat) (rbPos : 1 ≤ rb) (rbLe : rb ≤ 128)
     (small : w - start ≤ 12) :
-    (leafEntry cells w rb start base stride t).size ≤ (12 + 128 * 7 + 128 * 8) + 13 * (6 + 128 * 19) := by
+    (leafEntry cells w rb start base stride t).size ≤ (12 + 128 * 7 + 128 * 8) + 13 * (6 + laneCount * 19) := by
   unfold leafEntry
-  rw [Prog.size_seq, Prog.size_rep _ _ (6 + 128 * 19) fun k _ => size_accLevel cells rb start t (start + k)]
+  rw [Prog.size_seq, Prog.size_rep _ _ (6 + laneCount * 19) fun k _ => size_accLevel cells rb start t (start + k)]
   have := size_castDyn_le cells rb start t base stride rbPos rbLe
-  have : (w - start + 1) * (6 + 128 * 19) ≤ 13 * (6 + 128 * 19) := Nat.mul_le_mul_right _ (by omega)
+  have : (w - start + 1) * (6 + laneCount * 19) ≤ 13 * (6 + laneCount * 19) := Nat.mul_le_mul_right _ (by omega)
   omega
 
 /-- The bound of one expansion. -/
-abbrev expandBound : Nat := 12 * (4096 * 34) + 4096 * ((12 + 128 * 7 + 128 * 8) + 13 * (6 + 128 * 19))
+abbrev expandBound : Nat := 12 * (4096 * 36) + 4096 * ((12 + 128 * 7 + 128 * 8) + 13 * (6 + laneCount * 19))
 
 theorem size_expandReplay_le (w rb start : Nat) (treeBase : Nat → Nat) (castBase stride : Nat) (rbPos : 1 ≤ rb)
     (rbLe : rb ≤ 128) (wLe : w ≤ 12) :
@@ -101,15 +101,15 @@ theorem size_expandReplay_le (w rb start : Nat) (treeBase : Nat → Nat) (castBa
   rw [Prog.size_seq]
   have h1 := size_subtreeReplay_le cells start (w - start) treeBase stride (by omega)
   have h2 := size_rep_le (2 ^ (w - start)) (leafEntry cells w rb start castBase stride)
-    ((12 + 128 * 7 + 128 * 8) + 13 * (6 + 128 * 19))
+    ((12 + 128 * 7 + 128 * 8) + 13 * (6 + laneCount * 19))
     fun t _ => size_leafEntry_le cells w rb start castBase stride t rbPos rbLe (by omega)
-  have h3 : 2 ^ (w - start) * ((12 + 128 * 7 + 128 * 8) + 13 * (6 + 128 * 19)) ≤
-      4096 * ((12 + 128 * 7 + 128 * 8) + 13 * (6 + 128 * 19)) :=
+  have h3 : 2 ^ (w - start) * ((12 + 128 * 7 + 128 * 8) + 13 * (6 + laneCount * 19)) ≤
+      4096 * ((12 + 128 * 7 + 128 * 8) + 13 * (6 + laneCount * 19)) :=
     Nat.mul_le_mul_right _ (pow_le_4096 (by omega))
   unfold expandBound
   omega
 
-theorem size_roundPrefix (w rb n : Nat) : (roundPrefix cells w rb n).size = 7 + 128 * 29 + 9 + 6 + 19 := by
+theorem size_roundPrefix (w rb n : Nat) : (roundPrefix cells w rb n).size = 7 + laneCount * 29 + 9 + 6 + 19 := by
   unfold roundPrefix roundBit
   simp only [Prog.size_seq]
   rw [Prog.size_rep _ _ 29 fun _ _ => rfl]
@@ -126,7 +126,7 @@ theorem size_roundPrefix (w rb n : Nat) : (roundPrefix cells w rb n).size = 7 + 
 
 theorem size_roundReplay_le (w rb n : Nat) (treeBase : Nat → Nat) (castBase stride : Nat) (rbPos : 1 ≤ rb)
     (rbLe : rb ≤ 128) (wLe : w ≤ 12) :
-    (roundReplay cells w rb n treeBase castBase stride).size ≤ (7 + 128 * 29 + 9 + 6 + 19) + expandBound := by
+    (roundReplay cells w rb n treeBase castBase stride).size ≤ (7 + laneCount * 29 + 9 + 6 + 19) + expandBound := by
   unfold roundReplay
   rw [Prog.size_seq, size_roundPrefix]
   have := size_expandReplay_le cells w rb (n + 1) treeBase castBase stride rbPos rbLe wLe
@@ -152,7 +152,7 @@ theorem size_stagePrefix_le (w : Nat) (wLe : w ≤ 12) :
   simp only [Kriterion.CRT.laneCount]
   omega
 
-theorem size_stageFinal (w rb : Nat) : (stageFinal cells w rb).size = 2 + 128 * 24 + 5 := by
+theorem size_stageFinal (w rb : Nat) : (stageFinal cells w rb).size = 2 + laneCount * 24 + 5 := by
   unfold stageFinal
   simp only [Prog.size_seq]
   rw [Prog.size_rep _ _ 24 fun _ _ => rfl]
@@ -167,7 +167,7 @@ theorem size_stageFinal (w rb : Nat) : (stageFinal cells w rb).size = 2 + 128 * 
 /-- The bound of one stage. -/
 abbrev stageBound : Nat :=
   (128 * 6 + (1 + 128 * 9) + 4 + 3 * (1 + 128 * 13 * 2) + 10) + expandBound +
-    12 * ((7 + 128 * 29 + 9 + 6 + 19) + expandBound) + (2 + 128 * 24 + 5)
+    12 * ((7 + laneCount * 29 + 9 + 6 + 19) + expandBound) + (2 + laneCount * 24 + 5)
 
 theorem size_stageReplay_le (w rb : Nat) (treeBase : Nat → Nat) (castBase stride : Nat) (rbPos : 1 ≤ rb)
     (rbLe : rb ≤ 128) (wLe : w ≤ 12) :
@@ -177,10 +177,10 @@ theorem size_stageReplay_le (w rb : Nat) (treeBase : Nat → Nat) (castBase stri
   have h1 := size_stagePrefix_le cells w wLe
   have h2 := size_expandReplay_le cells w rb 1 treeBase castBase stride rbPos rbLe wLe
   have h3 := size_rep_le (w - 1) (fun k => roundReplay cells w rb (k + 1) treeBase castBase stride)
-    ((7 + 128 * 29 + 9 + 6 + 19) + expandBound)
+    ((7 + laneCount * 29 + 9 + 6 + 19) + expandBound)
     fun k _ => size_roundReplay_le cells w rb (k + 1) treeBase castBase stride rbPos rbLe wLe
-  have h4 : (w - 1) * ((7 + 128 * 29 + 9 + 6 + 19) + expandBound) ≤
-      12 * ((7 + 128 * 29 + 9 + 6 + 19) + expandBound) := Nat.mul_le_mul_right _ (by omega)
+  have h4 : (w - 1) * ((7 + laneCount * 29 + 9 + 6 + 19) + expandBound) ≤
+      12 * ((7 + laneCount * 29 + 9 + 6 + 19) + expandBound) := Nat.mul_le_mul_right _ (by omega)
   have h5 := size_stageFinal cells w rb
   unfold stageBound
   omega
@@ -190,19 +190,19 @@ end Stage
 /-! ### The growth, the reindex and the folds -/
 
 theorem size_treeStep (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) :
-    (treeStep cells tagOf n).size = 14 + 34 * 2 ^ n := by
+    (treeStep cells tagOf n).size = 16 + 38 * 2 ^ n := by
   unfold treeStep treeLevel
   simp only [Prog.size_seq]
-  rw [Prog.size_rep _ _ 25 fun _ _ => rfl, Prog.size_rep _ _ 9 fun _ _ => rfl]
-  have e1 : (treeRecover cells n).size = 13 := rfl
+  rw [Prog.size_rep _ _ 29 fun _ _ => rfl, Prog.size_rep _ _ 9 fun _ _ => rfl]
+  have e1 : (treeRecover cells n).size = 15 := rfl
   have e2 : (cst rD 0).size = 1 := rfl
   omega
 
 theorem size_growEval_le (cells : TreeCells) (tagOf : Nat → Nat → Nat) (start count : Nat)
     (small : start + count ≤ 16) :
-    (growEval cells tagOf start count).size ≤ 16 * (14 + 34 * 65536) := by
+    (growEval cells tagOf start count).size ≤ 16 * (16 + 38 * 65536) := by
   unfold growEval
-  refine le_trans (size_rep_le _ _ (14 + 34 * 65536) fun k bound => ?_) (Nat.mul_le_mul_right _ (by omega))
+  refine le_trans (size_rep_le _ _ (16 + 38 * 65536) fun k bound => ?_) (Nat.mul_le_mul_right _ (by omega))
   rw [size_treeStep]
   have := pow_le_65536 (n := start + k) (by omega)
   omega
@@ -227,12 +227,12 @@ theorem size_reindexBlock_le (levelBase vecBase n m : Nat) (nLe : n ≤ 16) (mLe
 
 theorem size_foldsLoop_le (cells : FoldCells) (m start count : Nat) (tagOf : Nat → Nat → Nat)
     (countLe : count ≤ 16) (mLe : m ≤ 2 ^ 11) :
-    (foldsLoop cells m start count tagOf).size ≤ 16 * (31 + 33 * 2 ^ 11) := by
+    (foldsLoop cells m start count tagOf).size ≤ 16 * (31 + 37 * 2 ^ 11) := by
   unfold foldsLoop
-  refine le_trans (size_rep_le _ _ (31 + 33 * 2 ^ 11) fun k _ => ?_) (Nat.mul_le_mul_right _ countLe)
+  refine le_trans (size_rep_le _ _ (31 + 37 * 2 ^ 11) fun k _ => ?_) (Nat.mul_le_mul_right _ countLe)
   unfold foldStep
   simp only [Prog.size_seq]
-  rw [Prog.size_rep _ _ 23 fun _ _ => rfl, Prog.size_rep _ _ 10 fun _ _ => rfl]
+  rw [Prog.size_rep _ _ 27 fun _ _ => rfl, Prog.size_rep _ _ 10 fun _ _ => rfl]
   have e1 : (foldRecover cells (start + k)).size = 11 := rfl
   have e2 : (hotUpdate cells m (2 ^ (start + k) % m) (start + k)).size = 19 := rfl
   have e3 : (cst rD 0).size = 1 := rfl
@@ -261,13 +261,13 @@ theorem size_conversionReplay_le (coord i : Nat) (row : Kriterion.CRT.OddRow) (m
     row.width1 (row.ell - row.width0) (fun level => Kriterion.CRT.extTreeTag coord i 1 level 0)
     (Kriterion.CRT.extCastTag coord i 1 0 0) 64 (by omega) (by omega) w1Le
   have h4 : (lastBitProg W (convStage1 row W (joinBase 0) (pinBase 0) (joinBase 1) (pinBase 1)).nextBase).size =
-      1 + 128 * 9 + 2 := by
+      1 + laneCount * 9 + 2 := by
     unfold lastBitProg lanePack
     simp only [Prog.size_seq]
     rw [Prog.size_rep _ _ 9 fun _ _ => rfl]
     have e1 : (cst rD 0).size = 1 := rfl
     have e2 : (storeAt (W + 258) rD).size = 2 := rfl
-    have lc : Kriterion.CRT.laneCount = 128 := rfl
+    have lc : Kriterion.CRT.laneCount = 104 := rfl
     omega
   have h5 : (saveLeaves (convStage0 row W (joinBase 0) (pinBase 0)).nodeBase (W + 2 ^ 16) row.width0 0).size ≤
       4096 * 4 := by

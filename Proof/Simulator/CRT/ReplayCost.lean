@@ -46,10 +46,10 @@ theorem size_ite_le (source : Register) (whenSet whenClear : Prog) :
 /-! ### The chunk loop -/
 
 theorem size_treeStep (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) :
-    (treeStep cells tagOf n).size = 14 + 34 * 2 ^ n := by
+    (treeStep cells tagOf n).size = 16 + 38 * 2 ^ n := by
   simp only [treeStep, treeLevel, Prog.size_seq]
-  rw [Prog.size_rep _ _ 25 (fun s _ => size_treeEntry cells tagOf n s),
-    Prog.size_rep _ _ 9 (fun s _ => rfl), show (treeRecover cells n).size = 13 from rfl,
+  rw [Prog.size_rep _ _ 29 (fun s _ => size_treeEntry cells tagOf n s),
+    Prog.size_rep _ _ 9 (fun s _ => rfl), show (treeRecover cells n).size = 15 from rfl,
     show (cst rD 0).size = 1 from rfl]
   ring
 
@@ -57,19 +57,19 @@ theorem size_treeEval_le (cells : TreeCells) (tagOf : Nat → Nat → Nat) (leve
     (treeEval cells tagOf levels).size ≤ 2 ^ 17 := by
   simp only [treeEval, Prog.size_seq]
   have steps := size_rep_le (levels - 1) (fun k => treeStep cells (tagOf (k + 1)) (k + 1))
-    (14 + 34 * 2 ^ 8) fun k kb => by
+    (16 + 38 * 2 ^ 8) fun k kb => by
       rw [size_treeStep]
       have : 2 ^ (k + 1) ≤ 2 ^ 8 := Nat.pow_le_pow_right (by norm_num) (by omega)
       omega
-  have : (levels - 1) * (14 + 34 * 2 ^ 8) ≤ 8 * (14 + 34 * 2 ^ 8) := Nat.mul_le_mul_right _ (by omega)
-  rw [show (treePrefix cells).size = 6 from rfl]
+  have : (levels - 1) * (16 + 38 * 2 ^ 8) ≤ 8 * (16 + 38 * 2 ^ 8) := Nat.mul_le_mul_right _ (by omega)
+  rw [show (treePrefix cells).size = 8 from rfl]
   omega
 
 theorem size_castBlock (cells : CastCells) (l : Nat) (tagOf : Nat → Nat) :
-    (castBlock cells l tagOf).size = 9 * castAnswers l + 8 * 128 := by
+    (castBlock cells l tagOf).size = 9 * castAnswers l + 8 * laneCount := by
   simp only [castBlock, castQueries, castLanesProg, Prog.size_seq]
   rw [Prog.size_rep _ _ 9 (fun j _ => rfl), Prog.size_rep _ _ 8 (fun i _ => rfl)]
-  rw [show laneCount = 128 from rfl]
+  rw [show laneCount = 104 from rfl]
   ring
 
 theorem size_chunkCastPhase_le (cc : ChunkCastCells) (width l : Nat) (tagOf : Nat → Nat → Nat)
@@ -101,7 +101,7 @@ theorem size_chunkCastPhase_le (cc : ChunkCastCells) (width l : Nat) (tagOf : Na
     omega
   have : 2 ^ width * (9 + 2 * (9 * 64 + 1024)) ≤ 2 ^ 8 * (9 + 2 * (9 * 64 + 1024)) :=
     Nat.mul_le_mul_right _ pw
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   rw [lc] at lanes ⊢
   omega
 
@@ -153,7 +153,7 @@ theorem size_truthWordBlock_le (castBase wordBase : Nat) (truthOf : Nat → Nat 
     (count ell : Nat) (countLe : count ≤ 32) (widthLe : ∀ c, c < count → width c ≤ 8) :
     (truthWordBlock castBase wordBase truthOf width count ell).size ≤ 2 ^ 23 := by
   unfold truthWordBlock
-  have each := size_rep_le 128 (wordLane castBase wordBase truthOf width count ell) (5 + 32 * (5 * 2 ^ 8))
+  have each := size_rep_le laneCount (wordLane castBase wordBase truthOf width count ell) (5 + 32 * (5 * 2 ^ 8))
     fun i _ => by
       simp only [wordLane, Prog.size_seq]
       have chunks := size_rep_le count (wordChunk castBase truthOf width i) (5 * 2 ^ 8) fun c cb => by
