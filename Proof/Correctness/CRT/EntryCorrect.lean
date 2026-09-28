@@ -16,6 +16,7 @@ hash, coins and input.
 import Proof.Correctness.CRT.EntryDelivery
 import Proof.Correctness.CRT.EntryDecode
 import Proof.Correctness.CRT.DigestUnlock
+import Proof.Correctness.CRT.Rows
 import Proof.Correctness.Base7Termination
 
 namespace Kriterion.CRT.EntryCorrect
@@ -49,10 +50,9 @@ def offXOf : Fin xCount → BaseField := offsetsX (gxOf H coins).offset (masksOf
 def offYOf : Fin yCount → BaseField := offsetsY (gyOf H coins).offset (masksOf H coins)
 def KOf : FieldMacToECMac.DigitValues := digitValuesOf (offXOf H coins) (offYOf H coins)
 def curveKOf : CurveMembership.Values := curveValuesOf (offXOf H coins) (offYOf H coins)
-def rowsOf : FieldMacToECMac.Rows :=
-  FieldMacToECMac.rowsForOutputKeys (outputKeysOf scalar coins) coins.pointRandomness
+def rowsOf : FieldMacToECMac.Rows := normRowsVec (outputKeysOf scalar coins) (KOf H coins)
 def pointOf : Fin digitCount → Biquadratic.Values :=
-  pointSlopes (rowsOf scalar coins) coins.pointRandomness (KOf H coins)
+  pointSlopes (rowsOf H scalar coins) coins.pointRandomness (KOf H coins)
 def curveSlopesOf : CurveMembership.Values :=
   CurveMembership.slopes coins.curveR1 coins.curveR2 (curveKOf H coins)
 def slXOf : Fin xCount → BaseField := slopesX (pointOf H scalar coins) (curveSlopesOf H coins)
@@ -74,7 +74,7 @@ theorem pubOf_curve : (pubOf H scalar coins).curve =
       (curveKOf H coins) := rfl
 
 theorem pubOf_rows : (pubOf H scalar coins).rows = Vector.ofFn fun digit =>
-    FieldMacToECMac.garbleRow ((rowsOf scalar coins).get digit) (KOf H coins digit) := rfl
+    Rows.garbleNormRow (Rows.unscaledOf (outputKeysOf scalar coins) digit) (KOf H coins digit) := rfl
 
 theorem pubOf_exception : (pubOf H scalar coins).exception = Vector.ofFn (entriesOf H scalar coins) := rfl
 
@@ -239,7 +239,7 @@ theorem rowValues_delivered (H : HashN) (scalar : NonZeroScalar) (coins : Coins)
     (hY : ∀ e, out.deliveredY e = slYOf H scalar coins e * input.y + toField ((gyOf H coins).offset e))
     (hmasks : out.masks = maskFunction (masksOf H coins)) :
     rowValues out =
-      FieldMacToECMac.delivered (rowsOf scalar coins) coins.pointRandomness (KOf H coins) input := by
+      FieldMacToECMac.delivered (rowsOf H scalar coins) coins.pointRandomness (KOf H coins) input := by
   funext digit element
   cases element with
   | inl element =>
@@ -318,6 +318,25 @@ theorem labelsOf_honest (coins : Coins) (input : AffineInput) :
     simp only [atNat, dif_pos (show position.val < coordinateBitCount from low)]
     split <;> simp_all
 
+/-! ### Lists of decoded rows -/
+
+theorem zipOfFn_eq {n : Nat} {α β : Type} (f : Fin n → α) (g : Fin n → β) :
+    List.zip (List.ofFn f) (List.ofFn g) = List.ofFn fun index => (f index, g index) := by
+  induction n with
+  | zero => simp
+  | succ n ih => rw [List.ofFn_succ, List.ofFn_succ, List.ofFn_succ, List.zip_cons_cons, ih]
+
+theorem mapM_ofFn_congr {n : Nat} {α β γ : Type} (f g : Fin n → α) (h : Fin n → β) (decode : α × β → Option γ)
+    (same : ∀ index, ∀ b, decode (f index, b) = decode (g index, b)) :
+    (List.ofFn fun index => (f index, h index)).mapM decode =
+      (List.ofFn fun index => (g index, h index)).mapM decode := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    rw [List.ofFn_succ, List.ofFn_succ, List.mapM_cons, List.mapM_cons, same 0,
+      ih (fun index => f index.succ) (fun index => g index.succ) (fun index => h index.succ)
+        (fun index => same index.succ)]
+
 /-! ### Correctness -/
 
 /-- **On the curve the evaluator returns the scalar multiple.** -/
@@ -343,21 +362,91 @@ theorem evaluate_onCurve [FieldCertificate] [GroupCertificate] (H : HashN) (scal
   have hmasks : out.masks = maskFunction (masksOf H coins) := by
     rw [hout, replay_eval_masks, curveOutput_eq H scalar coins input onCurve]
     rfl
-  have homog : FieldMacToECMac.evaluateHomogeneous ((pubOf H scalar coins).rows,
-      (pubOf H scalar coins).exception) (rowValues out) input =
-      FieldMacToECMac.evaluateRows (rowsOf scalar coins) input := by
-    rw [rowValues_delivered H scalar coins input out hX hY hmasks]
-    rw [← FieldMacToECMac.evaluateHomogeneousEncoded (outputKeysOf scalar coins) (rowsOf scalar coins)
-      coins.pointRandomness (KOf H coins) coins.inputMacKey (fun _ _ _ => Equiv.refl _)
-      coins.exceptionPad input onCurve (FieldMacToECMac.rowsForOutputKeysSparse _ _)]
-    simp only [FieldMacToECMac.evaluateHomogeneous, FieldMacToECMac.garble, pubOf_rows]
-  rw [homog]
-  refine EntryDecode.decodeResult_eq scalar.value coins.offsets coins.offsetsClamped coins.pointRandomness
+  -- the evaluator's homogeneous values are the corrected values of the normalized rows
+  have keyOn : ∀ index, OnCurve ((outputKeysOf scalar coins).get index).offset.coordinates :=
+    fun index => ((outputKeysOf scalar coins).get index).offset.onCurve
+  have valid : ∀ index phi, digitEndomorphismBase ((outputKeysOf scalar coins).get index).digit = some phi →
+      phi ^ 6 = 1 := fun index phi => digitEndomorphismBasePowSix _ phi
+  have zNe : ∀ index, (Rows.unscaledOf (outputKeysOf scalar coins) index).z.constant ≠ 0 :=
+    fun index => Rows.z0_ne_zero _ _ (keyOn index)
+  have sNe : ∀ index, (Rows.unscaledOf (outputKeysOf scalar coins) index).y.xSquared ≠ 0 :=
+    fun index => Rows.s4_ne_zero _ _ (keyOn index) (valid index)
+  have homog : Rows.evaluateNormRows (pubOf H scalar coins).rows (rowValues out) input =
+      Vector.ofFn fun index => Rows.corrected (Rows.unscaledOf (outputKeysOf scalar coins) index)
+        (KOf H coins index) input := by
+    rw [rowValues_delivered H scalar coins input out hX hY hmasks, pubOf_rows]
+    unfold Rows.evaluateNormRows
+    congr 1
+    funext index
+    rw [vector_get_ofFn]
+    unfold FieldMacToECMac.delivered rowsOf normRowsVec
+    rw [vector_get_ofFn]
+    exact Rows.evaluateNormRow_encoded _ _ _ _ _ input onCurve (zNe index) (sNe index)
+      (Rows.unscaledRows_sparse _ _)
+  -- the corrected randomness: `ρ` and `τ = κ^((p+1)/4)` of every digit
+  let rhoAt : Fin digitCount → NonZeroBase := fun index =>
+    ⟨Rows.rhoOf (Rows.unscaledOf (outputKeysOf scalar coins) index) (KOf H coins index),
+      Rows.rhoOf_ne_zero _ _ (zNe index)⟩
+  let tauAt : Fin digitCount → NonZeroBase := fun index =>
+    ⟨Rows.tauOf (Rows.kappaOf (Rows.unscaledOf (outputKeysOf scalar coins) index) (KOf H coins index)),
+      Rows.tauOf_ne_zero _ (Rows.kappaOf_ne_zero _ _ (sNe index))⟩
+  let randomness : FieldMacToECMac.Randomness := Vector.ofFn fun index =>
+    { coins.pointRandomness.get index with rho := rhoAt index, tau := tauAt index }
+  have randomnessGet : ∀ index, (randomness.get index).rho = rhoAt index ∧ (randomness.get index).tau = tauAt index :=
+    fun index => by simp only [randomness, vector_get_ofFn]; exact ⟨rfl, rfl⟩
+  have rowAt : ∀ index, FieldMacToECMac.evaluateRow
+      ((FieldMacToECMac.rowsForOutputKeys (outputKeysOf scalar coins) randomness).get index) input =
+      FieldMacToECMac.evaluateRow (Coordinates.rows ((outputKeysOf scalar coins).get index).offset.coordinates
+        (digitEndomorphismBase ((outputKeysOf scalar coins).get index).digit) (rhoAt index).value
+        (tauAt index).value) input := by
+    intro index
+    rw [JacobianMixed.rowsForOutputKeys_get, (randomnessGet index).1, (randomnessGet index).2]
+  -- every corrected value decodes as the old row at the corrected randomness
+  have sameDecode : ∀ index (exceptionDigit tripleDigit : Digit) (inputPoint : Point),
+      Garbling.decodeHomogeneous (Rows.corrected (Rows.unscaledOf (outputKeysOf scalar coins) index)
+          (KOf H coins index) input) exceptionDigit tripleDigit inputPoint =
+        Garbling.decodeHomogeneous (FieldMacToECMac.evaluateRow
+          ((FieldMacToECMac.rowsForOutputKeys (outputKeysOf scalar coins) randomness).get index) input)
+          exceptionDigit tripleDigit inputPoint := by
+    intro index exceptionDigit tripleDigit inputPoint
+    rw [rowAt]
+    unfold Rows.unscaledOf at sNe ⊢
+    cases selected : digitEndomorphismBase ((outputKeysOf scalar coins).get index).digit with
+    | none =>
+      have s := sNe index
+      rw [selected] at s
+      rw [Rows.corrected_none _ _ _ s]
+      exact Rows.decodeHomogeneous_scale_y _ input.x (Security.Phase3.onCurve_x_ne_zero input onCurve) _ _ _
+    | some phi =>
+      have s := sNe index
+      rw [selected] at s
+      rw [Rows.corrected_some _ _ _ _ s]
+  have decodeSame : ∀ digits : Fin digitCount → Digit × Digit,
+      Garbling.decodeResult
+          { point := input
+            pointMacs := Vector.ofFn fun index => Rows.corrected (Rows.unscaledOf (outputKeysOf scalar coins) index)
+              (KOf H coins index) input
+            exceptionDigits := Vector.ofFn fun o => (digits o).1
+            tripleDigits := Vector.ofFn fun o => (digits o).2 } =
+        Garbling.decodeResult
+          { point := input
+            pointMacs := FieldMacToECMac.evaluateRows
+              (FieldMacToECMac.rowsForOutputKeys (outputKeysOf scalar coins) randomness) input
+            exceptionDigits := Vector.ofFn fun o => (digits o).1
+            tripleDigits := Vector.ofFn fun o => (digits o).2 } := by
+    intro digits
+    simp only [Garbling.decodeResult, decoded]
+    congr 1
+    unfold Garbling.decodePointMacs FieldMacToECMac.evaluateRows
+    simp only [Vector.toList_ofFn, zipOfFn_eq]
+    exact mapM_ofFn_congr _ _ _ _ fun index b => sameDecode index b.1 b.2 point
+  rw [homog, decodeSame]
+  refine EntryDecode.decodeResult_eq scalar.value coins.offsets coins.offsetsClamped randomness
     input point decoded _ ?_
   intro index
   refine ⟨fun zZero xZero => ?_, fun zNe sZero => ?_⟩
   · obtain ⟨phi, selected, exceptional⟩ := EntryDecode.zeroRow_exceptional (outputKeysOf scalar coins)
-      coins.pointRandomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
+      randomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
       zZero xZero
     rw [pubOf_exception]
     simp only [vector_get_ofFn]
@@ -367,7 +456,7 @@ theorem evaluate_onCurve [FieldCertificate] [GroupCertificate] (H : HashN) (scal
       (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest coins input) index phi selected
       exceptional
   · obtain ⟨phi, selected, triple⟩ := EntryDecode.signZero_triple (outputKeysOf scalar coins)
-      coins.pointRandomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
+      randomness input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
       zNe sZero
     rw [pubOf_exception]
     simp only [vector_get_ofFn]
