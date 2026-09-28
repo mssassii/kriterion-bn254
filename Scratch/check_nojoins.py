@@ -2,10 +2,11 @@
 """Independent no-joins cost cross-check (derived from check_narrow_phase_a.py).
 
 No chunk joins: the 222 chunk-tree joins per coordinate are absorbed into the
-Lamport labels, so the published conversion vector has pins + modulus joins only.
+Lamport labels, so the published conversion vector has half-pins + modulus joins only.
 
 Keep check_fallback.py and its JSON as the historical 128-bit snapshot.  This
-script reads the frozen fallback selector and calculates the 104-lane variant.
+script checks the retained fallback selector, then calculates the current
+all-width-8, 104-lane variant.
 The arithmetic model is not a proof of Lean execution or of perfect correctness.
 """
 from collections import Counter
@@ -62,20 +63,20 @@ def main():
     reference = json.loads(read('Scratch/fallback_schedule.json'))
     assert width7 == {row['modulus'] for row in reference if row['w0'] == 7}
     assert [row['modulus'] for row in reference] == [m for m in moduli if m != 256]
-    assert re.search(r'def bn254Table\s*: CrtTable := fallbackTableOf bn254Moduli', params)
+    assert re.search(r'def bn254Table\s*: CrtTable := width8TableOf bn254Moduli', params)
     assert 'width1 := ell - width0 - 1, keep := max width0 (ell - 5)' in params
     assert Counter(row['w0'] for row in reference) == {8: 67, 7: 17}
+    assert re.search(r'def width8Row.*?\{ ell, width0 := 8, width1 := ell - 8 - 1, keep := max 8 \(ell - 5\) \}', params, re.S)
 
     row_g = row_e = row_pins = row_joins = 0
     for record in reference:
         m = record['modulus']
         ell = (32 * (m - 1)).bit_length()
-        w0 = 7 if m in width7 else 8
+        w0 = 8
         w1 = ell - w0 - 1
         keep = max(w0, ell - 5)
-        # The fallback schedule is unchanged; only its label/lane width changes.
-        for name, actual in [('ell', ell), ('w0', w0), ('w1', w1), ('keep', keep)]:
-            assert record[name] == actual, (m, name, actual)
+        # The real schedule preserves ell while using width 8 for every odd row.
+        assert record['ell'] == ell, (m, ell)
         assert 7 <= w0 <= 8 and 1 <= w1 and w0 + w1 + 1 == ell
         assert w0 <= keep <= ell <= 14 and m <= 2**keep
         g0, e0 = extract(w0, ell)
@@ -84,13 +85,13 @@ def main():
         growth_e = growth_g - (keep - w0)
         row_g += g0 + g1 + growth_g + (ell - keep) * m
         row_e += e0 + e1 + growth_e + (ell - keep) * (m - 1)
-        row_pins += ell + ell - w0
+        row_pins += ell - 1 + ell - w0 - 1
         row_joins += w0 - 1 + w1 - 1 + keep - w0 + ell - keep
 
     chunks = [8] * 31 + [6]
     chunk_g = sum(extract(width, 14)[0] for width in chunks)
     chunk_e = sum(extract(width, 14)[1] for width in chunks)
-    pins = 32 * 14 + row_pins
+    pins = 32 * (14 - 1) + row_pins
     chunk_joins = sum(width - 1 for width in chunks)
     source_joins = chunk_joins + row_joins     # Layout keeps the unread chunk-join cells
     joins = row_joins                          # published joins
@@ -108,13 +109,13 @@ def main():
     garble = sum(coord_g) + 1 + 1092 + 1198
     evaluate = sum(coord_e) + 1 + 1092 + 690
     record_bytes = ceildiv((2 * math.prod(moduli) - 1).bit_length(), 8)
-    ciphertext = 96 + 91 * 96 + 91 * 12 + 2 * blocks * (LABEL_BITS // 8) + 642 * record_bytes
-    assert chunk_joins == 222 and source_joins == 1467
-    assert (blocks, joins, pins, record_bytes) == (3190, 1245, 1945, 78)
-    assert coord_g == [506759, 455452]
-    assert coord_e == [503417, 452336]
-    assert (ciphertext, garble, evaluate) == (142940, 964502, 957536)
-    assert ciphertext == 148712 - 2 * chunk_joins * (LABEL_BITS // 8)
+    ciphertext = 96 + 91 * 96 + 91 * 1 + 2 * blocks * (LABEL_BITS // 8) + 642 * record_bytes
+    assert chunk_joins == 222 and source_joins == 1450
+    assert (blocks, joins, pins, record_bytes) == (2956, 1228, 1728, 78)
+    assert coord_g == [518727, 467420]
+    assert coord_e == [515402, 464321]
+    assert (ciphertext, garble, evaluate) == (135855, 988438, 981506)
+    assert ciphertext == 141627 - 2 * chunk_joins * (LABEL_BITS // 8)
     assert garble + 500 <= 1759967 and evaluate + 500 <= 1055879
 
     for name, value in [('convCount', blocks), ('ciphertextBytes', ciphertext)]:
@@ -129,7 +130,7 @@ def main():
     assert 'crtY : Vector Label convCount' in public
     assert public.count('Narrow.labelEncoding.vector convCount') == 2
     print(json.dumps(dict(status='independent no-joins integer model passed', label_bits=LABEL_BITS,
-        raw_answer_block_bits=RAW_BITS, width8_rows=67, width7_rows=17,
+        raw_answer_block_bits=RAW_BITS, width8_rows=84, width7_rows=0,
         conversion_labels=blocks, published_joins=joins, source_joins=source_joins, pins=pins, record_bytes=record_bytes,
         ciphertext_bytes=ciphertext, coordinate_garble=coord_g, coordinate_evaluate=coord_e,
         garble_queries=garble, evaluate_queries=evaluate,

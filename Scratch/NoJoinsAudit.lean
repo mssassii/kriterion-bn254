@@ -1,8 +1,8 @@
 /-
-No-joins audit (branch `nojoins`): construction, perfect correctness, source readback and exact
+No-joins audit (branch `nojoins-p`, parity base): construction, perfect correctness, source readback and exact
 metrics after absorbing the chunk-tree joins into the Lamport labels. Imports no Submission,
 privacy or simulator proof. Run with `lake env lean Scratch/NoJoinsAudit.lean` after building its
-imports. Supersedes the numerals of `Scratch/NarrowPhaseA.lean` (148,712 B with chunk joins).
+imports. Supersedes the numerals of `Scratch/NarrowPhaseA.lean` (141,627 B with chunk joins, as on `best104` 7d8fbbf).
 -/
 import Proof.Correctness.CRT.EntryCorrect
 import Proof.Correctness.CRT.SourceReads
@@ -35,11 +35,11 @@ run_cmd do
 
 /- Recompute from the construction definitions, not a copied score record. -/
 set_option maxRecDepth 100000 in
-example : ciphertextBytes = 142940 ∧ garbleBudget = 964502 ∧ evaluateBudget = 957536 := by
+example : ciphertextBytes = 135855 ∧ garbleBudget = 988438 ∧ evaluateBudget = 981506 := by
   decide +kernel
 
-/- 148,712 − 444 · 13 = 142,940: exactly the 2 · 222 chunk joins at 13 bytes. -/
-example : ciphertextBytes + 2 * 222 * 13 = 148712 := by decide
+/- 141,627 − 444 · 13 = 135,855: exactly the 2 · 222 chunk joins at 13 bytes. -/
+example : ciphertextBytes + 2 * 222 * 13 = 141627 := by decide
 
 /- Both query gates keep their headroom (counts unchanged by no-joins). -/
 example : garbleBudget + 500 ≤ 1759967 ∧ evaluateBudget + 500 ≤ 1055879 := by
@@ -47,10 +47,10 @@ example : garbleBudget + 500 ≤ 1759967 ∧ evaluateBudget + 500 ≤ 1055879 :=
   decide +kernel
 
 set_option maxRecDepth 100000 in
-example : Entry.table.convBlocks = 3190 := by
+example : Entry.table.convBlocks = 2956 := by
   simpa only [convCount] using convBlocks_table
 
-/- The source keeps its 1,467 join cells per coordinate (222 unread chunk-join cells). -/
+/- The source keeps its 1,450 join cells per coordinate (222 unread chunk-join cells). -/
 set_option maxRecDepth 100000 in
-example : Entry.joinCount = 1467 ∧ Entry.chunkJoinBase Entry.table.chunkCount = 222 := by
+example : Entry.joinCount = 1450 ∧ Entry.chunkJoinBase Entry.table.chunkCount = 222 := by
   decide +kernel
