@@ -1,6 +1,6 @@
 /-
 No-joins (branch nojoins-p, parity base): axiom audit of the privacy leaves ported mechanically to the derived Lamport key
-(the chunk-tree joins absorbed into the labels). Every theorem below compiles on `nojoins104` without `sorry`.
+(the chunk-tree joins absorbed into the labels). Every theorem below compiles on `nojoins-p` without `sorry`.
 The five declarations that need the new joint label law / fine view (LabelsSplit.tapeLabels_eq,
 CoreReads.realRest_congr, DeltaViewFD.garbleCM_asked/garbleCM_eval/convAgree_of_convVector_eq) and the modules
 behind them are not imported here. Run with `lake env lean Scratch/NoJoinsPrivacyPorted.lean` after building
