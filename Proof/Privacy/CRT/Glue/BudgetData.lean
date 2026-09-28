@@ -694,8 +694,9 @@ theorem smudgeErrorSingle_le : Nat.ble ((642 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 
 /-- The collision term `1759967/p` (the fixed G gate, bounding all garbler inputs), at most `1/1000`. -/
 theorem collisionError_le : Nat.ble (1759967 * 2 ^ 100 * 1000) p = true := by decide +kernel
 
-/-- `364/(r - 1)` and `455/(r - 1)`, each at most `1/1000`. -/
-theorem exceptionalError_le : Nat.ble (364 * 2 ^ 100 * 1000) (r - 1) = true := by decide +kernel
+/-- `546/(r - 1)` (the digit doublings `364/(r - 1)` and the row normalization's flag `182/p ≤ 182/(r - 1)`) and
+`455/(r - 1)`, each at most `1/1000`. -/
+theorem exceptionalError_le : Nat.ble (546 * 2 ^ 100 * 1000) (r - 1) = true := by decide +kernel
 theorem outputKernelError_le : Nat.ble (455 * 2 ^ 100 * 1000) (r - 1) = true := by decide +kernel
 
 /-- `185/2^128` and `1/2^128`, each at most `1/1000`. -/
@@ -716,7 +717,7 @@ theorem chainConstant_le_unit :
       ((3 * (padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968) * (M * p * (r - 1))
         + (1284 * (p - 1) ^ 2 + 273 * p) * (2 ^ 4352 * p * (r - 1))
         + 1759967 * (2 ^ 4352 * M * (r - 1))
-        + (364 + 455) * (2 ^ 4352 * M * p)
+        + (546 + 455) * (2 ^ 4352 * M * p)
         + (185 + 1) * 2 ^ 4224 * (M * p * (r - 1))) * 2 ^ 100)
       (2 ^ 4352 * M * p * (r - 1)) = true := by decide +kernel
 
@@ -726,7 +727,7 @@ theorem chainConstant_room :
       ((3 * (padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968) * (M * p * (r - 1))
         + (1284 * (p - 1) ^ 2 + 273 * p) * (2 ^ 4352 * p * (r - 1))
         + 1759967 * (2 ^ 4352 * M * (r - 1))
-        + (364 + 455) * (2 ^ 4352 * M * p)
+        + (546 + 455) * (2 ^ 4352 * M * p)
         + (185 + 1) * 2 ^ 4224 * (M * p * (r - 1))) * 2 ^ 100 * 16)
       (2 ^ 4352 * M * p * (r - 1)) = true := by decide +kernel
 

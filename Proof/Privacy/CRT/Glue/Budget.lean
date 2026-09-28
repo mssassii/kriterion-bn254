@@ -98,9 +98,16 @@ def stageOneTouchCharge : ℝ := crtHiddenCharge
 /-- The stage-1 touch flag of `G1U → HW`: `q₁ · (4/2^104 + 1/(p − 1))`. -/
 def stageOneTouchError (first : ℕ) : ℝ := (first : ℝ) * stageOneTouchCharge
 
-/-- The exceptional event, `364/(r − 1)` (route M's doubling flag covers `T = K`, `T = −K` and the sign row's
+/-- The digit doublings, `364/(r − 1)` (route M's doubling flag covers `T = K`, `T = −K` and the sign row's
 zero `T = 2K` for each of the 91 digits, and the certificates give only `#Point ≥ r`). -/
-def exceptionalError : ℝ := frac 364 (BudgetData.r - 1)
+def doublingError : ℝ := frac 364 (BudgetData.r - 1)
+
+/-- The row normalization's flag, `182/p`: one of the stage-1 source's two hidden cells of a digit is zero
+(`H8.normBadSrc`; it pays for the construction's zero collector offsets). -/
+def normError : ℝ := frac 182 BudgetData.p
+
+/-- The exceptional event, `546/(r − 1)`: the digit doublings and the row normalization's flag. -/
+def exceptionalError : ℝ := frac 546 (BudgetData.r - 1)
 
 /-- Coincidences, `185/2^128` (182 digest keys, one per exceptional kind of each digit, the off-curve mask key, two
 `Δ = 0` events). -/
@@ -132,7 +139,7 @@ theorem crtHiddenCharge_eq :
   field_simp
   ring
 
-theorem exceptionalError_eq : exceptionalError = 364 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
+theorem exceptionalError_eq : exceptionalError = 546 / ((BN254.scalarFieldModulus : ℝ) - 1) := by
   unfold exceptionalError frac
   rw [scalarFieldModulus_eq, Nat.cast_sub one_lt_r.le, Nat.cast_one]
   norm_num
@@ -158,7 +165,26 @@ theorem padSwap_share : BudgetData.padSwapNumer * 2 ^ 100 * 1000 ≤ BudgetData.
 
 theorem smudge_share : (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 20 ≤ BudgetData.M := by decide +kernel
 
-theorem exceptional_share : 364 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
+theorem exceptional_share : 546 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
+
+theorem r_sub_one_le_p : BudgetData.r - 1 ≤ BudgetData.p := by decide +kernel
+
+theorem doublingError_nonneg : 0 ≤ doublingError := frac_nonneg _ _
+
+theorem normError_nonneg : 0 ≤ normError := frac_nonneg _ _
+
+/-- **The digit doublings and the normalization flag fit the exceptional term**: `364/(r − 1) + 182/p ≤ 546/(r − 1)`. -/
+theorem doubling_add_norm_le : doublingError + normError ≤ exceptionalError := by
+  have rpos : (0 : ℝ) < ((BudgetData.r - 1 : ℕ) : ℝ) := by exact_mod_cast Nat.sub_pos_of_lt one_lt_r
+  have le : ((BudgetData.r - 1 : ℕ) : ℝ) ≤ (BudgetData.p : ℝ) := by exact_mod_cast r_sub_one_le_p
+  have normLe : normError ≤ frac 182 (BudgetData.r - 1) := by
+    unfold normError frac
+    exact div_le_div_of_nonneg_left (by norm_num) rpos le
+  unfold doublingError exceptionalError
+  refine le_trans (add_le_add_left normLe _) (le_of_eq ?_)
+  unfold frac
+  rw [← add_div]
+  norm_num
 
 theorem outputKernel_share : 455 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
 
