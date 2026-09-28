@@ -181,7 +181,7 @@ theorem doubling_add_norm_le : doublingError + normError ≤ exceptionalError :=
     unfold normError frac
     exact div_le_div_of_nonneg_left (by norm_num) rpos le
   unfold doublingError exceptionalError
-  refine le_trans (add_le_add_left normLe _) (le_of_eq ?_)
+  refine le_trans (add_le_add_right normLe _) (le_of_eq ?_)
   unfold frac
   rw [← add_div]
   norm_num
