@@ -1,4 +1,9 @@
 {
+  "bn254-scalar-multiplication": {
+    "expected_rev": "aaf278948a4127f99ee6752c7cec4b9f9bd43615",
+    "actual_rev": "aaf278948a4127f99ee6752c7cec4b9f9bd43615",
+    "tracked_changes": []
+  },
   "mathlib": {
     "expected_rev": "0df444a360eaa60ab8c11dca51a86af692955474",
     "actual_rev": "0df444a360eaa60ab8c11dca51a86af692955474",

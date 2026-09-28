@@ -34,7 +34,7 @@ All challenge definitions, `Submission.lean`, query programs, query budgets, ext
 - `lake env lean Scratch/PackedAudit.lean`: **exit0**, 14.1 seconds; `audit-second.log` and status. Actual Benchmark metrics, table/record bounds, query gates, exact bit/padding guards, formula-derived piece count, universal codec inverse, zero/maximal lengths and maximal decode/re-encode with tail `[137,42]` all pass.
 - `lake env lean Scratch/ProofAudit.lean`: **exit0**, 43.4 seconds ; 23800 declarations; axiom union exactly `propext`, `Classical.choice`, `Quot.sound`.
 - `python3 -B Scratch/check_packed.py`: independent integer model reproduces baseline/A1/H1/combined before computing the complete packed layout.
-- `dependencies.json`: all 13 dependency checkouts match pinned revisions with no tracked changes; Lean 4.33.1 commit 819816b2e0a3bf405af45ae5c7af2491d8f5bee6.
+- `dependencies.json`: all 14 dependency checkouts match pinned revisions with no tracked changes, explicitly including challenge `aaf278948a4127f99ee6752c7cec4b9f9bd43615`; Lean 4.33.1 commit 819816b2e0a3bf405af45ae5c7af2491d8f5bee6.
 
 Final source/configuration/audit manifest: **ea76922a04a00ae3cf705bcf9f0b58d1db28ec65d5021a4a3c4b2798aa38063a**, 453 files. The full-build manifest is preserved separately. `build-source-binding.json` checks that the only later source-file change was in the separate `Scratch/PackedAudit.lean`: its maximal-record witness uses `Nat.sub_lt` instead of brute-force power reduction, and its piece-count check also states the derived formula. Every construction, proof, solution and pin is byte-identical to the successful full build. Recheck the final manifest at the committed HEAD with `python3 -B Scratch/PackedSourceManifest.py check`.
 
