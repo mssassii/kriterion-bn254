@@ -5,7 +5,8 @@ A stage-2 guess at a tag `τ` of family at most 6 that is hot at `u` touches the
 with the same fine view the garbler's question lists are related (`DeltaView.garbler_rel`): at the same position the
 same tag, and at a hot tag the labels differ by `Δ_κ ⊕ Δ'_κ` (`κ` the tag's coordinate). The garbler asks each tag
 once (its question run is tagged, `keyRun_tags`), so two such tapes that both ask the same input `N` at `τ` have the same
-`Δ_κ` (`delta_unique`): `Δ_κ` is fixed by the fine view on the event. `DeltaView.delta_guess_le` then bounds the event
+`clip Δ_κ` (`delta_unique`): the projected delta is fixed by the fine view on the event.
+`DeltaView.delta_guess_clip_le` uses its `2^24`-element raw fibre to bound the event
 by `2^-128` given the stage-2 view.
 
 `convHot_case` discharges the two hypotheses with `coord_relational` (`Core/CoordRelational.lean`) and
@@ -82,7 +83,7 @@ theorem RelAsked.partner {hot : ℕ → Prop} {δ : Block} {A B : List ℕ} (rel
 once). -/
 theorem RelAsked.shift_zero {hot : ℕ → Prop} {δ : Block} {A B : List ℕ} (rel : RelAsked hot δ A B)
     (nodup : (B.map (· / 2 ^ 128)).Nodup) {N : ℕ} (hN : hot (N / 2 ^ 128)) (inA : N ∈ A) (inB : N ∈ B) :
-    δ = 0 := by
+    queryShift δ (N / 2 ^ 128) = 0 := by
   induction rel with
   | nil => exact absurd inA List.not_mem_nil
   | @cons a b rest rest' head tail ih =>
@@ -95,7 +96,7 @@ theorem RelAsked.shift_zero {hot : ℕ → Prop} {δ : Block} {A B : List ℕ} (
       rcases List.mem_cons.mp inB with second | inRest
       · rw [← second] at shifted
         have eq := shifted hN
-        calc δ = BitVec.ofNat 128 N ^^^ (BitVec.ofNat 128 N ^^^ δ) := by
+        calc queryShift δ (N / 2 ^ 128) = BitVec.ofNat 128 N ^^^ (BitVec.ofNat 128 N ^^^ queryShift δ (N / 2 ^ 128)) := by
               rw [← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
           _ = BitVec.ofNat 128 N ^^^ BitVec.ofNat 128 N := by rw [← eq]
           _ = 0 := BitVec.xor_self
@@ -110,18 +111,22 @@ section Case
 
 variable [FieldCertificate] [GroupCertificate]
 
-/-- **On two tapes with the same fine view that ask the same hot input, `Δ_κ` agrees.** -/
+/-- **On two tapes with the same fine view that ask the same hot conversion input, `clip Δ_κ` agrees.** -/
 theorem delta_unique (rel : CoordRelational) (tail : TailRel) (parameter : ℕ) (scalar : NonZeroScalar)
     (u : AffineInput) (κ : Fin 2) {tape tape' : TableTape crtEntry}
     (same : fine parameter scalar u κ tape = fine parameter scalar u κ tape') {N : ℕ} (hN : Shifted u κ (N / 2 ^ 128))
+    (conversion : tagFamily (N / 2 ^ 128) ≤ 6)
     (h1 : N ∈ StageTwo.gAsked scalar tape) (h2 : N ∈ StageTwo.gAsked scalar tape') :
-    res κ tape = res κ tape' := by
+    clip (res κ tape) = clip (res κ tape') := by
   have relG : RelAsked (Shifted u κ) (res κ tape ^^^ res κ tape') (StageTwo.gAsked scalar tape)
       (StageTwo.gAsked scalar tape') := (garbler_rel rel tail parameter scalar u κ same).1
   have zero := RelAsked.shift_zero relG (garbler_tags_nodup scalar tape'.1 _) hN h1 h2
-  calc res κ tape = res κ tape ^^^ 0 := BitVec.xor_zero.symm
-    _ = res κ tape ^^^ (res κ tape ^^^ res κ tape') := by rw [zero]
-    _ = res κ tape' := by rw [← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
+  have zeroClip : clip (res κ tape) ^^^ clip (res κ tape') = 0 := by
+    have z := congrArg clip zero
+    simpa only [queryShift, if_pos conversion, Narrow.clip_embed, Narrow.clip_xor, Narrow.clip_zero] using z
+  calc clip (res κ tape) = clip (res κ tape) ^^^ 0 := BitVec.xor_zero.symm
+    _ = clip (res κ tape) ^^^ (clip (res κ tape) ^^^ clip (res κ tape')) := by rw [zeroClip]
+    _ = clip (res κ tape') := by rw [← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
 
 /-- The coordinate of a tag, as `Fin 2`. -/
 def coordFin (τ : ℕ) : Fin 2 := ⟨tagCoord τ, by unfold tagCoord; omega⟩
@@ -131,35 +136,35 @@ end Case
 open Classical in
 /-- **H7's case `convHot`**, from `coord_relational` and `TailRel`. -/
 theorem convHot_case_of (rel : CoordRelational) (tail : TailRel) :
-    StageTwo.GuessCase StageTwo.convHot StageTwo.noExtra ((2 : ℝ≥0∞) ^ 128)⁻¹ := by
+    StageTwo.GuessCase StageTwo.convHot StageTwo.noExtra ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by
   intro field group parameter scalar u view N hot
   let κ := coordFin (N / 2 ^ 128)
   have shifted : Shifted u κ (N / 2 ^ 128) := ⟨rfl, Or.inl hot⟩
   let S : Set (TableTape crtEntry) := {tape | N ∈ StageTwo.gAsked scalar tape ∧ StageTwo.noExtra scalar u N tape}
-  let X : WType → Block := fun w =>
-    if h : ∃ tape, fine parameter scalar u κ tape = w ∧ N ∈ StageTwo.gAsked scalar tape then res κ h.choose else 0
-  have hS : ∀ tape ∈ S, res κ tape = X (fine parameter scalar u κ tape) ^^^ 0 := by
+  let X : WType → Label := fun w =>
+    if h : ∃ tape, fine parameter scalar u κ tape = w ∧ N ∈ StageTwo.gAsked scalar tape then clip (res κ h.choose) else 0
+  have hS : ∀ tape ∈ S, clip (res κ tape) = X (fine parameter scalar u κ tape) ^^^ 0 := by
     intro tape inside
     have exists_ : ∃ tape', fine parameter scalar u κ tape' = fine parameter scalar u κ tape ∧
         N ∈ StageTwo.gAsked scalar tape' := ⟨tape, rfl, inside.1⟩
     have spec := exists_.choose_spec
-    show res κ tape = (if h : ∃ tape', fine parameter scalar u κ tape' = fine parameter scalar u κ tape ∧
-        N ∈ StageTwo.gAsked scalar tape' then res κ h.choose else 0) ^^^ 0
-    have z : ∀ x : Block, x ^^^ 0 = x := fun x => BitVec.xor_zero
+    show clip (res κ tape) = (if h : ∃ tape', fine parameter scalar u κ tape' = fine parameter scalar u κ tape ∧
+        N ∈ StageTwo.gAsked scalar tape' then clip (res κ h.choose) else 0) ^^^ 0
+    have z : ∀ x : Label, x ^^^ 0 = x := fun x => BitVec.xor_zero
     rw [dif_pos exists_, z]
-    exact delta_unique rel tail parameter scalar u κ spec.1.symm shifted inside.1 spec.2
-  exact delta_guess_le rel tail parameter scalar u κ view S X 0 hS
+    exact delta_unique rel tail parameter scalar u κ spec.1.symm shifted hot.1 inside.1 spec.2
+  exact delta_guess_clip_le rel tail parameter scalar u κ view S X 0 hS
 
 /-- The case's error is within the hidden charge. -/
-theorem inv_le_charge : ((2 : ℝ≥0∞) ^ 128)⁻¹ ≤ ENNReal.ofReal crtHiddenCharge := by
-  have real : (1 : ℝ) / 2 ^ 128 ≤ crtHiddenCharge := by
+theorem inv_le_charge : ((2 : ℝ≥0∞) ^ labelBits)⁻¹ ≤ ENNReal.ofReal crtHiddenCharge := by
+  have real : (1 : ℝ) / 2 ^ labelBits ≤ crtHiddenCharge := by
     rw [crtHiddenCharge_eq]
     have pos : 0 ≤ 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
       unfold BN254.baseFieldModulus
       norm_num
-    have four : (1 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ 128 := by norm_num
+    have four : (1 : ℝ) / 2 ^ labelBits ≤ 4 / 2 ^ labelBits := by norm_num
     linarith
-  calc ((2 : ℝ≥0∞) ^ 128)⁻¹ = ENNReal.ofReal (1 / 2 ^ 128) := by
+  calc ((2 : ℝ≥0∞) ^ labelBits)⁻¹ = ENNReal.ofReal (1 / 2 ^ labelBits) := by
         rw [one_div, ENNReal.ofReal_inv_of_pos (by positivity), ENNReal.ofReal_pow (by norm_num)]
         simp
     _ ≤ ENNReal.ofReal crtHiddenCharge := ENNReal.ofReal_le_ofReal real
@@ -170,7 +175,7 @@ theorem coordRelational : CoordRelational :=
     Align.coord_relational H₁ H₂ S coord hS hcoord u Δ₁ Δ₂ Z₁ Z₂ hE hpub hagree
 
 /-- **H7's case `convHot`.** -/
-theorem convHot_case : StageTwo.GuessCase StageTwo.convHot StageTwo.noExtra ((2 : ℝ≥0∞) ^ 128)⁻¹ :=
+theorem convHot_case : StageTwo.GuessCase StageTwo.convHot StageTwo.noExtra ((2 : ℝ≥0∞) ^ labelBits)⁻¹ :=
   convHot_case_of coordRelational tailRel
 
 

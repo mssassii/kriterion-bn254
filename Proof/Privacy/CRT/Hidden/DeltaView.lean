@@ -2,10 +2,9 @@
 **H7's `Δ` residual** (shared by `convHot`, `Hidden/CaseConv.lean`, and `digestOther`,
 `Hidden/CaseDigest.lean`).
 
-A stage-2 guess at a tag of coordinate `κ` that the designed rule hides because the garbler's label there is the
-evaluator's plus `Δ_κ` (a hot conversion or body tag, or the digest label of the bit `u` does not hold) forces
-`Δ_κ` to be a value the evaluator's side fixes. This file proves that `Δ_κ` is uniform and independent of a view
-finer than the stage-2 view, so such a guess has conditional mass at most `2^-128`:
+A stage-2 guess at a hidden conversion/body tag fixes `clip Δ_κ`; a hidden digest guess fixes the full `Δ_κ`.
+This file preserves a full raw residual, uniform and independent of a view finer than the stage-2 view.
+The downstream bounds are `2^-104` for the projected conversion guess and `2^-128` for the full digest guess:
 
 * the **fine view** `fine` of a tape: coordinate `κ`'s published conversion material, the coins with `κ`'s zero
   labels replaced by `u`'s labels `E_κ = Z_κ ⊕ u·Δ_κ` and `Δ_κ` by `0` (`eCoins`), and the table outside the hot
@@ -170,7 +169,7 @@ theorem maskTable_eq (u : AffineInput) (κ : Fin 2) (table : TagTable) (tag : Fi
   rw [if_neg cold]
 
 /-- The type of the fine view. -/
-abbrev WType := Vector Block Entry.convCount × Entry.Coins × TagTable
+abbrev WType := Vector Label Entry.convCount × Entry.Coins × TagTable
 
 section Fine
 
@@ -178,7 +177,7 @@ variable [FieldCertificate] [GroupCertificate]
 
 /-- Coordinate `κ`'s published conversion material (the part of `crtConvSplit`). -/
 def crtPart (parameter : ℕ) (scalar : NonZeroScalar) (κ : Fin 2) (tape : TableTape crtEntry) :
-    Vector Block Entry.convCount :=
+    Vector Label Entry.convCount :=
   if κ = 0 then (H8.realGarbled crtEntry parameter scalar tape).1.crtX
   else (H8.realGarbled crtEntry parameter scalar tape).1.crtY
 
@@ -208,7 +207,7 @@ open Classical in
 /-- the split with the flag `False`, without the option wrapper. -/
 theorem conv_split (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (κ : Fin 2) {α : Type}
     (g : TableTape crtEntry → α) (reads : H8.ReadsOff Eq (H8.hotConvTag Entry.table u κ.val) g)
-    (b : Vector Block Entry.convCount) (a : α) :
+    (b : Vector Label Entry.convCount) (a : α) :
     ((swappedTableTape crtEntry).map fun tape => (crtPart parameter scalar κ tape, g tape)) (b, a) =
       ((@PMF.uniformOfFintype _ (Instance.view).sourceFintype (Instance.view).sourceNonempty).map fun source =>
           if κ = 0 then ((Instance.view).publish source).crtX else ((Instance.view).publish source).crtY) b *
@@ -319,7 +318,7 @@ theorem fine_split (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) 
         (crtPart parameter scalar κ tape, (restOf u κ tape, res κ tape))).map fun p => ((p.1, p.2.1), p.2.2) := by
     rw [PMF.map_comp]
     rfl
-  have assocInj : Function.Injective fun p : Vector Block Entry.convCount × (Entry.Coins × TagTable) × Block =>
+  have assocInj : Function.Injective fun p : Vector Label Entry.convCount × (Entry.Coins × TagTable) × Block =>
       ((p.1, p.2.1), p.2.2) := by
     rintro ⟨a1, a2, a3⟩ ⟨b1, b2, b3⟩ h
     simp only [Prod.mk.injEq] at h
@@ -449,11 +448,19 @@ theorem hash_agree {u : AffineInput} {κ : Fin 2} {t t' : TagTable} (same : mask
 
 /-! ### 6. Related asked lists -/
 
-/-- the relation between two asked lists (`Core/CoordRelational.lean`, the same body): position by
-position the same tag, equal inputs off `hot`, labels shifted by `δ` on `hot`. -/
-def RelAsked (hot : ℕ → Prop) (δ : Block) (A₁ A₂ : List ℕ) : Prop :=
+/-- A constant raw-word shift, used by the narrow coordinate relation after embedding. -/
+def RelAskedConst (hot : ℕ → Prop) (δ : Block) (A₁ A₂ : List ℕ) : Prop :=
   List.Forall₂ (fun n₁ n₂ => n₁ / 2 ^ 128 = n₂ / 2 ^ 128 ∧ (¬ hot (n₁ / 2 ^ 128) → n₁ = n₂) ∧
     (hot (n₁ / 2 ^ 128) → BitVec.ofNat 128 n₁ = BitVec.ofNat 128 n₂ ^^^ δ)) A₁ A₂
+
+/-- Conversion controls carry the projected shift; digest controls retain the full shift. -/
+def queryShift (δ : Block) (τ : ℕ) : Block :=
+  if tagFamily τ ≤ 6 then embed (clip δ) else δ
+
+/-- Equal tags and cold inputs, with the raw or projected shift selected by the tag family. -/
+def RelAsked (hot : ℕ → Prop) (δ : Block) (A₁ A₂ : List ℕ) : Prop :=
+  List.Forall₂ (fun n₁ n₂ => n₁ / 2 ^ 128 = n₂ / 2 ^ 128 ∧ (¬ hot (n₁ / 2 ^ 128) → n₁ = n₂) ∧
+    (hot (n₁ / 2 ^ 128) → BitVec.ofNat 128 n₁ = BitVec.ofNat 128 n₂ ^^^ queryShift δ (n₁ / 2 ^ 128))) A₁ A₂
 
 /-- **The tags whose garbler label is `u`'s label plus `Δ_κ`**: the hot conversion and body tags of `κ` (families 0
 to 6), and the digest labels of `κ` at the bit `u` does not hold (family 8). -/
@@ -484,6 +491,19 @@ theorem RelAsked.congr {hot hot' : ℕ → Prop} {δ : Block} {A B : List ℕ}
     refine List.Forall₂.cons ⟨head.1, fun h => head.2.1 fun h' => h ((iff a List.mem_cons_self).mp h'),
       fun h => head.2.2 ((iff a List.mem_cons_self).mpr h)⟩
       (ih fun m inside => iff m (List.mem_cons_of_mem _ inside))
+
+/-- Lift a constant shift on a restricted list to its tag-dependent shift. -/
+theorem RelAsked.of_constant {hot : ℕ → Prop} {δ raw : Block} {A B : List ℕ}
+    (rel : RelAskedConst hot raw A B)
+    (same : ∀ n ∈ A, queryShift δ (n / 2 ^ 128) = raw) : RelAsked hot δ A B := by
+  induction rel with
+  | nil => exact List.Forall₂.nil
+  | @cons a b rest rest' head tail ih =>
+    refine List.Forall₂.cons ⟨head.1, head.2.1, ?_⟩
+      (ih fun n hn => same n (List.mem_cons_of_mem _ hn))
+    intro h
+    rw [same a List.mem_cons_self]
+    exact head.2.2 h
 
 /-- **The garbler's tail after the two coordinates**: the key, the masks, the digest. -/
 def tailM (scalar : NonZeroScalar) (coins : Entry.Coins) :

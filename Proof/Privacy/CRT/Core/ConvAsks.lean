@@ -103,17 +103,21 @@ theorem asks_hlongM (label : Block) (tagOf : ℕ → ℕ) (count : ℕ) (h : ∀
     AsksIn Small (hlongM label tagOf count) :=
   asks_bind (asks_vector _ _ fun j => asks_askN _ (hashInput_small label _ (h j.val j.isLt))) fun _ => trivial
 
+theorem asks_hLabelM (label : Label) (tag : ℕ) (h : tag < 2 ^ 40) :
+    AsksIn Small (hLabelM label tag) :=
+  asks_bind (asks_h128M (embed label) tag h) fun _ => trivial
+
 /-! ### The blocks -/
 
-theorem asks_castM (l : ℕ) (label : Block) (tagOf : ℕ → ℕ) (h : ∀ j, j < castAnswers l → tagOf j < 2 ^ 40) :
+theorem asks_castM (l : ℕ) (label : Label) (tagOf : ℕ → ℕ) (h : ∀ j, j < castAnswers l → tagOf j < 2 ^ 40) :
     AsksIn Small (castM l label tagOf) :=
-  asks_bind (asks_hlongM label tagOf _ h) fun _ => trivial
+  asks_bind (asks_hlongM (embed label) tagOf _ h) fun _ => trivial
 
-theorem asks_garbleStepM (n : ℕ) (tagOf : ℕ → ℕ) (parent : Fin (2 ^ n) → Block)
+theorem asks_garbleStepM (n : ℕ) (tagOf : ℕ → ℕ) (parent : Fin (2 ^ n) → Label)
     (h : ∀ s, s < 2 ^ n → tagOf s < 2 ^ 40) : AsksIn Small (garbleStepM n tagOf parent) :=
-  asks_bind (asks_tableM _ _ fun slot => asks_h128M _ _ (h slot.val slot.isLt)) fun _ => trivial
+  asks_bind (asks_tableM _ _ fun slot => asks_hLabelM _ _ (h slot.val slot.isLt)) fun _ => trivial
 
-theorem asks_treeGarbleM (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (levels : ℕ)
+theorem asks_treeGarbleM (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (levels : ℕ)
     (h : ∀ n s, n < levels → s < 2 ^ n → tagOf n s < 2 ^ 40) : AsksIn Small (treeGarbleM tagOf Δ b0 levels) := by
   induction levels with
   | zero => trivial
@@ -124,7 +128,7 @@ theorem asks_treeGarbleM (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (levels :
       · trivial
       · exact asks_bind (asks_garbleStepM n _ _ fun s hs => h n s (by omega) hs) fun _ => trivial
 
-theorem asks_growGarbleM (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (labels : Fin (2 ^ start) → Block) (count : ℕ)
+theorem asks_growGarbleM (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (labels : Fin (2 ^ start) → Label) (count : ℕ)
     (h : ∀ n s, n < start + count → s < 2 ^ n → tagOf n s < 2 ^ 40) :
     AsksIn Small (growGarbleM tagOf start labels count) := by
   induction count with
@@ -134,12 +138,12 @@ theorem asks_growGarbleM (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (labels : F
       exact asks_bind (ih fun n s hn hs => h n s (by omega) hs) fun _ =>
         asks_bind (asks_garbleStepM _ _ _ fun s hs => h _ s (by omega) hs) fun _ => trivial
 
-theorem asks_foldGarbleM (m : ℕ) (tagOf : ℕ → ℕ) (shift : ℕ) (bitMask : Block) (labels : Fin m → Block)
+theorem asks_foldGarbleM (m : ℕ) (tagOf : ℕ → ℕ) (shift : ℕ) (bitMask : Label) (labels : Fin m → Label)
     (h : ∀ r, r < m → tagOf r < 2 ^ 40) : AsksIn Small (foldGarbleM m tagOf shift bitMask labels) :=
-  asks_bind (asks_tableM _ _ fun r => asks_h128M _ _ (h r.val r.isLt)) fun _ => trivial
+  asks_bind (asks_tableM _ _ fun r => asks_hLabelM _ _ (h r.val r.isLt)) fun _ => trivial
 
-theorem asks_foldsGarbleM (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ → Block) (count : ℕ) :
-    ∀ (start : ℕ) (labels : Fin m → Block), (∀ pos r, pos < start + count → r < m → tagOf pos r < 2 ^ 40) →
+theorem asks_foldsGarbleM (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ → Label) (count : ℕ) :
+    ∀ (start : ℕ) (labels : Fin m → Label), (∀ pos r, pos < start + count → r < m → tagOf pos r < 2 ^ 40) →
       AsksIn Small (foldsGarbleM m tagOf bitMask count start labels) := by
   induction count with
   | zero => intro _ _ _; trivial
@@ -149,7 +153,7 @@ theorem asks_foldsGarbleM (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ
       exact asks_bind (asks_foldGarbleM _ _ _ _ _ fun r hr => h start r (by omega) hr) fun step =>
         asks_bind (ih (start + 1) step.1 fun pos r hp hr => h pos r (by omega) hr) fun _ => trivial
 
-theorem asks_extStageGarbleM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (Δ : Block) (remainder : Lanes rb)
+theorem asks_extStageGarbleM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (Δ : Label) (remainder : Lanes rb)
     (ht : ∀ n s, n < w → s < 2 ^ n → treeTag n s < 2 ^ 40)
     (hc : ∀ leaf j, leaf < 2 ^ w → j < castAnswers rb → castTag leaf j < 2 ^ 40) :
     AsksIn Small (extStageGarbleM w treeTag castTag Δ remainder) := by
@@ -168,8 +172,8 @@ theorem slot_lt {n : ℕ} (hn : n ≤ 15) {s : ℕ} (hs : s < 2 ^ n) : s < 65536
   lt_of_lt_of_le hs (le_trans (pow_le_pow15 hn) (by norm_num))
 
 /-- **A chunk asks only small inputs.** -/
-theorem asks_chunkGarbleM (tbl : CrtTable) (range : ConvTagRange tbl) (coord : ℕ) (hc : coord < 2) (Δ : Block)
-    (Z : ℕ → Block) (c : ℕ) (hcc : c < tbl.chunkCount) : AsksIn Small (chunkGarbleM tbl coord Δ Z c) := by
+theorem asks_chunkGarbleM (tbl : CrtTable) (range : ConvTagRange tbl) (coord : ℕ) (hc : coord < 2) (Δ : Label)
+    (Z : ℕ → Label) (c : ℕ) (hcc : c < tbl.chunkCount) : AsksIn Small (chunkGarbleM tbl coord Δ Z c) := by
   have hw := range.chunkWidth c hcc
   have hC := range.chunkCount
   have hL := castAnswers_le tbl.castWidth
@@ -181,7 +185,7 @@ theorem asks_chunkGarbleM (tbl : CrtTable) (range : ConvTagRange tbl) (coord : �
   · exact tagCode_lt fam_lt.2.1 ⟨hc, by omega, by omega, by omega, slot_lt hw leaf.isLt, by omega⟩
 
 /-- **An odd modulus's conversion asks only small inputs.** -/
-theorem asks_conversionGarbleM (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Block) (word : Lanes row.ell)
+theorem asks_conversionGarbleM (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label) (word : Lanes row.ell)
     (hc : coord < 2) (hi : i < 128) (hrow : RowWF row) (hell : row.ell ≤ 15) (hm : m ≤ 65536) :
     AsksIn Small (conversionGarbleM coord i row m Δ word) := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := hrow
@@ -202,7 +206,7 @@ theorem asks_conversionGarbleM (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Bl
 
 /-! ### The in-range published material depends on the hash through the chunks and conversions -/
 
-theorem modGarbleM_zero (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Block)
+theorem modGarbleM_zero (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Label)
     (chunks : ℕ → ChunkGarbled tbl.castWidth) (i : Fin tbl.count) (hk : tbl.kind i = .chunkZero) :
     let g := (modGarbleM tbl S coord Δ chunks i).eval H
     g.stageJoins = (fun _ _ => 0) ∧ g.stagePins = (fun _ _ => 0) ∧ g.growJoins = (fun _ => 0) ∧
@@ -212,7 +216,7 @@ theorem modGarbleM_zero (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Block
   exact ⟨trivial, trivial, trivial, trivial⟩
 
 /-- The conversion fields of a modulus depend on the hash only through its conversion. -/
-theorem modFields_congr (tbl : CrtTable) (S coord : ℕ) (Δ : Block) (chunks : ℕ → ChunkGarbled tbl.castWidth)
+theorem modFields_congr (tbl : CrtTable) (S coord : ℕ) (Δ : Label) (chunks : ℕ → ChunkGarbled tbl.castWidth)
     (H H' : HashN) (hconv : ∀ (i : Fin tbl.count) (row : OddRow), tbl.kind i = .odd row → ∀ W : Lanes row.ell,
       (conversionGarbleM coord i.val row (tbl.modulus i) Δ W).eval H =
         (conversionGarbleM coord i.val row (tbl.modulus i) Δ W).eval H') (i : Fin tbl.count) :
@@ -234,7 +238,7 @@ theorem modFields_congr (tbl : CrtTable) (S coord : ℕ) (Δ : Block) (chunks : 
 
 /-- **The in-range published material of a coordinate** depends on the hash only through its chunks and its odd
 moduli's conversions. -/
-theorem readPub_congr (tbl : CrtTable) (S coord : ℕ) (Δ : Block) (Z : ℕ → Block) (H H' : HashN)
+theorem readPub_congr (tbl : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ → Label) (H H' : HashN)
     (hchunk : ∀ c, c < tbl.chunkCount → (chunkGarbleM tbl coord Δ Z c).eval H = (chunkGarbleM tbl coord Δ Z c).eval H')
     (hconv : ∀ (i : Fin tbl.count) (row : OddRow), tbl.kind i = .odd row → ∀ W : Lanes row.ell,
       (conversionGarbleM coord i.val row (tbl.modulus i) Δ W).eval H =
@@ -290,7 +294,7 @@ theorem schemeHash_small {FI EI : Type} (A : TagTable) (n : ℕ) (hn : Small n) 
 
 /-- **On the real table the garbler's in-range conversion material reads the table oracle as
 `tableHash (tagRead A)`.** -/
-theorem real_readPub {FI EI : Type} (A : TagTable) (S coord : ℕ) (hc : coord < 2) (Δ : Block) (Z : ℕ → Block) :
+theorem real_readPub {FI EI : Type} (A : TagTable) (S coord : ℕ) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label) :
     readPub bn254Table ((coordGarbleM bn254Table S coord Δ Z).eval
         (schemeHash (Kriterion.CRT.Privacy.tableOracle (FI := FI) (EI := EI) A))).pub =
       readPub bn254Table ((coordGarbleM bn254Table S coord Δ Z).eval (tableHash (tagRead A))).pub := by

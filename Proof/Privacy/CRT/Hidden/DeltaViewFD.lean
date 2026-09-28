@@ -18,6 +18,7 @@ has conditional mass at most `2^-128` given the stage-2 view.
 
 import Proof.Privacy.CRT.Hidden.DeltaView
 import Proof.Privacy.CRT.Paths.SameVisible
+import Proof.Privacy.CRT.Core.LabelUniform
 
 set_option linter.unusedSectionVars false
 set_option autoImplicit false
@@ -42,7 +43,7 @@ noncomputable section
 coordinate whose labels of `u` agree, whose published material agrees and whose hashes agree off the hot conversion
 tags ask related lists and agree on everything but the material. -/
 def CoordRelational : Prop :=
-  ∀ (H₁ H₂ : HashN) (S coord : ℕ), S ≤ 1000 → coord < 2 → ∀ (u : AffineInput) (Δ₁ Δ₂ : Block) (Z₁ Z₂ : ℕ → Block),
+  ∀ (H₁ H₂ : HashN) (S coord : ℕ), S ≤ 1000 → coord < 2 → ∀ (u : AffineInput) (Δ₁ Δ₂ : Label) (Z₁ Z₂ : ℕ → Label),
     (∀ j < 254, Z₁ j ^^^ (if (coordValue u coord).testBit j then Δ₁ else 0) =
       Z₂ j ^^^ (if (coordValue u coord).testBit j then Δ₂ else 0)) →
     FlatLayout.ConvAgree Entry.table ((coordGarbleM Entry.table S coord Δ₁ Z₁).eval H₁).pub
@@ -50,7 +51,7 @@ def CoordRelational : Prop :=
     (∀ (label₁ label₂ : Block) (τ : ℕ), τ < 2 ^ 40 →
       ¬ (tagFamily τ ≤ 5 ∧ tagCoord τ = coord ∧ hotTag Entry.table u τ = true) →
       H₁ (hashInput label₁ τ) = H₂ (hashInput label₂ τ)) →
-    RelAsked (fun τ => hotTag Entry.table u τ = true) (Δ₁ ^^^ Δ₂)
+    RelAskedConst (fun τ => hotTag Entry.table u τ = true) (embed (Δ₁ ^^^ Δ₂))
         (asked H₁ (coordGarbleM Entry.table S coord Δ₁ Z₁)) (asked H₂ (coordGarbleM Entry.table S coord Δ₂ Z₂)) ∧
       ((coordGarbleM Entry.table S coord Δ₁ Z₁).eval H₁).residue =
         ((coordGarbleM Entry.table S coord Δ₂ Z₂).eval H₂).residue ∧
@@ -65,11 +66,11 @@ def CoordRelational : Prop :=
 
 /-- Coordinate `x`'s garbler on the coins. -/
 abbrev cxM (coins : Entry.Coins) : CM (CoordGarbled Entry.table Entry.xCount) :=
-  coordGarbleM Entry.table Entry.xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)
+  coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))
 
 /-- Coordinate `y`'s garbler on the coins. -/
 abbrev cyM (coins : Entry.Coins) : CM (CoordGarbled Entry.table Entry.yCount) :=
-  coordGarbleM Entry.table Entry.yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)
+  coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))
 
 theorem garbleCM_asked (H : HashN) (scalar : NonZeroScalar) (coins : Entry.Coins) :
     asked H (Entry.garbleCM scalar coins) = asked H (cxM coins) ++ (asked H (cyM coins) ++ asked H (tailM scalar coins)) := by
@@ -86,7 +87,7 @@ theorem garbleCM_eval (H : HashN) (scalar : NonZeroScalar) (coins : Entry.Coins)
 /-! ### 3. The two coordinates -/
 
 /-- **A coordinate's garbler reads the table only at its own coordinate's tags.** -/
-theorem coord_congr (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Block) (Z : ℕ → Block) (t t' : TagTable)
+theorem coord_congr (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label) (t t' : TagTable)
     (agree : ∀ tag : Fin (2 ^ 40), tagCoord tag.val = coord → t tag = t' tag) :
     asked (hashOf t') (coordGarbleM Entry.table S coord Δ Z) = asked (hashOf t) (coordGarbleM Entry.table S coord Δ Z) ∧
       (coordGarbleM Entry.table S coord Δ Z).eval (hashOf t') =
@@ -102,7 +103,7 @@ theorem coord_congr (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Blo
   exact member.2
 
 /-- The tags of a coordinate's garbler: coordinate `coord`, family at most 6, in range. -/
-theorem coord_tags (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Block) (Z : ℕ → Block) (H : HashN) :
+theorem coord_tags (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label) (H : HashN) :
     ∀ n ∈ asked H (coordGarbleM Entry.table S coord Δ Z),
       tagCoord (n / 2 ^ 128) = coord ∧ tagFamily (n / 2 ^ 128) ≤ 6 := by
   intro n inside
@@ -160,7 +161,7 @@ theorem convAgree_of_convVector_eq {p q : ConvPublic} (same : Entry.convVector p
 
 /-- Coordinate `i`'s garbler on the coins. -/
 abbrev progM (S : ℕ) (i : Fin 2) (coins : Entry.Coins) : CM (CoordGarbled Entry.table S) :=
-  coordGarbleM Entry.table S i.val (coins.inputDelta (coordOf i)) (atNat (coins.inputZero (coordOf i)) 0)
+  coordGarbleM Entry.table S i.val (clip (coins.inputDelta (coordOf i))) (fun j => clip (atNat (coins.inputZero (coordOf i)) 0 j))
 
 theorem cxM_eq (coins : Entry.Coins) : cxM coins = progM Entry.xCount 0 coins := rfl
 
@@ -197,9 +198,23 @@ theorem coord_part (rel : CoordRelational) (u : AffineInput) (κ : Fin 2) {c c' 
         ¬ (tagFamily τ ≤ 5 ∧ tagCoord τ = i.val ∧ hotTag Entry.table u τ = true) →
         hashOf t (hashInput label₁ τ) = hashOf t' (hashInput label₂ τ) :=
       fun label₁ label₂ τ small cold => hash_agree sameT label₁ label₂ τ small cold
-    obtain ⟨relHot, _, hpad, hoff, hhint⟩ := rel (hashOf t) (hashOf t') S i.val hS i.isLt u _ _ _ _ hE
+    have hEclip : ∀ j < 254, clip (atNat (c.inputZero (coordOf i)) 0 j) ^^^
+        (if (coordValue u i.val).testBit j then clip (c.inputDelta (coordOf i)) else 0) =
+        clip (atNat (c'.inputZero (coordOf i)) 0 j) ^^^
+          (if (coordValue u i.val).testBit j then clip (c'.inputDelta (coordOf i)) else 0) := by
+      intro j hj
+      have h := congrArg clip (hE j hj)
+      simpa only [Narrow.clip_xor, apply_ite clip, Narrow.clip_zero] using h
+    obtain ⟨relHot, _, hpad, hoff, hhint⟩ := rel (hashOf t) (hashOf t') S i.val hS i.isLt u _ _ _ _ hEclip
       (convAgree_of_convVector_eq vec) hagree
-    refine ⟨RelAsked.congr (fun n inside => ?_) relHot, vec, hoff, hpad, hhint⟩
+    have mixed : RelAsked (fun τ => hotTag Entry.table u τ = true)
+        (deltaAt i c ^^^ deltaAt i c') (asked (hashOf t) (progM S i c))
+        (asked (hashOf t') (progM S i c')) := by
+      refine RelAsked.of_constant relHot fun n inside => ?_
+      obtain ⟨_, fam⟩ := coord_tags S i.val hS i.isLt _ _ (hashOf t) n inside
+      simp only [queryShift, if_pos fam, Narrow.clip_xor]
+      rfl
+    refine ⟨RelAsked.congr (fun n inside => ?_) mixed, vec, hoff, hpad, hhint⟩
     obtain ⟨coord, fam⟩ := coord_tags S i.val hS i.isLt _ _ (hashOf t) n inside
     exact (shifted_iff_hot coord fam).symm
   · have keys := keys_other sameC i hi
@@ -209,8 +224,8 @@ theorem coord_part (rel : CoordRelational) (u : AffineInput) (κ : Fin 2) {c c' 
       unfold progM
       rw [hZ, hΔ]
     rw [← prog]
-    obtain ⟨askedSame, evalSame⟩ := coord_congr S i.val hS i.isLt (c.inputDelta (coordOf i))
-      (atNat (c.inputZero (coordOf i)) 0) t t' fun tag coord =>
+    obtain ⟨askedSame, evalSame⟩ := coord_congr S i.val hS i.isLt (clip (c.inputDelta (coordOf i)))
+      (fun j => clip (atNat (c.inputZero (coordOf i)) 0 j)) t t' fun tag coord =>
         table_agree sameT tag fun hot => hi (Fin.ext (coord.symm.trans hot.2.1))
     refine ⟨RelAsked.of_eq askedSame.symm fun n inside => ?_, ?_⟩
     · obtain ⟨coord, _⟩ := coord_tags S i.val hS i.isLt _ _ (hashOf t) n inside
@@ -493,6 +508,36 @@ theorem delta_guess_le (rel : CoordRelational) (tail : TailRel) (parameter : ℕ
     (fun tape inside => hS tape inside) view
   refine le_trans bound (le_of_eq ?_)
   rw [Kriterion.ArgoMAC.Security.PGS.card_block, Nat.cast_one, one_div, Nat.cast_pow, Nat.cast_ofNat]
+
+open Classical in
+/-- A projected delta guess retains exactly `2^24` raw preimages; no high bits of the raw residual are exposed. -/
+theorem delta_guess_clip_le (rel : CoordRelational) (tail : TailRel) (parameter : ℕ) (scalar : NonZeroScalar)
+    (u : AffineInput) (κ : Fin 2) (view : crtEntry.Public × LamportSignature × List (Kriterion.CRT.Privacy.Entry Empty Empty))
+    (S : Set (TableTape crtEntry)) (X : WType → Label) (ℓ : Label)
+    (hS : ∀ tape ∈ S, clip (res κ tape) = X (fine parameter scalar u κ tape) ^^^ ℓ) :
+    (swappedTableTape crtEntry).toOuterMeasure
+        {tape | stageTwoView crtEntry Entry.table parameter scalar u tape = view ∧ tape ∈ S} ≤
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ * (swappedTableTape crtEntry).toOuterMeasure
+        {tape | stageTwoView crtEntry Entry.table parameter scalar u tape = view} := by
+  have nonempty : Nonempty (TableTape crtEntry) := ⟨(crtEntry.coinWitness, fun _ => (0, 0))⟩
+  let coarse : WType → crtEntry.Public × LamportSignature × List (Kriterion.CRT.Privacy.Entry Empty Empty) :=
+    fun w => stageTwoView crtEntry Entry.table parameter scalar u
+      (Classical.epsilon fun tape => fine parameter scalar u κ tape = w)
+  have hview : ∀ tape, stageTwoView crtEntry Entry.table parameter scalar u tape =
+      coarse (fine parameter scalar u κ tape) := fun tape =>
+    view_fd rel tail parameter scalar u κ (Classical.epsilon_spec (p := fun tape' =>
+      fine parameter scalar u κ tape' = fine parameter scalar u κ tape) ⟨tape, rfl⟩).symm
+  have bound := HiddenGuess.outer_fine_le (swappedTableTape crtEntry)
+    (stageTwoView crtEntry Entry.table parameter scalar u) (fine parameter scalar u κ) coarse hview (res κ)
+    (fine_split parameter scalar u κ) (fun tape => tape ∈ S) (fun w r => clip r = X w ^^^ ℓ) (2 ^ (128 - labelBits))
+    (fun w => le_of_eq (Narrow.clip_fiber_filter_card (X w ^^^ ℓ)))
+    (fun tape inside => hS tape inside) view
+  refine le_trans bound (le_of_eq ?_)
+  have ratio : ((2 ^ (128 - labelBits) : ℕ) : ℝ≥0∞) / (Fintype.card Block : ℝ≥0∞) =
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by
+    rw [Nat.cast_pow, Nat.cast_ofNat]
+    exact Narrow.clip_fibre_ratio
+  rw [ratio]
 
 end Guess
 

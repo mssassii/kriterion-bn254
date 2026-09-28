@@ -32,7 +32,7 @@ namespace Rel
 /-! ### 1. The relation, position by position -/
 
 /-- The labels `a`, `b` of one position with tag `τ`: equal off the hot tags, differing by `δ` at them. -/
-def LabelRel (hot : ℕ → Prop) (δ : Block) (τ : ℕ) (a b : Block) : Prop :=
+def LabelRel (hot : ℕ → Prop) (δ : Label) (τ : ℕ) (a b : Label) : Prop :=
   (hot τ → a = b ^^^ δ) ∧ (¬ hot τ → a = b)
 
 theorem ofNat_hashInput (label : Block) (tag : ℕ) : BitVec.ofNat 128 (hashInput label tag) = label := by
@@ -49,18 +49,18 @@ theorem hashInput_self (x : ℕ) : hashInput (BitVec.ofNat 128 x) (x / 2 ^ 128) 
   rw [BitVec.toNat_ofNat]
   exact Nat.mod_add_div x (2 ^ 128)
 
-theorem xor_shift (e Δ₁ Δ₂ : Block) : e ^^^ Δ₁ = (e ^^^ Δ₂) ^^^ (Δ₁ ^^^ Δ₂) := by
+theorem xor_shift (e Δ₁ Δ₂ : Label) : e ^^^ Δ₁ = (e ^^^ Δ₂) ^^^ (Δ₁ ^^^ Δ₂) := by
   apply BitVec.eq_of_getLsbD_eq; intro i _
   simp only [BitVec.getLsbD_xor]
   cases e.getLsbD i <;> cases Δ₁.getLsbD i <;> cases Δ₂.getLsbD i <;> rfl
 
 /-- Two labels that differ from one common label by `[c]·Δ₁` and `[c]·Δ₂`. -/
-theorem labelRel_of_eq (hot : ℕ → Prop) (τ : ℕ) (c : Prop) [Decidable c] (hc : hot τ ↔ c) {a b Δ₁ Δ₂ : Block}
+theorem labelRel_of_eq (hot : ℕ → Prop) (τ : ℕ) (c : Prop) [Decidable c] (hc : hot τ ↔ c) {a b Δ₁ Δ₂ : Label}
     (same : a ^^^ (if c then Δ₁ else 0) = b ^^^ (if c then Δ₂ else 0)) : LabelRel hot (Δ₁ ^^^ Δ₂) τ a b := by
   refine ⟨fun h => ?_, fun h => ?_⟩
   · rw [if_pos (hc.mp h), if_pos (hc.mp h)] at same
     apply BitVec.eq_of_getLsbD_eq; intro i _
-    have bit := congrArg (fun v : Block => v.getLsbD i) same
+    have bit := congrArg (fun v : Label => v.getLsbD i) same
     simp only [BitVec.getLsbD_xor] at bit ⊢
     revert bit
     cases a.getLsbD i <;> cases b.getLsbD i <;> cases Δ₁.getLsbD i <;> cases Δ₂.getLsbD i <;> decide
@@ -74,15 +74,15 @@ theorem relAsked_append {hot : ℕ → Prop} {δ : Block} {A₁ A₂ B₁ B₂ :
     (second : RelAsked hot δ B₁ B₂) : RelAsked hot δ (A₁ ++ B₁) (A₂ ++ B₂) :=
   List.rel_append first second
 
-theorem relAsked_single {hot : ℕ → Prop} {δ : Block} {τ : ℕ} {a b : Block} (rel : LabelRel hot δ τ a b) :
-    RelAsked hot δ [hashInput a τ] [hashInput b τ] := by
+theorem relAsked_single {hot : ℕ → Prop} {δ : Label} {τ : ℕ} {a b : Label} (rel : LabelRel hot δ τ a b) :
+    RelAsked hot (embed δ) [hashInput (embed a) τ] [hashInput (embed b) τ] := by
   refine List.Forall₂.cons ⟨?_, fun h => ?_, fun h => ?_⟩ List.Forall₂.nil
   · rw [hashInput_div, hashInput_div]
   · rw [hashInput_div] at h
     rw [rel.2 h]
   · rw [hashInput_div] at h
     rw [ofNat_hashInput, ofNat_hashInput]
-    exact rel.1 h
+    rw [rel.1 h, Narrow.embed_xor]
 
 theorem relAsked_flatMap {ι : Type} {hot : ℕ → Prop} {δ : Block} (index : List ι) (f₁ f₂ : ι → List ℕ)
     (each : ∀ i ∈ index, RelAsked hot δ (f₁ i) (f₂ i)) :
@@ -93,11 +93,11 @@ theorem relAsked_flatMap {ι : Type} {hot : ℕ → Prop} {δ : Block} (index : 
       simp only [List.flatMap_cons]
       exact relAsked_append (each i (List.mem_cons_self ..)) (ih fun j member => each j (List.mem_cons_of_mem _ member))
 
-theorem relAsked_map {ι : Type} {hot : ℕ → Prop} {δ : Block} (index : List ι) (a b : Block) (tagOf : ι → ℕ)
+theorem relAsked_map {ι : Type} {hot : ℕ → Prop} {δ : Label} (index : List ι) (a b : Label) (tagOf : ι → ℕ)
     (each : ∀ i ∈ index, LabelRel hot δ (tagOf i) a b) :
-    RelAsked hot δ (index.map fun i => hashInput a (tagOf i)) (index.map fun i => hashInput b (tagOf i)) := by
-  rw [← flatMap_singleton_eq_map index (fun i => hashInput a (tagOf i)),
-    ← flatMap_singleton_eq_map index (fun i => hashInput b (tagOf i))]
+    RelAsked hot (embed δ) (index.map fun i => hashInput (embed a) (tagOf i)) (index.map fun i => hashInput (embed b) (tagOf i)) := by
+  rw [← flatMap_singleton_eq_map index (fun i => hashInput (embed a) (tagOf i)),
+    ← flatMap_singleton_eq_map index (fun i => hashInput (embed b) (tagOf i))]
   exact relAsked_flatMap index _ _ fun i member => relAsked_single (each i member)
 
 /-! ### 2. Hash agreement along a program -/
@@ -157,7 +157,7 @@ section Tree
 
 variable (H₁ H₂ : HashN)
 
-theorem asked_treeEvalM_prefix (H : HashN) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) (n : ℕ) :
+theorem asked_treeEvalM_prefix (H : HashN) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) (n : ℕ) :
     ∀ k, ∀ x ∈ asked H (treeEvalM tagOf value bitLabel join n), x ∈ asked H (treeEvalM tagOf value bitLabel join (n + k)) := by
   intro k
   induction k with
@@ -170,8 +170,8 @@ theorem asked_treeEvalM_prefix (H : HashN) (tagOf : ℕ → ℕ → ℕ) (value 
       exact List.mem_append_left _ (ih x member)
 
 /-- **The tree, two runs.** -/
-theorem tree_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (Δ₁ Δ₂ : Block) (value : ℕ)
-    (bitMask₁ bitMask₂ bitLabel join₁ join₂ : ℕ → Block) (total : ℕ)
+theorem tree_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (Δ₁ Δ₂ : Label) (value : ℕ)
+    (bitMask₁ bitMask₂ bitLabel join₁ join₂ : ℕ → Label) (total : ℕ)
     (hbit₁ : ∀ j < total, bitLabel j = bitMask₁ j ^^^ (if value.testBit j then Δ₁ else 0))
     (hbit₂ : ∀ j < total, bitLabel j = bitMask₂ j ^^^ (if value.testBit j then Δ₂ else 0))
     (hjoin₁ : ∀ j, 1 ≤ j → j < total →
@@ -184,7 +184,7 @@ theorem tree_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (Δ₁ Δ₂
     (∀ n ≤ total, ∀ x : Fin (2 ^ n),
       ((treeGarbleM tagOf Δ₁ (bitMask₁ 0) n).eval H₁).1 x ^^^ (if x.val = value % 2 ^ n then Δ₁ else 0) =
         ((treeGarbleM tagOf Δ₂ (bitMask₂ 0) n).eval H₂).1 x ^^^ (if x.val = value % 2 ^ n then Δ₂ else 0)) ∧
-      RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (treeGarbleM tagOf Δ₁ (bitMask₁ 0) total))
+      RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (treeGarbleM tagOf Δ₁ (bitMask₁ 0) total))
         (asked H₂ (treeGarbleM tagOf Δ₂ (bitMask₂ 0) total)) := by
   have levels : ∀ n ≤ total, ∀ x : Fin (2 ^ n),
       ((treeGarbleM tagOf Δ₁ (bitMask₁ 0) n).eval H₁).1 x ^^^ (if x.val = value % 2 ^ n then Δ₁ else 0) =
@@ -220,7 +220,7 @@ section Chunk
 
 variable (H₁ H₂ : HashN) (T : CrtTable) (coord c : ℕ)
 
-theorem chunkEvalM_congr (labels₁ labels₂ : ℕ → Block) (v : ℕ) (joins₁ joins₂ : ℕ → Block)
+theorem chunkEvalM_congr (labels₁ labels₂ : ℕ → Label) (v : ℕ) (joins₁ joins₂ : ℕ → Label)
     (pin : Lanes T.castWidth) (hL : ∀ j < T.inputBits, labels₁ j = labels₂ j)
     (hJ : ∀ n, 1 ≤ n → n < T.chunkWidth c → joins₁ n = joins₂ n) :
     chunkEvalM T coord labels₁ v joins₁ pin c = chunkEvalM T coord labels₂ v joins₂ pin c := by
@@ -233,7 +233,7 @@ theorem chunkEvalM_congr (labels₁ labels₂ : ℕ → Block) (v : ℕ) (joins�
   simp only [tree, bits]
 
 /-- **A chunk, two runs**: the tree and the casts, and the common evaluator of the chunk. -/
-theorem chunk_rel (hot : ℕ → Prop) (Δ₁ Δ₂ : Block) (Z₁ Z₂ : ℕ → Block) (v : ℕ)
+theorem chunk_rel (hot : ℕ → Prop) (Δ₁ Δ₂ : Label) (Z₁ Z₂ : ℕ → Label) (v : ℕ)
     (hE : ∀ j < T.inputBits, Z₁ j ^^^ (if v.testBit j then Δ₁ else 0) = Z₂ j ^^^ (if v.testBit j then Δ₂ else 0))
     (hJ : ∀ n, 1 ≤ n → n < T.chunkWidth c →
       ((chunkGarbleM T coord Δ₁ Z₁ c).eval H₁).joins n = ((chunkGarbleM T coord Δ₂ Z₂ c).eval H₂).joins n)
@@ -244,15 +244,15 @@ theorem chunk_rel (hot : ℕ → Prop) (Δ₁ Δ₂ : Block) (Z₁ Z₂ : ℕ �
       hot (chunkTreeTag coord c n s.val) ↔ s.val = T.chunkValue v c % 2 ^ n)
     (castHot : ∀ leaf : Fin (2 ^ T.chunkWidth c), ∀ j < castAnswers T.castWidth,
       hot (chunkCastTag coord c leaf.val j) ↔ leaf.val = T.chunkValue v c) :
-    RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (chunkGarbleM T coord Δ₁ Z₁ c)) (asked H₂ (chunkGarbleM T coord Δ₂ Z₂ c)) ∧
+    RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (chunkGarbleM T coord Δ₁ Z₁ c)) (asked H₂ (chunkGarbleM T coord Δ₂ Z₂ c)) ∧
       (chunkEvalM T coord (fun j => Z₂ j ^^^ (if v.testBit j then Δ₂ else 0)) v
           ((chunkGarbleM T coord Δ₂ Z₂ c).eval H₂).joins ((chunkGarbleM T coord Δ₂ Z₂ c).eval H₂).pin c).eval H₂ =
         (chunkEvalM T coord (fun j => Z₁ j ^^^ (if v.testBit j then Δ₁ else 0)) v
           ((chunkGarbleM T coord Δ₁ Z₁ c).eval H₁).joins ((chunkGarbleM T coord Δ₁ Z₁ c).eval H₁).pin c).eval H₁ := by
   set g₁ := (chunkGarbleM T coord Δ₁ Z₁ c).eval H₁ with hg₁
   set g₂ := (chunkGarbleM T coord Δ₂ Z₂ c).eval H₂ with hg₂
-  set labels₁ : ℕ → Block := fun j => Z₁ j ^^^ (if v.testBit j then Δ₁ else 0) with hlabels₁
-  have hbit : ∀ (Z : ℕ → Block) (Δ : Block), ∀ j < T.chunkWidth c,
+  set labels₁ : ℕ → Label := fun j => Z₁ j ^^^ (if v.testBit j then Δ₁ else 0) with hlabels₁
+  have hbit : ∀ (Z : ℕ → Label) (Δ : Label), ∀ j < T.chunkWidth c,
       (fun n => Z (T.chunkOffset c + n) ^^^ (if v.testBit (T.chunkOffset c + n) then Δ else 0)) j =
         Z (T.chunkOffset c + j) ^^^ (if (T.chunkValue v c).testBit j then Δ else 0) := by
     intro Z Δ j hj
@@ -293,10 +293,10 @@ section GrowFoldBody
 
 variable (H₁ H₂ : HashN)
 
-theorem asked_growGarbleM_list (H : HashN) (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (G : Fin (2 ^ start) → Block) :
+theorem asked_growGarbleM_list (H : HashN) (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (G : Fin (2 ^ start) → Label) :
     ∀ count, asked H (growGarbleM tagOf start G count) =
       (List.range count).flatMap fun k => (List.finRange (2 ^ (start + k))).flatMap fun s =>
-        [hashInput (((growGarbleM tagOf start G k).eval H).1 s) (tagOf (start + k) s.val)] := by
+        [hashInput (embed (((growGarbleM tagOf start G k).eval H).1 s)) (tagOf (start + k) s.val)] := by
   intro count
   induction count with
   | zero => rfl
@@ -305,8 +305,8 @@ theorem asked_growGarbleM_list (H : HashN) (tagOf : ℕ → ℕ → ℕ) (start 
       rw [asked_bind, ih, List.range_succ, List.flatMap_append, asked_bind, asked_garbleStepM]
       simp only [asked_pure, List.append_nil, List.flatMap_cons, List.flatMap_nil]
 
-theorem asked_growEvalM_prefix (H : HashN) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block) (start : ℕ)
-    (labels : Fin (2 ^ start) → Block) (n : ℕ) :
+theorem asked_growEvalM_prefix (H : HashN) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label) (start : ℕ)
+    (labels : Fin (2 ^ start) → Label) (n : ℕ) :
     ∀ k, ∀ x ∈ asked H (growEvalM tagOf value bitLabel join start labels n),
       x ∈ asked H (growEvalM tagOf value bitLabel join start labels (n + k)) := by
   intro k
@@ -320,8 +320,8 @@ theorem asked_growEvalM_prefix (H : HashN) (tagOf : ℕ → ℕ → ℕ) (value 
       exact List.mem_append_left _ (ih x member)
 
 /-- **The growth, two runs**, with one evaluator (the joins of run 1). -/
-theorem grow_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (G₁ G₂ E : Fin (2 ^ start) → Block)
-    (Δ₁ Δ₂ : Block) (value : ℕ) (bitMask₁ bitMask₂ bitLabel : ℕ → Block) (total : ℕ)
+theorem grow_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (G₁ G₂ E : Fin (2 ^ start) → Label)
+    (Δ₁ Δ₂ : Label) (value : ℕ) (bitMask₁ bitMask₂ bitLabel : ℕ → Label) (total : ℕ)
     (hE₁ : ∀ x, E x = G₁ x ^^^ (if x.val = value % 2 ^ start then Δ₁ else 0))
     (hE₂ : ∀ x, E x = G₂ x ^^^ (if x.val = value % 2 ^ start then Δ₂ else 0))
     (hbit₁ : ∀ j, j < start + total → bitLabel j = bitMask₁ j ^^^ (if value.testBit j then Δ₁ else 0))
@@ -339,10 +339,10 @@ theorem grow_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (start : ℕ
       (growEvalM tagOf value bitLabel (fun p => ((growGarbleM tagOf start G₁ total).eval H₁).2 p ^^^ bitMask₁ p)
           start E count).eval H₁ x =
         ((growGarbleM tagOf start G₂ count).eval H₂).1 x ^^^ (if x.val = value % 2 ^ (start + count) then Δ₂ else 0)) ∧
-      RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (growGarbleM tagOf start G₁ total))
+      RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (growGarbleM tagOf start G₁ total))
         (asked H₂ (growGarbleM tagOf start G₂ total)) := by
-  set join₁ : ℕ → Block := fun p => ((growGarbleM tagOf start G₁ total).eval H₁).2 p ^^^ bitMask₁ p with hjoin₁
-  set join₂ : ℕ → Block := fun p => ((growGarbleM tagOf start G₂ total).eval H₂).2 p ^^^ bitMask₂ p with hjoin₂
+  set join₁ : ℕ → Label := fun p => ((growGarbleM tagOf start G₁ total).eval H₁).2 p ^^^ bitMask₁ p with hjoin₁
+  set join₂ : ℕ → Label := fun p => ((growGarbleM tagOf start G₂ total).eval H₂).2 p ^^^ bitMask₂ p with hjoin₂
   have levels : ∀ count ≤ total, ∀ x,
       (growEvalM tagOf value bitLabel join₁ start E count).eval H₁ x =
         ((growGarbleM tagOf start G₁ count).eval H₁).1 x ^^^ (if x.val = value % 2 ^ (start + count) then Δ₁ else 0) ∧
@@ -369,16 +369,16 @@ theorem grow_rel (hot : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (start : ℕ
   obtain ⟨l₁, l₂⟩ := levels k (by omega) s
   exact labelRel_of_eq hot _ _ (hotTags k member s) (l₁.symm.trans l₂)
 
-theorem asked_foldsGarbleM_succ (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ → Block) (count position : ℕ)
-    (labels : Fin m → Block) :
+theorem asked_foldsGarbleM_succ (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ → Label) (count position : ℕ)
+    (labels : Fin m → Label) :
     asked H (foldsGarbleM m tagOf bitMask (count + 1) position labels) =
       asked H (foldGarbleM m (tagOf position) (foldShift m position) (bitMask position) labels) ++
         asked H (foldsGarbleM m tagOf bitMask count (position + 1)
           ((foldGarbleM m (tagOf position) (foldShift m position) (bitMask position) labels).eval H).1) := by
   simp only [foldsGarbleM, asked_bind, asked_pure, List.append_nil]
 
-theorem asked_foldsEvalM_succ (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Block)
-    (count position hot : ℕ) (labels : Fin m → Block) :
+theorem asked_foldsEvalM_succ (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (bitLabel join : ℕ → Label)
+    (count position hot : ℕ) (labels : Fin m → Label) :
     asked H (foldsEvalM m tagOf value bitLabel join (count + 1) position hot labels) =
       asked H (foldEvalM m (tagOf position) (foldShift m position) hot (bitLabel position) (join position) labels) ++
         asked H (foldsEvalM m tagOf value bitLabel join count (position + 1)
@@ -388,9 +388,9 @@ theorem asked_foldsEvalM_succ (H : HashN) (m : ℕ) (tagOf : ℕ → ℕ → ℕ
   simp only [foldsEvalM, asked_bind]
 
 /-- **The folds, two runs**, with one evaluator. -/
-theorem folds_rel (hot : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (Δ₁ Δ₂ : Block)
-    (bitMask₁ bitMask₂ bitLabel join : ℕ → Block) :
-    ∀ count position h (G₁ G₂ E : Fin m → Block), h = value % 2 ^ position % m →
+theorem folds_rel (hot : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (Δ₁ Δ₂ : Label)
+    (bitMask₁ bitMask₂ bitLabel join : ℕ → Label) :
+    ∀ count position h (G₁ G₂ E : Fin m → Label), h = value % 2 ^ position % m →
       (∀ ρ, E ρ = G₁ ρ ^^^ (if ρ.val = h then Δ₁ else 0)) →
       (∀ ρ, E ρ = G₂ ρ ^^^ (if ρ.val = h then Δ₂ else 0)) →
       (∀ j, position ≤ j → j < position + count →
@@ -404,7 +404,7 @@ theorem folds_rel (hot : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ → �
       AgreeOn H₁ H₂ (asked H₁ (foldsEvalM m tagOf value bitLabel join count position h E)) →
       (∀ j, position ≤ j → j < position + count → ∀ r : Fin m,
         hot (tagOf j r.val) ↔ r.val = value % 2 ^ j % m) →
-      RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (foldsGarbleM m tagOf bitMask₁ count position G₁))
+      RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (foldsGarbleM m tagOf bitMask₁ count position G₁))
           (asked H₂ (foldsGarbleM m tagOf bitMask₂ count position G₂)) ∧
         (foldsEvalM m tagOf value bitLabel join count position h E).eval H₂ =
           (foldsEvalM m tagOf value bitLabel join count position h E).eval H₁ := by
@@ -475,11 +475,11 @@ theorem folds_rel (hot : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ → �
       rw [← stepEq]
       exact restEq
 
-theorem body_eval_eq (m S q coord i : ℕ) (final₁ final₂ : Fin m → Block)
-    (pads : ∀ ρ : Fin m, ∀ j < q, H₁ (hashInput (final₁ ρ) (bodyTag coord i ρ.val j)) =
-      H₂ (hashInput (final₂ ρ) (bodyTag coord i ρ.val j))) :
+theorem body_eval_eq (m S q coord i : ℕ) (final₁ final₂ : Fin m → Label)
+    (pads : ∀ ρ : Fin m, ∀ j < q, H₁ (hashInput (embed (final₁ ρ)) (bodyTag coord i ρ.val j)) =
+      H₂ (hashInput (embed (final₂ ρ)) (bodyTag coord i ρ.val j))) :
     (bodyGarbleM m S q coord i final₁).eval H₁ = (bodyGarbleM m S q coord i final₂).eval H₂ := by
-  have hl : ∀ ρ : Fin m, hlong H₁ (final₁ ρ) (bodyTag coord i ρ.val) q = hlong H₂ (final₂ ρ) (bodyTag coord i ρ.val) q := by
+  have hl : ∀ ρ : Fin m, hlong H₁ (embed (final₁ ρ)) (bodyTag coord i ρ.val) q = hlong H₂ (embed (final₂ ρ)) (bodyTag coord i ρ.val) q := by
     intro ρ
     unfold hlong
     congr 1
@@ -488,10 +488,10 @@ theorem body_eval_eq (m S q coord i : ℕ) (final₁ final₂ : Fin m → Block)
   simp only [bodyGarbleM, FreeQuery.eval_bind, eval_tableM, SliceC.eval_padVectorM, FreeQuery.eval_pure, hl]
 
 /-- **The body, two runs.** -/
-theorem body_rel (hot : ℕ → Prop) (m S q coord i : ℕ) (final₁ final₂ : Fin m → Block) (Δ₁ Δ₂ : Block) (h : ℕ)
+theorem body_rel (hot : ℕ → Prop) (m S q coord i : ℕ) (final₁ final₂ : Fin m → Label) (Δ₁ Δ₂ : Label) (h : ℕ)
     (same : ∀ ρ : Fin m, final₁ ρ ^^^ (if ρ.val = h then Δ₁ else 0) = final₂ ρ ^^^ (if ρ.val = h then Δ₂ else 0))
     (tags : ∀ r : Fin m, ∀ j < q, hot (bodyTag coord i r.val j) ↔ r.val = h) :
-    RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (bodyGarbleM m S q coord i final₁))
+    RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (bodyGarbleM m S q coord i final₁))
       (asked H₂ (bodyGarbleM m S q coord i final₂)) := by
   rw [asked_bodyGarbleM, asked_bodyGarbleM]
   exact relAsked_flatMap _ _ _ fun r _ => relAsked_map _ _ _ _ fun j _ =>
@@ -508,14 +508,14 @@ open Kriterion.CRT.ExtractSpec Kriterion.CRT.SliceC
 variable (H₁ H₂ : HashN) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ)
 
 /-- The garbler's stage queries in order, at the garbler's node labels. -/
-theorem asked_stage_list (H : HashN) (Δ : Block) (R : Lanes rb) :
+theorem asked_stage_list (H : HashN) (Δ : Label) (R : Lanes rb) :
     asked H (extStageGarbleM w treeTag castTag Δ R) =
       ((List.range w).flatMap fun n => if n = 0 then [] else
         (List.finRange (2 ^ n)).flatMap fun y =>
-          [hashInput (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ n y.val)
+          [hashInput (embed (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ n y.val))
             (treeTag n y.val)]) ++
         (List.finRange (2 ^ w)).flatMap fun leaf => (List.finRange (castAnswers rb)).map fun j =>
-          hashInput (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ w leaf.val)
+          hashInput (embed (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ w leaf.val))
             (castTag leaf.val j.val) := by
   have ht : ∀ n (x : Fin (2 ^ n)), ((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) n).eval H).1 x =
       gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ n x.val :=
@@ -526,7 +526,7 @@ theorem asked_stage_list (H : HashN) (Δ : Block) (R : Lanes rb) :
 
 include hw in
 /-- **One fused stage, two runs**: the queries, and one evaluator for both. -/
-theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Block) (R₁ R₂ : Lanes rb) (σ : ℕ)
+theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Label) (R₁ R₂ : Lanes rb) (σ : ℕ)
     (hR : R₁ + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ₁ = R₂ + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ₂)
     (hJ : ∀ n, 1 ≤ n → n < w → ((extStageGarbleM w treeTag castTag Δ₁ R₁).eval H₁).joins n =
       ((extStageGarbleM w treeTag castTag Δ₂ R₂).eval H₂).joins n)
@@ -544,7 +544,7 @@ theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Block
     (castInj : ∀ α j α' j', α < 2 ^ w → j < castAnswers rb → α' < 2 ^ w → j' < castAnswers rb →
       castTag α j = castTag α' j' → α = α')
     (treeCast : ∀ ℓ y α j, ℓ < w → y < 2 ^ ℓ → α < 2 ^ w → j < castAnswers rb → treeTag ℓ y ≠ castTag α j) :
-    RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (extStageGarbleM w treeTag castTag Δ₁ R₁))
+    RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (extStageGarbleM w treeTag castTag Δ₁ R₁))
         (asked H₂ (extStageGarbleM w treeTag castTag Δ₂ R₂)) ∧
       (extStageEvalM w treeTag castTag (R₂ + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ₂) (σ % 2 ^ w)
           ((extStageGarbleM w treeTag castTag Δ₂ R₂).eval H₂).joins
@@ -621,7 +621,7 @@ theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Block
       gNode sp₁ (gBit0 sp₁ R₁) Δ₁ ℓ y = gNode sp₂ (gBit0 sp₂ R₂) Δ₂ ℓ y := by
     intro ℓ y h1 h2 hy hne
     have member := (mem_garbler_stage H₁ w hw treeTag castTag Δ₁ R₁ _).mpr (Or.inl ⟨ℓ, y, h1, h2, hy, rfl⟩)
-    have coldx : ColdAt cold (hashInput (gNode sp₁ (gBit0 sp₁ R₁) Δ₁ ℓ y) (treeTag ℓ y)) := by
+    have coldx : ColdAt cold (hashInput (embed (gNode sp₁ (gBit0 sp₁ R₁) Δ₁ ℓ y)) (treeTag ℓ y)) := by
       unfold ColdAt
       rw [hashInput_div]
       exact (treeCold ℓ h1 h2 y hy).mpr hne
@@ -630,7 +630,7 @@ theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Block
     · have tags := congrArg (· / 2 ^ 128) same
       simp only [hashInput_div] at tags
       obtain ⟨rfl, rfl⟩ := treeInj ℓ y ℓ' y' h2 hy h2' hy' tags
-      exact hashInput_label_inj same
+      exact Narrow.embed_injective (hashInput_label_inj same)
     · have tags := congrArg (· / 2 ^ 128) same
       simp only [hashInput_div] at tags
       exact absurd tags (treeCast ℓ y α j h2 hy hα hj)
@@ -638,7 +638,7 @@ theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Block
       gNode sp₁ (gBit0 sp₁ R₁) Δ₁ w α = gNode sp₂ (gBit0 sp₂ R₂) Δ₂ w α := by
     intro α j hα hj hne
     have member := (mem_garbler_stage H₁ w hw treeTag castTag Δ₁ R₁ _).mpr (Or.inr ⟨α, j, hα, hj, rfl⟩)
-    have coldx : ColdAt cold (hashInput (gNode sp₁ (gBit0 sp₁ R₁) Δ₁ w α) (castTag α j)) := by
+    have coldx : ColdAt cold (hashInput (embed (gNode sp₁ (gBit0 sp₁ R₁) Δ₁ w α)) (castTag α j)) := by
       unfold ColdAt
       rw [hashInput_div]
       exact (castCold α hα j hj).mpr hne
@@ -650,7 +650,7 @@ theorem stage_rel (hw1 : 1 ≤ w) (hot cold : ℕ → Prop) (Δ₁ Δ₂ : Block
     · have tags := congrArg (· / 2 ^ 128) same
       simp only [hashInput_div] at tags
       obtain rfl := castInj α j α' j' hα hj hα' hj' tags
-      exact hashInput_label_inj same
+      exact Narrow.embed_injective (hashInput_label_inj same)
   -- position by position
   rw [asked_stage_list w hw treeTag castTag H₁ Δ₁ R₁, asked_stage_list w hw treeTag castTag H₂ Δ₂ R₂]
   refine relAsked_append (relAsked_flatMap _ _ _ fun n member => ?_)
@@ -723,8 +723,8 @@ theorem extTree_ne_cast {coord i stage w L : ℕ} (hc : coord < 2) (hi : i < 128
   have := (tagCode_injective r r' same).1
   simp [Family.extTree, Family.extCast] at this
 
-theorem wordBit_label (row : OddRow) (hell : row.width0 + row.width1 + 1 = row.ell) (Δ : Block)
-    (σ : ℕ) (gb0 gb1 eb0 eb1 : ℕ → Block) (gnext enext : Lanes (row.ell - row.width0 - row.width1))
+theorem wordBit_label (row : OddRow) (hell : row.width0 + row.width1 + 1 = row.ell) (Δ : Label)
+    (σ : ℕ) (gb0 gb1 eb0 eb1 : ℕ → Label) (gnext enext : Lanes (row.ell - row.width0 - row.width1))
     (hb0 : ∀ n < row.width0, eb0 n = gb0 n ^^^ (if σ.testBit n then Δ else 0))
     (hb1 : ∀ n < row.width1, eb1 n = gb1 n ^^^ (if (σ / 2 ^ row.width0).testBit n then Δ else 0))
     (hn1 : enext = gnext + ((σ / 2 ^ row.width0 / 2 ^ row.width1 : ℕ) :
@@ -746,7 +746,7 @@ theorem wordBit_label (row : OddRow) (hell : row.width0 + row.width1 + 1 = row.e
       simp only [decide_eq_true_eq]
 
 /-- **One odd modulus's conversion, two runs**: the queries, and the final one-hots around one evaluator. -/
-theorem conv_rel (hot cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ₁ Δ₂ : Block) (W₁ W₂ : Lanes row.ell)
+theorem conv_rel (hot cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ₁ Δ₂ : Label) (W₁ W₂ : Lanes row.ell)
     (σ : ℕ) (pub₁ pub₂ : ConvPublic)
     (h0 : 1 ≤ row.width0) (h1 : 1 ≤ row.width1) (hell : row.width0 + row.width1 + 1 = row.ell)
     (hk0 : row.width0 ≤ row.keep) (hk1 : row.keep ≤ row.ell) (hm : 0 < m) (hσ : σ < 2 ^ row.ell)
@@ -765,7 +765,7 @@ theorem conv_rel (hot cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m : �
     (agree : AgreeOn H₁ H₂ (asked H₁ (conversionEvalM coord i row m σ
       (W₁ + (σ : ZMod (2 ^ row.ell)) • deltaLanes row.ell Δ₁) pub₁)))
     (hotTags : ConvTags (fun τ => ¬ hot τ) coord i row m σ) (coldTags : ConvTags cold coord i row m σ) :
-    RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (conversionGarbleM coord i row m Δ₁ W₁))
+    RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (conversionGarbleM coord i row m Δ₁ W₁))
         (asked H₂ (conversionGarbleM coord i row m Δ₂ W₂)) ∧
       ∀ ρ : Fin m, ((conversionGarbleM coord i row m Δ₁ W₁).eval H₁).final ρ ^^^ (if ρ.val = σ % m then Δ₁ else 0) =
         ((conversionGarbleM coord i row m Δ₂ W₂).eval H₂).final ρ ^^^ (if ρ.val = σ % m then Δ₂ else 0) := by
@@ -935,7 +935,7 @@ theorem agreeOn_of_cold {cold : ℕ → Prop} (coldAgree : ∀ x, ColdAt cold x 
   fun x member => coldAgree x (aligned.sound x member).1
 
 /-- **One modulus, two runs**: the queries of its conversion and body, and its body's outputs. -/
-theorem mod_rel (hot cold : ℕ → Prop) (T : CrtTable) (S coord : ℕ) (Δ₁ Δ₂ : Block) (v : ℕ) (hT : CorrectTable T)
+theorem mod_rel (hot cold : ℕ → Prop) (T : CrtTable) (S coord : ℕ) (Δ₁ Δ₂ : Label) (v : ℕ) (hT : CorrectTable T)
     (hv : v < 2 ^ T.inputBits) (hcoord : coord < 2) (ranges : Paths.TableRanges T S)
     (pub₁ pub₂ : ConvPublic) (chunks₁ chunks₂ : ℕ → ChunkGarbled T.castWidth) (chunksE : ℕ → ChunkEval T.castWidth)
     (hL₁ : ∀ c < T.chunkCount, ∀ α < 2 ^ T.chunkWidth c,
@@ -957,14 +957,14 @@ theorem mod_rel (hot cold : ℕ → Prop) (T : CrtTable) (S coord : ℕ) (Δ₁ 
     (hpF₂ : pub₂.foldJoin i.val = ((modGarbleM T S coord Δ₂ chunks₂ i).eval H₂).foldJoins)
     (hmod : ∀ row, T.kind i = .odd row → FlatLayout.ModAgree row i.val pub₁ pub₂)
     (coldAgree : ∀ x, ColdAt cold x → H₁ x = H₂ x)
-    (pads : ∀ (f₁ f₂ : Fin (T.modulus i) → Block) (ρ : Fin (T.modulus i)), ∀ j < T.padAnswers S i,
-      H₁ (hashInput (f₁ ρ) (bodyTag coord i.val ρ.val j)) = H₂ (hashInput (f₂ ρ) (bodyTag coord i.val ρ.val j)))
+    (pads : ∀ (f₁ f₂ : Fin (T.modulus i) → Label) (ρ : Fin (T.modulus i)), ∀ j < T.padAnswers S i,
+      H₁ (hashInput (embed (f₁ ρ)) (bodyTag coord i.val ρ.val j)) = H₂ (hashInput (embed (f₂ ρ)) (bodyTag coord i.val ρ.val j)))
     (hotConv : ∀ row, T.kind i = .odd row →
       ConvTags (fun τ => ¬ hot τ) coord i.val row (T.modulus i) (T.wordValue (T.modulus i) v))
     (coldConv : ∀ row, T.kind i = .odd row → ConvTags cold coord i.val row (T.modulus i) (T.wordValue (T.modulus i) v))
     (hotBody : ∀ r : Fin (T.modulus i), ∀ j < T.padAnswers S i,
       hot (bodyTag coord i.val r.val j) ↔ r.val = v % T.modulus i) :
-    RelAsked hot (Δ₁ ^^^ Δ₂) (asked H₁ (modGarbleM T S coord Δ₁ chunks₁ i))
+    RelAsked hot (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (modGarbleM T S coord Δ₁ chunks₁ i))
         (asked H₂ (modGarbleM T S coord Δ₂ chunks₂ i)) ∧
       ((modGarbleM T S coord Δ₁ chunks₁ i).eval H₁).body = ((modGarbleM T S coord Δ₂ chunks₂ i).eval H₂).body := by
   have hm := hT.modulus_pos i
@@ -1112,7 +1112,7 @@ theorem convAgree_of_eq {T : CrtTable} {p q : ConvPublic} (same : p = q) : FlatL
 /-- **One coordinate, two runs**, for a correct table whose fields fit `tagCode`. -/
 theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges : Paths.TableRanges T S)
     (hcoord : coord < 2) (u : AffineInput) (hv : coordValue u coord < 2 ^ T.inputBits)
-    (Δ₁ Δ₂ : Block) (Z₁ Z₂ : ℕ → Block)
+    (Δ₁ Δ₂ : Label) (Z₁ Z₂ : ℕ → Label)
     (hE : ∀ j < T.inputBits, Z₁ j ^^^ (if (coordValue u coord).testBit j then Δ₁ else 0) =
       Z₂ j ^^^ (if (coordValue u coord).testBit j then Δ₂ else 0))
     (hpub : FlatLayout.ConvAgree T ((coordGarbleM T S coord Δ₁ Z₁).eval H₁).pub
@@ -1120,7 +1120,7 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
     (hagree : ∀ (label₁ label₂ : Block) (τ : ℕ), τ < 2 ^ 40 →
       ¬ (tagFamily τ ≤ 5 ∧ tagCoord τ = coord ∧ hotTag T u τ = true) →
       H₁ (hashInput label₁ τ) = H₂ (hashInput label₂ τ)) :
-    RelAsked (fun τ => hotTag T u τ = true) (Δ₁ ^^^ Δ₂)
+    RelAsked (fun τ => hotTag T u τ = true) (embed (Δ₁ ^^^ Δ₂))
         (asked H₁ (coordGarbleM T S coord Δ₁ Z₁)) (asked H₂ (coordGarbleM T S coord Δ₂ Z₂)) ∧
       ((coordGarbleM T S coord Δ₁ Z₁).eval H₁).residue = ((coordGarbleM T S coord Δ₂ Z₂).eval H₂).residue ∧
       ((coordGarbleM T S coord Δ₁ Z₁).eval H₁).padSum = ((coordGarbleM T S coord Δ₂ Z₂).eval H₂).padSum ∧
@@ -1143,7 +1143,7 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
   simp only at fJ₁ fP₁ fM₁ fJ₂ fP₂ fM₂
   obtain ⟨cJ, cP, mA⟩ := hpub
   -- the chunks
-  have chunkPin : ∀ (Δ : Block) (Z : ℕ → Block) (H : HashN) c (hc : c < T.chunkCount),
+  have chunkPin : ∀ (Δ : Label) (Z : ℕ → Label) (H : HashN) c (hc : c < T.chunkCount),
       (fun k : Fin T.castWidth => ((coordGarbleM T S coord Δ Z).eval H).pub.chunkPin c k.val) =
         pinBlocks ((chunkGarbleM T coord Δ Z c).eval H).pin →
       ((chunkGarbleM T coord Δ Z c).eval H).pin =
@@ -1151,7 +1151,7 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
     intro Δ Z H c hc same
     rw [same, pinOfBlocks_pinBlocks hT.castWidth_pos]
   have chunkFacts : ∀ c (hc : c < T.chunkCount),
-      RelAsked (fun τ => hotTag T u τ = true) (Δ₁ ^^^ Δ₂) (asked H₁ (chunkGarbleM T coord Δ₁ Z₁ c))
+      RelAsked (fun τ => hotTag T u τ = true) (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (chunkGarbleM T coord Δ₁ Z₁ c))
           (asked H₂ (chunkGarbleM T coord Δ₂ Z₂ c)) ∧
         (chunkEvalM T coord (fun j => Z₂ j ^^^ (if v.testBit j then Δ₂ else 0)) v
             ((chunkGarbleM T coord Δ₂ Z₂ c).eval H₂).joins ((chunkGarbleM T coord Δ₂ Z₂ c).eval H₂).pin c).eval H₂ =
@@ -1201,8 +1201,8 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
     rw [← (chunkFacts c hc).2]
     exact (chunk_correct H₂ T coord Δ₂ Z₂ v c).2 α hα
   -- the moduli
-  have pads : ∀ (i : Fin T.count) (f₁ f₂ : Fin (T.modulus i) → Block) (ρ : Fin (T.modulus i)), ∀ j < T.padAnswers S i,
-      H₁ (hashInput (f₁ ρ) (bodyTag coord i.val ρ.val j)) = H₂ (hashInput (f₂ ρ) (bodyTag coord i.val ρ.val j)) := by
+  have pads : ∀ (i : Fin T.count) (f₁ f₂ : Fin (T.modulus i) → Label) (ρ : Fin (T.modulus i)), ∀ j < T.padAnswers S i,
+      H₁ (hashInput (embed (f₁ ρ)) (bodyTag coord i.val ρ.val j)) = H₂ (hashInput (embed (f₂ ρ)) (bodyTag coord i.val ρ.val j)) := by
     intro i f₁ f₂ ρ j hj
     have hi : i.val < 128 := by have := ranges.count; have := i.isLt; omega
     have range : TagInRange coord i.val 0 0 ρ.val j :=
@@ -1213,7 +1213,7 @@ theorem coord_rel (T : CrtTable) (S coord : ℕ) (hT : CorrectTable T) (ranges :
     rw [tagFamily_tagCode range] at fam
     simp [Family.body] at fam
   have modFacts : ∀ i : Fin T.count,
-      RelAsked (fun τ => hotTag T u τ = true) (Δ₁ ^^^ Δ₂) (asked H₁ (modGarbleM T S coord Δ₁ chunks₁ i))
+      RelAsked (fun τ => hotTag T u τ = true) (embed (Δ₁ ^^^ Δ₂)) (asked H₁ (modGarbleM T S coord Δ₁ chunks₁ i))
           (asked H₂ (modGarbleM T S coord Δ₂ chunks₂ i)) ∧
         ((modGarbleM T S coord Δ₁ chunks₁ i).eval H₁).body = ((modGarbleM T S coord Δ₂ chunks₂ i).eval H₂).body :=
     fun i => mod_rel H₁ H₂ _ (Cold T u) T S coord Δ₁ Δ₂ v hT hv hcoord ranges _ _ chunks₁ chunks₂ chunksE
@@ -1238,7 +1238,7 @@ end Rel
 
 /-- **Two garbler runs of one coordinate** (the real table, `Entry.table`). -/
 theorem coord_relational (H₁ H₂ : HashN) (S coord : ℕ) (hS : S ≤ 1000) (hcoord : coord < 2) (u : AffineInput)
-    (Δ₁ Δ₂ : Block) (Z₁ Z₂ : ℕ → Block)
+    (Δ₁ Δ₂ : Label) (Z₁ Z₂ : ℕ → Label)
     (hE : ∀ j < 254, Z₁ j ^^^ (if (coordValue u coord).testBit j then Δ₁ else 0) =
       Z₂ j ^^^ (if (coordValue u coord).testBit j then Δ₂ else 0))
     (hpub : FlatLayout.ConvAgree Entry.table ((coordGarbleM Entry.table S coord Δ₁ Z₁).eval H₁).pub
@@ -1246,7 +1246,7 @@ theorem coord_relational (H₁ H₂ : HashN) (S coord : ℕ) (hS : S ≤ 1000) (
     (hagree : ∀ (label₁ label₂ : Block) (τ : ℕ), τ < 2 ^ 40 →
       ¬ (tagFamily τ ≤ 5 ∧ tagCoord τ = coord ∧ hotTag Entry.table u τ = true) →
       H₁ (hashInput label₁ τ) = H₂ (hashInput label₂ τ)) :
-    RelAsked (fun τ => hotTag Entry.table u τ = true) (Δ₁ ^^^ Δ₂)
+    RelAsked (fun τ => hotTag Entry.table u τ = true) (embed (Δ₁ ^^^ Δ₂))
         (asked H₁ (coordGarbleM Entry.table S coord Δ₁ Z₁)) (asked H₂ (coordGarbleM Entry.table S coord Δ₂ Z₂)) ∧
       ((coordGarbleM Entry.table S coord Δ₁ Z₁).eval H₁).residue = ((coordGarbleM Entry.table S coord Δ₂ Z₂).eval H₂).residue ∧
       ((coordGarbleM Entry.table S coord Δ₁ Z₁).eval H₁).padSum = ((coordGarbleM Entry.table S coord Δ₂ Z₂).eval H₂).padSum ∧

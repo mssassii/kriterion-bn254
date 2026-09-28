@@ -61,15 +61,15 @@ theorem inputBit_uBit (u : AffineInput) (κ : Fin 2) (p : ℕ) : inputBit u κ.v
 
 /-- Two labelled inputs at one tag are related when their labels are equal off `hot` and shifted by `δ` on it. -/
 theorem elem_rel (hot : ℕ → Prop) (δ : Block) (τ : ℕ) (l₁ l₂ : Block) (off : ¬ hot τ → l₁ = l₂)
-    (on : hot τ → l₁ = l₂ ^^^ δ) :
+    (on : hot τ → l₁ = l₂ ^^^ δ) (wide : 6 < tagFamily τ) :
     hashInput l₁ τ / 2 ^ 128 = hashInput l₂ τ / 2 ^ 128 ∧
       (¬ hot (hashInput l₁ τ / 2 ^ 128) → hashInput l₁ τ = hashInput l₂ τ) ∧
       (hot (hashInput l₁ τ / 2 ^ 128) →
-        BitVec.ofNat 128 (hashInput l₁ τ) = BitVec.ofNat 128 (hashInput l₂ τ) ^^^ δ) := by
+        BitVec.ofNat 128 (hashInput l₁ τ) = BitVec.ofNat 128 (hashInput l₂ τ) ^^^ queryShift δ (hashInput l₁ τ / 2 ^ 128)) := by
   rw [hashInput_div, hashInput_div]
   refine ⟨rfl, fun cold => by rw [off cold], fun hot => ?_⟩
   rw [ofNat_hashInput, ofNat_hashInput]
-  exact on hot
+  simpa only [queryShift, if_neg (by omega : ¬ tagFamily τ ≤ 6)] using on hot
 
 theorem RelAsked.flatMap {ι : Type} {hot : ℕ → Prop} {δ : Block} (l : List ι) (f g : ι → List ℕ)
     (each : ∀ i ∈ l, RelAsked hot δ (f i) (g i)) : RelAsked hot δ (l.flatMap f) (l.flatMap g) := by
@@ -146,8 +146,12 @@ theorem digestTable_rel (same : eCoins u κ c = eCoins u κ c') (H H' : HashN) :
   obtain ⟨off0, on0⟩ := label_rel same cc p 0 (by norm_num)
   obtain ⟨off1, on1⟩ := label_rel same cc p 1 (by norm_num)
   simp only [if_true, one_ne_zero, if_false] at off0 on0 off1 on1
-  exact List.Forall₂.cons (elem_rel _ _ _ _ _ off0 on0)
-    (List.Forall₂.cons (elem_rel _ _ _ _ _ off1 on1) List.Forall₂.nil)
+  have wide : ∀ b, b < 2 → 6 < tagFamily (digestLabelTag cc.val p.val b) := by
+    intro b hb
+    rw [(digestLabelTag_fields (b := b) cc.isLt (lt_of_lt_of_le p.isLt (by decide)) (by omega)).1]
+    norm_num
+  exact List.Forall₂.cons (elem_rel _ _ _ _ _ off0 on0 (wide 0 (by norm_num)))
+    (List.Forall₂.cons (elem_rel _ _ _ _ _ off1 on1 (wide 1 (by norm_num))) List.Forall₂.nil)
 
 /-- **The digest table's value is the same** on two tables with the same masks. -/
 theorem digestTable_eval {t t' : TagTable} (tsame : maskTable u κ t = maskTable u κ t') :
