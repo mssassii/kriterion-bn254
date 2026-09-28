@@ -1,0 +1,15 @@
+{
+  "command": [
+    "env",
+    "LEAN_NUM_THREADS=6",
+    "lake",
+    "env",
+    "lean",
+    "Scratch/StructuralAlgebra.lean"
+  ],
+  "head": "857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 2.4,
+  "log": "evidence/structural/algebra.log"
+}

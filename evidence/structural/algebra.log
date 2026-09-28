@@ -1,0 +1,7 @@
+$ env LEAN_NUM_THREADS=6 lake env lean Scratch/StructuralAlgebra.lean
+# HEAD 857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790
+# tracked changes:
+
+'Kriterion.StructuralResearch.x_row_factor_error' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.StructuralResearch.x_row_factor_of_offset' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.StructuralResearch.x_row_factor_iff' depends on axioms: [propext, Classical.choice, Quot.sound]

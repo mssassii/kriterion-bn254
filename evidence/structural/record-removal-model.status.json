@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "Scratch/structural_rows_model.py"
+  ],
+  "head": "857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 0.0,
+  "log": "evidence/structural/record-removal-model.log"
+}

@@ -1,0 +1,16 @@
+$ python3 -B Scratch/structural_rows_model.py
+# HEAD 857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790
+# tracked changes:
+
+{'removed_x_per_digit': 0, 'removed_y_per_digit': 0, 'records': 642, 'x_count': 367, 'y_count': 275, 'conversion_labels_per_coordinate': 2885, 'bytes': 125711, 'garble': 1061622, 'evaluate': 1054788, 'width_counts': {'7': 0, '8': 57, '9': 26, '10': 0, '11': 0}}
+{'removed_x_per_digit': 0, 'removed_y_per_digit': 1, 'records': 551, 'x_count': 367, 'y_count': 184, 'conversion_labels_per_coordinate': 2853, 'bytes': 117851, 'garble': 1059776, 'evaluate': 1053211, 'width_counts': {'7': 0, '8': 41, '9': 42, '10': 0, '11': 0}}
+{'removed_x_per_digit': 1, 'removed_y_per_digit': 0, 'records': 551, 'x_count': 276, 'y_count': 275, 'conversion_labels_per_coordinate': 2851, 'bytes': 117800, 'garble': 1061035, 'evaluate': 1054477, 'width_counts': {'7': 0, '8': 40, '9': 43, '10': 0, '11': 0}}
+{'removed_x_per_digit': 0, 'removed_y_per_digit': 2, 'records': 460, 'x_count': 367, 'y_count': 93, 'conversion_labels_per_coordinate': 2821, 'bytes': 109990, 'garble': 1060563, 'evaluate': 1054278, 'width_counts': {'7': 0, '8': 25, '9': 58, '10': 0, '11': 0}}
+{'removed_x_per_digit': 1, 'removed_y_per_digit': 1, 'records': 460, 'x_count': 276, 'y_count': 184, 'conversion_labels_per_coordinate': 2819, 'bytes': 109940, 'garble': 1061779, 'evaluate': 1055504, 'width_counts': {'7': 0, '8': 24, '9': 59, '10': 0, '11': 0}}
+{'removed_x_per_digit': 2, 'removed_y_per_digit': 0, 'records': 460, 'x_count': 185, 'y_count': 275, 'conversion_labels_per_coordinate': 2819, 'bytes': 109940, 'garble': 1061664, 'evaluate': 1055390, 'width_counts': {'7': 0, '8': 24, '9': 59, '10': 0, '11': 0}}
+{'removed_x_per_digit': 1, 'removed_y_per_digit': 2, 'records': 369, 'x_count': 276, 'y_count': 93, 'conversion_labels_per_coordinate': 2791, 'bytes': 102180, 'garble': 1059006, 'evaluate': 1052983, 'width_counts': {'7': 0, '8': 10, '9': 73, '10': 0, '11': 0}}
+{'removed_x_per_digit': 2, 'removed_y_per_digit': 1, 'records': 369, 'x_count': 185, 'y_count': 184, 'conversion_labels_per_coordinate': 2791, 'bytes': 102180, 'garble': 1058684, 'evaluate': 1052665, 'width_counts': {'7': 0, '8': 10, '9': 73, '10': 0, '11': 0}}
+{'removed_x_per_digit': 3, 'removed_y_per_digit': 0, 'records': 369, 'x_count': 94, 'y_count': 275, 'conversion_labels_per_coordinate': 2791, 'bytes': 102180, 'garble': 1059058, 'evaluate': 1053035, 'width_counts': {'7': 0, '8': 10, '9': 73, '10': 0, '11': 0}}
+{'removed_x_per_digit': 2, 'removed_y_per_digit': 2, 'records': 278, 'x_count': 185, 'y_count': 93, 'conversion_labels_per_coordinate': 2769, 'bytes': 94572, 'garble': 1061197, 'evaluate': 1055426, 'width_counts': {'7': 0, '8': 4, '9': 74, '10': 5, '11': 0}}
+{'removed_x_per_digit': 3, 'removed_y_per_digit': 1, 'records': 278, 'x_count': 94, 'y_count': 184, 'conversion_labels_per_coordinate': 2769, 'bytes': 94572, 'garble': 1061364, 'evaluate': 1055592, 'width_counts': {'7': 0, '8': 4, '9': 74, '10': 5, '11': 0}}
+{'removed_x_per_digit': 3, 'removed_y_per_digit': 2, 'records': 187, 'x_count': 94, 'y_count': 93, 'conversion_labels_per_coordinate': 2755, 'bytes': 87166, 'garble': 1056425, 'evaluate': 1050897, 'width_counts': {'7': 0, '8': 4, '9': 67, '10': 12, '11': 0}}
