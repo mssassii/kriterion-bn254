@@ -35,9 +35,8 @@ def upperRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) : Lanes
 theorem upperRd_congr (A A' : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ)
     (same : ∀ j : Fin (castAnswers l), A (tagOf j.val) = A' (tagOf j.val)) :
     upperRd A l tagOf = upperRd A' l tagOf := by
-  unfold upperRd castRd
-  congr 3
-  exact funext same
+  exact congrArg (fun answers : Fin (castAnswers l) → Block × Block =>
+    Parity.pinHalf l (castLanes l (packAnswers (castAnswers l) answers))) (funext same)
 
 /-- The cast on a tag table still derives its low plane from its leaf label. -/
 def parityRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) (G : Label) : Lanes l :=

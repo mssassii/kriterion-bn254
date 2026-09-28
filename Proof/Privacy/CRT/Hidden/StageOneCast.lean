@@ -366,7 +366,7 @@ theorem rest_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 32)
       (by rw [treePos_family κ.isLt (by omega)]; decide)
       (by rw [treePos_family κ.isLt (by omega)]; decide)))
     (fun c T => restPub κ (pubT scalar c T)) ?_
-    (fun _ _ a => clip a.1 = g) (2 ^ (256 - labelBits)) (fun _ _ => @clip_answer_card g (fun _ => Classical.propDecidable _)) v
+    (fun _ _ a => clip a.1 = g) (2 ^ (256 - labelBits)) (fun _ _ => @clip_answer_card _ _ g (fun _ => Classical.propDecidable _)) v
   intro c A A' agree
   apply restPub_congr κ scalar c A A'
   intro p hp
