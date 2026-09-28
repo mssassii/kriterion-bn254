@@ -1,0 +1,52 @@
+$ python3 Scratch/opus_joint_model.py
+# HEAD 684c3d826c4b54c6f5d501dff6489b49ebf6f97b
+# tracked changes:
+
+W1 check: blocks 2881 (expect 2881), bits 1003595 (expect 1003595), record bits 618
+target <= 799992 bits: reduction needed 203603 bits = 1008 blocks per coordinate
+C=24 (k=11 chunks): row+chunk-pin blocks 2753 (-128), bits 977739 (-25856; meets target: False); odd-row evaluator queries 269301 vs 279547
+C=16 (k=16 chunks): row+chunk-pin blocks 2563 (-318), bits 939359 (-64236; meets target: False); odd-row evaluator queries 249629 vs 279547
+C= 8 (hypothetical): row+chunk-pin blocks 2255 (-626), bits 877143 (-126452; meets target: False); odd-row evaluator queries 218002 vs 279547
+C= 4 (hypothetical): row+chunk-pin blocks 1979 (-902), bits 821391 (-182204; meets target: False); odd-row evaluator queries 170867 vs 279547
+C= 2 (hypothetical): row+chunk-pin blocks 1799 (-1082), bits 785031 (-218564; meets target: True); odd-row evaluator queries 102834 vs 279547
+C= 1 (carry-free word (hypothetical gadget)): row+chunk-pin blocks 1633 (-1248), bits 751499 (-252096; meets target: True); odd-row evaluator queries 63828 vs 279547
+chunk width 8: 32 chunks, chunk evaluator queries per coordinate 55522
+chunk width 11: 24 chunks, chunk evaluator queries per coordinate 329320
+chunk width 16: 16 chunks, chunk evaluator queries per coordinate 6995602
+
+# joint model (W1 accounting; REST constant = 0.0002574389496339896 )
+norm 7 (W1)  D=91 r=7 E=642 C=32 R=618: 1,003,595 bits = 125,450 B; room -203,603 bits = -1,008 extra blocks/coord or  -330 records
+norm 7 (W1)  D=91 r=7 E=642 C= 4 R=618:   821,391 bits = 102,674 B; room  -21,399 bits =   -106 extra blocks/coord or   -35 records
+norm 7 (W1)  D=91 r=7 E=642 C= 2 R=618:   785,031 bits =  98,129 B; room   14,961 bits =     74 extra blocks/coord or    24 records
+norm 7 (W1)  D=91 r=8 E=733 C=32 R=618: 1,059,833 bits = 132,480 B; room -259,841 bits = -1,287 extra blocks/coord or  -421 records
+norm 7 (W1)  D=91 r=8 E=733 C= 4 R=618:   877,629 bits = 109,704 B; room  -77,637 bits =   -385 extra blocks/coord or  -126 records
+norm 7 (W1)  D=91 r=8 E=733 C= 2 R=618:   841,269 bits = 105,159 B; room  -41,277 bits =   -205 extra blocks/coord or   -67 records
+norm 13      D=69 r=7 E=488 C=32 R=618:   902,593 bits = 112,825 B; room -102,601 bits =   -508 extra blocks/coord or  -167 records
+norm 13      D=69 r=7 E=488 C= 4 R=618:   720,389 bits =  90,049 B; room   79,603 bits =    394 extra blocks/coord or   128 records
+norm 13      D=69 r=7 E=488 C= 2 R=618:   684,029 bits =  85,504 B; room  115,963 bits =    574 extra blocks/coord or   187 records
+norm 13      D=69 r=8 E=557 C=32 R=618:   945,235 bits = 118,155 B; room -145,243 bits =   -720 extra blocks/coord or  -236 records
+norm 13      D=69 r=8 E=557 C= 4 R=618:   763,031 bits =  95,379 B; room   36,961 bits =    182 extra blocks/coord or    59 records
+norm 13      D=69 r=8 E=557 C= 2 R=618:   726,671 bits =  90,834 B; room   73,321 bits =    362 extra blocks/coord or   118 records
+norm 19      D=60 r=7 E=425 C=32 R=617:   860,849 bits = 107,607 B; room  -60,857 bits =   -302 extra blocks/coord or   -99 records
+norm 19      D=60 r=7 E=425 C=32 R=618:   861,274 bits = 107,660 B; room  -61,282 bits =   -304 extra blocks/coord or  -100 records
+norm 19      D=60 r=7 E=425 C= 4 R=617:   678,645 bits =  84,831 B; room  121,347 bits =    600 extra blocks/coord or   196 records
+norm 19      D=60 r=7 E=425 C= 4 R=618:   679,070 bits =  84,884 B; room  120,922 bits =    598 extra blocks/coord or   195 records
+norm 19      D=60 r=7 E=425 C= 2 R=617:   642,285 bits =  80,286 B; room  157,707 bits =    780 extra blocks/coord or   255 records
+norm 19      D=60 r=7 E=425 C= 2 R=618:   642,710 bits =  80,339 B; room  157,282 bits =    778 extra blocks/coord or   254 records
+norm 19      D=60 r=8 E=485 C=32 R=618:   898,354 bits = 112,295 B; room  -98,362 bits =   -487 extra blocks/coord or  -160 records
+norm 19      D=60 r=8 E=485 C= 4 R=618:   716,150 bits =  89,519 B; room   83,842 bits =    415 extra blocks/coord or   135 records
+norm 19      D=60 r=8 E=485 C= 2 R=618:   679,790 bits =  84,974 B; room  120,202 bits =    595 extra blocks/coord or   194 records
+norm 49      D=46 r=7 E=327 C=32 R=617:   796,673 bits =  99,585 B; room    3,319 bits =     16 extra blocks/coord or     5 records
+norm 49      D=46 r=7 E=327 C=32 R=618:   797,000 bits =  99,625 B; room    2,992 bits =     14 extra blocks/coord or     4 records
+norm 49      D=46 r=7 E=327 C= 4 R=617:   614,469 bits =  76,809 B; room  185,523 bits =    918 extra blocks/coord or   300 records
+norm 49      D=46 r=7 E=327 C= 4 R=618:   614,796 bits =  76,850 B; room  185,196 bits =    916 extra blocks/coord or   299 records
+norm 49      D=46 r=7 E=327 C= 2 R=617:   578,109 bits =  72,264 B; room  221,883 bits =  1,098 extra blocks/coord or   359 records
+norm 49      D=46 r=7 E=327 C= 2 R=618:   578,436 bits =  72,305 B; room  221,556 bits =  1,096 extra blocks/coord or   358 records
+norm 49      D=46 r=8 E=373 C=32 R=617:   825,055 bits = 103,132 B; room  -25,063 bits =   -125 extra blocks/coord or   -41 records
+norm 49      D=46 r=8 E=373 C=32 R=618:   825,428 bits = 103,179 B; room  -25,436 bits =   -126 extra blocks/coord or   -42 records
+norm 49      D=46 r=8 E=373 C= 4 R=617:   642,851 bits =  80,357 B; room  157,141 bits =    777 extra blocks/coord or   254 records
+norm 49      D=46 r=8 E=373 C= 4 R=618:   643,224 bits =  80,403 B; room  156,768 bits =    776 extra blocks/coord or   253 records
+norm 49      D=46 r=8 E=373 C= 2 R=617:   606,491 bits =  75,812 B; room  193,501 bits =    957 extra blocks/coord or   313 records
+norm 49      D=46 r=8 E=373 C= 2 R=618:   606,864 bits =  75,858 B; room  193,128 bits =    956 extra blocks/coord or   312 records
+
+record-width floor by encodings: {642: 618, 488: 618, 327: 617, 250: 617}

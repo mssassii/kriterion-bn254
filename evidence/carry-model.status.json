@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "Scratch/opus_carry_model.py"
+  ],
+  "head": "684c3d826c4b54c6f5d501dff6489b49ebf6f97b",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 0.0,
+  "log": "evidence/carry-model.log"
+}
