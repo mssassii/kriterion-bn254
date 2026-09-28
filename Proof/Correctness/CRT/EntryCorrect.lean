@@ -419,8 +419,15 @@ theorem homog_eq [FieldCertificate] (H : HashN) (scalar : NonZeroScalar) (coins 
   rw [e1, e2]
   have keyOn : OnCurve ((outputKeysOf scalar coins).get index).offset.coordinates :=
     ((outputKeysOf scalar coins).get index).offset.onCurve
-  exact Rows.evaluateNormRow_encoded _ _ _ _ _ input onCurve (Rows.z0_ne_zero _ _ keyOn)
-    (Rows.s4_ne_zero _ _ keyOn (fun phi => digitEndomorphismBasePowSix _ phi)) (Rows.unscaledRows_sparse _ _)
+  have zNe : (Rows.unscaledOf (outputKeysOf scalar coins) index).z.constant ≠ 0 :=
+    Rows.z0_ne_zero _ _ keyOn
+  have sNe : (Rows.unscaledOf (outputKeysOf scalar coins) index).y.xSquared ≠ 0 :=
+    Rows.s4_ne_zero _ _ keyOn (fun phi => digitEndomorphismBasePowSix _ phi)
+  have sparse : FieldMacToECMac.SparseRow (Rows.unscaledOf (outputKeysOf scalar coins) index) :=
+    Rows.unscaledRows_sparse _ _
+  exact Rows.evaluateNormRow_encoded (Rows.unscaledOf (outputKeysOf scalar coins) index) (KOf H coins index)
+    (coins.pointRandomness.get index).x (coins.pointRandomness.get index).y (coins.pointRandomness.get index).z
+    input onCurve zNe sNe sparse
 
 /-- The result of the corrected values decodes as the old rows at the corrected randomness. -/
 theorem decodeSame [FieldCertificate] [GroupCertificate] (H : HashN) (scalar : NonZeroScalar) (coins : Coins)
