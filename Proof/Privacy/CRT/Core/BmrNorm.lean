@@ -20,6 +20,7 @@ targets of scales `(ρ, τ)` it is the fixed-context ideal output at `(ρ, (−1
 import Proof.Privacy.CRT.Core.BmrCore
 import Proof.Privacy.CRT.Core.BodyMaskRowOff
 import Proof.Correctness.CRT.Rows
+import Proof.Privacy.Phase3.Glue.AbstractSimulator
 
 namespace Kriterion.CRT.Privacy.BMR
 
@@ -442,5 +443,165 @@ theorem nRealOutOff_eq_nGOff (facts : TableFacts T) (u : AffineInput) (c : Coins
 end Relations
 
 end
+
+/-! ### 5. The quadratic character and the sign split -/
+
+section Character
+
+variable [FieldCertificate]
+
+/-- `χ(x) = x^((p−1)/2)`. -/
+def chi (x : BaseField) : BaseField := x ^ Garbling.characterExponent
+
+theorem characterExponent_odd : Odd Garbling.characterExponent := by
+  rw [Nat.odd_iff]
+  unfold Garbling.characterExponent baseFieldModulus
+  norm_num
+
+theorem rootExponent_two : Garbling.rootExponent * 2 = Garbling.characterExponent + 1 := by
+  unfold Garbling.rootExponent Garbling.characterExponent baseFieldModulus
+  norm_num
+
+theorem chi_mul (a b : BaseField) : chi (a * b) = chi a * chi b := mul_pow a b _
+
+theorem chi_neg_one : chi (-1) = -1 := characterExponent_odd.neg_one_pow
+
+theorem chi_one : chi 1 = 1 := one_pow _
+
+theorem chi_sq_ne (x : BaseField) (ne : x ≠ 0) : chi (x ^ 2) = 1 := by
+  unfold chi
+  rw [← pow_mul, mul_comm, JacobianMixed.two_characterExponent]
+  exact ZMod.pow_card_sub_one_eq_one ne
+
+theorem chi_cases (x : BaseField) (ne : x ≠ 0) : chi x = 1 ∨ chi x = -1 := by
+  have sq : chi x ^ 2 = 1 := by
+    unfold chi
+    rw [← pow_mul, mul_comm, JacobianMixed.two_characterExponent]
+    exact ZMod.pow_card_sub_one_eq_one ne
+  exact sq_eq_one_iff.mp sq
+
+theorem one_ne_neg_one : (1 : BaseField) ≠ -1 := by
+  intro same
+  have two : (2 : BaseField) = 0 := by linear_combination same
+  exact Rows.two_ne_zero_base two
+
+theorem signed_mul (sign : Bool) (a b : BaseField) : Rows.signed sign (a * b) = Rows.signed sign a * b := by
+  cases sign <;> simp [Rows.signed, neg_mul]
+
+theorem signed_signed (sign : Bool) (a : BaseField) : Rows.signed sign (Rows.signed sign a) = a := by
+  cases sign <;> simp [Rows.signed]
+
+theorem signed_ne_zero (sign : Bool) (a : BaseField) (ne : a ≠ 0) : Rows.signed sign a ≠ 0 := by
+  cases sign <;> simpa [Rows.signed] using ne
+
+theorem chi_signed (sign : Bool) (a : BaseField) : chi (Rows.signed sign a) = Rows.signed sign (chi a) := by
+  cases sign
+  · rfl
+  · show chi (-a) = -chi a
+    rw [show -a = -1 * a by ring, chi_mul, chi_neg_one]
+    ring
+
+theorem signBit_eq (x : BaseField) : Rows.signBit x = decide (chi x = -1) := by
+  unfold Rows.signBit chi
+  rw [JacobianMixed.fieldPower_eq _ _ JacobianMixed.characterExponent_lt]
+
+/-- **`ν` of `(−1)^ν τ²` is `ν`.** -/
+theorem signBit_signed_sq (sign : Bool) (tau : BaseField) (ne : tau ≠ 0) :
+    Rows.signBit (Rows.signed sign (tau ^ 2)) = sign := by
+  rw [signBit_eq, chi_signed, chi_sq_ne tau ne]
+  cases sign
+  · simp [Rows.signed, one_ne_neg_one]
+  · simp [Rows.signed]
+
+/-- The square root `x^((p+1)/4)`. -/
+def root (x : BaseField) : BaseField := x ^ Garbling.rootExponent
+
+theorem root_sq (x : BaseField) (square : chi x = 1) : root x ^ 2 = x := by
+  unfold root
+  rw [← pow_mul, rootExponent_two, pow_succ]
+  unfold chi at square
+  rw [square, one_mul]
+
+theorem chi_root (x : BaseField) (square : chi x = 1) : chi (root x) = 1 := by
+  unfold chi root
+  rw [← pow_mul, mul_comm, pow_mul]
+  unfold chi at square
+  rw [square, one_pow]
+
+theorem root_ne_zero (x : BaseField) (ne : x ≠ 0) : root x ≠ 0 := pow_ne_zero _ ne
+
+theorem root_sq_elem (tau : BaseField) : root (tau ^ 2) = chi tau * tau := by
+  unfold root chi
+  rw [← pow_mul, mul_comm 2, rootExponent_two, pow_succ]
+
+/-- The sign split of one digit's sign scale: `(τ, ν) ↦ ((−1)^ν τ², [χ(τ) = 1])`. -/
+def signSplit (p : NonZeroBase × Bool) : NonZeroBase × Bool :=
+  (⟨Rows.signed p.2 (p.1.value ^ 2), signed_ne_zero _ _ (pow_ne_zero 2 p.1.nonzero)⟩, decide (chi p.1.value = 1))
+
+/-- Its inverse. -/
+def signJoin (q : NonZeroBase × Bool) : NonZeroBase × Bool :=
+  let sign := decide (chi q.1.value = -1)
+  let r := root (Rows.signed sign q.1.value)
+  (⟨if q.2 then r else -r, by
+      have ne := root_ne_zero _ (signed_ne_zero sign _ q.1.nonzero)
+      split
+      · exact ne
+      · exact neg_ne_zero.mpr ne⟩, sign)
+
+theorem signJoin_signSplit (p : NonZeroBase × Bool) : signJoin (signSplit p) = p := by
+  obtain ⟨⟨tau, ne⟩, sign⟩ := p
+  have chiKappa : chi (Rows.signed sign (tau ^ 2)) = Rows.signed sign 1 := by
+    rw [chi_signed, chi_sq_ne tau ne]
+  have signEq : decide (chi (Rows.signed sign (tau ^ 2)) = -1) = sign := by
+    rw [chiKappa]
+    cases sign
+    · simp [Rows.signed, one_ne_neg_one]
+    · simp [Rows.signed]
+  unfold signJoin signSplit
+  simp only
+  rw [signEq, signed_signed, root_sq_elem]
+  refine Prod.ext ?_ rfl
+  apply NonZeroBase.ext
+  simp only
+  rcases chi_cases tau ne with one | minus
+  · simp [one]
+  · simp [minus, one_ne_neg_one.symm]
+
+theorem signSplit_signJoin (q : NonZeroBase × Bool) : signSplit (signJoin q) = q := by
+  obtain ⟨⟨kappa, ne⟩, b⟩ := q
+  set sign := decide (chi kappa = -1) with hsign
+  have square : chi (Rows.signed sign kappa) = 1 := by
+    rw [chi_signed]
+    rcases chi_cases kappa ne with one | minus
+    · have : sign = false := by rw [hsign, one]; simp [one_ne_neg_one]
+      rw [this, one]
+      rfl
+    · have : sign = true := by rw [hsign, minus]; simp
+      rw [this, minus]
+      simp [Rows.signed]
+  have rootSq := root_sq _ square
+  have rootChi := chi_root _ square
+  unfold signSplit signJoin
+  simp only
+  refine Prod.ext ?_ ?_
+  · apply NonZeroBase.ext
+    simp only
+    have sq : (if b then root (Rows.signed sign kappa) else -root (Rows.signed sign kappa)) ^ 2 =
+        Rows.signed sign kappa := by
+      split <;> simp [neg_sq, rootSq]
+    rw [← hsign, sq, signed_signed]
+  · simp only
+    cases b
+    · simp only [Bool.false_eq_true, if_false]
+      rw [show -root (Rows.signed sign kappa) = -1 * root (Rows.signed sign kappa) by ring, chi_mul, chi_neg_one,
+        rootChi]
+      simp [one_ne_neg_one.symm]
+    · simp [rootChi]
+
+/-- **The sign split is a bijection.** -/
+def signEquiv : NonZeroBase × Bool ≃ NonZeroBase × Bool :=
+  ⟨signSplit, signJoin, signJoin_signSplit, signSplit_signJoin⟩
+
+end Character
 
 end Kriterion.CRT.Privacy.BMR
