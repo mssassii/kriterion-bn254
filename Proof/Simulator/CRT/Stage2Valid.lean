@@ -88,7 +88,7 @@ theorem noOracle_of_det : ∀ program : Prog, program.OpsSatisfy Op.Det → prog
 theorem det_solve : Solve.solve.OpsSatisfy Op.Det :=
   det_rep _ _ fun d _ => by
     simp only [Solve.solveDigit, Solve.solvePrefix, Solve.rowX, Solve.rowY, Solve.rowZ, Solve.addRowScaled,
-      Solve.addRow, Solve.addConstScaled, Solve.finishMask, Solve.finishMaskOver, Prog.seqList,
+      Solve.addRow, Solve.finishMask, Solve.finishMaskSigned, Prog.seqList,
       Prog.OpsSatisfy, loadAt, storeAt, ar, cst, Op.Det, and_self]
 
 /-- The rows program makes no oracle call (release-r1's tail points, Horner and head clamp, randomisers and lifts). -/

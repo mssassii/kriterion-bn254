@@ -596,8 +596,8 @@ theorem read_deltas (s : Entry.Source) : (readSource (exOf s)).deltas = s.deltas
 theorem read_signs (s : Entry.Source) : (readSource (exOf s)).signs = s.signs := by
   funext d
   show decide ((exSigns s d).val = 1) = s.signs d
-  unfold exSigns
-  cases s.signs d <;> rfl
+  have key : ∀ b : Bool, decide (b.toNat = 1) = b := by decide
+  exact key (s.signs d)
 
 /-- **Every source is the reading of its exact draws.** -/
 theorem readSource_exOf (s : Entry.Source) : readSource (exOf s) = s := by
