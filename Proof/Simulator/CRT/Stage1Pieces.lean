@@ -80,8 +80,9 @@ theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds r
   simp only [Function.comp_apply, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil,
     List.append_nil, pieceBits]
   rw [holds.fields (3 + 3 * digit.val) (by unfold fieldCount curveCellCount rowCellCount; omega), fieldWord,
-    bitRun_ofNat _ _ le_rfl, holds.signs digit, bitRun_ofNat _ _ (by norm_num), flagsOf_publish]
-  congr 2
+    bitRun_ofNat _ _ le_rfl, holds.signs digit, bitRun_ofNat _ _ (by norm_num)]
+  refine congrArg₂ (· ++ ·) (congrArg (lsbs 256) ?_) (congrArg (lsbs 8) (flagsOf_publish source digit).symm)
+  congr 1
   unfold fieldOf
   rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), dif_pos (by omega)]
   simp only [Entry.publish, Vector.getElem_ofFn, Entry.Source.normRow]
