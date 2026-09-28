@@ -242,8 +242,8 @@ theorem public_ext (p q : Entry.Public) (h1 : p.curve = q.curve) (h2 : p.rows = 
   rfl
 
 /-- P45's published cells and hints. -/
-theorem realOutOff_fst (ctx : BMR.Context) (u : AffineInput) (c : BMR.Coins Entry.table) :
-    (BMR.realOutOff ctx u c).1 = ((BMR.join ctx c, BMR.gamma ctx c, BMR.curveTable c), BMR.hint c) := rfl
+theorem realOutOff_fst (ctx : BMR.NContext) (u : AffineInput) (c : BMR.Coins Entry.table) :
+    (BMR.nRealOutOff ctx u c).1 = ((BMR.nJoin ctx c, BMR.nGamma ctx c, BMR.curveTable c), BMR.hint c) := rfl
 
 section View
 
@@ -253,9 +253,9 @@ omit [FieldCertificate] [GroupCertificate] in
 /-- **The published value reads P45 only through its output**, off the hidden positions. -/
 theorem pubOf_fd (scalar : NonZeroScalar) (u : AffineInput) (c1 c2 : Entry.Coins) (T T' : TagTable)
     (hOff : c1.offsets = c2.offsets) (hPad : c1.exceptionPad = c2.exceptionPad)
-    (hZero : c1.inputZero = c2.inputZero) (hDelta : c1.inputDelta = c2.inputDelta) (ctx : BMR.Context)
+    (hZero : c1.inputZero = c2.inputZero) (hDelta : c1.inputDelta = c2.inputDelta) (ctx : BMR.NContext)
     (hctx1 : BmrEntry.bmrContextOf scalar c1 = ctx) (hctx2 : BmrEntry.bmrContextOf scalar c2 = ctx)
-    (p45 : (BMR.realOutOff ctx u (BmrEntry.bmrCoinsOf c1 T)).1 = (BMR.realOutOff ctx u (BmrEntry.bmrCoinsOf c2 T')).1)
+    (p45 : (BMR.nRealOutOff ctx u (BmrEntry.bmrCoinsOf c1 T)).1 = (BMR.nRealOutOff ctx u (BmrEntry.bmrCoinsOf c2 T')).1)
     (agree : ∀ q, ¬ HidPos u q → T q = T' q) :
     EntryCorrect.pubOf (H8.tagHash T) scalar c1 = EntryCorrect.pubOf (H8.tagHash T') scalar c2 := by
   rw [realOutOff_fst, realOutOff_fst] at p45
@@ -292,9 +292,9 @@ theorem pubOf_fd (scalar : NonZeroScalar) (u : AffineInput) (c1 c2 : Entry.Coins
 theorem view_fd_core (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (off : validate u = false)
     (c1 c2 : Entry.Coins) (T T' : TagTable)
     (hOff : c1.offsets = c2.offsets) (hPad : c1.exceptionPad = c2.exceptionPad)
-    (hZero : c1.inputZero = c2.inputZero) (hDelta : c1.inputDelta = c2.inputDelta) (ctx : BMR.Context)
+    (hZero : c1.inputZero = c2.inputZero) (hDelta : c1.inputDelta = c2.inputDelta) (ctx : BMR.NContext)
     (hctx1 : BmrEntry.bmrContextOf scalar c1 = ctx) (hctx2 : BmrEntry.bmrContextOf scalar c2 = ctx)
-    (p45 : (BMR.realOutOff ctx u (BmrEntry.bmrCoinsOf c1 T)).1 = (BMR.realOutOff ctx u (BmrEntry.bmrCoinsOf c2 T')).1)
+    (p45 : (BMR.nRealOutOff ctx u (BmrEntry.bmrCoinsOf c1 T)).1 = (BMR.nRealOutOff ctx u (BmrEntry.bmrCoinsOf c2 T')).1)
     (agree : ∀ q, ¬ HidPos u q → T q = T' q) :
     stageTwoView Instance.crtEntry Entry.table parameter scalar u (c1, T) =
       stageTwoView Instance.crtEntry Entry.table parameter scalar u (c2, T') := by

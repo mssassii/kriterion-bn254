@@ -241,10 +241,10 @@ variable [FieldCertificate] [GroupCertificate]
 
 /-- Two sources with the same P45 fields. -/
 def SameB (s s' : Kriterion.CRT.Entry.Source) : Prop :=
-  s.curve = s'.curve ∧ s.rows = s'.rows ∧ s.recX = s'.recX ∧ s.recY = s'.recY
+  s.curve = s'.curve ∧ s.rows = s'.rows ∧ s.signs = s'.signs ∧ s.recX = s'.recX ∧ s.recY = s'.recY
 
 omit [FieldCertificate] [GroupCertificate] in
-theorem SameB.refl (s : Kriterion.CRT.Entry.Source) : SameB s s := ⟨rfl, rfl, rfl, rfl⟩
+theorem SameB.refl (s : Kriterion.CRT.Entry.Source) : SameB s s := ⟨rfl, rfl, rfl, rfl, rfl⟩
 
 /-- The view built from a source, a table and a draw. -/
 def viewOf (T : CrtTable) (u : AffineInput) {α : Type} (vis : TagTable → α → TagTable) (s : (view).Source)
@@ -431,7 +431,7 @@ theorem factor (T : CrtTable) (u : AffineInput) {α : Type} (D : (view).Source �
       have hy : ((view).publish (convSet 0 s z)).crtY = ((view).publish s).crtY := by
         show Kriterion.CRT.Entry.convVector ((convSet 0 s z).conv 1) = Kriterion.CRT.Entry.convVector (s.conv 1)
         rw [conv_congr 1 _ _ (convGet_other 0 1 (by decide) s z)]
-      have hm := massSame (convSet 0 s z) s ⟨rfl, rfl, rfl, rfl⟩
+      have hm := massSame (convSet 0 s z) s ⟨rfl, rfl, rfl, rfl, rfl⟩
       rw [hy, hm]
       try rfl)
     (fun s => ((view).publish s).crtX)
@@ -443,7 +443,7 @@ theorem factor (T : CrtTable) (u : AffineInput) {α : Type} (D : (view).Source �
     (fun s => ind (((view).publish s).exception = v.1.exception) * (ind ((view).labels s u = v.2.1) *
         (((swappedTableLaw crtLayout).map (restRead T u)) (restTarget T u v) * mass T u D vis (bmrPart T u v) s)))
     (fun s z => by
-      have hm := massSame (convSet 1 s z) s ⟨rfl, rfl, rfl, rfl⟩
+      have hm := massSame (convSet 1 s z) s ⟨rfl, rfl, rfl, rfl, rfl⟩
       rw [hm]
       try rfl)
     (fun s => ((view).publish s).crtY)
@@ -455,7 +455,7 @@ theorem factor (T : CrtTable) (u : AffineInput) {α : Type} (D : (view).Source �
     (fun s => ind ((view).labels s u = v.2.1) *
         (((swappedTableLaw crtLayout).map (restRead T u)) (restTarget T u v) * mass T u D vis (bmrPart T u v) s))
     (fun s z => by
-      have hm := massSame (excSet s z) s ⟨rfl, rfl, rfl, rfl⟩
+      have hm := massSame (excSet s z) s ⟨rfl, rfl, rfl, rfl, rfl⟩
       rw [hm]
       try rfl)
     (fun s => ((view).publish s).exception)
@@ -466,7 +466,7 @@ theorem factor (T : CrtTable) (u : AffineInput) {α : Type} (D : (view).Source �
     (fun _ _ => rfl) (fun _ => rfl) (fun _ _ _ => rfl)
     (fun s => ((swappedTableLaw crtLayout).map (restRead T u)) (restTarget T u v) * mass T u D vis (bmrPart T u v) s)
     (fun s z => by
-      have hm := massSame (LabelsSplitProof.withSourceKeys s z) s ⟨rfl, rfl, rfl, rfl⟩
+      have hm := massSame (LabelsSplitProof.withSourceKeys s z) s ⟨rfl, rfl, rfl, rfl, rfl⟩
       rw [hm])
     (fun s => (view).labels s u)
     (fun s s' h => by
@@ -520,25 +520,30 @@ theorem recY_congr {s s' : Kriterion.CRT.Entry.Source} (h : s.recY = s'.recY) :
   dsimp only
   rw [h]
 
-theorem rows_congr {s s' : Kriterion.CRT.Entry.Source} (h : s.rows = s'.rows) :
+theorem rows_congr {s s' : Kriterion.CRT.Entry.Source} (h : s.rows = s'.rows) (hs : s.signs = s'.signs) :
     ((view).publish s).rows = ((view).publish s').rows := by
   show (Kriterion.CRT.Entry.publish s).rows = (Kriterion.CRT.Entry.publish s').rows
+  have same : s.normRow = s'.normRow := by
+    funext d
+    unfold Kriterion.CRT.Entry.Source.normRow
+    rw [h, hs]
   unfold Kriterion.CRT.Entry.publish
   dsimp only
-  rw [h]
+  rw [same]
 
 /-- **The joins the reveal reads are the records' joins.** -/
 theorem joins_congr {s s' : Kriterion.CRT.Entry.Source} (same : SameB s s') :
     bmrJoinsOf ((view).publish s) = bmrJoinsOf ((view).publish s') := by
   unfold bmrJoinsOf
-  rw [recX_congr same.2.2.1, recY_congr same.2.2.2]
+  rw [recX_congr same.2.2.2.1, recY_congr same.2.2.2.2]
 
 theorem gamma_congr {s s' : Kriterion.CRT.Entry.Source} (same : SameB s s') :
     (view).gammaOf ((view).publish s) = (view).gammaOf ((view).publish s') := by
   show Kriterion.CRT.Entry.gammaOf (Kriterion.CRT.Entry.publish s) =
     Kriterion.CRT.Entry.gammaOf (Kriterion.CRT.Entry.publish s')
   unfold Kriterion.CRT.Entry.gammaOf
-  have hr : (Kriterion.CRT.Entry.publish s).rows = (Kriterion.CRT.Entry.publish s').rows := rows_congr same.2.1
+  have hr : (Kriterion.CRT.Entry.publish s).rows = (Kriterion.CRT.Entry.publish s').rows :=
+    rows_congr same.2.1 same.2.2.1
   rw [hr]
 
 /-- **The CRT values of the reveal read only the records' joins and the cold pads** (`replayCrtValues_x`, `_y`). -/
@@ -558,10 +563,11 @@ theorem values_congr (s s' : (view).Source) (u : AffineInput) (X X' : TagTable)
     rw [h1, h2, hJ, hC]
 
 theorem wraps_congr (s s' : (view).Source) (u : AffineInput) (X X' : TagTable)
-    (hJ : bmrJoinsOf ((view).publish s) = bmrJoinsOf ((view).publish s')) (hC : bmrColdOf X u = bmrColdOf X' u) :
+    (hJ : bmrJoinsOf ((view).publish s) = bmrJoinsOf ((view).publish s')) (hC : bmrColdOf X u = bmrColdOf X' u)
+    (hR : s.rows = s'.rows) :
     replayWraps s u X ↔ replayWraps s' u X' := by
-  unfold replayWraps
-  rw [values_congr s s' u X X' hJ hC]
+  unfold replayWraps replayWindow normBadSrc
+  rw [values_congr s s' u X X' hJ hC, hR]
 
 /-- The replay's output on a table. -/
 def outOf (s : (view).Source) (u : AffineInput) (t : TagTable) : ReplayOut :=
@@ -651,7 +657,7 @@ theorem maskOut_congr (t t' : TagTable) (agree : ∀ p : Fin (2 ^ 40), tagFamily
   rw [pairs, single]
 
 omit [FieldCertificate] [GroupCertificate] in
-theorem collectorMasks_congr (u : AffineInput) (o o' : ReplayOut) (gamma : Fin 91 → RowGamma)
+theorem collectorMasks_congr (u : AffineInput) (o o' : ReplayOut) (gamma : Fin 91 → NormRow)
     (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (hd : o.delivered = o'.delivered) (hm : o.masks = o'.masks) :
     collectorMasks u o gamma targets = collectorMasks u o' gamma targets := by
   unfold collectorMasks replayRowValues
@@ -720,7 +726,7 @@ theorem kernelOn_congr (T : CrtTable) (scalar : NonZeroScalar) (u : AffineInput)
     show rowsDoubling targets ∨ replayWraps s u (programmedTable t drawn) ↔
       rowsDoubling targets ∨ replayWraps s' u (programmedTable t' drawn)
     rw [wraps_congr s s' u _ _ (joins_congr same)
-      (cold_congr u _ _ fun p fam => progAgree drawn p (not_mem_restPos (Or.inl fam)))]
+      (cold_congr u _ _ fun p fam => progAgree drawn p (not_mem_restPos (Or.inl fam))) same.2.1]
   have out : ∀ drawn, bmrPart T u (viewOf T u programmedTable s t drawn) =
       bmrPart T u (viewOf T u programmedTable s' t' drawn) := fun drawn => by
     have e1 : ((view).publish s).curve = ((view).publish s').curve := same.1
@@ -728,7 +734,7 @@ theorem kernelOn_congr (T : CrtTable) (scalar : NonZeroScalar) (u : AffineInput)
         fun tag => programmedTable t' drawn tag.1.1 :=
       funext fun tag => progAgree drawn _ (not_mem_restPos tag.2)
     simp only [bmrPart, viewOf]
-    rw [e1, rows_congr same.2.1, recX_congr same.2.2.1, recY_congr same.2.2.2, e5]
+    rw [e1, rows_congr same.2.1 same.2.2.1, recX_congr same.2.2.2.1, recY_congr same.2.2.2.2, e5]
   unfold kernel drawsOn
   rw [PMF.map_bind, PMF.map_bind]
   refine congrArg (PMF.bind _) (funext fun dr => ?_)
@@ -780,13 +786,13 @@ theorem kernelOff_congr (T : CrtTable) (u : AffineInput) (s s' : (view).Source) 
     (same : SameB s s') (agree : ∀ p, p ∉ restPos T u → t p = t' p) :
     kernel T u (drawsOff u) (fun t _ => t) s t = kernel T u (drawsOff u) (fun t _ => t) s' t' := by
   have cold : bmrColdOf t u = bmrColdOf t' u := cold_congr u t t' fun p fam => agree p (not_mem_restPos (Or.inl fam))
-  have reveal : crtRevealOff s u t ↔ crtRevealOff s' u t' := wraps_congr s s' u t t' (joins_congr same) cold
+  have reveal : crtRevealOff s u t ↔ crtRevealOff s' u t' := wraps_congr s s' u t t' (joins_congr same) cold same.2.1
   have out : bmrPart T u (viewOf T u (fun t _ => t) s t ()) = bmrPart T u (viewOf T u (fun t _ => t) s' t' ()) := by
     have e1 : ((view).publish s).curve = ((view).publish s').curve := same.1
     have e5 : (fun tag : BmrTags T u => t tag.1.1) = fun tag => t' tag.1.1 :=
       funext fun tag => agree _ (not_mem_restPos tag.2)
     simp only [bmrPart, viewOf]
-    rw [e1, rows_congr same.2.1, recX_congr same.2.2.1, recY_congr same.2.2.2, e5]
+    rw [e1, rows_congr same.2.1 same.2.2.1, recX_congr same.2.2.2.1, recY_congr same.2.2.2.2, e5]
   unfold kernel drawsOff
   rw [PMF.pure_map, PMF.pure_map]
   by_cases h : crtRevealOff s u t

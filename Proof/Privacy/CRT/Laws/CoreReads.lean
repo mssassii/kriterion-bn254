@@ -106,7 +106,7 @@ variable [FieldCertificate] [GroupCertificate]
 theorem realBmr_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (c : crtEntry.Coins)
     (t : TagTable) :
     Laws.realBmr Tb parameter scalar u (c, t) =
-      BmrSplit.bmrOf u (BMR.realOut (BmrEntry.bmrContextOf scalar c) u (BmrEntry.bmrCoinsOf c t))
+      BmrSplit.bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar c) u (BmrEntry.bmrCoinsOf c t))
         (BmrSplit.restrictBmr u t) := by
   rw [← Laws.bmrPart_realView]
   exact BmrReal.bmrPart_realView parameter scalar u (c, t)
@@ -122,7 +122,7 @@ theorem realBmr_congr (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInpu
   have ctx : BmrEntry.bmrContextOf scalar c = BmrEntry.bmrContextOf scalar c' :=
     BmrSplit.bmrContextOf_congr scalar (show BmrSplit.ctxPart c = BmrSplit.ctxPart c' by
       unfold BmrSplit.ctxPart
-      rw [offsets, points])
+      rw [offsets])
   have coins : BmrEntry.bmrCoinsOf c t = BmrEntry.bmrCoinsOf c' t' := by
     unfold BmrEntry.bmrCoinsOf
     simp only [bmrPadsOf_congr agree, bmrMasksOf_congr agree, points, bridge, mask, r1, r2]
