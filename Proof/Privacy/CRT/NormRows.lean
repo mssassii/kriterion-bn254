@@ -28,7 +28,7 @@ noncomputable section
 /-! ### 1. The kernel -/
 
 /-- The unscaled rows of the scheme's coins. -/
-def nctxOf (scalar : NonZeroScalar) (coins : Coins) : BMR.NContext :=
+abbrev nctxOf (scalar : NonZeroScalar) (coins : Coins) : BMR.NContext :=
   ⟨fun d => Rows.unscaledOf (Entry.outputKeysOf scalar coins) d⟩
 
 /-- The row randomizers `(ρ, τ)` of the scheme's coins (unused by the construction; the kernel's scales). -/

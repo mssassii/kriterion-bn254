@@ -135,12 +135,18 @@ def RealReading (K : TableKernel) : Prop :=
         if H8.Doubling crtEntry scalar (coins, fun _ => (0, 0)) u then PMF.pure none
         else (bmrLaw K u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u (coinsOf τ (layerOf coins)))).map some
 
-/-- The P45 reveal: doubling of the corrected true rows, a CRT value in the two-sided window, or the
+/-- The P45 reveal at kernel scales: doubling of the corrected targets, a CRT value in the two-sided window, or the
 normalization flag of the source's hidden cells. -/
-def revealP45 (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
-    (cells : BMR.NSource Tb × BMR.Visible Tb u) : Prop :=
-  H8.rowsDoubling (NormRows.normTrueRows scalar coins u) ∨
+def revealAt (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins)
+    (scales : Fin 91 → NonZeroBase × NonZeroBase) (u : AffineInput) (cells : BMR.NSource Tb × BMR.Visible Tb u) :
+    Prop :=
+  H8.rowsDoubling (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u scales) ∨
     (∃ e, BMR.InWindow Tb (BMR.evalInt u cells.1.1 cells.2.1 e)) ∨ BMR.normBad cells.1
+
+/-- The P45 reveal at the coins' own kernel scales. -/
+abbrev revealP45 (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
+    (cells : BMR.NSource Tb × BMR.Visible Tb u) : Prop :=
+  revealAt scalar coins (NormRows.scalesOf coins) u cells
 
 open Classical in
 /-- **`M'`'s P45 part**. -/
@@ -214,11 +220,18 @@ theorem bmrContextOf_congr (scalar : NonZeroScalar) {coins coins' : Kriterion.Ar
   unfold BmrEntry.bmrContextOf NormRows.nctxOf Kriterion.CRT.Entry.outputKeysOf
   rw [offsets]
 
+/-- The doubling event on a table tape, as the entry's exceptional inputs. -/
+theorem doubling_tape (scalar : NonZeroScalar) (u : AffineInput) (tape : TableTape crtEntry) :
+    H8.Doubling crtEntry scalar tape u ↔ ∃ o, Kriterion.CRT.Entry.exceptional scalar tape.1 o = some u :=
+  Iff.rfl
+
 /-- The doubling event at a pair, as the entry's exceptional inputs of the coins. -/
 theorem doubling_iff (scalar : NonZeroScalar) (u : AffineInput) (coins : Kriterion.ArgoMAC.Scheme.Coins)
     (table : TagTable) :
-    H8.Doubling crtEntry scalar (coins, table) u ↔ ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u :=
-  Iff.rfl
+    H8.Doubling crtEntry scalar (coins, table) u ↔ ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u := by
+  refine (doubling_tape scalar u (coins, table)).trans ?_
+  dsimp only
+  exact Iff.rfl
 
 /-- The doubling event reads only the context part. -/
 theorem doubling_congr (scalar : NonZeroScalar) (u : AffineInput) {coins coins' : Kriterion.ArgoMAC.Scheme.Coins}
@@ -251,13 +264,21 @@ theorem normTrueRows_layer (scalar : NonZeroScalar) (u : AffineInput) (coins : K
 
 /-- The nonzero-coordinate facts of the context. -/
 theorem valid_ctx (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) :
-    (BmrEntry.bmrContextOf scalar coins).Valid := fun d =>
-  ⟨Rows.z0_ne_zero _ _ ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.onCurve,
-    Rows.s4_ne_zero _ _ ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.onCurve
-      (fun phi => digitEndomorphismBasePowSix _ phi)⟩
+    (BmrEntry.bmrContextOf scalar coins).Valid := by
+  intro d
+  have z := Rows.z0_ne_zero ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.coordinates
+    (digitEndomorphismBase ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit)
+    ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.onCurve
+  have s4 := Rows.s4_ne_zero ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.coordinates
+    (digitEndomorphismBase ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit)
+    ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.onCurve
+    (fun phi => digitEndomorphismBasePowSix ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit phi)
+  exact ⟨z, s4⟩
 
 theorem sparse_ctx (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) :
-    (BmrEntry.bmrContextOf scalar coins).Sparse := fun _ => Rows.unscaledRows_sparse _ _
+    (BmrEntry.bmrContextOf scalar coins).Sparse := fun d =>
+  Rows.unscaledRows_sparse ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.coordinates
+    (digitEndomorphismBase ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit)
 
 open Classical in
 /-- **`CrtBmrSplit` from the kernel, the two readings and the coin split.** -/
@@ -276,8 +297,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
   -- the ideal side, likewise
   let h : Kriterion.ArgoMAC.Scheme.Coins → Layer → ℝ≥0∞ := fun coins layer =>
     ∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Visible Tb u) cells *
-      (if H8.rowsDoubling (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u layer.1) ∨
-          (∃ e, BMR.InWindow Tb (BMR.evalInt u cells.1.1 cells.2.1 e)) ∨ BMR.normBad cells.1 then PMF.pure none
+      (if revealAt scalar coins layer.1 u cells then PMF.pure none
         else (bmrLaw K u (BMR.nIdealOut (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u layer.1) u cells)).map
           some) (some w)
   have rhs : ∀ coins, (∑' τ, PMF.uniformOfFintype Targets τ *
@@ -317,7 +337,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
     simp only [g, doubling_congr scalar u (fun _ => (0, 0)) (fun _ => (0, 0)) same, bmrContextOf_congr scalar same]
   have invariantH : ∀ coins coins' layer, ctxPart coins = ctxPart coins' → h coins layer = h coins' layer := by
     intro coins coins' layer same
-    simp only [h, bmrContextOf_congr scalar same]
+    simp only [h, revealAt, bmrContextOf_congr scalar same]
   rw [L, R, split g invariantG, split h invariantH]
   refine ENNReal.tsum_le_tsum fun coins => ?_
   gcongr coinLaw coins * ?_
@@ -330,7 +350,8 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
       intro s old
       refine ENNReal.tsum_eq_zero.mpr fun cells => ?_
       have flagged := BmrEntry.rowsDoubling_nTargets scalar coins u ((doubling_iff scalar u _ _).mp dbl) s
-      rw [if_pos (Or.inl flagged), PMF.pure_apply_of_ne _ _ (Option.some_ne_none w), mul_zero]
+      rw [if_pos (show revealAt scalar coins s u cells from Or.inl flagged),
+        PMF.pure_apply_of_ne _ _ (Option.some_ne_none w), mul_zero]
     simp only [zero, mul_zero, tsum_zero]
     exact zero_le
   · -- no doubling: the normalized core
@@ -344,8 +365,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
       simp only [gval]
       exact uniform_sum_equiv coinsEquiv fun c => bmrLaw K u (BMR.nRealOut (BmrEntry.bmrContextOf scalar coins) u c) w
     have hval : ∀ s old, h coins (s, old) = ∑' cells, PMF.uniformOfFintype (BMR.NSource Tb × BMR.Visible Tb u) cells *
-        (if H8.rowsDoubling (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u s) ∨
-            (∃ e, BMR.InWindow Tb (BMR.evalInt u cells.1.1 cells.2.1 e)) ∨ BMR.normBad cells.1 then 0
+        (if revealAt scalar coins s u cells then 0
           else bmrLaw K u (BMR.nIdealOut (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u s) u cells) w) := by
       intro s old
       refine tsum_congr fun cells => ?_
@@ -355,8 +375,7 @@ theorem crtBmrSplit_of (K : TableKernel) (real : ∀ [FieldCertificate] [GroupCe
     simp only [gconst, hval, BMR.tsum_uniform_const]
     exact BMR.nCore_weighted Flags.Wrap.entryTableFacts (BmrEntry.bmrContextOf scalar coins) (valid_ctx scalar coins)
       (sparse_ctx scalar coins) u onCurve
-      (fun s cells => H8.rowsDoubling (BMR.nTargets (BmrEntry.bmrContextOf scalar coins) u s) ∨
-        (∃ e, BMR.InWindow Tb (BMR.evalInt u cells.1.1 cells.2.1 e)) ∨ BMR.normBad cells.1)
+      (fun s cells => revealAt scalar coins s u cells)
       (fun s cells flagged window => flagged (Or.inr (Or.inl window)))
       (fun s cells flagged bad => flagged (Or.inr (Or.inr bad)))
       (fun o => bmrLaw K u o w)
