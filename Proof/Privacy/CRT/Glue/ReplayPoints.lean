@@ -224,12 +224,12 @@ theorem bodyEvalM_closed (κ : ℕ) (hκ : κ < 2) (S : ℕ) (hS : S = padS κ) 
   unfold padVectorM
   rw [asked_bind, asked_pure, List.append_nil, Align.asked_hlongM]
   have listEq : ((List.finRange (Kriterion.CRT.Entry.table.padAnswers S i)).map fun j =>
-      hashInput (final r) (bodyTag κ i.val r.val j.val)) =
-      ((List.range (padCount κ i.val)).map fun j => bodyTag κ i.val r.val j).map fun tag => hashInput (final r) tag := by
+      hashInput (embed (final r)) (bodyTag κ i.val r.val j.val)) =
+      ((List.range (padCount κ i.val)).map fun j => bodyTag κ i.val r.val j).map fun tag => hashInput (embed (final r)) tag := by
     rw [padCount_eq κ hκ S hS i, List.map_map, ← List.map_coe_finRange_eq_range, List.map_map]
     rfl
   rw [listEq]
-  refine closedList_site (final r) (.pad κ i.val r.val) _ (siteTags_pad κ i.val r.val) fun tag tagIn => ?_
+  refine closedList_site (embed (final r)) (.pad κ i.val r.val) _ (siteTags_pad κ i.val r.val) fun tag tagIn => ?_
   obtain ⟨j, hj, rfl⟩ := List.mem_map.mp tagIn
   rw [List.mem_range, padCount_eq κ hκ S hS i] at hj
   exact siteOf_bodyTag hκ hi (lt_trans r.isLt hm) (lt_trans hj hq)
