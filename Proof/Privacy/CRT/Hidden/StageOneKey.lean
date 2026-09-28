@@ -497,10 +497,11 @@ theorem moved (x : Entry.Coins × BMR.Pads table) (m : NZ) (R : TagTable) :
     show -m.1 + (x.1.curveR2 - (x.1.curveMask.value - m.1)) = -x.1.curveMask.value + x.1.curveR2
     ring
 
-theorem ctx_move (scalar : NonZeroScalar) (c : Entry.Coins) (m : NZ) :
-    BmrEntry.bmrContextOf scalar (moveCoins c m) = BmrEntry.bmrContextOf scalar c := rfl
-
 theorem moveCoins_offsets (c : Entry.Coins) (m : NZ) : (moveCoins c m).offsets = c.offsets := rfl
+
+theorem ctx_move (scalar : NonZeroScalar) (c : Entry.Coins) (m : NZ) :
+    BmrEntry.bmrContextOf scalar (moveCoins c m) = BmrEntry.bmrContextOf scalar c :=
+  BmrSplit.bmrContextOf_congr scalar (moveCoins_offsets c m)
 theorem moveCoins_exceptionPad (c : Entry.Coins) (m : NZ) : (moveCoins c m).exceptionPad = c.exceptionPad := rfl
 theorem moveCoins_inputZero (c : Entry.Coins) (m : NZ) : (moveCoins c m).inputZero = c.inputZero := rfl
 theorem moveCoins_inputDelta (c : Entry.Coins) (m : NZ) : (moveCoins c m).inputDelta = c.inputDelta := rfl
