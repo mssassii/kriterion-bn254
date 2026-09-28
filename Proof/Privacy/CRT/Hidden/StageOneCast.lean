@@ -16,6 +16,7 @@ import Proof.Correctness.CRT.ChunkStep
 
 set_option linter.unusedSectionVars false
 set_option autoImplicit false
+set_option maxRecDepth 4096
 
 namespace Kriterion.CRT.Privacy.CastNever
 
@@ -28,6 +29,8 @@ open Kriterion.CRT.Privacy.Laws (Indep Ignores)
 open scoped ENNReal
 
 noncomputable section
+
+attribute [local instance 2000] H8.tableModulusNeZero
 
 /-! ### The query label -/
 
@@ -214,7 +217,9 @@ theorem restPub_congr (κ : Fin 2) (scalar : NonZeroScalar) (c : Entry.Coins)
     ext i hi
     change (pubT scalar c A).rows.get ⟨i, hi⟩ = (pubT scalar c A').rows.get ⟨i, hi⟩
     unfold pubT
-    rw [BmrEntry.rows_eq, BmrEntry.rows_eq, bc]
+    have h := BmrEntry.rows_eq scalar c A ⟨i, hi⟩
+    rw [bc] at h
+    exact h.trans (BmrEntry.rows_eq scalar c A' ⟨i, hi⟩).symm
   have rx : (pubT scalar c A).recX = (pubT scalar c A').recX := by
     unfold pubT
     rw [BmrReal.recX_vec, BmrReal.recX_vec, bc]
@@ -253,10 +258,10 @@ theorem restPub_congr (κ : Fin 2) (scalar : NonZeroScalar) (c : Entry.Coins)
       rw [coord xCount 0 (by decide) (by decide) (by decide)]
   fin_cases κ
   · change Entry.Public.mk _ _ _ _ _ _ _ = Entry.Public.mk _ _ _ _ _ _ _
-    simp only [show (0 : Fin 2) = 0 from rfl, if_true] at other
+    change (pubT scalar c A).crtY = (pubT scalar c A').crtY at other
     rw [curve, rows, ex, other, rx, ry]
   · change Entry.Public.mk _ _ _ _ _ _ _ = Entry.Public.mk _ _ _ _ _ _ _
-    simp only [show (1 : Fin 2) ≠ 0 by decide, if_false] at other
+    change (pubT scalar c A).crtX = (pubT scalar c A').crtX at other
     rw [curve, rows, ex, other, rx, ry]
 
 /-- The zero input leaves the never-hot label's tree position cold. -/
@@ -302,7 +307,9 @@ theorem crtPart_pubT (κ : Fin 2) (scalar : NonZeroScalar) (tape : TableTape Ins
     DeltaView.crtPart 0 scalar κ tape = crtOf κ (pubT scalar tape.1 tape.2) := by
   rcases tape with ⟨c, T⟩
   unfold DeltaView.crtPart crtOf pubT
-  rw [BmrReal.realGarbled_pair]
+  split_ifs
+  · exact congrArg (fun p => p.1.crtX) (BmrReal.realGarbled_pair 0 scalar c T)
+  · exact congrArg (fun p => p.1.crtY) (BmrReal.realGarbled_pair 0 scalar c T)
 
 /-! ### Probability factorization -/
 
@@ -332,8 +339,17 @@ theorem clip_answer_card (g : Label) [DecidablePred fun a : Block × Block => cl
 theorem clip_answer_ratio :
     ((2 ^ (256 - labelBits) : ℕ) : ℝ≥0∞) / Fintype.card (Block × Block) =
       ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by
-  rw [Fintype.card_prod, Kriterion.ArgoMAC.Security.PGS.card_block]
-  norm_num [labelBits]
+  have den : Fintype.card (Block × Block) = 2 ^ (256 - labelBits) * 2 ^ labelBits := by
+    rw [Fintype.card_prod, Kriterion.ArgoMAC.Security.PGS.card_block]
+    decide
+  have nz : (2 : ℝ≥0∞) ^ (256 - labelBits) ≠ 0 := pow_ne_zero _ two_ne_zero
+  have nt : (2 : ℝ≥0∞) ^ (256 - labelBits) ≠ ⊤ := ENNReal.pow_ne_top ENNReal.ofNat_ne_top
+  rw [den]
+  simp only [Nat.cast_mul, Nat.cast_pow, Nat.cast_ofNat]
+  rw [ENNReal.div_eq_inv_mul, ENNReal.mul_inv (Or.inl nz) (Or.inl nt)]
+  calc _ = (((2 : ℝ≥0∞) ^ (256 - labelBits))⁻¹ * 2 ^ (256 - labelBits)) *
+      ((2 : ℝ≥0∞) ^ labelBits)⁻¹ := by ring
+    _ = _ := by rw [ENNReal.inv_mul_cancel nz nt, one_mul]
 
 /-- The target material is uniform conditional on the remaining public fields. -/
 theorem rest_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 32)
@@ -368,9 +384,6 @@ theorem public_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 3
         {tape | pubT scalar tape.1 tape.2 = v ∧ clip (tape.2 (treePos κ.val s)).1 = g} ≤
       ((2 : ℝ≥0∞) ^ labelBits)⁻¹ * (swappedTableTape Instance.crtEntry).toOuterMeasure
         {tape | pubT scalar tape.1 tape.2 = v} := by
-  let μ := swappedTableTape Instance.crtEntry
-  let ν := (@PMF.uniformOfFintype _ (Instance.view).sourceFintype (Instance.view).sourceNonempty).map
-    fun source => crtOf κ ((Instance.view).publish source)
   have joint := DeltaView.conv_split 0 scalar zeroInput κ
     (fun tape => (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1))
     (restPub_label_reads κ scalar hs hne) (crtOf κ v) (restPub κ v, g)
@@ -384,13 +397,24 @@ theorem public_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 3
         (crtOf κ v, (restPub κ v, g))} =
       {tape | pubT scalar tape.1 tape.2 = v ∧ clip (tape.2 (treePos κ.val s)).1 = g} := by
     ext tape
-    simp only [Set.mem_setOf_eq, Prod.mk.injEq, pub_eq_iff κ (pubT scalar tape.1 tape.2) v]
-    tauto
+    change ((crtOf κ (pubT scalar tape.1 tape.2),
+      (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1)) =
+      (crtOf κ v, (restPub κ v, g))) ↔ _
+    rw [Prod.mk.injEq, Prod.mk.injEq]
+    constructor
+    · rintro ⟨hc, hr, hy⟩
+      exact ⟨(pub_eq_iff κ _ v).mpr ⟨hc, hr⟩, hy⟩
+    · rintro ⟨hp, hy⟩
+      obtain ⟨hc, hr⟩ := (pub_eq_iff κ _ v).mp hp
+      exact ⟨hc, hr, hy⟩
   have marginalSet : {tape : TableTape Instance.crtEntry |
       (crtOf κ (pubT scalar tape.1 tape.2), restPub κ (pubT scalar tape.1 tape.2)) =
         (crtOf κ v, restPub κ v)} = {tape | pubT scalar tape.1 tape.2 = v} := by
     ext tape
-    simp only [Set.mem_setOf_eq, Prod.mk.injEq, pub_eq_iff κ (pubT scalar tape.1 tape.2) v]
+    change ((crtOf κ (pubT scalar tape.1 tape.2), restPub κ (pubT scalar tape.1 tape.2)) =
+      (crtOf κ v, restPub κ v)) ↔ _
+    rw [Prod.mk.injEq]
+    exact (pub_eq_iff κ _ v).symm
   rw [jointSet] at joint
   rw [marginalSet] at marginal
   have restSet : {tape : TableTape Instance.crtEntry |
@@ -398,7 +422,7 @@ theorem public_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 3
       {tape | restPub κ (pubT scalar tape.1 tape.2) = restPub κ v ∧
         clip (tape.2 (treePos κ.val s)).1 = g} := by
     ext tape
-    exact Prod.mk.injEq
+    simp only [Set.mem_ofPred_eq, Prod.mk.injEq]
   rw [restSet] at joint
   rw [joint, marginal]
   calc _ ≤ _ := mul_le_mul' le_rfl (rest_guess κ scalar hs g (restPub κ v))
