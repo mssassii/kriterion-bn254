@@ -858,7 +858,7 @@ theorem agree_growEval (cells : TreeCells) (tagOf : Nat → Nat → Nat) (start 
         exact bitCells count (by omega)
       have bitNowRaw : after.ram (word (cells.bit (start + count))) =
           blockWord (embed (bitLabel (start + count))) := by rw [blockWord_embed]; exact bitNow
-      have stepAgree := agree_treeStep cells (tagOf (start + count)) (start + count) (by omega) value valueSmall
+      have stepAgree := agree_treeStep (FixedIndex := FixedIndex) (EncIndex := EncIndex) cells (tagOf (start + count)) (start + count) (by omega) value valueSmall
         (embed (bitLabel (start + count))) (join (start + count)) previous after layout alphaNow levelCells
         joinNow bitNowRaw (fun s sb => tagSmall count s (by omega) sb)
       simp only [show ∀ l : Label, clip (embed l) = l from Narrow.clip_embed] at stepAgree
