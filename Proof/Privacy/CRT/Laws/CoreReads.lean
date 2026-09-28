@@ -109,7 +109,9 @@ theorem realBmr_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput
       BmrSplit.bmrOf u (BMR.nRealOut (BmrEntry.bmrContextOf scalar c) u (BmrEntry.bmrCoinsOf c t))
         (BmrSplit.restrictBmr u t) := by
   rw [← Laws.bmrPart_realView]
-  exact BmrReal.bmrPart_realView parameter scalar u (c, t)
+  have h := BmrReal.bmrPart_realView parameter scalar u (c, t)
+  dsimp only at h
+  exact h
 
 /-- **The real P45 part reads the coins off the input labels and the exception pads, and the table at the families
 6, 7 and 10.** -/
