@@ -121,7 +121,8 @@ theorem retained_finalOf (start : Memory)
       (Or.inr (by unfold Layout.zeroJoin; omega))
       (Or.inr (by unfold Layout.zeroJoin; omega))
       (Or.inr (by unfold Layout.zeroJoin exceptionBase exceptionCellCount; omega))
-      (Or.inr (by unfold Layout.zeroJoin fieldBase fieldCount curveCellCount rowCellCount; omega))]
+      (Or.inr (by unfold Layout.zeroJoin fieldBase fieldCount curveCellCount rowCellCount; omega))
+      (Or.inr (by unfold Layout.zeroJoin fieldBase; omega))]
     exact zeroStart
   · intro j hj
     rw [evenKeep j hj, deltaKeep (j / 254) (by unfold labelCount at hj; omega)]
