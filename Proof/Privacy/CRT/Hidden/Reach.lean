@@ -497,8 +497,12 @@ theorem row_shape (i : Fin Entry.table.count) (row : OddRow) (hk : Entry.table.k
   obtain ⟨rfl, _⟩ := row_eq i row hk
   have castW : bn254Table.castWidth = 14 := rfl
   rw [table_chunkCount] at lt
-  have w0lo : 7 ≤ (width8Row 32 (Entry.table.modulus i)).width0 := by decide
-  have w0hi : (width8Row 32 (Entry.table.modulus i)).width0 ≤ 8 := by decide
+  have w0lo : 7 ≤ (width8Row 32 (Entry.table.modulus i)).width0 := by
+    change 7 ≤ 8
+    decide
+  have w0hi : (width8Row 32 (Entry.table.modulus i)).width0 ≤ 8 := by
+    change 8 ≤ 8
+    decide
   refine ⟨w0lo, w0hi, rfl, rfl, ?_, by rw [castW] at cast; exact cast, lt⟩
   omega
 
