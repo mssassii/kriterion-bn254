@@ -102,7 +102,7 @@ theorem coordEvalKeys_sub (T : CrtTable) (S coord : Nat) : coordEvalKeys T S coo
 
 /-- **The evaluator of one coordinate.** -/
 theorem coordEvalM_tagged (T : CrtTable) (S coord : Nat) (ranges : TableRanges T S) (coordLt : coord < 2)
-    (pub : ConvPublic) (records : Fin S → Nat) (v : Nat) (labels : Nat → Block) :
+    (pub : ConvPublic) (records : Fin S → Nat) (v : Nat) (labels : Nat → Label) :
     Tagged (coordEvalKeys T S coord) (coordEvalM T S coord pub records v labels) := by
   unfold coordEvalM
   refine Tagged.bind (Tagged.tableM (S := fun c => pairKeys 0 1 coord c 0) T.chunkCount

@@ -245,7 +245,7 @@ theorem lane_bit_lt (hl : 0 < l) (hl' : l ≤ 128) (lane : Fin laneCount) (j : F
   have blocks : lane.val / k < castBlocks l := by
     unfold castBlocks
     rw [← hk]
-    have hlane : lane.val < 128 := lane.isLt
+    have hlane : lane.val < labelBits := lane.isLt
     apply (Nat.lt_div_iff_mul_lt per).mpr
     · have := Nat.div_mul_le_self lane.val k
       omega

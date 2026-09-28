@@ -17,11 +17,12 @@ set_option maxRecDepth 100000
 /-- A cast reads at most `64` answers, whatever its width. -/
 theorem castAnswers_le (width : Nat) : castAnswers width ≤ 64 := by
   unfold castAnswers castBlocks
+  change ((104 + lanesPerBlock width - 1) / lanesPerBlock width + 1) / 2 ≤ 64
   generalize lanesPerBlock width = per
   rcases Nat.eq_zero_or_pos per with zero | positive
   · subst zero
     simp
-  · have blocks : (128 + per - 1) / per ≤ 128 := Nat.div_le_of_le_mul (by omega)
+  · have blocks : (104 + per - 1) / per ≤ 104 := Nat.div_le_of_le_mul (by omega)
     omega
 
 theorem bn254_modulus_le : ∀ i, bn254Table.modulus i ≤ 439 := by decide +kernel

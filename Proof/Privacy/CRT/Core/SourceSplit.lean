@@ -28,7 +28,7 @@ abbrev LabelKey := (Fin 2 → Fin coordinateBitCount → Block) × (Fin 2 → Bl
 
 /-- The published cells of a source. -/
 abbrev Cells := (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) ×
-  (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Entry.joinCount → Block) ×
+  (Fin digitCount → Exception.Entry) × (Fin 2 → Fin Entry.joinCount → Label) ×
   (Fin 2 → (k : Fin Entry.pinCount) → Lanes (Entry.pinWidth k)) × (Fin Entry.xCount → Fin Entry.table.product) ×
   (Fin Entry.yCount → Fin Entry.table.product)
 

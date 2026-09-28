@@ -250,10 +250,10 @@ theorem garbler_to_reach [FieldCertificate] [GroupCertificate] :
 
 /-- The garbler's inputs, by block. -/
 theorem garbler_of_mem {n : ℕ}
-    (h : n ∈ asked H (coordGarbleM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.xCount 0 (coins.inputDelta .x)
-          (atNat (coins.inputZero .x) 0)) ∨
-      n ∈ asked H (coordGarbleM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.yCount 1 (coins.inputDelta .y)
-          (atNat (coins.inputZero .y) 0)) ∨
+    (h : n ∈ asked H (coordGarbleM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.xCount 0 (clip (coins.inputDelta .x))
+          (fun j => clip (atNat (coins.inputZero .x) 0 j))) ∨
+      n ∈ asked H (coordGarbleM Kriterion.CRT.Entry.table Kriterion.CRT.Entry.yCount 1 (clip (coins.inputDelta .y))
+          (fun j => clip (atNat (coins.inputZero .y) 0 j))) ∨
       n ∈ asked H (keyM coins.bridgeKey) ∨
       n ∈ asked H (maskAnswersM ((keyM coins.bridgeKey).eval H) digitCount) ∨
       n ∈ asked H (digestTableM coordinateBitCount (Kriterion.CRT.Entry.zeroOf coins)

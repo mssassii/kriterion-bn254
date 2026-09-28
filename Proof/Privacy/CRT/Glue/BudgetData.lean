@@ -702,9 +702,10 @@ theorem outputKernelError_le : Nat.ble (455 * 2 ^ 100 * 1000) (r - 1) = true := 
 theorem coincidenceError_le : Nat.ble (185 * 2 ^ 100 * 1000) (2 ^ 128) = true := by decide +kernel
 theorem machineCutoffError_le : Nat.ble (1 * 2 ^ 100 * 1000) (2 ^ 128) = true := by decide +kernel
 
-/-- Per stage-1 query `8/2^128 + 1/(p - 1)` and per stage-2 query `4/2^128 + 1/(p - 1)`, at most `1/1000`. -/
-theorem stageOneQuery_le : Nat.ble ((8 * (p - 1) + 2 ^ 128) * 2 ^ 100 * 1000) (2 ^ 128 * (p - 1)) = true := by decide +kernel
-theorem stageTwoQuery_le : Nat.ble ((4 * (p - 1) + 2 ^ 128) * 2 ^ 100 * 1000) (2 ^ 128 * (p - 1)) = true := by decide +kernel
+/-- Hidden plus touch per stage-1 query is at most `2/3` of the unit;
+the stage-2 hidden charge alone is at most `1/3`. Both field charges are counted at stage 1. -/
+theorem stageOneQuery_le : Nat.ble ((8 * (p - 1) + 2 * 2 ^ 104) * 2 ^ 100 * 3) (2 * 2 ^ 104 * (p - 1)) = true := by decide +kernel
+theorem stageTwoQuery_le : Nat.ble ((4 * (p - 1) + 2 ^ 104) * 2 ^ 100 * 3) (2 ^ 104 * (p - 1)) = true := by decide +kernel
 
 /-! ### The closing inequality for the constant, exactly
 

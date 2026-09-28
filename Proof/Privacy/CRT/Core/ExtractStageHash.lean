@@ -6,7 +6,7 @@ Every CRT definition takes the oracle as `H : HashN := Nat → Block × Block`; 
 `Proof.Privacy.CRT.Core.ExtractStage` (the stage with its hidden tuple as parameters) to that reading:
 
 * `garbleStage H tags sub Δ`: one fused stage of the garbler run on `H`, every slot hashed, input-free: tree materials
-  `h128 H G (treeTag n σ)`, casts `castLanes l (hlong H G (castTag α) (castAnswers l))` (D11), joins
+  `hLabel H G (treeTag n σ)`, casts `castLanes l (hlong H (embed G) (castTag α) (castAnswers l))` (D11), joins
   `Y_n ⊕ laneBit (sub − reduce res_n) n`, pin `Σ_α A_α + Δ⃗`;
 * `garbleStage_eq_publish`: for **every** `H` and every stage value `s`, the garbler's published tuple is `publish`
   of the frame read from `H` at the hidden tuple read from `H` at the hot positions of `s` (the point reading, where
@@ -23,6 +23,7 @@ tag layout). Nothing here depends on the garbler's program form.
 
 import Construction.CRT.Interface
 import Proof.Privacy.CRT.Core.ExtractStage
+import Proof.Privacy.CRT.Core.LabelUniform
 
 namespace Kriterion.CRT.Privacy.ExtractStage
 
@@ -44,53 +45,53 @@ def frozenTags (κ idx st : ℕ) : StageTags where
   castTag α j := Kriterion.CRT.tagCode Kriterion.CRT.Family.extCast κ idx st 0 α j
 
 /-- A cast of width `l` read from `H` at label `G` (D11). -/
-def castRead (H : Kriterion.CRT.HashN) (l : ℕ) (tagOf : ℕ → ℕ) (G : Block) : Lanes 128 l :=
-  Kriterion.CRT.castLanes l (Kriterion.CRT.hlong H G tagOf (Kriterion.CRT.castAnswers l))
+def castRead (H : Kriterion.CRT.HashN) (l : ℕ) (tagOf : ℕ → ℕ) (G : Label) : Lanes labelBits l :=
+  Kriterion.CRT.castLanes l (Kriterion.CRT.hlong H (embed G) tagOf (Kriterion.CRT.castAnswers l))
 
 /-- The frame of one stage run on `H`: the cold answers are `H`'s at the points the garbler asks. -/
-def hashFrame (H : Kriterion.CRT.HashN) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block) :
-    Frame 128 w l where
+def hashFrame (H : Kriterion.CRT.HashN) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label) :
+    Frame labelBits w l where
   sub := sub
   delta := Δ
-  tree n σ G := Kriterion.CRT.h128 H G (tags.treeTag n σ)
+  tree n σ G := Kriterion.CRT.hLabel H G (tags.treeTag n σ)
   cast α G := castRead H l (tags.castTag α) G
 
 /-! ### The garbler of one stage on a hash, every slot hashed -/
 
 section Full
 
-variable (H : Kriterion.CRT.HashN) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block)
+variable (H : Kriterion.CRT.HashN) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label)
 
 /-- The labels of tree level `k + 1`, every material hashed. -/
-def fullLevel : ℕ → ℕ → Block
+def fullLevel : ℕ → ℕ → Label
   | 0 => fun i => if i = 0 then laneBit sub 0 ^^^ Δ else laneBit sub 0
   | k + 1 => fun i =>
       if i < 2 ^ (k + 1) then
-        fullLevel k i ^^^ Kriterion.CRT.h128 H (fullLevel k i) (tags.treeTag (k + 1) i)
+        fullLevel k i ^^^ Kriterion.CRT.hLabel H (fullLevel k i) (tags.treeTag (k + 1) i)
       else
-        Kriterion.CRT.h128 H (fullLevel k (i - 2 ^ (k + 1))) (tags.treeTag (k + 1) (i - 2 ^ (k + 1)))
+        Kriterion.CRT.hLabel H (fullLevel k (i - 2 ^ (k + 1))) (tags.treeTag (k + 1) (i - 2 ^ (k + 1)))
 
 /-- The material of slot `σ` of tree level `k + 1`. -/
-def fullMaterial (k σ : ℕ) : Block :=
-  Kriterion.CRT.h128 H (fullLevel H tags sub Δ k σ) (tags.treeTag (k + 1) σ)
+def fullMaterial (k σ : ℕ) : Label :=
+  Kriterion.CRT.hLabel H (fullLevel H tags sub Δ k σ) (tags.treeTag (k + 1) σ)
 
 /-- The cast of leaf `α`. -/
-def fullCast (α : ℕ) : Lanes 128 l :=
+def fullCast (α : ℕ) : Lanes labelBits l :=
   castRead H l (tags.castTag α) (fullLevel H tags sub Δ (w - 1) α)
 
 /-- The class sum `res_n`. -/
-def fullClassSum (n : ℕ) : Lanes 128 l :=
+def fullClassSum (n : ℕ) : Lanes labelBits l :=
   ∑ α ∈ Finset.range (2 ^ w), (((α % 2 ^ n : ℕ) : ZMod (2 ^ l)) • fullCast (l := l) H tags sub Δ α)
 
 /-- **The stage garbler on `H`** (input-free): the joins `J_{k+1}` for `k < w − 1` and the pin. -/
-def garbleStage : Published 128 w l :=
+def garbleStage : Published labelBits w l :=
   (fun k => xorUpTo (fullMaterial H tags sub Δ k.val) (2 ^ (k.val + 1))
       ^^^ laneBit (sub - reduceTo w (fullClassSum (l := l) H tags sub Δ (k.val + 1))) (k.val + 1),
     (∑ α ∈ Finset.range (2 ^ w), fullCast (l := l) H tags sub Δ α) + deltaLanes l Δ)
 
 /-- The hidden tuple at stage value `s`: the hot materials of every level and the hot leaf's cast, as `H` answers
 them at the garbler's points. -/
-def hiddenOf (s : ℕ) : Hidden 128 w l :=
+def hiddenOf (s : ℕ) : Hidden labelBits w l :=
   (fun k => fullMaterial H tags sub Δ k.val (s % 2 ^ (k.val + 1)), fullCast H tags sub Δ s)
 
 end Full
@@ -99,7 +100,7 @@ end Full
 
 section Bridge
 
-variable (H : Kriterion.CRT.HashN) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block) (s : ℕ)
+variable (H : Kriterion.CRT.HashN) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label) (s : ℕ)
 
 theorem level_hashFrame_eq :
     ∀ k, k ≤ w - 1 →
@@ -193,33 +194,37 @@ theorem hashInput_div (G : Block) (tag : ℕ) : Kriterion.CRT.hashInput G tag / 
       = Kriterion.CRT.packAnswers count fun j => T (tagOf j.val) := by
   simp only [Kriterion.CRT.hlong, tableHash, hashInput_div]
 
+@[simp] theorem hLabel_tableHash (T : ℕ → Block × Block) (G : Label) (tag : ℕ) :
+    Kriterion.CRT.hLabel (tableHash T) G tag = clip (T tag).1 := by
+  simp only [Kriterion.CRT.hLabel, h128_tableHash]
+
 /-- The frame of a stage on a table: the cold answers by tag, the labels ignored. -/
-def tableFrame (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block) :
-    Frame 128 w l where
+def tableFrame (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label) :
+    Frame labelBits w l where
   sub := sub
   delta := Δ
-  tree n σ _ := (T (tags.treeTag n σ)).1
+  tree n σ _ := (clip (T (tags.treeTag n σ)).1)
   cast α _ := Kriterion.CRT.castLanes l
     (Kriterion.CRT.packAnswers (Kriterion.CRT.castAnswers l) fun j => T (tags.castTag α j.val))
 
 /-- The hidden tuple read from the hot tags of a table at stage value `s`. -/
-def readHot (T : ℕ → Block × Block) (tags : StageTags) (s : ℕ) : Hidden 128 w l :=
-  (fun k => (T (tags.treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1,
+def readHot (T : ℕ → Block × Block) (tags : StageTags) (s : ℕ) : Hidden labelBits w l :=
+  (fun k => (clip (T (tags.treeTag (k.val + 1) (s % 2 ^ (k.val + 1)))).1),
     Kriterion.CRT.castLanes l
       (Kriterion.CRT.packAnswers (Kriterion.CRT.castAnswers l) fun j => T (tags.castTag s j.val)))
 
-theorem hashFrame_tableHash (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block) :
+theorem hashFrame_tableHash (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label) :
     hashFrame (l := l) (tableHash T) tags sub Δ = tableFrame T tags sub Δ := by
   unfold hashFrame tableFrame castRead
-  simp only [h128_tableHash, hlong_tableHash]
+  simp only [hLabel_tableHash, hlong_tableHash]
 
-theorem hiddenOf_tableHash (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block)
+theorem hiddenOf_tableHash (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label)
     (s : ℕ) : hiddenOf (l := l) (tableHash T) tags sub Δ s = readHot T tags s := by
   unfold hiddenOf readHot fullMaterial fullCast castRead
-  simp only [h128_tableHash, hlong_tableHash]
+  simp only [hLabel_tableHash, hlong_tableHash]
 
 /-- **The bridge, table reading.** On a table the stage garbler publishes `publish (tableFrame T) s (readHot T s)`. -/
-theorem garbleStage_tableHash (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes 128 w) (Δ : Block)
+theorem garbleStage_tableHash (T : ℕ → Block × Block) (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label)
     (s : ℕ) :
     garbleStage (l := l) (tableHash T) tags sub Δ = publish (tableFrame T tags sub Δ) s (readHot T tags s) := by
   rw [garbleStage_eq_publish (tableHash T) tags sub Δ s, hashFrame_tableHash, hiddenOf_tableHash]
@@ -283,12 +288,12 @@ end Cold
 
 /-- On tables, the published tuple depends on the table at cold tags only: two tables that agree at every cold tree
 tag and every cold cast tag of `s` give the same published tuple for every hidden tuple. -/
-theorem publish_tableFrame_congr {T T' : ℕ → Block × Block} (tags : StageTags) (sub : Lanes 128 w) (Δ : Block)
+theorem publish_tableFrame_congr {T T' : ℕ → Block × Block} (tags : StageTags) (sub : Lanes labelBits w) (Δ : Label)
     (s : ℕ) (treeEq : ∀ k σ, σ ≠ s % 2 ^ (k + 1) → T (tags.treeTag (k + 1) σ) = T' (tags.treeTag (k + 1) σ))
-    (castEq : ∀ α j, α ≠ s → T (tags.castTag α j) = T' (tags.castTag α j)) (h : Hidden 128 w l) :
+    (castEq : ∀ α j, α ≠ s → T (tags.castTag α j) = T' (tags.castTag α j)) (h : Hidden labelBits w l) :
     publish (tableFrame T tags sub Δ) s h = publish (tableFrame T' tags sub Δ) s h :=
   publish_congr_cold (F := tableFrame T tags sub Δ) (F' := tableFrame T' tags sub Δ) s rfl rfl
-    (fun k σ _ hσ => by show (T _).1 = (T' _).1; rw [treeEq k σ hσ])
+    (fun k σ _ hσ => by show (clip (T _).1) = (clip (T' _).1); rw [treeEq k σ hσ])
     (fun α _ hα => by
       show Kriterion.CRT.castLanes l (Kriterion.CRT.packAnswers _ _)
         = Kriterion.CRT.castLanes l (Kriterion.CRT.packAnswers _ _)
@@ -300,10 +305,10 @@ theorem publish_tableFrame_congr {T T' : ℕ → Block × Block} (tags : StageTa
 from any law and the hidden tuple uniformly: the published tuple of the stage is uniform and independent of the
 rest. -/
 theorem table_stage_uniform {Rest : Type*} (rest : PMF Rest) (table : Rest → ℕ → Block × Block)
-    (tags : StageTags) (subOf : Rest → Lanes 128 w) (deltaOf : Rest → Block) (s : ℕ) (hs : s < 2 ^ w) :
-    (rest.bind fun r => (PMF.uniformOfFintype (Hidden 128 w l)).map fun h =>
+    (tags : StageTags) (subOf : Rest → Lanes labelBits w) (deltaOf : Rest → Label) (s : ℕ) (hs : s < 2 ^ w) :
+    (rest.bind fun r => (PMF.uniformOfFintype (Hidden labelBits w l)).map fun h =>
         (r, publish (tableFrame (table r) tags (subOf r) (deltaOf r)) s h))
-      = rest.bind fun r => (PMF.uniformOfFintype (Published 128 w l)).map fun b => (r, b) :=
+      = rest.bind fun r => (PMF.uniformOfFintype (Published labelBits w l)).map fun b => (r, b) :=
   stage_published_uniform rest (fun r => tableFrame (table r) tags (subOf r) (deltaOf r)) s hs
 
 end Kriterion.CRT.Privacy.ExtractStage

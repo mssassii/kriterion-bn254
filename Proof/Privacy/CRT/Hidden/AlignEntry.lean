@@ -58,28 +58,28 @@ theorem coordValue_one (u : BN254.AffineInput) : coordValue u 1 = u.y.val := by 
 /-- **The replay's conversion layer** asks every cold conversion input of the garbler and nothing else. -/
 theorem replayConv_aligned (H : HashN) (scalar : BN254.NonZeroScalar) (coins : Coins) (u : BN254.AffineInput) :
     Aligned (ColdAt fun τ => hotTag table u τ = false)
-      (asked H (coordGarbleM table xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)) ++
-        asked H (coordGarbleM table yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)))
+      (asked H (coordGarbleM table xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))) ++
+        asked H (coordGarbleM table yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))))
       (asked H (replayConv (pubOf H scalar coins) u (labelsFor coins u))) := by
   have progX : coordEvalM table xCount 0 (convOf (pubOf H scalar coins).crtX)
-      (fun e => ((pubOf H scalar coins).recX.get e).val) u.x.val (labelX (labelsFor coins u)) =
+      (fun e => ((pubOf H scalar coins).recX.get e).val) u.x.val (fun j => clip (labelX (labelsFor coins u) j)) =
       coordEvalM table xCount 0 (gxOf H coins).pub ((gxOf H coins).records fun e => (slXOf H scalar coins e).val)
-        u.x.val (fun j => atNat (coins.inputZero .x) 0 j ^^^ (if u.x.val.testBit j then coins.inputDelta .x else 0)) := by
+        u.x.val (fun j => clip (atNat (coins.inputZero .x) 0 j) ^^^ (if u.x.val.testBit j then clip (coins.inputDelta .x) else 0)) := by
     unfold labelsFor
     rw [show (fun e => ((pubOf H scalar coins).recX.get e).val) =
         (gxOf H coins).records (fun e => (slXOf H scalar coins e).val) from funext (pubOf_recX H scalar coins),
       coordEvalM_labels_congr table xCount 0 _ _ u.x.val _ _
-        (fun j low => labelX_honest _ _ _ (coins_key_x coins) u j low),
+        (fun j low => clip_labelX_honest _ _ _ (coins_key_x coins) u j low),
       pubOf_crtX, FlatLayout.coordEvalM_congr table xCount 0 _ _ _ u.x.val _ (convAgree_convOf _)]
   have progY : coordEvalM table yCount 1 (convOf (pubOf H scalar coins).crtY)
-      (fun e => ((pubOf H scalar coins).recY.get e).val) u.y.val (labelY (labelsFor coins u)) =
+      (fun e => ((pubOf H scalar coins).recY.get e).val) u.y.val (fun j => clip (labelY (labelsFor coins u) j)) =
       coordEvalM table yCount 1 (gyOf H coins).pub ((gyOf H coins).records fun e => (slYOf H scalar coins e).val)
-        u.y.val (fun j => atNat (coins.inputZero .y) 0 j ^^^ (if u.y.val.testBit j then coins.inputDelta .y else 0)) := by
+        u.y.val (fun j => clip (atNat (coins.inputZero .y) 0 j) ^^^ (if u.y.val.testBit j then clip (coins.inputDelta .y) else 0)) := by
     unfold labelsFor
     rw [show (fun e => ((pubOf H scalar coins).recY.get e).val) =
         (gyOf H coins).records (fun e => (slYOf H scalar coins e).val) from funext (pubOf_recY H scalar coins),
       coordEvalM_labels_congr table yCount 1 _ _ u.y.val _ _
-        (fun j low => labelY_honest _ _ _ (coins_key_y coins) u j low),
+        (fun j low => clip_labelY_honest _ _ _ (coins_key_y coins) u j low),
       pubOf_crtY, FlatLayout.coordEvalM_congr table yCount 1 _ _ _ u.y.val _ (convAgree_convOf _)]
   have tagsX := coordTags_cold table u xCount 0 (by norm_num) (Paths.bn254_ranges _ (by decide))
   have tagsY := coordTags_cold table u yCount 1 (by norm_num) (Paths.bn254_ranges _ (by decide))
@@ -89,9 +89,9 @@ theorem replayConv_aligned (H : HashN) (scalar : BN254.NonZeroScalar) (coins : C
   simp only [asked_bind, asked_pure, List.append_nil]
   rw [progX, progY]
   refine Aligned.append ?_ ?_
-  · exact coord_aligned H table xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0) _ u.x.val
+  · exact coord_aligned H table xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j)) _ u.x.val
       SliceC.bn254_correctTable (by rw [table_inputBits]; exact val_lt_two_pow _) _ tagsX
-  · exact coord_aligned H table yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0) _ u.y.val
+  · exact coord_aligned H table yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j)) _ u.y.val
       SliceC.bn254_correctTable (by rw [table_inputBits]; exact val_lt_two_pow _) _ tagsY
 
 /-! ### The designed rule on tags -/

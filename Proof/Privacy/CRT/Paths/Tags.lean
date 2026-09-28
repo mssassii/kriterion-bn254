@@ -271,6 +271,12 @@ theorem h128M (S : Set TagKey) (label : Block) (tag : Nat) (key : TagKey) (coded
   KeyRun.bind (askN S label tag key coded member range) fun answer _ keys =>
     KeyRun.pure _ answer.1 keys
 
+/-- The narrow conversion hash queries an embedded label and clips only its answer. -/
+theorem hLabelM (S : Set TagKey) (label : Label) (tag : Nat) (key : TagKey)
+    (coded : key.code = tag) (member : key ∈ S) (range : key.InRange) :
+    Tagged S (CRT.hLabelM label tag) :=
+  bind_pure (h128M S (embed label) tag key coded member range) _
+
 /-- The history of `count` queries at one label. -/
 def oneLabel (key : Nat → TagKey) (label : Block) : Nat → List (TagKey × Block)
   | 0 => []

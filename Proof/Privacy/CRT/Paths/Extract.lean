@@ -75,13 +75,13 @@ theorem subtreeSlot_injective {start slot s t : Nat} (same : slot + 2 ^ start * 
 /-- **A level of one-block hashes at slots `f t`** (no slot skipped; `f` injective). -/
 theorem levelHashesF_tagged (fam coord idx stage n width : Nat) (fields : Fields fam coord idx stage)
     (levelSmall : n < 16) (f : Nat → Nat) (fSmall : ∀ t, t < width → f t < 65536)
-    (fInjective : ∀ s t, s < width → t < width → f s = f t → s = t) (label : Fin width → Block) :
+    (fInjective : ∀ s t, s < width → t < width → f s = f t → s = t) (label : Fin width → Label) :
     Tagged {k | k.fam = fam ∧ k.coord = coord ∧ k.idx = idx ∧ k.stage = stage ∧ k.part = 0 ∧ k.level = n ∧
         ∃ t < width, k.slot = f t}
-      (CRT.tableM width fun t => h128M (label t) (tagCode fam coord idx stage n (f t.val) 0)) := by
+      (CRT.tableM width fun t => hLabelM (label t) (tagCode fam coord idx stage n (f t.val) 0)) := by
   have each : ∀ t : Fin width, Tagged ({⟨fam, coord, idx, stage, n, f t.val, 0⟩} : Set TagKey)
-      (h128M (label t) (tagCode fam coord idx stage n (f t.val) 0)) := fun t =>
-    Tagged.h128M _ (label t) _ ⟨fam, coord, idx, stage, n, f t.val, 0⟩ rfl rfl
+      (hLabelM (label t) (tagCode fam coord idx stage n (f t.val) 0)) := fun t =>
+    Tagged.hLabelM _ (label t) _ ⟨fam, coord, idx, stage, n, f t.val, 0⟩ rfl rfl
       ⟨fields.famLt, fields.coordLt, fields.idxLt, fields.stageLt, levelSmall, fSmall t.val t.isLt, by norm_num⟩
   refine (Tagged.tableM (S := fun t => {⟨fam, coord, idx, stage, n, f t, 0⟩}) width each
     fun i j hi hj different => ⟨singleton_disjoint fun same => different (fInjective i j hi hj
@@ -104,7 +104,7 @@ theorem fields_ext {coord idx stage : Nat} (coordLt : coord < 2) (idxLt : idx < 
 
 /-- **The subtree below a closed node** (`subtreeM`). -/
 theorem subtreeM_tagged (coord idx stage start slot : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
-    (stageLt : stage < 4) (slotLt : slot < 2 ^ start) (label : Block) :
+    (stageLt : stage < 4) (slotLt : slot < 2 ^ start) (label : Label) :
     ∀ depth, start + depth ≤ 16 →
       Tagged (subtreeKeys coord idx stage start slot depth)
         (subtreeM (fun level slot => tagCode 2 coord idx stage level slot 0) start slot label depth)
@@ -153,7 +153,7 @@ theorem expandKeys_slot {coord idx stage start slot depth count : Nat} (slotLt :
 /-- **One expansion** (`expandM`): the subtree below a closed node, then the casts of its leaves. -/
 theorem expandM_tagged {rb : Nat} (w : Nat) (coord idx stage start slot : Nat) (coordLt : coord < 2)
     (idxLt : idx < 128) (stageLt : stage < 4) (slotLt : slot < 2 ^ start) (small : start + (w - start) ≤ 16)
-    (answers : castAnswers rb ≤ 64) (label : Block) (state : StageState rb) :
+    (answers : castAnswers rb ≤ 64) (label : Label) (state : StageState rb) :
     Tagged (expandKeys coord idx stage start slot (w - start) (castAnswers rb))
       (expandM w (fun level slot => tagCode 2 coord idx stage level slot 0)
         (fun leaf part => tagCode 3 coord idx stage 0 leaf part) start slot label state) := by
@@ -208,7 +208,7 @@ theorem roundKeys_fams {coord idx stage w value count j : Nat} {k : TagKey}
 /-- **One round** (`stageRoundM`): the expansion of the closed child at level `n + 1`. -/
 theorem stageRoundM_tagged {rb : Nat} (w : Nat) (coord idx stage : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
     (stageLt : stage < 4) (wSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (sub : Lanes w) (value : Nat)
-    (joins : Nat → Block) (pin : Lanes rb) (n : Nat) (nSmall : n < 16) (state : StageState rb) :
+    (joins : Nat → Label) (pin : Lanes rb) (n : Nat) (nSmall : n < 16) (state : StageState rb) :
     Tagged (roundKeys coord idx stage w value (castAnswers rb) n)
       (stageRoundM w (fun level slot => tagCode 2 coord idx stage level slot 0)
         (fun leaf part => tagCode 3 coord idx stage 0 leaf part) sub value joins pin n state) := by
@@ -236,7 +236,7 @@ def roundsKeys (coord idx stage w value count n remaining : Nat) : Set TagKey :=
 /-- **The rounds** (`stageRoundsM`). -/
 theorem stageRoundsM_tagged {rb : Nat} (w : Nat) (coord idx stage : Nat) (coordLt : coord < 2)
     (idxLt : idx < 128) (stageLt : stage < 4) (wSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (sub : Lanes w)
-    (value : Nat) (joins : Nat → Block) (pin : Lanes rb) :
+    (value : Nat) (joins : Nat → Label) (pin : Lanes rb) :
     ∀ (remaining n : Nat) (state : StageState rb), n + remaining ≤ 16 →
       Tagged (roundsKeys coord idx stage w value (castAnswers rb) n remaining)
         (stageRoundsM w (fun level slot => tagCode 2 coord idx stage level slot 0)
@@ -260,7 +260,7 @@ theorem stageRoundsM_tagged {rb : Nat} (w : Nat) (coord idx stage : Nat) (coordL
 /-- **One fused extraction stage of the evaluator** (`extStageEvalM`). -/
 theorem extStageEvalM_tagged {rb : Nat} (coord idx stage w : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
     (stageLt : stage < 4) (wSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (remainder : Lanes rb)
-    (value : Nat) (joins : Nat → Block) (pin : Lanes rb) :
+    (value : Nat) (joins : Nat → Label) (pin : Lanes rb) :
     Tagged (pairKeys 2 3 coord idx stage)
       (extStageEvalM w (fun level slot => tagCode 2 coord idx stage level slot 0)
         (fun leaf part => tagCode 3 coord idx stage 0 leaf part) remainder value joins pin) := by

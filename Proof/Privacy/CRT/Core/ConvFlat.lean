@@ -11,7 +11,7 @@ from its joins and pins (`Construction/CRT/Layout.lean`). This file connects the
 * **B2** (`phi_bijective`, `phi_uniform`): the source's joins and pins of one coordinate are read back by `readPub` as
   a bijection `phi` onto `ConvVals table`. The join and pin positions of `ConvVals` are enumerated by sums and sigmas
   whose `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_chunk`, `jIdx_mod`, `pIdx_mod`), so `phi` is
-  injective; the two sides have `2 ^ (128 · 3412)` elements.
+  injective; the two sides have `2 ^ (labelBits · 3412)` elements.
 * `source_joins_pins_uniform`, `source_crt_law`: under a uniform source the joins and pins of coordinate `κ` are
   uniform, so the source's flat vector is `flatOf` of uniform conversion values.
 -/
@@ -39,22 +39,22 @@ theorem atNat_lt {α : Type} {count : ℕ} (family : Fin count → α) (default 
 
 section Card
 
-theorem natCard_block : Nat.card Block = 2 ^ 128 := by
-  rw [Nat.card_congr (⟨BitVec.toFin, BitVec.ofFin, fun _ => rfl, fun _ => rfl⟩ : Block ≃ Fin (2 ^ 128)),
+theorem natCard_block : Nat.card Label = 2 ^ labelBits := by
+  rw [Nat.card_congr (⟨BitVec.toFin, BitVec.ofFin, fun _ => rfl, fun _ => rfl⟩ : Label ≃ Fin (2 ^ labelBits)),
     Nat.card_eq_fintype_card, Fintype.card_fin]
 
-theorem natCard_blocks (n : ℕ) : Nat.card (Fin n → Block) = 2 ^ (128 * n) := by
+theorem natCard_blocks (n : ℕ) : Nat.card (Fin n → Label) = 2 ^ (labelBits * n) := by
   rw [Nat.card_fun, natCard_block, Nat.card_eq_fintype_card, Fintype.card_fin, ← pow_mul]
 
-theorem natCard_lanes (w : ℕ) : Nat.card (Lanes w) = 2 ^ (128 * w) := by
+theorem natCard_lanes (w : ℕ) : Nat.card (Lanes w) = 2 ^ (labelBits * w) := by
   rw [Nat.card_fun, Nat.card_zmod, Nat.card_eq_fintype_card, Fintype.card_fin, ← pow_mul, Nat.mul_comm]
 
-theorem natCard_prod {α β : Type} {a b : ℕ} (ha : Nat.card α = 2 ^ (128 * a)) (hb : Nat.card β = 2 ^ (128 * b)) :
-    Nat.card (α × β) = 2 ^ (128 * (a + b)) := by
+theorem natCard_prod {α β : Type} {a b : ℕ} (ha : Nat.card α = 2 ^ (labelBits * a)) (hb : Nat.card β = 2 ^ (labelBits * b)) :
+    Nat.card (α × β) = 2 ^ (labelBits * (a + b)) := by
   rw [Nat.card_prod, ha, hb, ← pow_add, Nat.mul_add]
 
-theorem natCard_pi {ι : Type} [Fintype ι] {β : ι → Type} (f : ι → ℕ) (h : ∀ i, Nat.card (β i) = 2 ^ (128 * f i)) :
-    Nat.card (∀ i, β i) = 2 ^ (128 * ∑ i, f i) := by
+theorem natCard_pi {ι : Type} [Fintype ι] {β : ι → Type} (f : ι → ℕ) (h : ∀ i, Nat.card (β i) = 2 ^ (labelBits * f i)) :
+    Nat.card (∀ i, β i) = 2 ^ (labelBits * ∑ i, f i) := by
   rw [Nat.card_pi, Finset.prod_congr rfl fun i _ => h i, Finset.prod_pow_eq_pow_sum, Finset.mul_sum]
 
 end Card
@@ -71,16 +71,8 @@ theorem pinBlocks_bijective {w : ℕ} (hw : 0 < w) : Function.Bijective (pinBloc
     rw [← Nat.card_eq_fintype_card, ← Nat.card_eq_fintype_card, natCard_lanes, natCard_blocks])
 
 /-- **The dense codec reads blocks injectively.** -/
-theorem pinOfBlocks_injective (w : ℕ) : Function.Injective (pinOfBlocks w) := by
-  rcases Nat.eq_zero_or_pos w with rfl | hw
-  · intro a b _
-    funext k
-    exact k.elim0
-  · intro a b h
-    obtain ⟨A, rfl⟩ := (pinBlocks_bijective hw).2 a
-    obtain ⟨B, rfl⟩ := (pinBlocks_bijective hw).2 b
-    rw [SliceC.pinOfBlocks_pinBlocks hw, SliceC.pinOfBlocks_pinBlocks hw] at h
-    rw [h]
+theorem pinOfBlocks_injective (w : ℕ) : Function.Injective (pinOfBlocks w) :=
+  Function.LeftInverse.injective (g := pinBlocks) fun blocks => Narrow.pinBlocks_pinOfBlocks blocks
 
 /-- Two lanes of a positive width `W = w` whose blocks read the same through the codec at width `w` are equal. -/
 theorem lanes_eq_of_read {W w : ℕ} (hw : W = w) (hpos : 0 < W) (A B : Lanes W)
@@ -198,7 +190,7 @@ theorem convVector_congr (p q : ConvPublic) (h : readPub table p = readPub table
 open Classical in
 /-- The flat vector of in-range conversion values (any material with that reading; the choice does not matter by
 `convVector_congr`). -/
-def flatOf (v : ConvVals table) : Vector Block convCount :=
+def flatOf (v : ConvVals table) : Vector Label convCount :=
   if h : ∃ p : ConvPublic, readPub table p = v then convVector h.choose else Vector.ofFn fun _ => 0
 
 /-- **B1: the published flat vector is a function of the in-range reading.** -/
@@ -215,7 +207,7 @@ end B1
 section B2
 
 /-- The joins and pins of one coordinate of a source. -/
-abbrev JP : Type := (Fin joinCount → Block) × ((k : Fin pinCount) → Lanes (pinWidth k))
+abbrev JP : Type := (Fin joinCount → Label) × ((k : Fin pinCount) → Lanes (pinWidth k))
 
 /-- A source with the given joins and pins at both coordinates. -/
 def srcOf (x : JP) : Source :=
@@ -303,14 +295,14 @@ theorem jIdx_mod (i : Fin table.count) (r : ModJoinPos (rowI i)) :
   omega
 
 /-- A modulus's values read at a join position. -/
-def modRead {row : OddRow} (x : StageVals row) : ModJoinPos row → Block
+def modRead {row : OddRow} (x : StageVals row) : ModJoinPos row → Label
   | .inl (.inl (.inl a)) => x.1.1 a
   | .inl (.inl (.inr b)) => x.2.1.1 b
   | .inl (.inr c) => x.2.2.1 c
   | .inr d => x.2.2.2 d
 
 /-- The conversion values read at a join position. -/
-def jRead (v : ConvVals table) : JoinPos → Block
+def jRead (v : ConvVals table) : JoinPos → Label
   | .inl ⟨c, k⟩ => v.1.1 c k
   | .inr ⟨i, r⟩ => modRead (v.2 i) r
 
@@ -478,18 +470,18 @@ def stageBlocks (row : OddRow) : ℕ :=
   ((row.width0 - 1) + row.ell) + (((row.width1 - 1) + (row.ell - row.width0)) +
     ((row.keep - row.width0) + (row.ell - row.keep)))
 
-theorem natCard_stageVals (row : OddRow) : Nat.card (StageVals row) = 2 ^ (128 * stageBlocks row) :=
+theorem natCard_stageVals (row : OddRow) : Nat.card (StageVals row) = 2 ^ (labelBits * stageBlocks row) :=
   natCard_prod (natCard_prod (natCard_blocks _) (natCard_lanes _))
     (natCard_prod (natCard_prod (natCard_blocks _) (natCard_lanes _))
       (natCard_prod (natCard_blocks _) (natCard_blocks _)))
 
 theorem natCard_convVals : Nat.card (ConvVals table) =
-    2 ^ (128 * (((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +
+    2 ^ (labelBits * (((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +
       ∑ _c : Fin table.chunkCount, table.castWidth) + ∑ i : Fin table.count, stageBlocks (rowI i))) :=
   natCard_prod (natCard_prod (natCard_pi _ fun _ => natCard_blocks _) (natCard_pi _ fun _ => natCard_lanes _))
     (natCard_pi _ fun _ => natCard_stageVals _)
 
-theorem natCard_JP : Nat.card JP = 2 ^ (128 * (joinCount + ∑ k : Fin pinCount, pinWidth k)) :=
+theorem natCard_JP : Nat.card JP = 2 ^ (labelBits * (joinCount + ∑ k : Fin pinCount, pinWidth k)) :=
   natCard_prod (natCard_blocks _) (natCard_pi _ fun _ => natCard_lanes _)
 
 theorem blocks_eq : ((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +

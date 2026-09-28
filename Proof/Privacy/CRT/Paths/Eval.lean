@@ -16,14 +16,14 @@ open Cryptography Kriterion.ArgoMAC
 theorem levelHashesSkip_tagged (fam coord idx stage n width : Nat) (fields : Fields fam coord idx stage)
     (levelSmall : n < 16) (f : Nat → Nat) (fSmall : ∀ t, t < width → f t < 65536)
     (fInjective : ∀ s t, s < width → t < width → f s = f t → s = t) (skip : Fin width → Prop)
-    [DecidablePred skip] (label : Fin width → Block) :
+    [DecidablePred skip] (label : Fin width → Label) :
     Tagged {k | k.fam = fam ∧ k.coord = coord ∧ k.idx = idx ∧ k.stage = stage ∧ k.part = 0 ∧ k.level = n ∧
         ∃ t < width, k.slot = f t}
-      (CRT.tableM width fun t => if skip t then pure 0 else h128M (label t) (tagCode fam coord idx stage n (f t.val) 0)) := by
+      (CRT.tableM width fun t => if skip t then pure 0 else hLabelM (label t) (tagCode fam coord idx stage n (f t.val) 0)) := by
   have each : ∀ t : Fin width, Tagged ({⟨fam, coord, idx, stage, n, f t.val, 0⟩} : Set TagKey)
-      (if skip t then pure 0 else h128M (label t) (tagCode fam coord idx stage n (f t.val) 0)) := fun t =>
+      (if skip t then pure 0 else hLabelM (label t) (tagCode fam coord idx stage n (f t.val) 0)) := fun t =>
     Tagged.ite (fun _ => Tagged.pure _ _) fun _ =>
-      Tagged.h128M _ (label t) _ ⟨fam, coord, idx, stage, n, f t.val, 0⟩ rfl rfl
+      Tagged.hLabelM _ (label t) _ ⟨fam, coord, idx, stage, n, f t.val, 0⟩ rfl rfl
         ⟨fields.famLt, fields.coordLt, fields.idxLt, fields.stageLt, levelSmall, fSmall t.val t.isLt, by norm_num⟩
   refine (Tagged.tableM (S := fun t => {⟨fam, coord, idx, stage, n, f t, 0⟩}) width each
     fun i j hi hj different => ⟨singleton_disjoint fun same => different (fInjective i j hi hj
@@ -36,7 +36,7 @@ theorem levelHashesSkip_tagged (fam coord idx stage n width : Nat) (fields : Fie
 
 /-- **One level of the evaluator's tree**: every slot but the active one. -/
 theorem evalStepM_tagged (fam coord idx stage n : Nat) (fields : Fields fam coord idx stage)
-    (levelSmall : n < 16) (active : Fin (2 ^ n)) (bitLabel join : Block) (parent : Fin (2 ^ n) → Block) :
+    (levelSmall : n < 16) (active : Fin (2 ^ n)) (bitLabel join : Label) (parent : Fin (2 ^ n) → Label) :
     Tagged (levelKeys fam coord idx stage n (2 ^ n))
       (evalStepM n (fun slot => tagCode fam coord idx stage n slot 0) active bitLabel join parent) := by
   unfold evalStepM
@@ -48,7 +48,7 @@ theorem evalStepM_tagged (fam coord idx stage n : Nat) (fields : Fields fam coor
 
 /-- **The evaluator's tree** over `levels ≤ 16` bits (known bits). -/
 theorem treeEvalM_tagged (fam coord idx stage : Nat) (fields : Fields fam coord idx stage) (value : Nat)
-    (bitLabel join : Nat → Block) :
+    (bitLabel join : Nat → Label) :
     ∀ levels, levels ≤ 16 →
       Tagged (treeKeys fam coord idx stage levels)
         (treeEvalM (fun level slot => tagCode fam coord idx stage level slot 0) value bitLabel join levels)
@@ -79,7 +79,7 @@ theorem treeEvalM_tagged (fam coord idx stage : Nat) (fields : Fields fam coord 
 
 /-- **The evaluator's growth** from level `start` by `count` levels. -/
 theorem growEvalM_tagged (fam coord idx stage : Nat) (fields : Fields fam coord idx stage) (value : Nat)
-    (bitLabel join : Nat → Block) (start : Nat) (labels : Fin (2 ^ start) → Block) :
+    (bitLabel join : Nat → Label) (start : Nat) (labels : Fin (2 ^ start) → Label) :
     ∀ count, start + count ≤ 16 →
       Tagged (growKeys fam coord idx stage start count)
         (growEvalM (fun level slot => tagCode fam coord idx stage level slot 0) value bitLabel join start labels
@@ -107,7 +107,7 @@ theorem growEvalM_tagged (fam coord idx stage : Nat) (fields : Fields fam coord 
 
 /-- **The casts of every leaf but one** below `2 ^ width`. -/
 theorem leafCastsSkip_tagged (fam coord idx stage width l : Nat) (fields : Fields fam coord idx stage)
-    (widthSmall : width ≤ 16) (answers : castAnswers l ≤ 64) (hot : Nat) (label : Fin (2 ^ width) → Block) :
+    (widthSmall : width ≤ 16) (answers : castAnswers l ≤ 64) (hot : Nat) (label : Fin (2 ^ width) → Label) :
     Tagged (castKeys fam coord idx stage (2 ^ width) (castAnswers l))
       (CRT.tableM (2 ^ width) fun leaf => if leaf.val = hot then pure 0 else castM l (label leaf) fun part =>
         tagCode fam coord idx stage 0 leaf.val part) := by
@@ -127,7 +127,7 @@ theorem leafCastsSkip_tagged (fam coord idx stage width l : Nat) (fields : Field
     omega
 
 /-- **The evaluator's chunk** `c`. -/
-theorem chunkEvalM_tagged (T : CrtTable) (coord : Nat) (labels : Nat → Block) (v : Nat) (joins : Nat → Block)
+theorem chunkEvalM_tagged (T : CrtTable) (coord : Nat) (labels : Nat → Label) (v : Nat) (joins : Nat → Label)
     (pin : Lanes T.castWidth) (c : Nat) (coordLt : coord < 2) (cLt : c < 128) (widthSmall : T.chunkWidth c ≤ 16)
     (answers : castAnswers T.castWidth ≤ 64) :
     Tagged (pairKeys 0 1 coord c 0) (chunkEvalM T coord labels v joins pin c) := by
@@ -153,8 +153,8 @@ theorem chunkEvalM_tagged (T : CrtTable) (coord : Nat) (labels : Nat → Block) 
 
 /-- **The evaluator's folds.** -/
 theorem foldsEvalM_tagged (coord idx m : Nat) (coordLt : coord < 2) (idxLt : idx < 128) (mSmall : m ≤ 65536)
-    (value : Nat) (bitLabel join : Nat → Block) :
-    ∀ (count start hot : Nat) (labels : Fin m → Block), start + count ≤ 16 →
+    (value : Nat) (bitLabel join : Nat → Label) :
+    ∀ (count start hot : Nat) (labels : Fin m → Label), start + count ≤ 16 →
       Tagged (foldKeys coord idx start count m)
         (foldsEvalM m (fun position residue => tagCode 5 coord idx 0 position residue 0) value bitLabel join count
           start hot labels)
@@ -184,7 +184,7 @@ theorem foldsEvalM_tagged (coord idx m : Nat) (coordLt : coord < 2) (idxLt : idx
 
 /-- **The evaluator's body** of one modulus: every residue's pad vector but the hot one. -/
 theorem bodyEvalM_tagged (coord idx m S q : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
-    (mSmall : m ≤ 65536) (qSmall : q ≤ 64) (final : Fin m → Block) (hot : Nat) (joins : Fin S → Nat) :
+    (mSmall : m ≤ 65536) (qSmall : q ≤ 64) (final : Fin m → Label) (hot : Nat) (joins : Fin S → Nat) :
     Tagged (bodyKeys coord idx m q) (bodyEvalM m S q coord idx final hot joins) := by
   unfold bodyEvalM
   refine Tagged.bind_empty ((Tagged.tableM (S := fun residue => padKeys coord idx residue q) m

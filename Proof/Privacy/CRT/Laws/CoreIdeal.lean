@@ -267,7 +267,7 @@ def kernel (T : CrtTable) (u : AffineInput) {α : Type} (D : (view).Source → T
 /-! #### Lenses on the source -/
 
 /-- The conversion coordinate `κ` of a source: its joins and pins. -/
-abbrev ConvKeys := (Fin Kriterion.CRT.Entry.joinCount → Block) ×
+abbrev ConvKeys := (Fin Kriterion.CRT.Entry.joinCount → Label) ×
   ((k : Fin Kriterion.CRT.Entry.pinCount) → Lanes (Kriterion.CRT.Entry.pinWidth k))
 
 def convGet (κ : Fin 2) (s : Kriterion.CRT.Entry.Source) : ConvKeys := (s.joins κ, s.pins κ)

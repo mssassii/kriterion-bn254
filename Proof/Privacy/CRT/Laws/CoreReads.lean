@@ -177,7 +177,7 @@ theorem crtY_congr (parameter : ℕ) (scalar : NonZeroScalar) (c : crtEntry.Coin
   dsimp only
   refine congrArg _ (congrArg _ (BmrReal.eval_congr_asked _ _ _ fun n asked => ?_))
   have tagged := Paths.coordGarbleM_tagged Entry.table Entry.yCount 1 (Paths.bn254_ranges _ (by decide))
-    (by norm_num) (c.inputDelta .y) (atNat (c.inputZero .y) 0)
+    (by norm_num) (clip (c.inputDelta .y)) (fun j => clip (atNat (c.inputZero .y) 0 j))
   obtain ⟨k, member, range, label, rfl⟩ := Align.asked_of_tagged tagged _ n asked
   have small := Paths.TagKey.code_lt range
   show DeltaView.hashOf t (hashInput label k.code) = DeltaView.hashOf t' (hashInput label k.code)

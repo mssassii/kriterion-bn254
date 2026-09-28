@@ -2,8 +2,8 @@
 **CRT privacy core: the conversion garbler on an answer table.**
 
 On the answer-table reading of the oracle a labelled query is answered by
-its tag alone (`h128_tableHash`, `hlong_tableHash`), so the garbler's published conversion material of one coordinate
-is an explicit function of the table's readings (a tree, growth or fold material reads `.1` of one answer; a cast reads
+its tag alone (`hLabel_tableHash`, `hlong_tableHash`), so the garbler's published conversion material of one coordinate
+is an explicit function of the table's readings (a tree, growth or fold material clips `.1` of one answer; a cast reads
 `castAnswers l` answers by D11), the zero labels and `Δ`, and never of the tree labels. This file computes it, gadget by
 gadget, for the frozen programs (`Construction/CRT/{Tree, Chunk, Extract, Fold, Coord}.lean`):
 
@@ -35,10 +35,10 @@ open Kriterion.CRT.ExtractSpec (StageParams gJoin gPin gBit gNext gCast gLeaf gR
 def castRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) : Lanes l :=
   castLanes l (packAnswers (castAnswers l) fun j => A (tagOf j.val))
 
-theorem h128_table (A : ℕ → Block × Block) (G : Block) (tag : ℕ) : h128 (tableHash A) G tag = (A tag).1 :=
-  ExtractStage.h128_tableHash A G tag
+theorem hLabel_table (A : ℕ → Block × Block) (G : Label) (tag : ℕ) : hLabel (tableHash A) G tag = (clip (A tag).1) :=
+  ExtractStage.hLabel_tableHash A G tag
 
-theorem castM_table (A : ℕ → Block × Block) (l : ℕ) (G : Block) (tagOf : ℕ → ℕ) :
+theorem castM_table (A : ℕ → Block × Block) (l : ℕ) (G : Label) (tagOf : ℕ → ℕ) :
     (castM l G tagOf).eval (tableHash A) = castRd A l tagOf := by
   rw [SliceC.eval_castM, ExtractStage.hlong_tableHash]
   rfl
@@ -46,26 +46,26 @@ theorem castM_table (A : ℕ → Block × Block) (l : ℕ) (G : Block) (tagOf : 
 /-! ### Trees, growth and folds -/
 
 /-- **A tree join on a table**: the level XOR is the XOR of the table's materials of the level. -/
-theorem treeGarbleM_levelSum_table (A : ℕ → Block × Block) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (total n : ℕ)
+theorem treeGarbleM_levelSum_table (A : ℕ → Block × Block) (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (total n : ℕ)
     (h1 : 1 ≤ n) (h2 : n < total) :
     ((treeGarbleM tagOf Δ b0 total).eval (tableHash A)).2 n =
-      xorFold (fun slot : Fin (2 ^ n) => (A (tagOf n slot.val)).1) := by
+      xorFold (fun slot : Fin (2 ^ n) => (clip (A (tagOf n slot.val)).1)) := by
   rw [SliceC.treeGarbleM_levelSum _ _ _ _ total n h1 h2]
-  simp only [h128_table]
+  simp only [hLabel_table]
 
 /-- **A growth join on a table.** -/
 theorem growGarbleM_levelSum_table (A : ℕ → Block × Block) (tagOf : ℕ → ℕ → ℕ) (start : ℕ)
-    (labels : Fin (2 ^ start) → Block) (count j : ℕ) (hj : j < count) :
+    (labels : Fin (2 ^ start) → Label) (count j : ℕ) (hj : j < count) :
     ((growGarbleM tagOf start labels count).eval (tableHash A)).2 (start + j) =
-      xorFold (fun slot : Fin (2 ^ (start + j)) => (A (tagOf (start + j) slot.val)).1) := by
+      xorFold (fun slot : Fin (2 ^ (start + j)) => (clip (A (tagOf (start + j) slot.val)).1)) := by
   rw [SliceC.growGarbleM_levelSum _ _ _ _ count j hj]
-  simp only [h128_table]
+  simp only [hLabel_table]
 
 /-- **A fold join on a table**: the XOR of the table's materials of the position, XOR the bit mask. -/
-theorem foldsGarbleM_join_table (A : ℕ → Block × Block) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ → Block) :
-    ∀ (count start : ℕ) (labels : Fin m → Block) (position : ℕ), start ≤ position → position < start + count →
+theorem foldsGarbleM_join_table (A : ℕ → Block × Block) (m : ℕ) (tagOf : ℕ → ℕ → ℕ) (bitMask : ℕ → Label) :
+    ∀ (count start : ℕ) (labels : Fin m → Label) (position : ℕ), start ≤ position → position < start + count →
       ((foldsGarbleM m tagOf bitMask count start labels).eval (tableHash A)).2 position =
-        xorFold (fun ρ : Fin m => (A (tagOf position ρ.val)).1) ^^^ bitMask position
+        xorFold (fun ρ : Fin m => (clip (A (tagOf position ρ.val)).1)) ^^^ bitMask position
   | 0, start, _, position, h1, h2 => absurd h2 (by omega)
   | count + 1, start, labels, position, h1, h2 => by
       rw [SliceC.eval_foldsGarbleM_succ]
@@ -73,17 +73,17 @@ theorem foldsGarbleM_join_table (A : ℕ → Block × Block) (m : ℕ) (tagOf : 
       by_cases hp : position = start
       · subst hp
         rw [if_pos rfl, SliceC.eval_foldGarbleM]
-        simp only [h128_table]
+        simp only [hLabel_table]
       · rw [if_neg hp]
         exact foldsGarbleM_join_table A m tagOf bitMask count (start + 1) _ position (by omega) (by omega)
 
 /-! ### A chunk -/
 
 /-- **A chunk on a table**: its joins, its casts and its pin. -/
-theorem chunk_table (A : ℕ → Block × Block) (tbl : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block) (c : ℕ) :
+theorem chunk_table (A : ℕ → Block × Block) (tbl : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ) :
     let g := (chunkGarbleM tbl coord Δ Z c).eval (tableHash A)
     (∀ n, 1 ≤ n → n < tbl.chunkWidth c →
-        g.joins n = xorFold (fun slot : Fin (2 ^ n) => (A (chunkTreeTag coord c n slot.val)).1) ^^^
+        g.joins n = xorFold (fun slot : Fin (2 ^ n) => (clip (A (chunkTreeTag coord c n slot.val)).1)) ^^^
           Z (tbl.chunkOffset c + n)) ∧
     (∀ leaf, leaf < 2 ^ tbl.chunkWidth c → g.casts leaf = castRd A tbl.castWidth (chunkCastTag coord c leaf)) ∧
     g.pin = (∑ leaf : Fin (2 ^ tbl.chunkWidth c), castRd A tbl.castWidth (chunkCastTag coord c leaf.val)) +
@@ -101,21 +101,21 @@ theorem chunk_table (A : ℕ → Block × Block) (tbl : CrtTable) (coord : ℕ) 
 ignored. -/
 def tableStage (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ) :
     StageParams rb :=
-  ExtractStage.stageOf w hw (fun n x _ => (A (treeTag n x)).1) (fun α _ => castRd A rb (castTag α))
+  ExtractStage.stageOf w hw (fun n x _ => (clip (A (treeTag n x)).1)) (fun α _ => castRd A rb (castTag α))
 
 theorem hashStage_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ) :
     SliceC.hashStage (tableHash A) w hw treeTag castTag = tableStage A w hw treeTag castTag := by
   unfold SliceC.hashStage tableStage ExtractStage.stageOf
   congr 1
   · funext n x lab
-    exact h128_table A lab (treeTag n x)
+    exact hLabel_table A lab (treeTag n x)
   · funext α lab
     simp only [castRd, ExtractStage.hlong_tableHash]
 
 /-- `gNext` of the hashed stage on a table (the stage appears in its type, so `hashStage_table` does not rewrite
 it directly). -/
 theorem gNext_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ)
-    (R : Lanes rb) (Δ : Block) :
+    (R : Lanes rb) (Δ : Label) :
     (gNext (SliceC.hashStage (tableHash A) w hw treeTag castTag) R Δ : Lanes (rb - w)) =
       gNext (tableStage A w hw treeTag castTag) R Δ := by
   show peelDiv R (gRes (SliceC.hashStage (tableHash A) w hw treeTag castTag) R Δ w) w =
@@ -123,17 +123,17 @@ theorem gNext_table (A : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w �
   rw [hashStage_table]
 
 /-- The bit masks of a conversion above stage 0 read only stage 1's bits and remainder. -/
-theorem wordBit_high (row : OddRow) (b0 b1 : ℕ → Block) (last : Block) (p : ℕ) (hp : row.width0 ≤ p) :
+theorem wordBit_high (row : OddRow) (b0 b1 : ℕ → Label) (last : Label) (p : ℕ) (hp : row.width0 ≤ p) :
     wordBit row b0 b1 last p = if p < row.width0 + row.width1 then b1 (p - row.width0) else last := by
   simp only [wordBit, if_neg (show ¬ p < row.width0 by omega)]
 
 /-! ### One odd modulus -/
 
 /-- The conversion program of one odd modulus, evaluated, with its intermediate results named. -/
-theorem conversionGarbleM_eval (H : HashN) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Block) (W : Lanes row.ell)
+theorem conversionGarbleM_eval (H : HashN) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label) (W : Lanes row.ell)
     (g0 : StageGarbled row.ell row.width0) (g1 : StageGarbled (row.ell - row.width0) row.width1)
-    (grown : (Fin (2 ^ (row.width0 + (row.keep - row.width0))) → Block) × (ℕ → Block))
-    (folded : (Fin m → Block) × (ℕ → Block))
+    (grown : (Fin (2 ^ (row.width0 + (row.keep - row.width0))) → Label) × (ℕ → Label))
+    (folded : (Fin m → Label) × (ℕ → Label))
     (hg0 : (extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval H = g0)
     (hg1 : (extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) Δ g0.next).eval H = g1)
     (hgrown : (growGarbleM (growTag coord i) row.width0 (stored fun leaf => g0.leaves leaf.val)
@@ -153,7 +153,7 @@ theorem conversionGarbleM_eval (H : HashN) (coord i : ℕ) (row : OddRow) (m : �
 /-- **The conversion of one odd modulus on a table**: the stage joins and pins are `ExtractSpec`'s at the table's
 stages (stage 1 on stage 0's peeled remainder), and the growth and fold joins are the XOR of the table's materials of
 their level, XOR the bit mask of the word's bit there. -/
-theorem conversion_table (A : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Block)
+theorem conversion_table (A : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label)
     (W : Lanes row.ell) (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0)
     (hk : row.width0 ≤ row.keep) :
     let sp0 := tableStage A row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)
@@ -167,10 +167,10 @@ theorem conversion_table (A : ℕ → Block × Block) (coord i : ℕ) (row : Odd
     (∀ n, 1 ≤ n → n < row.width1 → g.stageJoins 1 n = gJoin sp1 R1 Δ n) ∧
     (∀ k, g.stagePins 1 k = atNat (stored (pinBlocks (gPin sp1 R1 Δ))) 0 k) ∧
     (∀ j, j < row.keep - row.width0 → g.growJoins (row.width0 + j) =
-        xorFold (fun slot : Fin (2 ^ (row.width0 + j)) => (A (growTag coord i (row.width0 + j) slot.val)).1) ^^^
+        xorFold (fun slot : Fin (2 ^ (row.width0 + j)) => (clip (A (growTag coord i (row.width0 + j) slot.val)).1)) ^^^
           bitMask (row.width0 + j)) ∧
     (∀ j, j < row.ell - row.keep → g.foldJoins (row.keep + j) =
-        xorFold (fun ρ : Fin m => (A (foldTag coord i (row.keep + j) ρ.val)).1) ^^^ bitMask (row.keep + j)) := by
+        xorFold (fun ρ : Fin m => (clip (A (foldTag coord i (row.keep + j) ρ.val)).1)) ^^^ bitMask (row.keep + j)) := by
   intro sp0 sp1 R1 bitMask g
   obtain ⟨g0, hg0⟩ : ∃ g0, (extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) Δ W).eval
       (tableHash A) = g0 := ⟨_, rfl⟩
@@ -227,7 +227,7 @@ theorem conversion_table (A : ℕ → Block × Block) (coord i : ℕ) (row : Odd
 /-! ### A modulus and a coordinate -/
 
 /-- **An odd modulus**: its published conversion material is its conversion's, on the word of the chunks' casts. -/
-theorem modGarbleM_odd (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Block)
+theorem modGarbleM_odd (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Label)
     (chunks : ℕ → ChunkGarbled tbl.castWidth) (i : Fin tbl.count) (row : OddRow) (hk : tbl.kind i = .odd row) :
     let conv := (conversionGarbleM coord i.val row (tbl.modulus i) Δ
       (truthWord tbl (tbl.modulus i) row.ell fun c leaf => (chunks c).casts leaf)).eval H
@@ -239,7 +239,7 @@ theorem modGarbleM_odd (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Block)
   exact ⟨trivial, trivial, trivial, trivial⟩
 
 /-- **A coordinate's published conversion material** is its chunks' and its moduli's. -/
-theorem coord_pub (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Block) (Z : ℕ → Block) :
+theorem coord_pub (H : HashN) (tbl : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ → Label) :
     let chunks : ℕ → ChunkGarbled tbl.castWidth :=
       atNat (fun c : Fin tbl.chunkCount => (chunkGarbleM tbl coord Δ Z c.val).eval H) (ChunkGarbled.empty _)
     let pub := ((coordGarbleM tbl S coord Δ Z).eval H).pub

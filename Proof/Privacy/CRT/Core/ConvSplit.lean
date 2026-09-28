@@ -164,10 +164,10 @@ theorem fillAt_eq (κ v : ℕ) (A : TagTable) (f : HotRead table → Block × Bl
 
 /-- **The core of the split**, for one coordinate `κ` read at value `v`, with the coordinate's `Δ` and zero labels
 taken from the coins. -/
-theorem split_core {α : Type} (S κ : ℕ) (hκ : κ < 2) (v : ℕ) (Δof : crtEntry.Coins → Block)
-    (Zof : crtEntry.Coins → ℕ → Block) (hidden : Fin (2 ^ 40) → Prop)
+theorem split_core {α : Type} (S κ : ℕ) (hκ : κ < 2) (v : ℕ) (Δof : crtEntry.Coins → Label)
+    (Zof : crtEntry.Coins → ℕ → Label) (hidden : Fin (2 ^ 40) → Prop)
     (hhot : ∀ r : HotRead table, hidden (tag40 (readTag table κ v r)))
-    (g : TableTape crtEntry → α) (hg : H8.ReadsOff Eq hidden g) (b : Vector Block convCount) (a : α) :
+    (g : TableTape crtEntry → α) (hg : H8.ReadsOff Eq hidden g) (b : Vector Label convCount) (a : α) :
     ((swappedTableTape crtEntry).map fun tape => some (convVector ((coordGarbleM table S κ (Δof tape.1)
         (Zof tape.1)).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub, g tape))
         (some (b, a)) =
@@ -247,11 +247,11 @@ theorem split_core {α : Type} (S κ : ℕ) (hκ : κ < 2) (v : ℕ) (Δof : crt
 
 /-- **A part of the garbling that is one coordinate's flat vector splits off** (`H8.PartSplit` for the hot
 conversion tags of `κ` at `u`). -/
-theorem partSplit_of (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (S : ℕ) (Δof : crtEntry.Coins → Block)
-    (Zof : crtEntry.Coins → ℕ → Block) (part : TableTape crtEntry → Vector Block convCount)
+theorem partSplit_of (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (S : ℕ) (Δof : crtEntry.Coins → Label)
+    (Zof : crtEntry.Coins → ℕ → Label) (part : TableTape crtEntry → Vector Label convCount)
     (hpart : ∀ tape : TableTape crtEntry, part tape = convVector ((coordGarbleM table S κ (Δof tape.1)
       (Zof tape.1)).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub)
-    (ideal : PMF (Vector Block convCount))
+    (ideal : PMF (Vector Label convCount))
     (hideal : ideal = (PMF.uniformOfFintype (ConvVals table)).map Flat.flatOf) :
     H8.PartSplit Eq (H8.hotConvTag table u κ) (fun _ => False) part ideal := by
   intro α g hg b a
@@ -268,13 +268,13 @@ theorem partSplit_of (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (S : ℕ) (Δof
 
 theorem garbleCM_crtX (scalar : NonZeroScalar) (coins : Coins) (H : HashN) :
     ((garbleCM scalar coins).eval H).1.crtX =
-      convVector ((coordGarbleM table xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval H).pub := by
+      convVector ((coordGarbleM table xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval H).pub := by
   simp only [garbleCM, FreeQuery.eval_bind, FreeQuery.eval_pure]
   rfl
 
 theorem garbleCM_crtY (scalar : NonZeroScalar) (coins : Coins) (H : HashN) :
     ((garbleCM scalar coins).eval H).1.crtY =
-      convVector ((coordGarbleM table yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval H).pub := by
+      convVector ((coordGarbleM table yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval H).pub := by
   simp only [garbleCM, FreeQuery.eval_bind, FreeQuery.eval_pure]
   rfl
 
@@ -292,7 +292,7 @@ theorem realGarbled_eq (parameter : ℕ) (scalar : NonZeroScalar) (tape : TableT
 
 theorem realGarbled_crtX (parameter : ℕ) (scalar : NonZeroScalar) (tape : TableTape crtEntry) :
     (H8.realGarbled crtEntry parameter scalar tape).1.crtX =
-      convVector ((coordGarbleM table xCount 0 (tape.1.inputDelta .x) (atNat (tape.1.inputZero .x) 0)).eval
+      convVector ((coordGarbleM table xCount 0 (clip (tape.1.inputDelta .x)) (fun j => clip (atNat (tape.1.inputZero .x) 0 j))).eval
         (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub := by
   rw [realGarbled_eq]
   simp only [garbleCM, FreeQuery.eval_bind, FreeQuery.eval_pure]
@@ -300,7 +300,7 @@ theorem realGarbled_crtX (parameter : ℕ) (scalar : NonZeroScalar) (tape : Tabl
 
 theorem realGarbled_crtY (parameter : ℕ) (scalar : NonZeroScalar) (tape : TableTape crtEntry) :
     (H8.realGarbled crtEntry parameter scalar tape).1.crtY =
-      convVector ((coordGarbleM table yCount 1 (tape.1.inputDelta .y) (atNat (tape.1.inputZero .y) 0)).eval
+      convVector ((coordGarbleM table yCount 1 (clip (tape.1.inputDelta .y)) (fun j => clip (atNat (tape.1.inputZero .y) 0 j))).eval
         (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub := by
   rw [realGarbled_eq]
   simp only [garbleCM, FreeQuery.eval_bind, FreeQuery.eval_pure]
@@ -321,10 +321,10 @@ theorem crtConvSplit_x : H8.CrtConvSplit table 0 := by
   intro _ _ parameter scalar u α g hg b a
   have hpart : ∀ tape : TableTape crtEntry, (if (0 : Fin 2) = 0 then (H8.realGarbled crtEntry parameter scalar tape).1.crtX
       else (H8.realGarbled crtEntry parameter scalar tape).1.crtY) =
-      convVector ((coordGarbleM table xCount 0 (tape.1.inputDelta .x) (atNat (tape.1.inputZero .x) 0)).eval
+      convVector ((coordGarbleM table xCount 0 (clip (tape.1.inputDelta .x)) (fun j => clip (atNat (tape.1.inputZero .x) 0 j))).eval
         (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub :=
     fun tape => (if_pos rfl).trans (realGarbled_crtX parameter scalar tape)
-  exact partSplit_of u 0 (by decide) xCount (fun c => c.inputDelta .x) (fun c => atNat (c.inputZero .x) 0) _
+  exact partSplit_of u 0 (by decide) xCount (fun c => clip (c.inputDelta .x)) (fun c j => clip (atNat (c.inputZero .x) 0 j)) _
     hpart _ (ideal_eq 0) g hg b a
 
 /-- **P3, the conversion row of H8 for `y`.** -/
@@ -332,10 +332,10 @@ theorem crtConvSplit_y : H8.CrtConvSplit table 1 := by
   intro _ _ parameter scalar u α g hg b a
   have hpart : ∀ tape : TableTape crtEntry, (if (1 : Fin 2) = 0 then (H8.realGarbled crtEntry parameter scalar tape).1.crtX
       else (H8.realGarbled crtEntry parameter scalar tape).1.crtY) =
-      convVector ((coordGarbleM table yCount 1 (tape.1.inputDelta .y) (atNat (tape.1.inputZero .y) 0)).eval
+      convVector ((coordGarbleM table yCount 1 (clip (tape.1.inputDelta .y)) (fun j => clip (atNat (tape.1.inputZero .y) 0 j))).eval
         (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub :=
     fun tape => (if_neg (by decide)).trans (realGarbled_crtY parameter scalar tape)
-  exact partSplit_of u 1 (by decide) yCount (fun c => c.inputDelta .y) (fun c => atNat (c.inputZero .y) 0) _
+  exact partSplit_of u 1 (by decide) yCount (fun c => clip (c.inputDelta .y)) (fun c j => clip (atNat (c.inputZero .y) 0 j)) _
     hpart _ (ideal_eq 1) g hg b a
 
 /-- **P3: the conversion row of H8, for both coordinates.** -/

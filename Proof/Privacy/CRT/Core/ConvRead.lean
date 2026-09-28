@@ -3,14 +3,15 @@
 
 `Conversion.lean` states the conversion core on the hidden values `ConvVals tbl`. On the chain's tag table
 (`TagTable := Fin (2 ^ 40) → Block × Block`, read by tag, `tagRead`) the garbler's own hidden values are the readings
-of the table at the hot tags (`readHot tbl coord v (tagRead A)`): `.1` of one answer per hashed tree, growth or fold
+of the table at the hot tags (`readHot tbl coord v (tagRead A)`): `clip` of `.1` of one answer per hashed tree, growth or fold
 level, the cast reading of `castAnswers l` answers per pin. This file names every such read (`HotRead tbl`, one index
 per answer read) and its tag (`readTag`), shows that the hot readings are a fixed function `rho` of the table read at
 those tags (`readHot_eq`, by `rfl`), and that `rho` pushes the uniform law to the uniform law (`rho_uniform`, from the
-`.1` projection and `castLanes_uniform`). The index types are built from sums and sigmas in the shape of
+clipped first-block projection and `castLanes_uniform`). The index types are built from sums and sigmas in the shape of
 `ConvVals`, so the law is the composition of `TableSplit`'s combinators.
 -/
 
+import Proof.Privacy.CRT.Core.LabelUniform
 import Proof.Privacy.CRT.Core.Conversion
 import Proof.Privacy.CRT.Core.TableSplit
 import Proof.Privacy.CRT.Swap.Reading
@@ -62,7 +63,7 @@ theorem sigma_map_uniform {I : Type} [Fintype I] [DecidableEq I] {β C : I → T
 
 end Combinators
 
-/-- The first block of a uniform answer is uniform. -/
+/-- The first block of a uniform answer remains a full raw block (digest consumers). -/
 theorem fst_uniform : (PMF.uniformOfFintype (Block × Block)).map Prod.fst = PMF.uniformOfFintype Block := by
   classical
   refine Kriterion.ArgoMAC.Security.Phase3.uniform_map_of_fibre_equiv _ fun b b' => ?_
@@ -72,10 +73,14 @@ theorem fst_uniform : (PMF.uniformOfFintype (Block × Block)).map Prod.fst = PMF
     left_inv := fun p => Subtype.ext (Prod.ext p.2.symm rfl)
     right_inv := fun p => Subtype.ext (Prod.ext p.2.symm rfl) }
 
-/-- The first blocks of uniform answers are uniform. -/
+/-- The clipped first block of a uniform answer is uniform. -/
+theorem clip_fst_uniform : (PMF.uniformOfFintype (Block × Block)).map (fun a => clip a.1) =
+    PMF.uniformOfFintype Label := Narrow.uniform_answer_clip
+
+/-- The clipped first blocks of uniform answers are uniform active labels. -/
 theorem fsts_uniform (n : ℕ) :
-    (PMF.uniformOfFintype (Fin n → Block × Block)).map (fun g k => (g k).1) = PMF.uniformOfFintype (Fin n → Block) :=
-  pi_map_uniform (fun _ => Prod.fst) fun _ => fst_uniform
+    (PMF.uniformOfFintype (Fin n → Block × Block)).map (fun g k => (clip (g k).1)) = PMF.uniformOfFintype (Fin n → Label) :=
+  pi_map_uniform (fun _ a => clip a.1) fun _ => clip_fst_uniform
 
 theorem lanes_subsingleton_zero (a b : Lanes 0) : a = b := lanes_zero_eq a b
 
@@ -112,23 +117,23 @@ abbrev ChunkRead (tbl : CrtTable) : Type :=
 abbrev HotRead (tbl : CrtTable) : Type :=
   ChunkRead tbl ⊕ (Σ i : Fin tbl.count, StageRead (rowOf (tbl.kind i) (tbl.modulus i)))
 
-/-- The first blocks of a family of answers. -/
-def fstRho (n : ℕ) (g : Fin n → Block × Block) : Fin n → Block := fun k => (g k).1
+/-- The clipped first blocks of a family of raw answers. -/
+def fstRho (n : ℕ) (g : Fin n → Block × Block) : Fin n → Label := fun k => (clip (g k).1)
 
 /-- A stage's hidden tuple from its reads. -/
-def pairRho (w l : ℕ) (g : PairRead w l → Block × Block) : Hidden 128 w l :=
+def pairRho (w l : ℕ) (g : PairRead w l → Block × Block) : Hidden labelBits w l :=
   (fstRho _ fun k => g (.inl k), castLanes l (packAnswers (castAnswers l) fun j => g (.inr j)))
 
 /-- The growth and fold materials of a modulus from their reads. -/
 def gfRho (row : OddRow) (g : (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep)) → Block × Block) :
-    (Fin (row.keep - row.width0) → Block) × (Fin (row.ell - row.keep) → Block) :=
+    (Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label) :=
   (fstRho _ fun k => g (.inl k), fstRho _ fun k => g (.inr k))
 
 /-- Stage 1, growth and folds of a modulus from their reads. -/
 def tailRho (row : OddRow) (g : (PairRead row.width1 (row.ell - row.width0) ⊕
     (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep))) → Block × Block) :
-    Hidden 128 row.width1 (row.ell - row.width0) ×
-      ((Fin (row.keep - row.width0) → Block) × (Fin (row.ell - row.keep) → Block)) :=
+    Hidden labelBits row.width1 (row.ell - row.width0) ×
+      ((Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label)) :=
   (pairRho row.width1 (row.ell - row.width0) fun r => g (.inl r), gfRho row fun r => g (.inr r))
 
 /-- A modulus's hidden values from its reads. -/
@@ -137,7 +142,7 @@ def stageRho (row : OddRow) (g : StageRead row → Block × Block) : StageVals r
 
 /-- The chunks' tree materials from their reads. -/
 def chunkJoinRho (tbl : CrtTable) (g : (Σ c : Fin tbl.chunkCount, Fin (tbl.chunkWidth c.val - 1)) → Block × Block) :
-    (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Block :=
+    (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label :=
   fun c => fstRho _ fun k => g ⟨c, k⟩
 
 /-- The chunks' hot casts from their reads. -/
@@ -159,25 +164,25 @@ def rho (tbl : CrtTable) (g : HotRead tbl → Block × Block) : ConvVals tbl :=
   (chunkRho tbl fun r => g (.inl r), modsRho tbl fun r => g (.inr r))
 
 theorem fstRho_uniform (n : ℕ) :
-    (PMF.uniformOfFintype (Fin n → Block × Block)).map (fstRho n) = PMF.uniformOfFintype (Fin n → Block) :=
+    (PMF.uniformOfFintype (Fin n → Block × Block)).map (fstRho n) = PMF.uniformOfFintype (Fin n → Label) :=
   fsts_uniform n
 
 theorem pairRho_uniform (w l : ℕ) (hl : l ≤ 128) :
     (PMF.uniformOfFintype (PairRead w l → Block × Block)).map (pairRho w l) =
-      PMF.uniformOfFintype (Hidden 128 w l) :=
+      PMF.uniformOfFintype (Hidden labelBits w l) :=
   sum_map_uniform (fstRho _) (fun g => castLanes l (packAnswers (castAnswers l) g)) (fstRho_uniform _)
     (castRead_uniform l hl)
 
 theorem gfRho_uniform (row : OddRow) :
     (PMF.uniformOfFintype ((Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep)) → Block × Block)).map
-      (gfRho row) = PMF.uniformOfFintype ((Fin (row.keep - row.width0) → Block) × (Fin (row.ell - row.keep) → Block)) :=
+      (gfRho row) = PMF.uniformOfFintype ((Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label)) :=
   sum_map_uniform (fstRho _) (fstRho _) (fstRho_uniform _) (fstRho_uniform _)
 
 theorem tailRho_uniform (row : OddRow) (hl : row.ell ≤ 128) :
     (PMF.uniformOfFintype ((PairRead row.width1 (row.ell - row.width0) ⊕
       (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep))) → Block × Block)).map (tailRho row) =
-      PMF.uniformOfFintype (Hidden 128 row.width1 (row.ell - row.width0) ×
-        ((Fin (row.keep - row.width0) → Block) × (Fin (row.ell - row.keep) → Block))) :=
+      PMF.uniformOfFintype (Hidden labelBits row.width1 (row.ell - row.width0) ×
+        ((Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label))) :=
   sum_map_uniform (pairRho _ _) (gfRho row) (pairRho_uniform _ _ (le_trans (Nat.sub_le _ _) hl)) (gfRho_uniform row)
 
 theorem stageRho_uniform (row : OddRow) (hl : row.ell ≤ 128) :
@@ -242,8 +247,8 @@ theorem castAnswers_le (l : ℕ) : castAnswers l ≤ 64 := by
   rcases Nat.eq_zero_or_pos (lanesPerBlock l) with h | h
   · rw [h, Nat.div_zero]
     norm_num
-  · have : (128 + lanesPerBlock l - 1) / lanesPerBlock l ≤ 128 :=
-      Nat.div_le_of_le_mul (by omega)
+  · have : (labelBits + lanesPerBlock l - 1) / lanesPerBlock l ≤ 128 :=
+      Nat.div_le_of_le_mul (by unfold labelBits; omega)
     omega
 
 /-- The fields of the tags the conversion core reads stay in range (tags below `2 ^ 40`). -/
@@ -411,8 +416,8 @@ open Kriterion.CRT.Privacy.ExtractStage (overrideHot specPublish)
 
 /-- **A stage on two tables that agree at its cold tags** publishes the same, with the same remainder and bits. -/
 theorem stage_congr (T T' : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (tt ct : ℕ → ℕ → ℕ) (s : ℕ)
-    (h : Hidden 128 w rb) (R : Lanes rb) (Δ : Block)
-    (treeEq : ∀ n x, 1 ≤ n → n < w → x < 2 ^ n → x ≠ s % 2 ^ n → (T (tt n x)).1 = (T' (tt n x)).1)
+    (h : Hidden labelBits w rb) (R : Lanes rb) (Δ : Label)
+    (treeEq : ∀ n x, 1 ≤ n → n < w → x < 2 ^ n → x ≠ s % 2 ^ n → (clip (T (tt n x)).1) = (clip (T' (tt n x)).1))
     (castEq : ∀ α, α < 2 ^ w → α ≠ s → castRd T rb (ct α) = castRd T' rb (ct α)) :
     specPublish (tableStage T w hw tt ct) R Δ s h = specPublish (tableStage T' w hw tt ct) R Δ s h ∧
       (gNext (overrideHot (tableStage T w hw tt ct) s h) R Δ : Lanes (rb - w)) =
@@ -452,8 +457,8 @@ theorem stage_congr (T T' : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w
     unfold gLevelSum
     apply SliceC.xsum_congr
     intro x hx
-    show (if x = s % 2 ^ n then ExtractStage.hot h.1 (n - 1) else (T (tt n x)).1) =
-      (if x = s % 2 ^ n then ExtractStage.hot h.1 (n - 1) else (T' (tt n x)).1)
+    show (if x = s % 2 ^ n then ExtractStage.hot h.1 (n - 1) else (clip (T (tt n x)).1)) =
+      (if x = s % 2 ^ n then ExtractStage.hot h.1 (n - 1) else (clip (T' (tt n x)).1))
     split_ifs with e
     · rfl
     · exact treeEq n x h1 h2 (Finset.mem_range.mp hx) e
@@ -466,14 +471,14 @@ theorem stage_congr (T T' : ℕ → Block × Block) {rb : ℕ} (w : ℕ) (hw : w
   rw [levels (k.val + 1) (by omega) (by omega), bits]
 
 /-- Stage 1's input remainder in `modPublish`. -/
-def modR1 (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ) (Δ : Block) (hw0 : row.width0 ≤ row.ell)
+def modR1 (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ) (Δ : Label) (hw0 : row.width0 ≤ row.ell)
     (W : Lanes row.ell) (h : StageVals row) : Lanes (row.ell - row.width0) :=
   gNext (overrideHot (tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0))
     (σ % 2 ^ row.width0) h.1) W Δ
 
 /-- The bit masks of the growth and fold joins in `modPublish`. -/
-def modBit (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ) (Δ : Block) (hw0 : row.width0 ≤ row.ell)
-    (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) (h : StageVals row) (p : ℕ) : Block :=
+def modBit (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ) (Δ : Label) (hw0 : row.width0 ≤ row.ell)
+    (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) (h : StageVals row) (p : ℕ) : Label :=
   if p < row.width0 + row.width1 then
     gBit (overrideHot (tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1))
       (σ / 2 ^ row.width0 % 2 ^ row.width1) h.2.1) (modR1 T coord i row σ Δ hw0 W h) Δ (p - row.width0)
@@ -482,7 +487,7 @@ def modBit (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (σ : ℕ
 
 section Forms
 
-variable (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Block) (hw0 : row.width0 ≤ row.ell)
+variable (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Label) (hw0 : row.width0 ≤ row.ell)
   (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) (h : StageVals row)
 
 theorem modPublish_stage0 : (modPublish T coord i row m σ Δ hw0 hw1 W h).1 =
@@ -496,33 +501,33 @@ theorem modPublish_stage1 : (modPublish T coord i row m σ Δ hw0 hw1 W h).2.1 =
 theorem modPublish_grow (k : Fin (row.keep - row.width0)) : (modPublish T coord i row m σ Δ hw0 hw1 W h).2.2.1 k =
     xorFold (fun slot : Fin (2 ^ (row.width0 + k.val)) =>
         if slot.val = σ % 2 ^ (row.width0 + k.val) then h.2.2.1 k
-        else (T (growTag coord i (row.width0 + k.val) slot.val)).1) ^^^
+        else (clip (T (growTag coord i (row.width0 + k.val) slot.val)).1)) ^^^
       modBit T coord i row σ Δ hw0 hw1 W h (row.width0 + k.val) := rfl
 
 theorem modPublish_fold (k : Fin (row.ell - row.keep)) : (modPublish T coord i row m σ Δ hw0 hw1 W h).2.2.2 k =
     xorFold (fun ρ : Fin m =>
         if ρ.val = σ % 2 ^ (row.keep + k.val) % m then h.2.2.2 k
-        else (T (foldTag coord i (row.keep + k.val) ρ.val)).1) ^^^
+        else (clip (T (foldTag coord i (row.keep + k.val) ρ.val)).1)) ^^^
       modBit T coord i row σ Δ hw0 hw1 W h (row.keep + k.val) := rfl
 
 end Forms
 
 /-- **One modulus on two tables that agree at its cold tags** publishes the same. -/
-theorem modPublish_congr (T T' : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Block)
+theorem modPublish_congr (T T' : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Label)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) (h : StageVals row)
     (tree0 : ∀ n x, 1 ≤ n → n < row.width0 → x < 2 ^ n → x ≠ σ % 2 ^ row.width0 % 2 ^ n →
-      (T (extTreeTag coord i 0 n x)).1 = (T' (extTreeTag coord i 0 n x)).1)
+      (clip (T (extTreeTag coord i 0 n x)).1) = (clip (T' (extTreeTag coord i 0 n x)).1))
     (cast0 : ∀ α, α < 2 ^ row.width0 → α ≠ σ % 2 ^ row.width0 →
       castRd T row.ell (extCastTag coord i 0 α) = castRd T' row.ell (extCastTag coord i 0 α))
     (tree1 : ∀ n x, 1 ≤ n → n < row.width1 → x < 2 ^ n → x ≠ σ / 2 ^ row.width0 % 2 ^ row.width1 % 2 ^ n →
-      (T (extTreeTag coord i 1 n x)).1 = (T' (extTreeTag coord i 1 n x)).1)
+      (clip (T (extTreeTag coord i 1 n x)).1) = (clip (T' (extTreeTag coord i 1 n x)).1))
     (cast1 : ∀ α, α < 2 ^ row.width1 → α ≠ σ / 2 ^ row.width0 % 2 ^ row.width1 →
       castRd T (row.ell - row.width0) (extCastTag coord i 1 α) =
         castRd T' (row.ell - row.width0) (extCastTag coord i 1 α))
     (grow : ∀ k, k < row.keep - row.width0 → ∀ x, x < 2 ^ (row.width0 + k) → x ≠ σ % 2 ^ (row.width0 + k) →
-      (T (growTag coord i (row.width0 + k) x)).1 = (T' (growTag coord i (row.width0 + k) x)).1)
+      (clip (T (growTag coord i (row.width0 + k) x)).1) = (clip (T' (growTag coord i (row.width0 + k) x)).1))
     (fold : ∀ k, k < row.ell - row.keep → ∀ ρ, ρ < m → ρ ≠ σ % 2 ^ (row.keep + k) % m →
-      (T (foldTag coord i (row.keep + k) ρ)).1 = (T' (foldTag coord i (row.keep + k) ρ)).1) :
+      (clip (T (foldTag coord i (row.keep + k) ρ)).1) = (clip (T' (foldTag coord i (row.keep + k) ρ)).1)) :
     modPublish T coord i row m σ Δ hw0 hw1 W h = modPublish T' coord i row m σ Δ hw0 hw1 W h := by
   obtain ⟨p0, n0, -⟩ := stage_congr T T' row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)
     (σ % 2 ^ row.width0) h.1 W Δ tree0 cast0
@@ -573,8 +578,8 @@ theorem two_pow_lt_65536 {a : ℕ} (h : a ≤ 15) : 2 ^ a < 65536 :=
 
 /-- **`convPublish` reads the table at cold tags only**: two tag tables that agree off the hot tags of `v` give the
 same published conversion material for every hidden value. -/
-theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : ℕ) (hc : coord < 2) (Z : ℕ → Block)
-    (Δ : Block) (A A' : Fin (2 ^ 40) → Block × Block)
+theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : ℕ) (hc : coord < 2) (Z : ℕ → Label)
+    (Δ : Label) (A A' : Fin (2 ^ 40) → Block × Block)
     (agree : ∀ x, (∀ r, tag40 (readTag tbl coord v r) ≠ x) → A x = A' x) (h : ConvVals tbl) :
     convPublish tbl coord v ⟨tagRead A, Z, Δ⟩ h = convPublish tbl coord v ⟨tagRead A', Z, Δ⟩ h := by
   have cold := cold_at tbl range coord v hc A A' agree
@@ -608,7 +613,7 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
     · rfl
     · have hk := k.isLt
       have hw := range.chunkWidth c.val c.isLt
-      exact congrArg Prod.fst (cold (.inl (.inl ⟨c, k⟩)) slot.val
+      exact congrArg (fun a => clip a.1) (cold (.inl (.inl ⟨c, k⟩)) slot.val
         (lt_of_lt_of_le slot.isLt (le_of_lt (two_pow_lt_65536 (by omega)))) e)
   · show chunkPinH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.2 c = chunkPinH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.2 c
     unfold chunkPinH
@@ -630,7 +635,7 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
     apply modPublish_congr
     · intro n x h1 h2 hx e
       obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
-      exact congrArg Prod.fst (cold (.inr ⟨i, .inl (.inl ⟨k, by omega⟩)⟩) x
+      exact congrArg (fun a => clip a.1) (cold (.inr ⟨i, .inl (.inl ⟨k, by omega⟩)⟩) x
         (lt_of_lt_of_le hx (le_of_lt (two_pow_lt_65536 (by omega)))) e)
     · intro α hα e
       show castLanes _ (packAnswers _ _) = castLanes _ (packAnswers _ _)
@@ -639,7 +644,7 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
       exact cold (.inr ⟨i, .inl (.inr j)⟩) α (lt_of_lt_of_le hα (le_of_lt (two_pow_lt_65536 (by omega)))) e
     · intro n x h1 h2 hx e
       obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
-      exact congrArg Prod.fst (cold (.inr ⟨i, .inr (.inl (.inl ⟨k, by omega⟩))⟩) x
+      exact congrArg (fun a => clip a.1) (cold (.inr ⟨i, .inr (.inl (.inl ⟨k, by omega⟩))⟩) x
         (lt_of_lt_of_le hx (le_of_lt (two_pow_lt_65536 (by omega)))) e)
     · intro α hα e
       show castLanes _ (packAnswers _ _) = castLanes _ (packAnswers _ _)
@@ -648,10 +653,10 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
       exact cold (.inr ⟨i, .inr (.inl (.inr j))⟩) α (lt_of_lt_of_le hα (le_of_lt (two_pow_lt_65536 (by omega))))
         e
     · intro k hk x hx e
-      exact congrArg Prod.fst (cold (.inr ⟨i, .inr (.inr (.inl ⟨k, hk⟩))⟩) x
+      exact congrArg (fun a => clip a.1) (cold (.inr ⟨i, .inr (.inr (.inl ⟨k, hk⟩))⟩) x
         (lt_of_lt_of_le hx (le_of_lt (two_pow_lt_65536 (by omega)))) e)
     · intro k hk ρ hρ e
-      exact congrArg Prod.fst (cold (.inr ⟨i, .inr (.inr (.inr ⟨k, hk⟩))⟩) ρ (by omega) e)
+      exact congrArg (fun a => clip a.1) (cold (.inr ⟨i, .inr (.inr (.inr ⟨k, hk⟩))⟩) ρ (by omega) e)
 
 end Congr
 
@@ -666,7 +671,7 @@ of `ρ`. -/
 theorem conversion_law (tbl : CrtTable) (wf : ConvTableWF tbl) (range : ConvTagRange tbl) (coord v : ℕ)
     (hc : coord < 2) (S : ℕ) {Rest : Type*} (rest : PMF Rest)
     (tableOf : Rest → (HotRead tbl → Block × Block) → Fin (2 ^ 40) → Block × Block)
-    (zOf : Rest → ℕ → Block) (dOf : Rest → Block)
+    (zOf : Rest → ℕ → Label) (dOf : Rest → Label)
     (hot : ∀ ρ g r, tableOf ρ g (tag40 (readTag tbl coord v r)) = g r)
     (cold : ∀ ρ g g' x, (∀ r, tag40 (readTag tbl coord v r) ≠ x) → tableOf ρ g x = tableOf ρ g' x) :
     (rest.bind fun ρ => (PMF.uniformOfFintype (HotRead tbl → Block × Block)).map fun g =>
@@ -717,7 +722,7 @@ theorem fillHot_cold (tbl : CrtTable) (coord v : ℕ) (A : Fin (2 ^ 40) → Bloc
 and independent of `ρ`. -/
 theorem conversion_law_fill (tbl : CrtTable) (wf : ConvTableWF tbl) (range : ConvTagRange tbl) (coord v : ℕ)
     (hc : coord < 2) (S : ℕ) {Rest : Type*} (rest : PMF Rest) (tableOf : Rest → Fin (2 ^ 40) → Block × Block)
-    (zOf : Rest → ℕ → Block) (dOf : Rest → Block) :
+    (zOf : Rest → ℕ → Label) (dOf : Rest → Label) :
     (rest.bind fun ρ => (PMF.uniformOfFintype (HotRead tbl → Block × Block)).map fun g =>
         (ρ, readPub tbl ((coordGarbleM tbl S coord (dOf ρ) (zOf ρ)).eval
           (tableHash (tagRead (fillHot tbl coord v (tableOf ρ) g)))).pub))

@@ -52,6 +52,12 @@ theorem asked_bind (program : CM α) (next : α → CM β) :
   rw [asked_bind]
   rfl
 
+@[simp] theorem asked_hLabelM (label : Label) (tag : ℕ) :
+    asked H (hLabelM label tag) = [hashInput (embed label) tag] := by
+  unfold hLabelM
+  rw [asked_bind, asked_h128M]
+  simp only [asked_pure, List.append_nil]
+
 theorem asked_vector (count : ℕ) (program : Fin count → CM α) :
     asked H (FreeQuery.vector count program) = (List.finRange count).flatMap fun i => asked H (program i) := by
   induction count with
@@ -87,14 +93,14 @@ theorem asked_hlongM (label : Block) (tagOf : ℕ → ℕ) (count : ℕ) :
   simp only [asked_askN, asked_pure, List.append_nil]
   exact flatMap_singleton_eq_map _ _
 
-theorem asked_castM (l : ℕ) (label : Block) (tagOf : ℕ → ℕ) :
-    asked H (castM l label tagOf) = (List.finRange (castAnswers l)).map fun j => hashInput label (tagOf j.val) := by
+theorem asked_castM (l : ℕ) (label : Label) (tagOf : ℕ → ℕ) :
+    asked H (castM l label tagOf) = (List.finRange (castAnswers l)).map fun j => hashInput (embed label) (tagOf j.val) := by
   unfold castM
   rw [asked_bind, asked_hlongM]
   simp
 
-theorem asked_padVectorM (m S q : ℕ) (label : Block) (tagOf : ℕ → ℕ) :
-    asked H (padVectorM m S q label tagOf) = (List.finRange q).map fun j => hashInput label (tagOf j.val) := by
+theorem asked_padVectorM (m S q : ℕ) (label : Label) (tagOf : ℕ → ℕ) :
+    asked H (padVectorM m S q label tagOf) = (List.finRange q).map fun j => hashInput (embed label) (tagOf j.val) := by
   unfold padVectorM
   rw [asked_bind, asked_hlongM]
   simp
@@ -159,8 +165,8 @@ def ColdAt (cold : ℕ → Prop) (x : ℕ) : Prop := cold (x / 2 ^ 128)
 /-- **The slot shape.** The garbler asks `query (G s) s` at every slot `s`, the evaluator `query (E s) s` at every
 slot but `hot` (nothing at `hot`); off the hot slot the labels agree, and every query of the hot slot has a hot tag.
 Then every cold query of the garbler is the evaluator's. -/
-theorem slots_covers {count : ℕ} (cold : ℕ → Prop) (hot : Fin count) (query : Block → Fin count → List ℕ)
-    (G E : Fin count → Block) (agree : ∀ s, s ≠ hot → E s = G s)
+theorem slots_covers {count : ℕ} (cold : ℕ → Prop) (hot : Fin count) (query : Label → Fin count → List ℕ)
+    (G E : Fin count → Label) (agree : ∀ s, s ≠ hot → E s = G s)
     (hotTags : ∀ x ∈ query (G hot) hot, ¬ cold (x / 2 ^ 128)) :
     Covers (ColdAt cold) ((List.finRange count).flatMap fun s => query (G s) s)
       ((List.finRange count).flatMap fun s => if s = hot then [] else query (E s) s) := by
@@ -219,7 +225,7 @@ end Aligned
 at every slot that is not hot; off the hot slots the labels agree, and a query of slot `s` is cold exactly when `s`
 is not hot. -/
 theorem slots_aligned {count : ℕ} (P : ℕ → Prop) (isHot : Fin count → Prop) [DecidablePred isHot]
-    (query : Block → Fin count → List ℕ) (G E : Fin count → Block) (agree : ∀ s, ¬ isHot s → E s = G s)
+    (query : Label → Fin count → List ℕ) (G E : Fin count → Label) (agree : ∀ s, ¬ isHot s → E s = G s)
     (tags : ∀ label s, ∀ x ∈ query label s, (P x ↔ ¬ isHot s)) :
     Aligned P ((List.finRange count).flatMap fun s => query (G s) s)
       ((List.finRange count).flatMap fun s => if isHot s then [] else query (E s) s) := by
@@ -233,7 +239,7 @@ theorem slots_aligned {count : ℕ} (P : ℕ → Prop) (isHot : Fin count → Pr
 /-- The singleton query of a tag function, read at a cold predicate on tags. -/
 theorem single_tags (cold : ℕ → Prop) (tagOf : ℕ → ℕ) {count : ℕ} (isHot : Fin count → Prop)
     (tags : ∀ s : Fin count, cold (tagOf s.val) ↔ ¬ isHot s) :
-    ∀ (label : Block) (s : Fin count), ∀ x ∈ [hashInput label (tagOf s.val)], (ColdAt cold x ↔ ¬ isHot s) := by
+    ∀ (label : Label) (s : Fin count), ∀ x ∈ [hashInput (embed label) (tagOf s.val)], (ColdAt cold x ↔ ¬ isHot s) := by
   intro label s x inside
   rw [List.mem_singleton.mp inside]
   unfold ColdAt
@@ -243,7 +249,7 @@ theorem single_tags (cold : ℕ → Prop) (tagOf : ℕ → ℕ) {count : ℕ} (i
 /-- The part queries of a labelled long hash, read at a cold predicate on tags. -/
 theorem parts_tags (cold : ℕ → Prop) (partTag : ℕ → ℕ → ℕ) (parts : ℕ) {count : ℕ} (isHot : Fin count → Prop)
     (tags : ∀ s : Fin count, ∀ j < parts, cold (partTag s.val j) ↔ ¬ isHot s) :
-    ∀ (label : Block) (s : Fin count), ∀ x ∈ (List.finRange parts).map (fun j => hashInput label (partTag s.val j.val)),
+    ∀ (label : Label) (s : Fin count), ∀ x ∈ (List.finRange parts).map (fun j => hashInput (embed label) (partTag s.val j.val)),
       (ColdAt cold x ↔ ¬ isHot s) := by
   intro label s x inside
   obtain ⟨j, _, same⟩ := List.mem_map.mp inside
@@ -258,35 +264,35 @@ section Trees
 
 variable (H : HashN)
 
-theorem asked_garbleStepM (n : ℕ) (tagOf : ℕ → ℕ) (parent : Fin (2 ^ n) → Block) :
+theorem asked_garbleStepM (n : ℕ) (tagOf : ℕ → ℕ) (parent : Fin (2 ^ n) → Label) :
     asked H (garbleStepM n tagOf parent) =
-      (List.finRange (2 ^ n)).flatMap fun s => [hashInput (parent s) (tagOf s.val)] := by
+      (List.finRange (2 ^ n)).flatMap fun s => [hashInput (embed (parent s)) (tagOf s.val)] := by
   unfold garbleStepM
   rw [asked_bind, asked_tableM]
   simp
 
-theorem asked_evalStepM (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Block)
-    (parent : Fin (2 ^ n) → Block) :
+theorem asked_evalStepM (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Label)
+    (parent : Fin (2 ^ n) → Label) :
     asked H (evalStepM n tagOf active bitLabel join parent) =
-      (List.finRange (2 ^ n)).flatMap fun s => if s = active then [] else [hashInput (parent s) (tagOf s.val)] := by
+      (List.finRange (2 ^ n)).flatMap fun s => if s = active then [] else [hashInput (embed (parent s)) (tagOf s.val)] := by
   unfold evalStepM
   rw [asked_bind, asked_tableM]
-  simp only [asked_ite, asked_pure, asked_h128M, List.append_nil]
+  simp only [asked_ite, asked_pure, asked_hLabelM, List.append_nil]
 
 /-- **One level.** -/
-theorem step_aligned (cold : ℕ → Prop) (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Block)
-    (G E : Fin (2 ^ n) → Block) (agree : ∀ s, s ≠ active → E s = G s)
+theorem step_aligned (cold : ℕ → Prop) (n : ℕ) (tagOf : ℕ → ℕ) (active : Fin (2 ^ n)) (bitLabel join : Label)
+    (G E : Fin (2 ^ n) → Label) (agree : ∀ s, s ≠ active → E s = G s)
     (tags : ∀ s : Fin (2 ^ n), cold (tagOf s.val) ↔ s ≠ active) :
     Aligned (ColdAt cold) (asked H (garbleStepM n tagOf G))
       (asked H (evalStepM n tagOf active bitLabel join E)) := by
   rw [asked_garbleStepM, asked_evalStepM]
-  exact slots_aligned _ (fun s => s = active) (fun label s => [hashInput label (tagOf s.val)]) G E agree
+  exact slots_aligned _ (fun s => s = active) (fun label s => [hashInput (embed label) (tagOf s.val)]) G E agree
     (single_tags cold tagOf _ tags)
 
 /-- **The tree with known bits** (every hashed level `1 .. total - 1`), under the hypotheses of
 `SliceC.treeEvalM_correct`. -/
-theorem tree_aligned (cold : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (Δ : Block) (value : ℕ)
-    (bitMask bitLabel join : ℕ → Block) (total : ℕ)
+theorem tree_aligned (cold : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (Δ : Label) (value : ℕ)
+    (bitMask bitLabel join : ℕ → Label) (total : ℕ)
     (hbit : ∀ j < total, bitLabel j = bitMask j ^^^ (if value.testBit j then Δ else 0))
     (hjoin : ∀ j, 1 ≤ j → j < total →
       join j = ((treeGarbleM tagOf Δ (bitMask 0) total).eval H).2 j ^^^ bitMask j)
@@ -319,8 +325,8 @@ theorem tree_aligned (cold : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (Δ : B
           exact ne (Fin.ext same)
 
 /-- **The growth of a one-hot by known bits**, under the hypotheses of `SliceC.growEvalM_correct`. -/
-theorem grow_aligned (cold : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (G E : Fin (2 ^ start) → Block) (Δ : Block)
-    (value : ℕ) (bitMask bitLabel join : ℕ → Block) (total : ℕ)
+theorem grow_aligned (cold : ℕ → Prop) (tagOf : ℕ → ℕ → ℕ) (start : ℕ) (G E : Fin (2 ^ start) → Label) (Δ : Label)
+    (value : ℕ) (bitMask bitLabel join : ℕ → Label) (total : ℕ)
     (hE : ∀ x, E x = G x ^^^ (if x.val = value % 2 ^ start then Δ else 0))
     (hbit : ∀ j, j < start + total → bitLabel j = bitMask j ^^^ (if value.testBit j then Δ else 0))
     (hjoin : ∀ j, join j = ((growGarbleM tagOf start G total).eval H).2 j ^^^ bitMask j)
@@ -355,27 +361,27 @@ end Trees
 
 section Chunk
 
-variable (H : HashN) (T : CrtTable) (coord : ℕ) (Δ : Block) (Z : ℕ → Block) (c : ℕ)
+variable (H : HashN) (T : CrtTable) (coord : ℕ) (Δ : Label) (Z : ℕ → Label) (c : ℕ)
 
 theorem asked_chunkGarbleM :
     asked H (chunkGarbleM T coord Δ Z c) =
       asked H (treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)) ++
         (List.finRange (2 ^ T.chunkWidth c)).flatMap fun leaf =>
           (List.finRange (castAnswers T.castWidth)).map fun j =>
-            hashInput (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0))
-              (T.chunkWidth c)).eval H).1 leaf) (chunkCastTag coord c leaf.val j.val) := by
+            hashInput (embed (((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0))
+              (T.chunkWidth c)).eval H).1 leaf)) (chunkCastTag coord c leaf.val j.val) := by
   unfold chunkGarbleM
   simp only [asked_bind, asked_tableM, asked_castM, asked_pure, List.append_nil]
 
-theorem asked_chunkEvalM (labels : ℕ → Block) (v : ℕ) (joins : ℕ → Block) (pin : Lanes T.castWidth) :
+theorem asked_chunkEvalM (labels : ℕ → Label) (v : ℕ) (joins : ℕ → Label) (pin : Lanes T.castWidth) :
     asked H (chunkEvalM T coord labels v joins pin c) =
       asked H (treeEvalM (chunkTreeTag coord c) (T.chunkValue v c) (fun n => labels (T.chunkOffset c + n)) joins
           (T.chunkWidth c)) ++
         (List.finRange (2 ^ T.chunkWidth c)).flatMap fun leaf =>
           if leaf.val = T.chunkValue v c then [] else
           (List.finRange (castAnswers T.castWidth)).map fun j =>
-            hashInput (((treeEvalM (chunkTreeTag coord c) (T.chunkValue v c)
-              (fun n => labels (T.chunkOffset c + n)) joins (T.chunkWidth c)).eval H) leaf)
+            hashInput (embed (((treeEvalM (chunkTreeTag coord c) (T.chunkValue v c)
+              (fun n => labels (T.chunkOffset c + n)) joins (T.chunkWidth c)).eval H) leaf))
               (chunkCastTag coord c leaf.val j.val) := by
   unfold chunkEvalM
   simp only [asked_bind, asked_tableM, asked_ite, asked_castM, asked_pure, List.append_nil]
@@ -418,7 +424,7 @@ theorem chunk_aligned (v : ℕ) (cold : ℕ → Prop)
   · have hlt := SliceC.chunkValue_lt T v c
     refine slots_aligned (ColdAt cold) (fun leaf => leaf.val = T.chunkValue v c)
       (fun label leaf => (List.finRange (castAnswers T.castWidth)).map fun j =>
-        hashInput label (chunkCastTag coord c leaf.val j.val)) _ _ (fun leaf hot => ?_)
+        hashInput (embed label) (chunkCastTag coord c leaf.val j.val)) _ _ (fun leaf hot => ?_)
       (parts_tags cold (chunkCastTag coord c) (castAnswers T.castWidth) _ castTags)
     rw [correct (T.chunkWidth c) le_rfl leaf, Nat.mod_eq_of_lt hlt, if_neg hot, SliceC.xor_zero_block]
 
@@ -430,23 +436,23 @@ section FoldsBody
 
 variable (H : HashN)
 
-theorem asked_foldGarbleM (m : ℕ) (tagOf : ℕ → ℕ) (shift : ℕ) (bitMask : Block) (labels : Fin m → Block) :
+theorem asked_foldGarbleM (m : ℕ) (tagOf : ℕ → ℕ) (shift : ℕ) (bitMask : Label) (labels : Fin m → Label) :
     asked H (foldGarbleM m tagOf shift bitMask labels) =
-      (List.finRange m).flatMap fun r => [hashInput (labels r) (tagOf r.val)] := by
+      (List.finRange m).flatMap fun r => [hashInput (embed (labels r)) (tagOf r.val)] := by
   unfold foldGarbleM
-  simp only [asked_bind, asked_tableM, asked_h128M, asked_pure, List.append_nil]
+  simp only [asked_bind, asked_tableM, asked_hLabelM, asked_pure, List.append_nil]
 
-theorem asked_foldEvalM (m : ℕ) (tagOf : ℕ → ℕ) (shift hot : ℕ) (bitLabel join : Block) (labels : Fin m → Block) :
+theorem asked_foldEvalM (m : ℕ) (tagOf : ℕ → ℕ) (shift hot : ℕ) (bitLabel join : Label) (labels : Fin m → Label) :
     asked H (foldEvalM m tagOf shift hot bitLabel join labels) =
-      (List.finRange m).flatMap fun r => if r.val = hot then [] else [hashInput (labels r) (tagOf r.val)] := by
+      (List.finRange m).flatMap fun r => if r.val = hot then [] else [hashInput (embed (labels r)) (tagOf r.val)] := by
   unfold foldEvalM
-  simp only [asked_bind, asked_tableM, asked_ite, asked_h128M, asked_pure, List.append_nil]
+  simp only [asked_bind, asked_tableM, asked_ite, asked_hLabelM, asked_pure, List.append_nil]
 
 /-- **The folds** at positions `position, ..., position + count - 1`, under the hypotheses of
 `SliceC.foldsEvalM_correct`, from the hot index `(value mod 2^position) mod m`. -/
-theorem folds_aligned (cold : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (Δ : Block)
-    (bitMask bitLabel join : ℕ → Block) :
-    ∀ count position hot (G E : Fin m → Block), hot = value % 2 ^ position % m →
+theorem folds_aligned (cold : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ → ℕ → ℕ) (value : ℕ) (Δ : Label)
+    (bitMask bitLabel join : ℕ → Label) :
+    ∀ count position hot (G E : Fin m → Label), hot = value % 2 ^ position % m →
       (∀ ρ, E ρ = G ρ ^^^ (if ρ.val = hot then Δ else 0)) →
       (∀ j, position ≤ j → j < position + count →
         bitLabel j = bitMask j ^^^ (if value.testBit j then Δ else 0)) →
@@ -468,7 +474,7 @@ theorem folds_aligned (cold : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ 
     simp only [foldsGarbleM, foldsEvalM, asked_bind, asked_pure, List.append_nil]
     refine Aligned.append ?_ ?_
     · rw [asked_foldGarbleM, asked_foldEvalM]
-      refine slots_aligned _ (fun r => r.val = hot) (fun label r => [hashInput label (tagOf position r.val)]) G E
+      refine slots_aligned _ (fun r => r.val = hot) (fun label r => [hashInput (embed label) (tagOf position r.val)]) G E
         (fun r hr => by rw [hE, if_neg hr, SliceC.xor_zero_block])
         (single_tags cold (tagOf position) _ fun r => ?_)
       rw [tags position le_rfl (by omega) r, hhot]
@@ -485,29 +491,29 @@ theorem folds_aligned (cold : ℕ → Prop) (m : ℕ) (hm : 0 < m) (tagOf : ℕ 
       simp only
       rw [if_neg (by omega)]
 
-theorem asked_bodyGarbleM (m S q coord i : ℕ) (final : Fin m → Block) :
+theorem asked_bodyGarbleM (m S q coord i : ℕ) (final : Fin m → Label) :
     asked H (bodyGarbleM m S q coord i final) =
       (List.finRange m).flatMap fun r =>
-        (List.finRange q).map fun j => hashInput (final r) (bodyTag coord i r.val j.val) := by
+        (List.finRange q).map fun j => hashInput (embed (final r)) (bodyTag coord i r.val j.val) := by
   unfold bodyGarbleM
   simp only [asked_bind, asked_tableM, asked_padVectorM, asked_pure, List.append_nil]
 
-theorem asked_bodyEvalM (m S q coord i : ℕ) (final : Fin m → Block) (hot : ℕ) (joins : Fin S → ℕ) :
+theorem asked_bodyEvalM (m S q coord i : ℕ) (final : Fin m → Label) (hot : ℕ) (joins : Fin S → ℕ) :
     asked H (bodyEvalM m S q coord i final hot joins) =
       (List.finRange m).flatMap fun r => if r.val = hot then [] else
-        (List.finRange q).map fun j => hashInput (final r) (bodyTag coord i r.val j.val) := by
+        (List.finRange q).map fun j => hashInput (embed (final r)) (bodyTag coord i r.val j.val) := by
   unfold bodyEvalM
   simp only [asked_bind, asked_tableM, asked_ite, asked_padVectorM, asked_pure, List.append_nil]
 
 /-- **The body** of one modulus: the evaluator's final one-hot is the garbler's off the hot slot. -/
-theorem body_aligned (cold : ℕ → Prop) (m S q coord i : ℕ) (final finalE : Fin m → Block) (Δ : Block) (hot : ℕ)
+theorem body_aligned (cold : ℕ → Prop) (m S q coord i : ℕ) (final finalE : Fin m → Label) (Δ : Label) (hot : ℕ)
     (joins : Fin S → ℕ) (hE : ∀ ρ, finalE ρ = final ρ ^^^ (if ρ.val = hot then Δ else 0))
     (tags : ∀ r : Fin m, ∀ j < q, cold (bodyTag coord i r.val j) ↔ ¬ r.val = hot) :
     Aligned (ColdAt cold) (asked H (bodyGarbleM m S q coord i final))
       (asked H (bodyEvalM m S q coord i finalE hot joins)) := by
   rw [asked_bodyGarbleM, asked_bodyEvalM]
   exact slots_aligned _ (fun r => r.val = hot)
-    (fun label r => (List.finRange q).map fun j => hashInput label (bodyTag coord i r.val j.val)) final finalE
+    (fun label r => (List.finRange q).map fun j => hashInput (embed label) (bodyTag coord i r.val j.val)) final finalE
     (fun r hr => by rw [hE, if_neg hr, SliceC.xor_zero_block]) (parts_tags cold (bodyTag coord i) q _ tags)
 
 end FoldsBody
@@ -519,11 +525,11 @@ section StageLists
 variable (H : HashN)
 
 /-- The garbler's tree queries, level by level. -/
-theorem asked_treeGarbleM_list (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) :
+theorem asked_treeGarbleM_list (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) :
     ∀ levels, asked H (treeGarbleM tagOf Δ b0 levels) =
       (List.range levels).flatMap fun n => if n = 0 then [] else
         (List.finRange (2 ^ n)).flatMap fun y =>
-          [hashInput (((treeGarbleM tagOf Δ b0 n).eval H).1 y) (tagOf n y.val)] := by
+          [hashInput (embed (((treeGarbleM tagOf Δ b0 n).eval H).1 y)) (tagOf n y.val)] := by
   intro levels
   induction levels with
   | zero => rfl
@@ -537,11 +543,11 @@ theorem asked_treeGarbleM_list (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) :
       rw [asked_garbleStepM]
 
 /-- The subtree's queries, relative level by relative level. -/
-theorem asked_subtreeM_list (treeTag : ℕ → ℕ → ℕ) (start slot : ℕ) (label : Block) :
+theorem asked_subtreeM_list (treeTag : ℕ → ℕ → ℕ) (start slot : ℕ) (label : Label) :
     ∀ d, asked H (subtreeM treeTag start slot label d) =
       (List.range d).flatMap fun d' =>
         (List.finRange (2 ^ d')).flatMap fun t =>
-          [hashInput (((subtreeM treeTag start slot label d').eval H).1 t)
+          [hashInput (embed (((subtreeM treeTag start slot label d').eval H).1 t))
             (treeTag (start + d') (slot + 2 ^ start * t.val))] := by
   intro d
   induction d with
@@ -554,31 +560,31 @@ theorem asked_subtreeM_list (treeTag : ℕ → ℕ → ℕ) (start slot : ℕ) (
     rw [asked_garbleStepM]
 
 /-- An expansion's queries: its subtree, then the casts of its leaves; the state does not matter. -/
-theorem asked_expandM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (start slot : ℕ) (label : Block)
+theorem asked_expandM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (start slot : ℕ) (label : Label)
     (state : StageState rb) :
     asked H (expandM w treeTag castTag start slot label state) =
       asked H (subtreeM treeTag start slot label (w - start)) ++
         (List.finRange (2 ^ (w - start))).flatMap fun t =>
           (List.finRange (castAnswers rb)).map fun j =>
-            hashInput (((subtreeM treeTag start slot label (w - start)).eval H).1 t)
+            hashInput (embed (((subtreeM treeTag start slot label (w - start)).eval H).1 t))
               (castTag (slot + 2 ^ start * t.val) j.val) := by
   unfold expandM
   simp only [asked_bind, asked_tableM, asked_castM, asked_pure, List.append_nil]
 
 /-- The garbler's stage queries: the tree, then every leaf's cast. -/
-theorem asked_extStageGarbleM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (Δ : Block) (R : Lanes rb) :
+theorem asked_extStageGarbleM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (Δ : Label) (R : Lanes rb) :
     asked H (extStageGarbleM w treeTag castTag Δ R) =
       asked H (treeGarbleM treeTag Δ (laneBit (materialize (reduceTo w R)) 0) w) ++
         (List.finRange (2 ^ w)).flatMap fun leaf =>
           (List.finRange (castAnswers rb)).map fun j =>
-            hashInput (((treeGarbleM treeTag Δ (laneBit (materialize (reduceTo w R)) 0) w).eval H).1 leaf)
+            hashInput (embed (((treeGarbleM treeTag Δ (laneBit (materialize (reduceTo w R)) 0) w).eval H).1 leaf))
               (castTag leaf.val j.val) := by
   unfold extStageGarbleM
   simp only [asked_bind, asked_tableM, asked_castM, asked_pure, List.append_nil]
 
 /-- The evaluator's stage queries: the expansion of round 0, then the rounds. -/
 theorem asked_extStageEvalM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (R : Lanes rb) (value : ℕ)
-    (joins : ℕ → Block) (pin : Lanes rb) :
+    (joins : ℕ → Label) (pin : Lanes rb) :
     let sub := materialize (reduceTo w R)
     let start : StageState rb :=
       { levelSum := fun _ => 0
@@ -597,7 +603,7 @@ theorem asked_extStageEvalM {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ 
   rfl
 
 theorem asked_stageRoundsM_succ {rb : ℕ} (w : ℕ) (treeTag castTag : ℕ → ℕ → ℕ) (sub : Lanes w) (value : ℕ)
-    (joins : ℕ → Block) (pin : Lanes rb) (r n : ℕ) (state : StageState rb) :
+    (joins : ℕ → Label) (pin : Lanes rb) (r n : ℕ) (state : StageState rb) :
     asked H (stageRoundsM w treeTag castTag sub value joins pin (r + 1) n state) =
       asked H (stageRoundM w treeTag castTag sub value joins pin n state) ++
         asked H (stageRoundsM w treeTag castTag sub value joins pin r (n + 1)
@@ -700,10 +706,10 @@ theorem eq_slot_of_mod {start slot y : ℕ} (hmod : y % 2 ^ start = slot) : slot
 
 variable (H : HashN) {rb : ℕ} (w : ℕ) (hw : w ≤ rb) (treeTag castTag : ℕ → ℕ → ℕ)
 
-theorem mem_asked_treeGarbleM (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (levels x : ℕ) :
+theorem mem_asked_treeGarbleM (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Label) (levels x : ℕ) :
     x ∈ asked H (treeGarbleM tagOf Δ b0 levels) ↔
       ∃ n, 1 ≤ n ∧ n < levels ∧ ∃ y : Fin (2 ^ n),
-        x = hashInput (((treeGarbleM tagOf Δ b0 n).eval H).1 y) (tagOf n y.val) := by
+        x = hashInput (embed (((treeGarbleM tagOf Δ b0 n).eval H).1 y)) (tagOf n y.val) := by
   rw [asked_treeGarbleM_list]
   simp only [List.mem_flatMap, List.mem_range, mem_ite_nil, List.mem_finRange, List.mem_singleton, true_and]
   constructor
@@ -714,13 +720,13 @@ theorem mem_asked_treeGarbleM (tagOf : ℕ → ℕ → ℕ) (Δ b0 : Block) (lev
 
 /-- The garbler's stage queries: every node of levels `1 .. w - 1` and every part of every leaf's cast, at the
 garbler's labels. -/
-theorem mem_garbler_stage (Δ : Block) (R : Lanes rb) (x : ℕ) :
+theorem mem_garbler_stage (Δ : Label) (R : Lanes rb) (x : ℕ) :
     x ∈ asked H (extStageGarbleM w treeTag castTag Δ R) ↔
       (∃ ℓ y, 1 ≤ ℓ ∧ ℓ < w ∧ y < 2 ^ ℓ ∧
-        x = hashInput (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ ℓ y)
+        x = hashInput (embed (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ ℓ y))
           (treeTag ℓ y)) ∨
       (∃ α j, α < 2 ^ w ∧ j < castAnswers rb ∧
-        x = hashInput (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ w α)
+        x = hashInput (embed (gNode (hashStage H w hw treeTag castTag) (gBit0 (hashStage H w hw treeTag castTag) R) Δ w α))
           (castTag α j)) := by
   have htree := fun levels => (eval_treeGarbleM H treeTag Δ (laneBit (reduceTo w R) 0)
     (hashStage H w hw treeTag castTag) (fun _ _ _ => rfl) levels).1
@@ -735,13 +741,13 @@ theorem mem_garbler_stage (Δ : Block) (R : Lanes rb) (x : ℕ) :
     · exact Or.inr ⟨⟨α, hα⟩, ⟨j, hj⟩, by rw [htree w ⟨α, hα⟩]; rfl⟩
 
 /-- What an expansion at `(start, slot)` asks, at the garbler's labels. -/
-def ExpMem (sp : StageParams rb) (b0 Δ : Block) (start slot x : ℕ) : Prop :=
+def ExpMem (sp : StageParams rb) (b0 Δ : Label) (start slot x : ℕ) : Prop :=
   (∃ ℓ y, start ≤ ℓ ∧ ℓ < w ∧ y < 2 ^ ℓ ∧ y % 2 ^ start = slot ∧
-    x = hashInput (gNode sp b0 Δ ℓ y) (treeTag ℓ y)) ∨
-  (∃ α j, α < 2 ^ w ∧ α % 2 ^ start = slot ∧ j < castAnswers rb ∧ x = hashInput (gNode sp b0 Δ w α) (castTag α j))
+    x = hashInput (embed (gNode sp b0 Δ ℓ y)) (treeTag ℓ y)) ∨
+  (∃ α j, α < 2 ^ w ∧ α % 2 ^ start = slot ∧ j < castAnswers rb ∧ x = hashInput (embed (gNode sp b0 Δ w α)) (castTag α j))
 
 /-- **An expansion with the garbler's label** asks the garbler's queries of the closed node's subtree and leaves. -/
-theorem mem_expandM (b0 Δ : Block) (start slot : ℕ) (hstart : 1 ≤ start) (hle : start ≤ w)
+theorem mem_expandM (b0 Δ : Label) (start slot : ℕ) (hstart : 1 ≤ start) (hle : start ≤ w)
     (hslot : slot < 2 ^ start) (state : StageState rb) (x : ℕ) :
     x ∈ asked H (expandM w treeTag castTag start slot (gNode (hashStage H w hw treeTag castTag) b0 Δ start slot)
         state) ↔ ExpMem w treeTag castTag (hashStage H w hw treeTag castTag) b0 Δ start slot x := by
@@ -773,13 +779,13 @@ theorem mem_expandM (b0 Δ : Block) (start slot : ℕ) (hstart : 1 ≤ start) (h
       simp only
       rw [eq_slot_of_mod hmod, hw']
 
-theorem asked_expandM_congr (start slot : ℕ) {label label' : Block} (same : label = label')
+theorem asked_expandM_congr (start slot : ℕ) {label label' : Label} (same : label = label')
     (state state' : StageState rb) :
     asked H (expandM w treeTag castTag start slot label state) =
       asked H (expandM w treeTag castTag start slot label' state') := by
   rw [asked_expandM, asked_expandM, same]
 
-theorem asked_expandM_label (start slot : ℕ) {label label' : Block} (same : label = label')
+theorem asked_expandM_label (start slot : ℕ) {label label' : Label} (same : label = label')
     (state : StageState rb) :
     asked H (expandM w treeTag castTag start slot label state) =
       asked H (expandM w treeTag castTag start slot label' state) := by
@@ -787,7 +793,7 @@ theorem asked_expandM_label (start slot : ℕ) {label label' : Block} (same : la
 
 /-- **One round asks the expansion of its closed slot at the garbler's label** (the label computation of
 `SliceC.stageRoundM_inv`). -/
-theorem asked_stageRoundM_eq (R : Lanes rb) (Δ : Block) (σ : ℕ) (joins : ℕ → Block) (pin : Lanes rb)
+theorem asked_stageRoundM_eq (R : Lanes rb) (Δ : Label) (σ : ℕ) (joins : ℕ → Label) (pin : Lanes rb)
     (hJ : ∀ n, 1 ≤ n → n < w → joins n = gJoin (hashStage H w hw treeTag castTag) R Δ n)
     (hP : pin = gPin (hashStage H w hw treeTag castTag) R Δ)
     (n : ℕ) (hn1 : 1 ≤ n) (hn : n < w) (st : StageState rb)
@@ -853,7 +859,7 @@ theorem asked_stageRoundM_eq (R : Lanes rb) (Δ : Block) (σ : ℕ) (joins : ℕ
     rfl
 
 /-- **The rounds `n, ..., n + r - 1`** ask exactly the expansions of their closed slots at the garbler's labels. -/
-theorem mem_stageRoundsM (R : Lanes rb) (Δ : Block) (σ : ℕ) (joins : ℕ → Block) (pin : Lanes rb)
+theorem mem_stageRoundsM (R : Lanes rb) (Δ : Label) (σ : ℕ) (joins : ℕ → Label) (pin : Lanes rb)
     (hJ : ∀ n, 1 ≤ n → n < w → joins n = gJoin (hashStage H w hw treeTag castTag) R Δ n)
     (hP : pin = gPin (hashStage H w hw treeTag castTag) R Δ) :
     ∀ r n, 1 ≤ n → n + r ≤ w → ∀ st : StageState rb,
@@ -888,7 +894,7 @@ theorem mem_stageRoundsM (R : Lanes rb) (Δ : Block) (σ : ℕ) (joins : ℕ →
 
 /-- **The evaluator's stage queries**: the expansions of the closed slots of rounds `0 .. w - 1`, at the garbler's
 labels. -/
-theorem mem_evaluator_stage (hw1 : 1 ≤ w) (Δ : Block) (R : Lanes rb) (σ x : ℕ) :
+theorem mem_evaluator_stage (hw1 : 1 ≤ w) (Δ : Label) (R : Lanes rb) (σ x : ℕ) :
     x ∈ asked H (extStageEvalM w treeTag castTag (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ) (σ % 2 ^ w)
         ((extStageGarbleM w treeTag castTag Δ R).eval H).joins ((extStageGarbleM w treeTag castTag Δ R).eval H).pin) ↔
       ∃ k, k < w ∧ ExpMem w treeTag castTag (hashStage H w hw treeTag castTag)
@@ -945,7 +951,7 @@ theorem mem_evaluator_stage (hw1 : 1 ≤ w) (Δ : Block) (R : Lanes rb) (σ x : 
 include hw in
 /-- **The fused extraction stage** (`SliceC.extStage_correct`'s setting): the garbler's cold queries are the
 evaluator's, and the evaluator asks only cold garbler queries. -/
-theorem stage_aligned (hw1 : 1 ≤ w) (cold : ℕ → Prop) (Δ : Block) (R : Lanes rb) (σ : ℕ)
+theorem stage_aligned (hw1 : 1 ≤ w) (cold : ℕ → Prop) (Δ : Label) (R : Lanes rb) (σ : ℕ)
     (treeTags : ∀ ℓ, 1 ≤ ℓ → ℓ < w → ∀ y < 2 ^ ℓ, cold (treeTag ℓ y) ↔ y ≠ σ % 2 ^ w % 2 ^ ℓ)
     (castTags : ∀ α < 2 ^ w, ∀ j < castAnswers rb, cold (castTag α j) ↔ α ≠ σ % 2 ^ w) :
     Aligned (ColdAt cold) (asked H (extStageGarbleM w treeTag castTag Δ R))
@@ -1009,7 +1015,7 @@ structure ConvTags (cold : ℕ → Prop) (coord i : ℕ) (row : OddRow) (m σ : 
 
 /-- **One odd modulus's conversion** (`SliceC.conversion_final`'s setting): the two fused stages, the growth and the
 folds. -/
-theorem conversion_aligned (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Block) (W : Lanes row.ell) (σ : ℕ)
+theorem conversion_aligned (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label) (W : Lanes row.ell) (σ : ℕ)
     (pub : ConvPublic) (cold : ℕ → Prop)
     (h0 : 1 ≤ row.width0) (h1 : 1 ≤ row.width1) (hell : row.width0 + row.width1 + 1 = row.ell)
     (hk0 : row.width0 ≤ row.keep) (hk1 : row.keep ≤ row.ell) (hm : 0 < m)
@@ -1100,7 +1106,7 @@ theorem conversion_aligned (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Block)
       (fun j _ _ => rfl) tags.fold
 
 /-- **One modulus**: the conversion (odd row) and the body (`SliceC.mod_residue`'s setting). -/
-theorem mod_aligned (T : CrtTable) (S coord : ℕ) (Δ : Block) (v : ℕ) (hT : CorrectTable T)
+theorem mod_aligned (T : CrtTable) (S coord : ℕ) (Δ : Label) (v : ℕ) (hT : CorrectTable T)
     (hv : v < 2 ^ T.inputBits) (pub : ConvPublic) (joinsE : Fin T.count → Fin S → ℕ)
     (chunksG : ℕ → ChunkGarbled T.castWidth) (chunksE : ℕ → ChunkEval T.castWidth)
     (hL : ∀ c < T.chunkCount, ∀ α < 2 ^ T.chunkWidth c,
@@ -1180,7 +1186,7 @@ structure CoordTags (cold : ℕ → Prop) (T : CrtTable) (S coord v : ℕ) : Pro
 
 /-- **One coordinate** (`SliceC.coord_delivery`'s setting): with the honest labels, the published material and the
 records of the garbler, the evaluator asks every cold garbler query of the coordinate and nothing else. -/
-theorem coord_aligned (T : CrtTable) (S coord : ℕ) (Δ : Block) (Z : ℕ → Block) (slopes : Fin S → ℕ) (v : ℕ)
+theorem coord_aligned (T : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ → Label) (slopes : Fin S → ℕ) (v : ℕ)
     (hT : CorrectTable T) (hv : v < 2 ^ T.inputBits) (cold : ℕ → Prop) (tags : CoordTags cold T S coord v) :
     Aligned (ColdAt cold) (asked H (coordGarbleM T S coord Δ Z))
       (asked H (coordEvalM T S coord ((coordGarbleM T S coord Δ Z).eval H).pub

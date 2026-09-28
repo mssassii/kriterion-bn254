@@ -22,8 +22,8 @@ theorem fields_fold {coord idx : Nat} (coordLt : coord < 2) (idxLt : idx < 128) 
 
 /-- **The garbler's folds.** -/
 theorem foldsGarbleM_tagged (coord idx m : Nat) (coordLt : coord < 2) (idxLt : idx < 128) (mSmall : m ≤ 65536)
-    (bitMask : Nat → Block) :
-    ∀ (count start : Nat) (labels : Fin m → Block), start + count ≤ 16 →
+    (bitMask : Nat → Label) :
+    ∀ (count start : Nat) (labels : Fin m → Label), start + count ≤ 16 →
       Tagged (foldKeys coord idx start count m)
         (foldsGarbleM m (fun position residue => tagCode 5 coord idx 0 position residue 0) bitMask count start
           labels)
@@ -68,11 +68,11 @@ def bodyKeys (coord idx m count : Nat) : Set TagKey :=
 
 /-- **One pad vector**: `q` answers at one label (one pad site). -/
 theorem padVectorM_tagged (coord idx residue m S q : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
-    (residueSmall : residue < 65536) (qSmall : q ≤ 64) (label : Block) :
+    (residueSmall : residue < 65536) (qSmall : q ≤ 64) (label : Label) :
     Tagged (padKeys coord idx residue q)
       (padVectorM m S q label fun part => tagCode 6 coord idx 0 0 residue part) := by
   unfold padVectorM
-  refine Tagged.bind_empty ((Tagged.hlongM label _ q (fun part => ⟨6, coord, idx, 0, 0, residue, part⟩)
+  refine Tagged.bind_empty ((Tagged.hlongM (embed label) _ q (fun part => ⟨6, coord, idx, 0, 0, residue, part⟩)
     (fun _ _ => rfl) (fun part small => ⟨by norm_num, coordLt, idxLt, by norm_num, by norm_num, residueSmall,
       show part < 64 by omega⟩)
     fun i j _ _ same => by cases same; rfl).mono ?_) fun _ => Tagged.pure _ _
@@ -82,7 +82,7 @@ theorem padVectorM_tagged (coord idx residue m S q : Nat) (coordLt : coord < 2) 
 
 /-- **The garbler's body** of one modulus: every residue's pad vector. -/
 theorem bodyGarbleM_tagged (coord idx m S q : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
-    (mSmall : m ≤ 65536) (qSmall : q ≤ 64) (final : Fin m → Block) :
+    (mSmall : m ≤ 65536) (qSmall : q ≤ 64) (final : Fin m → Label) :
     Tagged (bodyKeys coord idx m q)
       (bodyGarbleM m S q coord idx final) := by
   unfold bodyGarbleM
@@ -111,7 +111,7 @@ def pairKeys (treeFam castFam coord idx stage : Nat) : Set TagKey :=
 theorem treeCasts_tagged {α : Type} (treeFam castFam coord idx stage width l : Nat)
     (treeFields : Fields treeFam coord idx stage) (castFields : Fields castFam coord idx stage)
     (different : treeFam ≠ castFam) (widthSmall : width ≤ 16) (answers : castAnswers l ≤ 64)
-    (delta bit0 : Block) (finish : _ → (Fin (2 ^ width) → Lanes l) → α) :
+    (delta bit0 : Label) (finish : _ → (Fin (2 ^ width) → Lanes l) → α) :
     Tagged (pairKeys treeFam castFam coord idx stage)
       (treeGarbleM (fun level slot => tagCode treeFam coord idx stage level slot 0) delta bit0 width >>= fun tree =>
         CRT.tableM (2 ^ width) (fun leaf => castM l (tree.1 leaf) fun part =>
@@ -132,7 +132,7 @@ theorem treeCasts_tagged {α : Type} (treeFam castFam coord idx stage width l : 
       exact ⟨Or.inr inCasts.1, inCasts.2.1, inCasts.2.2.1, inCasts.2.2.2.1⟩
 
 /-- **The garbler's chunk** `c`. -/
-theorem chunkGarbleM_tagged (T : CrtTable) (coord : Nat) (delta : Block) (zeroLabel : Nat → Block) (c : Nat)
+theorem chunkGarbleM_tagged (T : CrtTable) (coord : Nat) (delta : Label) (zeroLabel : Nat → Label) (c : Nat)
     (coordLt : coord < 2) (cLt : c < 128) (widthSmall : T.chunkWidth c ≤ 16)
     (answers : castAnswers T.castWidth ≤ 64) :
     Tagged (pairKeys 0 1 coord c 0) (chunkGarbleM T coord delta zeroLabel c) :=
@@ -142,7 +142,7 @@ theorem chunkGarbleM_tagged (T : CrtTable) (coord : Nat) (delta : Block) (zeroLa
 
 /-- **The garbler of one fused extraction stage.** -/
 theorem extStageGarbleM_tagged {rb : Nat} (coord idx stage w : Nat) (coordLt : coord < 2) (idxLt : idx < 128)
-    (stageLt : stage < 4) (widthSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (delta : Block)
+    (stageLt : stage < 4) (widthSmall : w ≤ 16) (answers : castAnswers rb ≤ 64) (delta : Label)
     (remainder : Lanes rb) :
     Tagged (pairKeys 2 3 coord idx stage)
       (extStageGarbleM w (fun level slot => tagCode 2 coord idx stage level slot 0)
@@ -218,7 +218,7 @@ def convKeys (coord idx : Nat) : Set TagKey :=
 
 /-- **The garbler's conversion** of an odd modulus. -/
 theorem conversionGarbleM_tagged (coord idx : Nat) (row : OddRow) (m : Nat) (coordLt : coord < 2)
-    (idxLt : idx < 128) (ranges : RowRanges row) (mSmall : m ≤ 65536) (delta : Block) (word : Lanes row.ell) :
+    (idxLt : idx < 128) (ranges : RowRanges row) (mSmall : m ≤ 65536) (delta : Label) (word : Lanes row.ell) :
     Tagged (convKeys coord idx) (conversionGarbleM coord idx row m delta word) := by
   unfold conversionGarbleM
   have growFields : Fields 4 coord idx 0 := ⟨by norm_num, coordLt, idxLt, by norm_num, by norm_num, by norm_num⟩
@@ -269,7 +269,7 @@ def modKeys (coord idx : Nat) : Set TagKey :=
 
 /-- **The garbler of one modulus.** -/
 theorem modGarbleM_tagged (T : CrtTable) (S coord : Nat) (ranges : TableRanges T S) (coordLt : coord < 2)
-    (delta : Block) (chunks : Nat → ChunkGarbled T.castWidth) (i : Fin T.count) :
+    (delta : Label) (chunks : Nat → ChunkGarbled T.castWidth) (i : Fin T.count) :
     Tagged (modKeys coord i.val) (modGarbleM T S coord delta chunks i) := by
   have idxLt : i.val < 128 := lt_of_lt_of_le i.isLt ranges.count
   have bodySub : bodyKeys coord i.val (T.modulus i) (T.padAnswers S i) ⊆ modKeys coord i.val := by
@@ -302,7 +302,7 @@ def coordKeys (coord : Nat) : Set TagKey := {k | k.fam ≤ 6 ∧ k.coord = coord
 
 /-- **The garbler of one coordinate.** -/
 theorem coordGarbleM_tagged (T : CrtTable) (S coord : Nat) (ranges : TableRanges T S) (coordLt : coord < 2)
-    (delta : Block) (zeroLabel : Nat → Block) :
+    (delta : Label) (zeroLabel : Nat → Label) :
     Tagged (coordKeys coord) (coordGarbleM T S coord delta zeroLabel) := by
   unfold coordGarbleM
   refine Tagged.bind' (Tagged.tableM (S := fun c => pairKeys 0 1 coord c 0) T.chunkCount

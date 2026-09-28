@@ -3,7 +3,7 @@
 
 At input `u` with coordinate value `v`, every gadget of the conversion layer (the chunk trees and casts, the two fused
 extraction stages, the growth and the folds of every odd modulus) has one hidden value at its hot slot: a material
-(one block, the `.1` of the hot answer) per hashed tree, growth or fold level, and a cast (`Lanes l`) per pin. The
+(one 104-bit label, `clip` of `.1` of the hot answer) per hashed tree, growth or fold level, and a cast (`Lanes l`) per pin. The
 published conversion material has exactly the same shape: one join per hashed level, one pin per cast family. Both
 are `ConvVals tbl`.
 
@@ -87,12 +87,12 @@ theorem rowOf_hw1 (k : Kind) (m : ℕ) : (rowOf k m).width1 ≤ (rowOf k m).ell 
 /-- The values of one modulus: stage 0's and stage 1's tuples (joins of the hashed levels and the pin), the growth
 joins and the fold joins. -/
 abbrev StageVals (row : OddRow) : Type :=
-  Hidden 128 row.width0 row.ell × Hidden 128 row.width1 (row.ell - row.width0) ×
-    (Fin (row.keep - row.width0) → Block) × (Fin (row.ell - row.keep) → Block)
+  Hidden labelBits row.width0 row.ell × Hidden labelBits row.width1 (row.ell - row.width0) ×
+    (Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label)
 
 /-- The values of the chunks: the joins of the hashed tree levels `1 .. w_c − 1` and the pins. -/
 abbrev ChunkVals (tbl : CrtTable) : Type :=
-  ((c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Block) × (Fin tbl.chunkCount → Lanes tbl.castWidth)
+  ((c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) × (Fin tbl.chunkCount → Lanes tbl.castWidth)
 
 /-- **The conversion values of one coordinate**: the hidden values at the hot slots, and equally the published
 conversion material (one join per hashed level, one pin per cast family). -/
@@ -117,8 +117,8 @@ instance convValsNonempty (tbl : CrtTable) : Nonempty (ConvVals tbl) :=
 labels and `Δ`. -/
 structure ConvRest where
   table : ℕ → Block × Block
-  zero : ℕ → Block
-  delta : Block
+  zero : ℕ → Label
+  delta : Label
 
 /-! ### The published material from the rest and the hidden values -/
 
@@ -132,11 +132,11 @@ def chunkCastH (pins : Fin tbl.chunkCount → Lanes tbl.castWidth) (c : Fin tbl.
   if leaf = tbl.chunkValue v c.val then pins c else castRd r.table tbl.castWidth (chunkCastTag coord c.val leaf)
 
 /-- The join of hashed level `k + 1` of chunk `c`. -/
-def chunkJoinH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Block) (c : Fin tbl.chunkCount)
-    (k : Fin (tbl.chunkWidth c.val - 1)) : Block :=
+def chunkJoinH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) (c : Fin tbl.chunkCount)
+    (k : Fin (tbl.chunkWidth c.val - 1)) : Label :=
   xorFold (fun slot : Fin (2 ^ (k.val + 1)) =>
       if slot.val = tbl.chunkValue v c.val % 2 ^ (k.val + 1) then joins c k
-      else (r.table (chunkTreeTag coord c.val (k.val + 1) slot.val)).1) ^^^
+      else (clip (r.table (chunkTreeTag coord c.val (k.val + 1) slot.val)).1)) ^^^
     r.zero (tbl.chunkOffset c.val + (k.val + 1))
 
 /-- The pin of chunk `c`. -/
@@ -154,7 +154,7 @@ end Publish
 /-- **The published material of one modulus** of row `row` and word value `σ`, from the word mask `W` and the
 modulus's hidden values `h`: the two stages (`specPublish`, the stage with its hot answers overridden), then the
 growth and fold joins with the word's bit masks. -/
-def modPublish (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Block)
+def modPublish (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Label)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell)
     (h : StageVals row) : StageVals row :=
   let st0 := tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)
@@ -162,16 +162,16 @@ def modPublish (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ
   let s0 := σ % 2 ^ row.width0
   let s1 := σ / 2 ^ row.width0 % 2 ^ row.width1
   let R1 : Lanes (row.ell - row.width0) := gNext (overrideHot st0 s0 h.1) W Δ
-  let bitMask : ℕ → Block := fun p =>
+  let bitMask : ℕ → Label := fun p =>
     if p < row.width0 + row.width1 then gBit (overrideHot st1 s1 h.2.1) R1 Δ (p - row.width0)
     else laneBit (gNext (overrideHot st1 s1 h.2.1) R1 Δ) 0
   (specPublish st0 W Δ s0 h.1, specPublish st1 R1 Δ s1 h.2.1,
     fun k => xorFold (fun slot : Fin (2 ^ (row.width0 + k.val)) =>
         if slot.val = σ % 2 ^ (row.width0 + k.val) then h.2.2.1 k
-        else (T (growTag coord i (row.width0 + k.val) slot.val)).1) ^^^ bitMask (row.width0 + k.val),
+        else (clip (T (growTag coord i (row.width0 + k.val) slot.val)).1)) ^^^ bitMask (row.width0 + k.val),
     fun k => xorFold (fun ρ : Fin m =>
         if ρ.val = σ % 2 ^ (row.keep + k.val) % m then h.2.2.2 k
-        else (T (foldTag coord i (row.keep + k.val) ρ.val)).1) ^^^ bitMask (row.keep + k.val))
+        else (clip (T (foldTag coord i (row.keep + k.val) ρ.val)).1)) ^^^ bitMask (row.keep + k.val))
 
 /-- **The published conversion material of one coordinate** from the rest and the hidden values. -/
 def convPublish (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) (h : ConvVals tbl) : ConvVals tbl :=
@@ -183,17 +183,17 @@ def convPublish (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) (h : ConvVals tb
 /-! ### Injectivity -/
 
 /-- A XOR fold with one hidden slot is the XOR of the others and the hidden value. -/
-theorem xorFold_hot {n : ℕ} (hot : ℕ) (hh : hot < n) (y : Block) (Y : Fin n → Block) :
+theorem xorFold_hot {n : ℕ} (hot : ℕ) (hh : hot < n) (y : Label) (Y : Fin n → Label) :
     xorFold (fun slot : Fin n => if slot.val = hot then y else Y slot) = xorFoldExcept ⟨hot, hh⟩ Y ^^^ y := by
   rw [← SliceC.xorFoldExcept_xor ⟨hot, hh⟩ (fun slot : Fin n => if slot.val = hot then y else Y slot), if_pos rfl]
   congr 1
   refine SliceC.xorFoldExcept_congr _ _ _ fun slot hs => ?_
   rw [if_neg fun h => hs (Fin.ext h)]
 
-theorem xor_cancel_mid (K y y' z : Block) (h : K ^^^ y ^^^ z = K ^^^ y' ^^^ z) : y = y' := by
+theorem xor_cancel_mid (K y y' z : Label) (h : K ^^^ y ^^^ z = K ^^^ y' ^^^ z) : y = y' := by
   apply BitVec.eq_of_getLsbD_eq
   intro i _
-  have e := congrArg (fun t : Block => t.getLsbD i) h
+  have e := congrArg (fun t : Label => t.getLsbD i) h
   simp only [BitVec.getLsbD_xor] at e
   revert e
   cases K.getLsbD i <;> cases y.getLsbD i <;> cases y'.getLsbD i <;> cases z.getLsbD i <;> simp
@@ -235,7 +235,7 @@ theorem stageVals_empty_eq (a b : StageVals emptyRow) : a = b := by
   rw [f0, f1, f2, f3, lanes_zero_eq a0' b0', lanes_zero_eq a1' b1']
 
 /-- **One modulus is injective in its hidden values.** -/
-theorem modPublish_injective (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Block)
+theorem modPublish_injective (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Label)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell)
     (hrow : row = emptyRow ∨ (RowWF row ∧ 0 < m)) :
     Function.Injective (modPublish T coord i row m σ Δ hw0 hw1 W) := by
@@ -310,7 +310,7 @@ section Link
 variable {rb : ℕ}
 
 /-- The hidden tuple a stage's own answers give: overriding with it changes no cast (`spec_garbler_eq_publish`, restated for the casts). -/
-theorem gCast_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s α : ℕ) :
+theorem gCast_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s α : ℕ) :
     gCast (overrideHot sp s (ExtractStage.hiddenOfSpec sp R Δ s)) R Δ α = gCast sp R Δ α := by
   unfold gCast gLeaf
   show (if α = s then _ else sp.castF α _) = _
@@ -322,24 +322,24 @@ theorem gCast_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s
     rfl
   · rfl
 
-theorem gRes_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s n : ℕ) :
+theorem gRes_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s n : ℕ) :
     gRes (overrideHot sp s (ExtractStage.hiddenOfSpec sp R Δ s)) R Δ n = gRes sp R Δ n :=
   Finset.sum_congr rfl fun α _ => by rw [gCast_override_self]
 
-theorem gNext_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s : ℕ) :
+theorem gNext_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s : ℕ) :
     (gNext (overrideHot sp s (ExtractStage.hiddenOfSpec sp R Δ s)) R Δ : Lanes (rb - sp.w)) = gNext sp R Δ := by
   show peelDiv R (gRes (overrideHot sp s (ExtractStage.hiddenOfSpec sp R Δ s)) R Δ sp.w) sp.w =
     peelDiv R (gRes sp R Δ sp.w) sp.w
   rw [gRes_override_self]
 
-theorem gBit_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s n : ℕ) :
+theorem gBit_override_self (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s n : ℕ) :
     gBit (overrideHot sp s (ExtractStage.hiddenOfSpec sp R Δ s)) R Δ n = gBit sp R Δ n := by
   unfold gBit
   rw [gRes_override_self]
   rfl
 
 /-- At its own hot answers the overridden stage publishes what the stage publishes. -/
-theorem specPublish_self (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s : ℕ) (hw1 : 1 ≤ sp.w) :
+theorem specPublish_self (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s : ℕ) (hw1 : 1 ≤ sp.w) :
     specPublish sp R Δ s (ExtractStage.hiddenOfSpec sp R Δ s) =
       ((fun k : Fin (sp.w - 1) => gJoin sp R Δ (k.val + 1)), gPin sp R Δ) := by
   unfold specPublish
@@ -360,17 +360,17 @@ def readPub (tbl : CrtTable) (pub : ConvPublic) : ConvVals tbl :=
 
 /-- A table's readings at the hot slots of one modulus of row `row` and word value `σ`. -/
 def readHotMod (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) : StageVals row :=
-  ((fun k => (T (extTreeTag coord i 0 (k.val + 1) (σ % 2 ^ row.width0 % 2 ^ (k.val + 1)))).1,
+  ((fun k => (clip (T (extTreeTag coord i 0 (k.val + 1) (σ % 2 ^ row.width0 % 2 ^ (k.val + 1)))).1),
       castRd T row.ell (extCastTag coord i 0 (σ % 2 ^ row.width0))),
-    (fun k => (T (extTreeTag coord i 1 (k.val + 1) (σ / 2 ^ row.width0 % 2 ^ row.width1 % 2 ^ (k.val + 1)))).1,
+    (fun k => (clip (T (extTreeTag coord i 1 (k.val + 1) (σ / 2 ^ row.width0 % 2 ^ row.width1 % 2 ^ (k.val + 1)))).1),
       castRd T (row.ell - row.width0) (extCastTag coord i 1 (σ / 2 ^ row.width0 % 2 ^ row.width1))),
-    fun k => (T (growTag coord i (row.width0 + k.val) (σ % 2 ^ (row.width0 + k.val)))).1,
-    fun k => (T (foldTag coord i (row.keep + k.val) (σ % 2 ^ (row.keep + k.val) % m))).1)
+    fun k => (clip (T (growTag coord i (row.width0 + k.val) (σ % 2 ^ (row.width0 + k.val)))).1),
+    fun k => (clip (T (foldTag coord i (row.keep + k.val) (σ % 2 ^ (row.keep + k.val) % m))).1))
 
 /-- **A table's readings at the hot slots of the coordinate value `v`**: the hidden values the garbler's own table
 gives. -/
 def readHot (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) : ConvVals tbl :=
-  ((fun c k => (T (chunkTreeTag coord c.val (k.val + 1) (tbl.chunkValue v c.val % 2 ^ (k.val + 1)))).1,
+  ((fun c k => (clip (T (chunkTreeTag coord c.val (k.val + 1) (tbl.chunkValue v c.val % 2 ^ (k.val + 1)))).1),
       fun c => castRd T tbl.castWidth (chunkCastTag coord c.val (tbl.chunkValue v c.val))),
     fun i => readHotMod T coord i.val (rowOf (tbl.kind i) (tbl.modulus i)) (tbl.modulus i)
       (tbl.wordValue (tbl.modulus i) v))
@@ -381,7 +381,7 @@ structure ConvTableWF (tbl : CrtTable) : Prop where
   rows : ∀ i row, tbl.kind i = .odd row → RowWF row ∧ 0 < tbl.modulus i
 
 /-- The program's word (from the chunks' casts on the table) is `wordH` at the table's own hot readings. -/
-theorem word_eq (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) (Z : ℕ → Block) (Δ : Block) (m ell : ℕ) :
+theorem word_eq (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) (Z : ℕ → Label) (Δ : Label) (m ell : ℕ) :
     truthWord tbl m ell (fun c leaf =>
         (atNat (fun c : Fin tbl.chunkCount => (chunkGarbleM tbl coord Δ Z c.val).eval (tableHash T))
           (ChunkGarbled.empty _) c).casts leaf) =
@@ -401,22 +401,22 @@ theorem word_eq (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) (Z
   · rfl
 
 /-- The published material of one odd modulus as the garbler computes it on a table (`conversion_table`). -/
-def modGarbled (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Block)
+def modGarbled (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m : ℕ) (Δ : Label)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell) : StageVals row :=
   let sp0 := tableStage T row.width0 hw0 (extTreeTag coord i 0) (extCastTag coord i 0)
   let sp1 := tableStage T row.width1 hw1 (extTreeTag coord i 1) (extCastTag coord i 1)
   let R1 : Lanes (row.ell - row.width0) := gNext sp0 W Δ
-  let bitMask : ℕ → Block := fun p =>
+  let bitMask : ℕ → Label := fun p =>
     if p < row.width0 + row.width1 then gBit sp1 R1 Δ (p - row.width0) else laneBit (gNext sp1 R1 Δ) 0
   (((fun k : Fin (row.width0 - 1) => gJoin sp0 W Δ (k.val + 1)), gPin sp0 W Δ),
     ((fun k : Fin (row.width1 - 1) => gJoin sp1 R1 Δ (k.val + 1)), gPin sp1 R1 Δ),
     fun k => xorFold (fun slot : Fin (2 ^ (row.width0 + k.val)) =>
-        (T (growTag coord i (row.width0 + k.val) slot.val)).1) ^^^ bitMask (row.width0 + k.val),
-    fun k => xorFold (fun ρ : Fin m => (T (foldTag coord i (row.keep + k.val) ρ.val)).1) ^^^
+        (clip (T (growTag coord i (row.width0 + k.val) slot.val)).1)) ^^^ bitMask (row.width0 + k.val),
+    fun k => xorFold (fun ρ : Fin m => (clip (T (foldTag coord i (row.keep + k.val) ρ.val)).1)) ^^^
       bitMask (row.keep + k.val))
 
 /-- **One modulus at its own hot readings** publishes what the garbler publishes. -/
-theorem modPublish_self (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Block)
+theorem modPublish_self (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ : ℕ) (Δ : Label)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) (W : Lanes row.ell)
     (w0pos : 1 ≤ row.width0) (w1pos : 1 ≤ row.width1) :
     modPublish T coord i row m σ Δ hw0 hw1 W (readHotMod T coord i row m σ) =
@@ -478,7 +478,7 @@ theorem modPublish_self (T : ℕ → Block × Block) (coord i : ℕ) (row : OddR
       · exact congrArg (fun R => laneBit R 0) eN
 
 /-- **One odd modulus of the real garbler** publishes `modGarbled` on the word of its chunks. -/
-theorem mod_link (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Block) (Z : ℕ → Block) (Δ : Block)
+theorem mod_link (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Block) (Z : ℕ → Label) (Δ : Label)
     (i : Fin tbl.count) (row : OddRow) (hk : tbl.kind i = .odd row) (wf : RowWF row)
     (hw0 : row.width0 ≤ row.ell) (hw1 : row.width1 ≤ row.ell - row.width0) :
     readMod ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub i.val row =
@@ -525,7 +525,7 @@ theorem stageVals_eq_of_empty (r : OddRow) (hr : r = emptyRow) (a b : StageVals 
   subst hr
   exact stageVals_empty_eq a b
 
-theorem mod_eq_gen (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Block) (Z : ℕ → Block) (Δ : Block)
+theorem mod_eq_gen (tbl : CrtTable) (S coord v : ℕ) (T : ℕ → Block × Block) (Z : ℕ → Label) (Δ : Label)
     (i : Fin tbl.count) (r row : OddRow) (hr : r = row) (hk : tbl.kind i = .odd row) (wf : RowWF row)
     (hw0 : r.width0 ≤ r.ell) (hw1 : r.width1 ≤ r.ell - r.width0) :
     readMod ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub i.val r =
@@ -554,7 +554,7 @@ frozen `coordGarbleM` run on the answer table `T` publishes, read in range, exac
 `(T, Z, Δ)` at the hidden values `readHot tbl coord v T` (the table's readings at the hot slots of `v`). With
 `conversion_uniform` this is the law of the real garbler's conversion material. -/
 theorem garbler_conv_eq (tbl : CrtTable) (wf : ConvTableWF tbl) (S coord v : ℕ) (T : ℕ → Block × Block)
-    (Z : ℕ → Block) (Δ : Block) :
+    (Z : ℕ → Label) (Δ : Label) :
     readPub tbl ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub =
       convPublish tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T) := by
   obtain ⟨cp, jp, -, -, -, -⟩ := coord_pub (tableHash T) tbl S coord Δ Z

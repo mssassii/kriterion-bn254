@@ -5,7 +5,7 @@
 `castF leaf label`; the garbler is `gNode`, `gJoin`, `gPin`. The hidden tuple `(y_1, ..., y_{w-1}, A_s)` of the
 privacy core enters by overriding the stage's answers at the hot positions of the stage value `s`
 (`overrideHot`): `mat n x _` becomes `y_n` at the hot slot `x = s mod 2 ^ n`, and `castF s _` becomes `A_s`. On
-the answer-table reading (`mat n x lab = (T (treeTag n x)).1`, `Kriterion.CRT.tableHash`) this is exactly
+the answer-table reading (`mat n x lab = (clip (T (treeTag n x)).1)`, `Kriterion.CRT.tableHash`) this is exactly
 `Function.update` of the table at the hot tags.
 
 * `spec_publish_eq`: the published joins and pin of the overridden stage are `publish (specFrame sp R Δ) s h`, the
@@ -20,6 +20,7 @@ Needs `1 ≤ sp.w` (the stages of table T9 have widths 7 and `ℓ − 8 ≥ 2`).
 
 import Construction.CRT.ExtractSpec
 import Proof.Privacy.CRT.Core.ExtractStage
+import Proof.Privacy.CRT.Core.LabelUniform
 
 namespace Kriterion.CRT.Privacy.ExtractStage
 
@@ -28,16 +29,16 @@ open Kriterion.CRT.ExtractSpec (StageParams stepMat gNode gBit0 gLeaf gCast gRes
 
 variable {rb : ℕ}
 
-/-! ### The shared definitions agree at 128 lanes -/
+/-! ### The shared definitions agree at 104 lanes -/
 
-theorem laneBit_eq_crt {l : ℕ} (A : Lanes 128 l) (n : ℕ) : laneBit A n = Kriterion.CRT.laneBit A n := rfl
+theorem laneBit_eq_crt {l : ℕ} (A : Lanes labelBits l) (n : ℕ) : laneBit A n = Kriterion.CRT.laneBit A n := rfl
 
-theorem reduceTo_eq_crt {l : ℕ} (w : ℕ) (A : Lanes 128 l) :
+theorem reduceTo_eq_crt {l : ℕ} (w : ℕ) (A : Lanes labelBits l) :
     reduceTo w A = Kriterion.CRT.reduceTo w A := rfl
 
-theorem deltaLanes_eq_crt (l : ℕ) (Δ : Block) : deltaLanes l Δ = Kriterion.CRT.deltaLanes l Δ := rfl
+theorem deltaLanes_eq_crt (l : ℕ) (Δ : Label) : deltaLanes l Δ = Kriterion.CRT.deltaLanes l Δ := rfl
 
-theorem xsum_range_eq (f : ℕ → Block) : ∀ K, xsum (Finset.range K) f = xorUpTo f K
+theorem xsum_range_eq (f : ℕ → Label) : ∀ K, xsum (Finset.range K) f = xorUpTo f K
   | 0 => rfl
   | K + 1 => by
       have ih := xsum_range_eq f K
@@ -71,14 +72,14 @@ theorem mod_top {x i : ℕ} (lt : x < 2 ^ (i + 1)) :
 /-! ### The overridden stage and its frame -/
 
 /-- The stage with its answers at the hot positions of `s` replaced by the hidden tuple. -/
-def overrideHot (sp : StageParams rb) (s : ℕ) (h : Hidden 128 sp.w rb) : StageParams rb where
+def overrideHot (sp : StageParams rb) (s : ℕ) (h : Hidden labelBits sp.w rb) : StageParams rb where
   w := sp.w
   hw := sp.hw
   mat n x lab := if x = s % 2 ^ n then hot (w := sp.w) h.1 (n - 1) else sp.mat n x lab
   castF α lab := if α = s then h.2 else sp.castF α lab
 
 /-- The frame of `ExtractStage` read from the stage: `sub = reduce_w R`, `Δ`, the cold answers `mat` and `castF`. -/
-def specFrame (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Block) : Frame 128 sp.w rb where
+def specFrame (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Label) : Frame labelBits sp.w rb where
   sub := Kriterion.CRT.reduceTo sp.w R
   delta := Δ
   tree := sp.mat
@@ -86,7 +87,7 @@ def specFrame (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Block) : 
 
 section Override
 
-variable (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Block) (s : ℕ) (h : Hidden 128 sp.w rb)
+variable (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ) (h : Hidden labelBits sp.w rb)
 
 theorem gBit0_override : gBit0 (overrideHot sp s h) R = bit0 (specFrame sp R Δ) := rfl
 
@@ -171,12 +172,12 @@ end Override
 /-! ### The instance of the inversion lemma, on the construction's stage -/
 
 /-- The published tuple of a stage whose hot answers are the hidden tuple. -/
-def specPublish (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Block) (s : ℕ)
-    (h : Hidden 128 sp.w rb) : Published 128 sp.w rb :=
+def specPublish (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ)
+    (h : Hidden labelBits sp.w rb) : Published labelBits sp.w rb :=
   ((fun k : Fin (sp.w - 1) => gJoin (overrideHot sp s h) R Δ (k.val + 1)), gPin (overrideHot sp s h) R Δ)
 
 /-- **The construction's stage is injective in its hidden tuple.** -/
-theorem spec_publish_injective (sp : StageParams rb) (hw1 : 1 ≤ sp.w) (R : Kriterion.CRT.Lanes rb) (Δ : Block)
+theorem spec_publish_injective (sp : StageParams rb) (hw1 : 1 ≤ sp.w) (R : Kriterion.CRT.Lanes rb) (Δ : Label)
     (s : ℕ) (hs : s < 2 ^ sp.w) : Function.Injective (specPublish sp R Δ s) := by
   intro h h' same
   have e : ∀ h, specPublish sp R Δ s h = publish (specFrame sp R Δ) s h :=
@@ -185,7 +186,7 @@ theorem spec_publish_injective (sp : StageParams rb) (hw1 : 1 ≤ sp.w) (R : Kri
   exact publish_injective (specFrame sp R Δ) s hs same
 
 /-- A stage of width `w` built from its answers. -/
-def stageOf (w : ℕ) (hw : w ≤ rb) (mat : ℕ → ℕ → Block → Block) (castF : ℕ → Block → Kriterion.CRT.Lanes rb) :
+def stageOf (w : ℕ) (hw : w ≤ rb) (mat : ℕ → ℕ → Label → Label) (castF : ℕ → Label → Kriterion.CRT.Lanes rb) :
     StageParams rb :=
   { w := w, hw := hw, mat := mat, castF := castF }
 
@@ -193,24 +194,24 @@ def stageOf (w : ℕ) (hw : w ≤ rb) (mat : ℕ → ℕ → Block → Block) (c
 (`mat`, `castF`), the remainder `R` and `Δ` from any law and the hidden tuple uniformly: the published joins and pin
 of the stage with its hot answers overridden by the hidden tuple are uniform and independent of the rest. -/
 theorem spec_stage_uniform {Rest : Type*} (rest : PMF Rest) (w : ℕ) (hw : w ≤ rb) (hw1 : 1 ≤ w)
-    (matOf : Rest → ℕ → ℕ → Block → Block) (castOf : Rest → ℕ → Block → Kriterion.CRT.Lanes rb)
-    (remOf : Rest → Kriterion.CRT.Lanes rb) (deltaOf : Rest → Block) (s : ℕ) (hs : s < 2 ^ w) :
-    (rest.bind fun r => (PMF.uniformOfFintype (Hidden 128 w rb)).map fun h =>
+    (matOf : Rest → ℕ → ℕ → Label → Label) (castOf : Rest → ℕ → Label → Kriterion.CRT.Lanes rb)
+    (remOf : Rest → Kriterion.CRT.Lanes rb) (deltaOf : Rest → Label) (s : ℕ) (hs : s < 2 ^ w) :
+    (rest.bind fun r => (PMF.uniformOfFintype (Hidden labelBits w rb)).map fun h =>
         (r, specPublish (stageOf w hw (matOf r) (castOf r)) (remOf r) (deltaOf r) s h))
-      = rest.bind fun r => (PMF.uniformOfFintype (Published 128 w rb)).map fun b => (r, b) :=
+      = rest.bind fun r => (PMF.uniformOfFintype (Published labelBits w rb)).map fun b => (r, b) :=
   bind_map_uniform_of_injective rest _
     (fun r => spec_publish_injective (stageOf w hw (matOf r) (castOf r)) hw1 (remOf r) (deltaOf r) s hs) rfl
 
 /-! ### The real garbler is the overridden stage at its own hot answers -/
 
 /-- The hidden tuple the stage's own answers give at the hot positions of `s`. -/
-def hiddenOfSpec (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Block) (s : ℕ) : Hidden 128 sp.w rb :=
+def hiddenOfSpec (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ) : Hidden labelBits sp.w rb :=
   (fun k => sp.mat (k.val + 1) (s % 2 ^ (k.val + 1)) (gNode sp (gBit0 sp R) Δ (k.val + 1) (s % 2 ^ (k.val + 1))),
     gCast sp R Δ s)
 
 section Self
 
-variable (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Block) (s : ℕ)
+variable (sp : StageParams rb) (R : Kriterion.CRT.Lanes rb) (Δ : Label) (s : ℕ)
 
 theorem mat_override_self (m : ℕ) (hm : m + 1 < sp.w) (t : ℕ) :
     (overrideHot sp s (hiddenOfSpec sp R Δ s)).mat (m + 1) t (gNode sp (gBit0 sp R) Δ (m + 1) t)

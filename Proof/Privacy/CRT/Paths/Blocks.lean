@@ -53,12 +53,12 @@ theorem pow_lt_65536 {n : Nat} (small : n < 16) : 2 ^ n < 65536 :=
 
 /-- **One level of the garbler's tree**: every slot hashed once. -/
 theorem garbleStepM_tagged (fam coord idx stage n : Nat) (fields : Fields fam coord idx stage)
-    (levelSmall : n < 16) (parent : Fin (2 ^ n) → Block) :
+    (levelSmall : n < 16) (parent : Fin (2 ^ n) → Label) :
     Tagged (levelKeys fam coord idx stage n (2 ^ n))
       (garbleStepM n (fun slot => tagCode fam coord idx stage n slot 0) parent) := by
   unfold garbleStepM
   refine Tagged.bind_pure ((Tagged.tableM (S := fun slot => {⟨fam, coord, idx, stage, n, slot, 0⟩}) (2 ^ n)
-    (fun slot => Tagged.h128M _ _ _ _ rfl rfl ⟨fields.famLt, fields.coordLt, fields.idxLt, fields.stageLt, levelSmall,
+    (fun slot => Tagged.hLabelM _ _ _ _ rfl rfl ⟨fields.famLt, fields.coordLt, fields.idxLt, fields.stageLt, levelSmall,
       lt_trans slot.isLt (pow_lt_65536 levelSmall), by norm_num⟩)
     fun i j _ _ different => ⟨singleton_disjoint fun same => different (by cases same; rfl),
       siteDisjoint_of_fam fun k inS => by
@@ -68,7 +68,7 @@ theorem garbleStepM_tagged (fam coord idx stage n : Nat) (fields : Fields fam co
   exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, small⟩
 
 /-- **The garbler's tree** over `levels ≤ 16` bits. -/
-theorem treeGarbleM_tagged (fam coord idx stage : Nat) (fields : Fields fam coord idx stage) (delta bit0 : Block) :
+theorem treeGarbleM_tagged (fam coord idx stage : Nat) (fields : Fields fam coord idx stage) (delta bit0 : Label) :
     ∀ levels, levels ≤ 16 →
       Tagged (treeKeys fam coord idx stage levels)
         (treeGarbleM (fun level slot => tagCode fam coord idx stage level slot 0) delta bit0 levels)
@@ -102,12 +102,12 @@ theorem treeGarbleM_tagged (fam coord idx stage : Nat) (fields : Fields fam coor
 
 /-- **A level of `width` one-block hashes at level field `n`** (tree levels, folds). -/
 theorem levelHashes_tagged (fam coord idx stage n width : Nat) (fields : Fields fam coord idx stage)
-    (levelSmall : n < 16) (widthSmall : width ≤ 65536) (label : Fin width → Block) :
+    (levelSmall : n < 16) (widthSmall : width ≤ 65536) (label : Fin width → Label) :
     Tagged (levelKeys fam coord idx stage n width)
-      (CRT.tableM width fun slot => h128M (label slot) (tagCode fam coord idx stage n slot.val 0)) := by
+      (CRT.tableM width fun slot => hLabelM (label slot) (tagCode fam coord idx stage n slot.val 0)) := by
   have each : ∀ slot : Fin width, Tagged ({⟨fam, coord, idx, stage, n, slot.val, 0⟩} : Set TagKey)
-      (h128M (label slot) (tagCode fam coord idx stage n slot.val 0)) := fun slot =>
-    Tagged.h128M _ (label slot) _ ⟨fam, coord, idx, stage, n, slot.val, 0⟩ rfl rfl
+      (hLabelM (label slot) (tagCode fam coord idx stage n slot.val 0)) := fun slot =>
+    Tagged.hLabelM _ (label slot) _ ⟨fam, coord, idx, stage, n, slot.val, 0⟩ rfl rfl
       ⟨fields.famLt, fields.coordLt, fields.idxLt, fields.stageLt, levelSmall,
         lt_of_lt_of_le slot.isLt widthSmall, by norm_num⟩
   refine (Tagged.tableM (S := fun slot => {⟨fam, coord, idx, stage, n, slot, 0⟩}) width each
@@ -125,7 +125,7 @@ def growKeys (fam coord idx stage start count : Nat) : Set TagKey :=
 
 /-- **The garbler's growth** of a one-hot from level `start` by `count` levels (`start + count ≤ 16`). -/
 theorem growGarbleM_tagged (fam coord idx stage start : Nat) (fields : Fields fam coord idx stage)
-    (labels : Fin (2 ^ start) → Block) :
+    (labels : Fin (2 ^ start) → Label) :
     ∀ count, start + count ≤ 16 →
       Tagged (growKeys fam coord idx stage start count)
         (growGarbleM (fun level slot => tagCode fam coord idx stage level slot 0) start labels count)
@@ -162,11 +162,11 @@ def castKeys (fam coord idx stage leaves count : Nat) : Set TagKey :=
 
 /-- **One cast** of leaf `leaf`: its `castAnswers l` answers at one label. -/
 theorem castM_tagged (fam coord idx stage leaf l : Nat) (fields : Fields fam coord idx stage)
-    (leafSmall : leaf < 65536) (answers : castAnswers l ≤ 64) (label : Block) :
+    (leafSmall : leaf < 65536) (answers : castAnswers l ≤ 64) (label : Label) :
     Tagged (leafKeys fam coord idx stage leaf (castAnswers l))
       (castM l label fun part => tagCode fam coord idx stage 0 leaf part) := by
   unfold castM
-  refine Tagged.bind_pure ((Tagged.hlongM label _ (castAnswers l)
+  refine Tagged.bind_pure ((Tagged.hlongM (embed label) _ (castAnswers l)
     (fun part => ⟨fam, coord, idx, stage, 0, leaf, part⟩) (fun _ _ => rfl)
     (fun part small => ⟨fields.famLt, fields.coordLt, fields.idxLt, fields.stageLt, by norm_num, leafSmall,
       show part < 64 by omega⟩)
@@ -181,7 +181,7 @@ theorem two_pow_le_65536 {width : Nat} (widthSmall : width ≤ 16) : 2 ^ width �
 
 /-- **The casts of every leaf** below `2 ^ width`. -/
 theorem leafCasts_tagged (fam coord idx stage width l : Nat) (fields : Fields fam coord idx stage)
-    (widthSmall : width ≤ 16) (answers : castAnswers l ≤ 64) (label : Fin (2 ^ width) → Block) :
+    (widthSmall : width ≤ 16) (answers : castAnswers l ≤ 64) (label : Fin (2 ^ width) → Label) :
     Tagged (castKeys fam coord idx stage (2 ^ width) (castAnswers l))
       (CRT.tableM (2 ^ width) fun leaf => castM l (label leaf) fun part =>
         tagCode fam coord idx stage 0 leaf.val part) := by
