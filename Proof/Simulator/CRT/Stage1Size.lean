@@ -126,6 +126,7 @@ theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 : Nat)
     (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) : total ≤ 2 ^ 55 := by
   rewrite [CrtStored.joinCount_eq] at h2
   rewrite [CrtConv.pinCount_eq] at h3
+  simp only [laneCount, Narrow.labelBits] at h3
   simp only [fieldCount, curveCellCount, rowCellCount, exceptionByteCount, recordCount, moduliCount, labelCount,
     recordLimbCount, Entry.xCount, Entry.yCount] at h0 h1 h4 h5 h8 h9
   omega
