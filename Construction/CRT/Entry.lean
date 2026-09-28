@@ -6,10 +6,10 @@ Garbler order (queries): the CRT layer of `x` (`coordGarbleM table 367 0`), of `
 (`coordGarbleM table 275 1`), the key `K = (H t.val).1` (`keyM`), the 1,092 mask answers
 (`maskAnswersM`), the digest labels and finals (`digestGarbleM`). Then the pure assembly
 (release-r1's "offsets first, slopes derived from offsets, joins last"): the element offset of
-a curve encoding is `O_e mod p`, of a row encoding `(O_e mod p) - π_e`; slopes by
-`CurveMembership.slopes` and `Biquadratic.slopes`; row constants by
-`FieldMacToECMac.garbleRow`; curve constants by `CurveMembership.garble`; records by
-`CoordGarbled.records` with the slopes' values.
+a curve encoding is `O_e mod p`, of a row encoding `(O_e mod p) - π_e`; the rows normalized by the
+offsets of the collectors `rowZ_x9` and `rowY_cubic` (`Rows.normRows`); slopes by
+`CurveMembership.slopes` and `Biquadratic.slopes`; row data by `Rows.garbleNormRow`; curve constants by
+`CurveMembership.garble`; records by `CoordGarbled.records` with the slopes' values.
 
 Evaluator: an off-curve input is refused before any query (`some none`). On the curve, the replay
 prefix (`replay`: the CRT layer of `x` and `y` on the restored labels, the curve check from the
@@ -22,6 +22,7 @@ import Construction.CRT.Mask
 import Construction.CRT.Digest
 import Construction.CRT.Bounds
 import Construction.Scheme
+import Construction.CRT.Rows
 
 namespace Kriterion.CRT.Entry
 
@@ -159,6 +160,10 @@ def curveValuesOf (xValues : Fin xCount → BaseField) (yValues : Fin yCount →
     CurveMembership.Values :=
   Pipeline.curveValues (curvePartX xValues) (curvePartY yValues)
 
+/-- The normalized rows of every digit, from the output keys and the element offsets. -/
+def normRowsVec (keys : FieldMacToECMac.OutputKeys) (K : FieldMacToECMac.DigitValues) : FieldMacToECMac.Rows :=
+  Vector.ofFn (Rows.normRowsOf keys K)
+
 /-- The row slopes of every digit. -/
 def pointSlopes (rows : FieldMacToECMac.Rows) (randomness : FieldMacToECMac.Randomness)
     (K : FieldMacToECMac.DigitValues) : Fin digitCount → Biquadratic.Values :=
@@ -190,10 +195,10 @@ def assemble (scalar : NonZeroScalar) (coins : Coins) (gx : CoordGarbled table x
     (gy : CoordGarbled table yCount) (masks : MaskValues digitCount)
     (entries : Fin digitCount → Exception.Entry) : Public :=
   let outputKeys := outputKeysOf scalar coins
-  let rows := FieldMacToECMac.rowsForOutputKeys outputKeys coins.pointRandomness
   let offX := offsetsX gx.offset masks
   let offY := offsetsY gy.offset masks
   let K := digitValuesOf offX offY
+  let rows := normRowsVec outputKeys K
   let curveK := curveValuesOf offX offY
   let point := pointSlopes rows coins.pointRandomness K
   let curve := CurveMembership.slopes coins.curveR1 coins.curveR2 curveK
@@ -201,8 +206,7 @@ def assemble (scalar : NonZeroScalar) (coins : Coins) (gx : CoordGarbled table x
   let recordsY := gy.records fun e => (slopesY point curve e).val
   { curve := CurveMembership.garble coins.bridgeKey coins.curveMask.value coins.curveR1
       coins.curveR2 curveK
-    rows := Vector.ofFn fun digit =>
-      FieldMacToECMac.garbleRow (rows.get digit) (K digit)
+    rows := Vector.ofFn fun digit => Rows.garbleNormRow (Rows.unscaledOf outputKeys digit) (K digit)
     exception := Vector.ofFn entries
     crtX := convVector gx.pub
     crtY := convVector gy.pub
@@ -339,8 +343,7 @@ def evaluateCM [FieldCertificate] [GroupCertificate] (pub : Public) (input : Aff
             (fun o => pub.exception.get o) >>= fun digits =>
           pure (some (Garbling.decodeResult
             { point := input
-              pointMacs := FieldMacToECMac.evaluateHomogeneous (pub.rows, pub.exception)
-                (rowValues out) input
+              pointMacs := Rows.evaluateNormRows pub.rows (rowValues out) input
               exceptionDigits := Vector.ofFn fun o => (digits o).1
               tripleDigits := Vector.ofFn fun o => (digits o).2 }))
 
@@ -491,7 +494,7 @@ def evaluateProgram [FieldCertificate] [GroupCertificate] (pub : Public) (input 
 def resultOf (pub : Public) (input : AffineInput) (out : ReplayOut)
     (digits : Fin digitCount → Digit × Digit) : FieldMacToECMac.Result :=
   { point := input
-    pointMacs := FieldMacToECMac.evaluateHomogeneous (pub.rows, pub.exception) (rowValues out) input
+    pointMacs := Rows.evaluateNormRows pub.rows (rowValues out) input
     exceptionDigits := Vector.ofFn fun o => (digits o).1
     tripleDigits := Vector.ofFn fun o => (digits o).2 }
 

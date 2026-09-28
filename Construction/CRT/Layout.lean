@@ -72,10 +72,15 @@ def rowAt (i : Nat) : OddRow :=
 
 /-! ### The source -/
 
-/-- Every published cell in source form, and the Lamport key. -/
+/-- Every published cell in source form, and the Lamport key.
+
+`rows d` holds the digit's published `X` constant (`xC0`) and two cells that are never published
+(`yC4`, `zC0`): the privacy proof's stand-ins for the offsets of the collectors `rowY_cubic` and
+`rowZ_x9`, whose zero event is the normalization's bad event (`Rows.zeroFlag`). `signs d` is `ν`. -/
 structure Source where
   curve : BaseField × BaseField × BaseField
   rows : Fin digitCount → RowGamma
+  signs : Fin digitCount → Bool
   exception : Fin digitCount → Exception.Entry
   joins : Fin 2 → Fin joinCount → Label
   pins : Fin 2 → (k : Fin pinCount) → Lanes (pinWidth k)
@@ -109,10 +114,14 @@ def Source.conv (source : Source) (coord : Fin 2) : ConvPublic where
     source.joinAt coord (modJoinBase i + ((rowAt i).width0 - 1) + ((rowAt i).width1 - 1)
       + ((rowAt i).keep - (rowAt i).width0) + (j - (rowAt i).keep))
 
+/-- The published row data of a source digit: its `X` constant, both normalization flags clear, its sign. -/
+def Source.normRow (source : Source) (digit : Fin digitCount) : NormRow :=
+  { xC0 := (source.rows digit).xC0, zFlag := false, sFlag := false, sign := source.signs digit }
+
 /-- **Publish**: the dense packing of the pins, the flat layout, the records with hint 0. -/
 def publish (source : Source) : Public where
   curve := source.curve
-  rows := Vector.ofFn source.rows
+  rows := Vector.ofFn source.normRow
   exception := Vector.ofFn source.exception
   crtX := convVector (source.conv 0)
   crtY := convVector (source.conv 1)
@@ -165,23 +174,23 @@ instance labelFinite : Finite Label :=
 
 /-- The data of a source. -/
 abbrev SourceData :=
-  (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) ×
+  (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) × (Fin digitCount → Bool) ×
     (Fin digitCount → Exception.Entry) × (Fin 2 → Fin joinCount → Label) ×
     (Fin 2 → (k : Fin pinCount) → Lanes (pinWidth k)) × (Fin xCount → Fin table.product) ×
     (Fin yCount → Fin table.product) × (Fin 2 → Fin coordinateBitCount → Block) × (Fin 2 → Block)
 
 /-- A source's data. -/
 def Source.data (source : Source) : SourceData :=
-  (source.curve, source.rows, source.exception, source.joins, source.pins, source.recX, source.recY,
-    source.zeros, source.deltas)
+  (source.curve, source.rows, source.signs, source.exception, source.joins, source.pins, source.recX,
+    source.recY, source.zeros, source.deltas)
 
 theorem Source.data_injective : Function.Injective Source.data := by
   intro first second equal
   cases first
   cases second
   simp only [Source.data, Prod.mk.injEq] at equal
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := equal
-  subst h1 h2 h3 h4 h5 h6 h7 h8 h9
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩ := equal
+  subst h1 h2 h3 h4 h5 h6 h7 h8 h9 h10
   rfl
 
 instance sourceFinite : Finite Source := Finite.of_injective Source.data Source.data_injective
@@ -199,6 +208,7 @@ theorem table_product_pos : 0 < table.product := by
 instance sourceNonempty : Nonempty Source :=
   ⟨{ curve := (0, 0, 0)
      rows := fun _ => ⟨0, 0, 0⟩
+     signs := fun _ => false
      exception := fun _ => Vector.ofFn fun _ => 0
      joins := fun _ _ => 0
      pins := fun _ _ => 0
