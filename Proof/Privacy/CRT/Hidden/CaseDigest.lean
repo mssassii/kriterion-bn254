@@ -85,7 +85,7 @@ theorem digestOther_delta (scalar : NonZeroScalar) (u : AffineInput) (tape : Tab
       refine ⟨c, p, by rw [hashInput_div, hcoord], by rw [hashInput_div, hslot], ?_⟩
       rw [ofNat_label, EntryCorrect.labelsOf_honest (schemeHash (tableOracle (FI := Empty) (EI := Empty) tab)) coins u c p]
       have zero : ¬ coordBit u c p.val = 1 := fun one => otherBit one.symm
-      rw [if_neg zero]
+      rw [if_neg zero, BitVec.xor_zero]
       exact xor_cancel_right' _ _ _ rfl
   · rw [asked_tableM] at inFinals
     simp only [List.mem_flatMap, List.mem_finRange, true_and] at inFinals
