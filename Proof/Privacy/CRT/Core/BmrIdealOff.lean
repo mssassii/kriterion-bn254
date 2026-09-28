@@ -305,6 +305,7 @@ theorem not_window (u : AffineInput) (cells : NSource Tb × Cold Tb u) (clear : 
 theorem normBadSrc_iff (s : Kriterion.CRT.Entry.Source) : H8.normBadSrc s ↔ normBad (srcOf s) := by
   unfold H8.normBadSrc normBad GoodScales hiddenCells srcOf
   simp only [not_forall, not_and_or, ne_eq, not_not]
+  exact Iff.rfl
 
 /-- **Route M's window event is the window event of P45's `evalInt`.** -/
 theorem replayWindow_iff [FieldCertificate] [GroupCertificate] (s : Kriterion.CRT.Entry.Source) (u : AffineInput)
