@@ -88,7 +88,7 @@ theorem rowsDoubling_of_doubling_old [FieldCertificate] [GroupCertificate] (scal
         sign_double _ key.offset.onCurve (JacobianMixed.noAffineYZero _ key.offset.onCurve), mul_zero]
 
 /-- At a nonzero digit the corrected row of any keys and randomness is the old row. -/
-theorem nTargets_keys_some [FieldCertificate] (keys : FieldMacToECMac.OutputKeys)
+theorem nTargets_keys_some [FieldCertificate] [GroupCertificate] (keys : FieldMacToECMac.OutputKeys)
     (randomness : FieldMacToECMac.Randomness) (u : AffineInput) (d : Fin 91) (phi : BaseField)
     (selected : digitEndomorphismBase (keys.get d).digit = some phi) :
     BMR.nTargets ⟨fun d => Rows.unscaledOf keys d⟩ u (fun d => ((randomness.get d).rho, (randomness.get d).tau)) d =
@@ -149,13 +149,36 @@ theorem rowsDoubling_nTargets [FieldCertificate] [GroupCertificate] (scalar : No
     (doubling : ∃ o, Kriterion.CRT.Entry.exceptional scalar coins o = some u)
     (s : Fin 91 → NonZeroBase × NonZeroBase) :
     H8.rowsDoubling (BMR.nTargets (NormRows.nctxOf scalar coins) u s) := by
-  let coins' : Kriterion.ArgoMAC.Scheme.Coins :=
-    { coins with pointRandomness := Security.Phase3.setRho coins.pointRandomness s }
-  have flagged := rowsDoubling_of_doubling scalar coins' u doubling
-  have scales : NormRows.scalesOf coins' = s := Security.Phase3.rhoOf_setRho _ _
-  unfold NormRows.normTrueRows at flagged
-  rw [scales] at flagged
-  exact flagged
+  obtain ⟨o, hexc⟩ := doubling
+  unfold Kriterion.CRT.Entry.exceptional at hexc
+  by_cases inRange : o / 2 < digitCount
+  swap
+  · rw [dif_neg inRange] at hexc
+    cases hexc
+  rw [dif_pos inRange] at hexc
+  generalize hkey : (Kriterion.CRT.Entry.outputKeysOf scalar coins).get ⟨o / 2, inRange⟩ = key at hexc
+  dsimp only at hexc
+  cases hphi : digitEndomorphismBase key.digit with
+  | none => rw [hphi] at hexc; cases hexc
+  | some phi =>
+    rw [hphi] at hexc
+    simp only [Option.some.injEq] at hexc
+    refine ⟨⟨o / 2, inRange⟩, ?_⟩
+    have six := digitEndomorphismBasePowSix key.digit phi hphi
+    unfold BMR.nTargets
+    simp only [NormRows.nctxOf, Rows.unscaledOf]
+    rw [hkey, hphi]
+    simp only [Rows.unscaledRows, Coordinates.evaluateScaleSome, one_pow, one_mul]
+    by_cases kind : o % 2 = 0
+    · rw [if_pos kind] at hexc
+      left
+      rw [← hexc, Exception.exceptionalInput_transform phi six, Coordinates.exceptionalZ _ _ rfl, mul_zero]
+    · rw [if_neg kind] at hexc
+      right
+      rw [← hexc]
+      unfold Exception.tripleInput
+      rw [Exception.exceptionalInput_transform phi six,
+        sign_double _ key.offset.onCurve (JacobianMixed.noAffineYZero _ key.offset.onCurve), mul_zero]
 
 /-! ### The real reading: pads and offsets -/
 
