@@ -20,7 +20,8 @@ delivery of the affine encodings replaced:
 
 * **the delivery layer**: the switch systems are replaced by the CRT-residue projectivization of Duty-Free
   Bits (Khambhati, Bhattacharya and Heath), applied to Argo MAC encodings as in ePrint 2026/2100: per coordinate, one conversion of the 254 input bits into
-  one-hot labels of the residues modulo 85 small moduli (3,178 published blocks), then one 78-byte record
+  one-hot labels of the residues modulo 85 small moduli (2,956 published blocks: the 222 chunk-tree joins are
+  absorbed into the Lamport labels and not published), then one 78-byte record
   per encoding;
 * **the gating**: the rows are masked by hash outputs keyed by the curve check's value, in place of the
   second switch system on labels whitened by EncPRF pads;
@@ -34,7 +35,7 @@ are xinshu's.
 
 | metric | value | rule |
 |---|---|---|
-| `ciphertextBytes` | **141,627** `= 96 + 91·96 + 91·1 + 2·41,314 + 642·78` | ranked, lower is better |
+| `ciphertextBytes` | **135,855** `= 96 + 91·96 + 91·1 + 2·38,428 + 642·78` | ranked, lower is better |
 | `garbleQueries` | **988,438** `≤ 1,759,967` | acceptance gate |
 | `evaluateQueries` | **981,506** `≤ 1,055,879` (74,373 below) | acceptance gate |
 
@@ -179,16 +180,19 @@ no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side th
 | `curve` | 3 curve-check constants | 96 |
 | `rows` | 91 digits × 3 constants × 32 B | 8,736 |
 | `exception` | 91 digits × one-byte entry | 91 |
-| `crtX`, `crtY` | 3,178 labels × 13 B per coordinate | 82,628 |
+| `crtX`, `crtY` | 2,956 labels × 13 B per coordinate | 76,856 |
 | `recX`, `recY` | 642 records × 78 B (367 of `x`, 275 of `y`) | 50,076 |
-| **total** | | **141,627** |
+| **total** | | **135,855** |
 
 A record is `h_e·M + Σ_i J_{e,i}·Π_{i'<i} m_{i'}`, below `2M < 2^624`. Every field has a fixed width, so
 every public value encodes to the same length (`Entry.Wire.encoding_length`). Against `de8f397`, the sign
 row saves 91 records (7,098 B) and 91 row constants (2,912 B), and the second exceptional case adds 6
 bytes per digit (546 B) in the original layout: 9,464 B less. The fallback schedule saves another 4,288 B,
 first extraction width 8 on every odd row saves 884 B more, parity casts (every pin even, published
-halved: one label less per pin, 400 pins) save 5,200 B more, and compacting both exceptional kinds into one byte saves 1,001 B, and 104-bit conversion labels save 20,472 B, for 41,309 B less in total.
+halved: one label less per pin, 400 pins) save 5,200 B more, and compacting both exceptional kinds into one byte saves 1,001 B, and 104-bit conversion labels save 20,472 B, and
+absorbing the chunk-tree joins into the Lamport labels (no chunk joins: the actual zero label of bit `8c + n`,
+`n ≥ 1`, is `Z ⊕ embed(J_{c,n})`, and the evaluator's chunk trees run on zero joins) saves `2·222·13 = 5,772` B, for
+47,081 B less in total.
 
 ## 3. Query accounting
 
@@ -266,7 +270,7 @@ lake env lean Scratch/ProofAudit.lean   # the three axioms over every declaratio
 ```
 
 `Scratch/` is not a Lean library and the verifier ignores it. `Scratch/Audit.lean` fails if the bytes
-(141,627, from the metric and from encoding an all-zero public value), the garbling budget (988,438) or
+(135,855, from the metric and from encoding an all-zero public value), the garbling budget (988,438) or
 the evaluation budget (981,506) differ, or if a budget comes within 500 queries of its gate, and it checks
 the axioms of the solution and of the privacy field. Build time depends strongly on available
 memory; this fallback draft has not been built, and no build-time estimate is claimed here.
