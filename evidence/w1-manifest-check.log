@@ -1,0 +1,5 @@
+$ python3 Scratch/opus_w1_manifest.py check 88fcad8
+# HEAD 88fcad833697e37993c66b25e40eac04d872cf54
+# tracked changes:
+
+manifest matches 439 files (commit 88fcad8): c896419cdca17c964b7da719362a7679cf3ea516242169fd16ef6b213b751ff7

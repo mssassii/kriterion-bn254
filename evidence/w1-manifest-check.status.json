@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "Scratch/opus_w1_manifest.py",
+    "check",
+    "88fcad8"
+  ],
+  "head": "88fcad833697e37993c66b25e40eac04d872cf54",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 4.1,
+  "log": "evidence/w1-manifest-check.log"
+}
