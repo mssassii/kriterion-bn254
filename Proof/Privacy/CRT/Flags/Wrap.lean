@@ -149,7 +149,6 @@ theorem window_source [FieldCertificate] [GroupCertificate] (source : (Instance.
 
 end Wrap
 
-open Classical in
 /-- **The wrap reveal at one source**: the window, or the source's normalization flag. -/
 theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
     (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWraps source u T} ≤
@@ -165,7 +164,6 @@ theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.vi
     rw [same]
     exact Wrap.window_source source u
 
-open Classical in
 /-- **The wrap flag on the swapped table** (for `CrtFlagMass`): against every weight on the published value, the
 weighted mass of the wrap reveal is at most `smudgeError + normError` times the total weight. -/
 theorem crtWrapTable_le [FieldCertificate] [GroupCertificate] (u : AffineInput)

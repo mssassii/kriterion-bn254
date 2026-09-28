@@ -299,9 +299,9 @@ def replayWindow (source : (view).Source) (u : AffineInput) (table : TagTable) :
 /-- **The normalization flag of a source**: one of the two hidden cells of a digit (`zC0`, `yC4`, never published)
 is zero. It pays for the bad event of the row normalization (a zero collector offset, `Rows.zeroFlag`), whose coins
 the real side publishes with a set flag (`Core/BmrNorm.lean`). -/
-def normBadSrc (source : (view).Source) : Prop := ∃ d, (source.rows d).zC0 = 0 ∨ (source.rows d).yC4 = 0
+def normBadSrc (source : Kriterion.CRT.Entry.Source) : Prop := ∃ d, (source.rows d).zC0 = 0 ∨ (source.rows d).yC4 = 0
 
-instance normBadSrcDecidable (source : (view).Source) : Decidable (normBadSrc source) := by
+instance normBadSrcDecidable (source : Kriterion.CRT.Entry.Source) : Decidable (normBadSrc source) := by
   unfold normBadSrc
   infer_instance
 

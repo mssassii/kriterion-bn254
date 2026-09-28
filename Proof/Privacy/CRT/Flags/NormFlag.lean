@@ -53,7 +53,7 @@ def restEquiv : Entry.Source ≃ Rest × BMR.Scales where
 /-- The published value does not read the hidden cells. -/
 theorem publish_withHidden (s : Entry.Source) (h : BMR.Scales) : Entry.publish (withHidden s h) = Entry.publish s := rfl
 
-theorem normBadSrc_withHidden [FieldCertificate] [GroupCertificate] (s : Entry.Source) (h : BMR.Scales) :
+theorem normBadSrc_withHidden (s : Entry.Source) (h : BMR.Scales) :
     H8.normBadSrc (withHidden s h) ↔ ¬ BMR.GoodScales h := by
   unfold H8.normBadSrc BMR.GoodScales withHidden
   simp only [not_forall, not_and_or, ne_eq, not_not]
@@ -105,7 +105,6 @@ theorem badMass_le [FieldCertificate] :
   rw [ENNReal.ofReal_div_of_pos (by exact_mod_cast p_pos), ENNReal.ofReal_natCast, ENNReal.ofReal_natCast,
     baseFieldModulus_eq, div_eq_mul_inv]
 
-open Classical in
 /-- **The normalization flag against a weight on the published value**: at most `182/p` times the weight. -/
 theorem normFlag_le [FieldCertificate] [GroupCertificate] (weight : Entry.Public → ℝ≥0∞)
     [Fintype Entry.Source] [Nonempty Entry.Source] :
