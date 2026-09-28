@@ -23,8 +23,8 @@ open Cryptography Kriterion.ArgoMAC
 /-! ### Casts -/
 
 /-- A cast of width `l`: `castAnswers l` answers at `tagOf part`, read block-aligned (D11). -/
-def castM (l : Nat) (label : Block) (tagOf : Nat → Nat) : CM (Lanes l) :=
-  hlongM label tagOf (castAnswers l) >>= fun value => pure (materialize (castLanes l value))
+def castM (l : Nat) (label : Label) (tagOf : Nat → Nat) : CM (Lanes l) :=
+  hlongM (embed label) tagOf (castAnswers l) >>= fun value => pure (materialize (castLanes l value))
 
 /-- The sum of a finite family of lanes, lane by lane, stored. -/
 def sumLanes {l count : Nat} (family : Fin count → Lanes l) : Lanes l :=
@@ -43,19 +43,19 @@ def chunkCastTag (coord c leaf part : Nat) : Nat := tagCode Family.chunkCast coo
 /-- What the garbler keeps of one chunk: leaf labels, casts, published joins and pin. -/
 structure ChunkGarbled (L : Nat) where
   /-- Leaf label of leaf `α` (`0` off range). -/
-  leaves : Nat → Block
+  leaves : Nat → Label
   /-- Cast of leaf `α`. -/
   casts : Nat → Lanes L
   /-- Published join of tree level `n` (`1 ≤ n < w_c`). -/
-  joins : Nat → Block
+  joins : Nat → Label
   /-- The pin `Σ_α A_α + Δ⃗`. -/
   pin : Lanes L
 
 /-- The garbler's chunk `c` of coordinate `coord` from the coordinate's zero labels. -/
-def chunkGarbleM (T : CrtTable) (coord : Nat) (delta : Block) (zeroLabel : Nat → Block) (c : Nat) :
+def chunkGarbleM (T : CrtTable) (coord : Nat) (delta : Label) (zeroLabel : Nat → Label) (c : Nat) :
     CM (ChunkGarbled T.castWidth) :=
   let width := T.chunkWidth c
-  let bitMask : Nat → Block := fun n => zeroLabel (T.chunkOffset c + n)
+  let bitMask : Nat → Label := fun n => zeroLabel (T.chunkOffset c + n)
   treeGarbleM (chunkTreeTag coord c) delta (bitMask 0) width >>= fun tree =>
     tableM (2 ^ width) (fun leaf => castM T.castWidth (tree.1 leaf) (chunkCastTag coord c leaf.val))
       >>= fun casts =>
@@ -68,16 +68,16 @@ def chunkGarbleM (T : CrtTable) (coord : Nat) (delta : Block) (zeroLabel : Nat �
 
 /-- What the evaluator holds of one chunk: leaf labels and casts (the hot cast recovered). -/
 structure ChunkEval (L : Nat) where
-  leaves : Nat → Block
+  leaves : Nat → Label
   casts : Nat → Lanes L
 
 /-- The evaluator's chunk `c`: `labels j` is its label of coordinate bit `j`, `v` the value,
 `joins` and `pin` the published material of the chunk. -/
-def chunkEvalM (T : CrtTable) (coord : Nat) (labels : Nat → Block) (v : Nat) (joins : Nat → Block)
+def chunkEvalM (T : CrtTable) (coord : Nat) (labels : Nat → Label) (v : Nat) (joins : Nat → Label)
     (pin : Lanes T.castWidth) (c : Nat) : CM (ChunkEval T.castWidth) :=
   let width := T.chunkWidth c
   let value := T.chunkValue v c
-  let bitLabel : Nat → Block := fun n => labels (T.chunkOffset c + n)
+  let bitLabel : Nat → Label := fun n => labels (T.chunkOffset c + n)
   treeEvalM (chunkTreeTag coord c) value bitLabel joins width >>= fun tree =>
     tableM (2 ^ width) (fun leaf =>
       if leaf.val = value then pure 0

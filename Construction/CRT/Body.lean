@@ -23,8 +23,8 @@ open Cryptography Kriterion.ArgoMAC
 def bodyTag (coord i residue part : Nat) : Nat := tagCode Family.body coord i 0 0 residue part
 
 /-- The pad digits of one slot: `q` answers, the fraction reading, `S` digits base `m`. -/
-def padVectorM (m S q : Nat) (label : Block) (tagOf : Nat → Nat) : CM (Fin S → Nat) :=
-  hlongM label tagOf q >>= fun value =>
+def padVectorM (m S q : Nat) (label : Label) (tagOf : Nat → Nat) : CM (Fin S → Nat) :=
+  hlongM (embed label) tagOf q >>= fun value =>
     let fraction := fractionValue m S q value
     pure (stored fun e => digit m fraction e.val)
 
@@ -36,7 +36,7 @@ structure BodyGarbled (S : Nat) where
   padSum : Fin S → Nat
 
 /-- The garbler's body of modulus `m` (index `i`) on its final one-hot. -/
-def bodyGarbleM (m S q coord i : Nat) (final : Fin m → Block) : CM (BodyGarbled S) :=
+def bodyGarbleM (m S q coord i : Nat) (final : Fin m → Label) : CM (BodyGarbled S) :=
   tableM m (fun residue => padVectorM m S q (final residue) (bodyTag coord i residue.val))
     >>= fun pads =>
       pure { residue := stored fun e =>
@@ -45,7 +45,7 @@ def bodyGarbleM (m S q coord i : Nat) (final : Fin m → Block) : CM (BodyGarble
 
 /-- The evaluator's body of modulus `m` (index `i`) on its final one-hot with hot index `hot` and
 the residue joins `joins e`: the residues `L_{e,m}`. -/
-def bodyEvalM (m S q coord i : Nat) (final : Fin m → Block) (hot : Nat) (joins : Fin S → Nat) :
+def bodyEvalM (m S q coord i : Nat) (final : Fin m → Label) (hot : Nat) (joins : Fin S → Nat) :
     CM (Fin S → Nat) :=
   tableM m (fun residue =>
     if residue.val = hot then pure fun _ => 0

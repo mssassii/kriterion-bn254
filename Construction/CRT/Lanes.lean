@@ -1,12 +1,12 @@
 /-
 Arithmetic labels (Heath 2024): an arithmetic label of a value `σ` in
-`Z_{2^l}` is a vector of 128 lanes; the garbler holds the mask `A`, the evaluator `A + σ • Δ⃗`,
+`Z_{2^l}` is a vector of 104 lanes; the garbler holds the mask `A`, the evaluator `A + σ • Δ⃗`,
 where `Δ⃗` reads the global offset `Δ` lane by lane as 0 or 1. Sums and multiplication by public
 naturals are free.
 
 This file defines `Δ⃗` (`deltaLanes`), the boolean label of one bit plane (`laneBit`), the
 reduction to a smaller width (`reduceTo`, a ring hom when the width shrinks, L6), the exact peel
-(`peelDiv`, L11), scaling by a public natural, and `materialize`, the identity that stores the 128
+(`peelDiv`, L11), scaling by a public natural, and `materialize`, the identity that stores the 104
 lanes in an array (programs call it at stage boundaries so that the interpreter does not
 recompute a lane).
 -/
@@ -20,10 +20,10 @@ open Cryptography
 variable {width : Nat}
 
 /-- `Δ⃗`: lane `i` is bit `i` of `Δ` (frozen text). -/
-def deltaLanes (l : Nat) (Δ : Block) : Lanes l := fun i => if Δ.getLsbD i.1 then 1 else 0
+def deltaLanes (l : Nat) (Δ : Label) : Lanes l := fun i => if Δ.getLsbD i.1 then 1 else 0
 
 /-- The boolean label of bit plane `b`: bit `i` of the block is bit `b` of lane `i` (frozen text). -/
-def laneBit {l : Nat} (A : Lanes l) (b : Nat) : Block :=
+def laneBit {l : Nat} (A : Lanes l) (b : Nat) : Label :=
   BitVec.ofFnLE (fun i : Fin laneCount => (A i).val.testBit b)
 
 /-- Reduction to width `target` lane by lane (`x ↦ x mod 2 ^ target`); a ring hom when

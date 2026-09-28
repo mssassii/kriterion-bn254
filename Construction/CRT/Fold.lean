@@ -18,7 +18,7 @@ namespace Kriterion.CRT
 open Cryptography Kriterion.ArgoMAC
 
 /-- The reindex of a one-hot of `2 ^ n` labels modulo `m`. -/
-def reindex (n : Nat) (labels : Fin (2 ^ n) → Block) (m : Nat) : Fin m → Block :=
+def reindex (n : Nat) (labels : Fin (2 ^ n) → Label) (m : Nat) : Fin m → Label :=
   stored fun residue =>
     Fin.foldl (2 ^ n) (fun acc leaf => if leaf.val % m = residue.val then acc ^^^ labels leaf else acc) 0
 
@@ -30,19 +30,19 @@ def foldSource {m : Nat} (residue : Fin m) (shift : Nat) : Fin m :=
 def foldShift (m j : Nat) : Nat := 2 ^ j % m
 
 /-- The garbler's fold: the new vector and the published join. -/
-def foldGarbleM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (bitMask : Block)
-    (labels : Fin m → Block) : CM ((Fin m → Block) × Block) :=
-  tableM m (fun residue => h128M (labels residue) (tagOf residue.val)) >>= fun materials =>
+def foldGarbleM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (bitMask : Label)
+    (labels : Fin m → Label) : CM ((Fin m → Label) × Label) :=
+  tableM m (fun residue => hLabelM (labels residue) (tagOf residue.val)) >>= fun materials =>
     pure (stored (fun residue =>
         labels residue ^^^ materials residue ^^^ materials (foldSource residue shift)),
       xorFold materials ^^^ bitMask)
 
 /-- The evaluator's fold at hot index `hot`. -/
-def foldEvalM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (hot : Nat) (bitLabel join : Block)
-    (labels : Fin m → Block) : CM (Fin m → Block) :=
+def foldEvalM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (hot : Nat) (bitLabel join : Label)
+    (labels : Fin m → Label) : CM (Fin m → Label) :=
   tableM m (fun residue =>
-    if residue.val = hot then pure 0 else h128M (labels residue) (tagOf residue.val)) >>= fun cold =>
-      let materials : Fin m → Block := stored fun residue =>
+    if residue.val = hot then pure 0 else hLabelM (labels residue) (tagOf residue.val)) >>= fun cold =>
+      let materials : Fin m → Label := stored fun residue =>
         if residue.val = hot then
           bitLabel ^^^ join ^^^ Fin.foldl m (fun acc other => if other.val = hot then acc else acc ^^^ cold other) 0
         else cold residue
@@ -51,8 +51,8 @@ def foldEvalM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (hot : Nat) (bitLabe
 
 /-- The garbler's folds at bit positions `start, ..., start + count - 1`: the final vector and the
 join of each position. `tagOf position residue` is the fold tag. -/
-def foldsGarbleM (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Block) :
-    (count start : Nat) → (Fin m → Block) → CM ((Fin m → Block) × (Nat → Block))
+def foldsGarbleM (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Label) :
+    (count start : Nat) → (Fin m → Label) → CM ((Fin m → Label) × (Nat → Label))
   | 0, _, labels => pure (labels, fun _ => 0)
   | count + 1, position, labels =>
       foldGarbleM m (tagOf position) (foldShift m position) (bitMask position) labels >>= fun step =>
@@ -61,8 +61,8 @@ def foldsGarbleM (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Bloc
 
 /-- The evaluator's folds; `value` is `σ_m` (its bit `j` moves the hot index by `s_j`). Returns the
 final vector and the final hot index. -/
-def foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block) :
-    (count start hot : Nat) → (Fin m → Block) → CM ((Fin m → Block) × Nat)
+def foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label) :
+    (count start hot : Nat) → (Fin m → Label) → CM ((Fin m → Label) × Nat)
   | 0, _, hot, labels => pure (labels, hot)
   | count + 1, position, hot, labels =>
       foldEvalM m (tagOf position) (foldShift m position) hot (bitLabel position) (join position)

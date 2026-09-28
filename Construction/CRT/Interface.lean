@@ -9,6 +9,7 @@ never unfolded or decided in a proof; they are computed only by kernel-accelerat
 operations or by `#eval`. No sum over `Fin (2 ^ w)` or over the 85 rows is enumerated.
 -/
 
+import Construction.CRT.LabelLanes
 import Mathlib.Data.ZMod.Basic
 import Mathlib.Algebra.BigOperators.Fin
 import Batteries.Data.BitVec.Basic
@@ -17,6 +18,8 @@ import Cryptography.Primitives
 namespace Kriterion.CRT
 
 open Cryptography
+
+export Narrow (labelBits Label clip embed)
 
 /-! ### The hash of the layer -/
 
@@ -73,6 +76,10 @@ def packAnswers (count : Nat) (answers : Fin count → Block × Block) : Nat :=
 /-- The one-block hash: the first block of the answer. -/
 def h128 (H : HashN) (label : Block) (tag : Nat) : Block := (H (hashInput label tag)).1
 
+/-- The conversion-label hash: embed the input and clip the first raw answer. -/
+def hLabel (H : HashN) (label : Label) (tag : Nat) : Label :=
+  clip (h128 H (embed label) tag)
+
 /-- The long hash: `count` answers at tags `tagOf 0, ..., tagOf (count - 1)`, concatenated. -/
 def hlong (H : HashN) (label : Block) (tagOf : Nat → Nat) (count : Nat) : Nat :=
   packAnswers count fun j => H (hashInput label (tagOf j.val))
@@ -80,16 +87,16 @@ def hlong (H : HashN) (label : Block) (tagOf : Nat → Nat) (count : Nat) : Nat 
 /-! ### Arithmetic labels and the cast reading (D11) -/
 
 /-- The lanes of an arithmetic label: one per bit of a block. -/
-abbrev laneCount : Nat := 128
+abbrev laneCount : Nat := labelBits
 
 /-- An arithmetic label over `Z_{2^width}`: one lane per bit of a block. -/
-abbrev Lanes (width : Nat) := Fin laneCount → ZMod (2 ^ width)
+abbrev Lanes (width : Nat) := Narrow.LLanes width
 
 /-- Lanes per 128-bit block in a cast of width `width` (no lane straddles a block). -/
 def lanesPerBlock (width : Nat) : Nat := 128 / width
 
 /-- Blocks read by a cast of width `width`. -/
-def castBlocks (width : Nat) : Nat := (128 + lanesPerBlock width - 1) / lanesPerBlock width
+def castBlocks (width : Nat) : Nat := (labelBits + lanesPerBlock width - 1) / lanesPerBlock width
 
 /-- Hash answers read by a cast of width `width` (two blocks per answer). -/
 def castAnswers (width : Nat) : Nat := (castBlocks width + 1) / 2
@@ -104,18 +111,15 @@ def castLanes (width : Nat) (value : Nat) : Lanes width :=
 
 /-! ### The dense pin codec -/
 
-/-- The pin natural: lane `i` at bits `[width * i, width * i + width)`. -/
-def pinNat {width : Nat} (lanes : Lanes width) : Nat :=
-  ∑ lane : Fin laneCount, (lanes lane).val * 2 ^ (width * lane.val)
+/-- The pin natural: 104 lane representatives of `width` bits each. -/
+def pinNat {width : Nat} (lanes : Lanes width) : Nat := Narrow.pinNat lanes
 
-/-- The `width` published blocks of a pin, little-endian. -/
-def pinBlocks {width : Nat} (lanes : Lanes width) : Fin width → Block :=
-  fun index => BitVec.ofNat 128 (pinNat lanes >>> (128 * index.val))
+/-- Exactly `width` narrow labels, densely packed at 104-bit stride. -/
+def pinBlocks {width : Nat} (lanes : Lanes width) : Fin width → Label := Narrow.pinBlocks lanes
 
-/-- Read a pin back from its blocks. -/
-def pinOfBlocks (width : Nat) (blocks : Fin width → Block) : Lanes width :=
-  let value := ∑ index : Fin width, (blocks index).toNat * 2 ^ (128 * index.val)
-  fun lane => ((value >>> (width * lane.val) : Nat) : ZMod (2 ^ width))
+/-- Read a pin back from its narrow labels. -/
+def pinOfBlocks (width : Nat) (blocks : Fin width → Label) : Lanes width :=
+  Narrow.pinOfBlocks width blocks
 
 /-! ### Pads: the fraction reading (D6) and the pad counts (D5) -/
 

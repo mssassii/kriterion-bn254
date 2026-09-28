@@ -38,18 +38,18 @@ variable {rb : Nat}
 /-- What the garbler keeps of one stage. -/
 structure StageGarbled (rb w : Nat) where
   /-- Leaf labels (`α < 2 ^ w`). -/
-  leaves : Nat → Block
+  leaves : Nat → Label
   /-- Bit masks `b_n` (`n < w`). -/
-  bits : Nat → Block
+  bits : Nat → Label
   /-- Published joins `J_n` (`1 ≤ n < w`). -/
-  joins : Nat → Block
+  joins : Nat → Label
   /-- Published pin. -/
   pin : Lanes rb
   /-- Next remainder mask. -/
   next : Lanes (rb - w)
 
 /-- The garbler of one fused stage. `treeTag level slot` and `castTag leaf part` are the tags. -/
-def extStageGarbleM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (delta : Block)
+def extStageGarbleM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (delta : Label)
     (remainder : Lanes rb) : CM (StageGarbled rb w) :=
   let sub := materialize (reduceTo w remainder)
   let bit0 := laneBit sub 0
@@ -57,7 +57,7 @@ def extStageGarbleM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (delta : B
     tableM (2 ^ w) (fun leaf => castM rb (tree.1 leaf) (castTag leaf.val)) >>= fun casts =>
       let classSum : Fin (w + 1) → Lanes rb := stored fun n =>
         sumLanes fun leaf : Fin (2 ^ w) => scaleLanes (leaf.val % 2 ^ n.val) (casts leaf)
-      let bits : Fin w → Block := stored fun n =>
+      let bits : Fin w → Label := stored fun n =>
         if n.val = 0 then bit0
         else laneBit (sub - reduceTo w (atNat classSum 0 n.val)) n.val
       pure { leaves := atNat tree.1 0
@@ -71,23 +71,23 @@ def extStageGarbleM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (delta : B
 /-- The evaluator's state between rounds. -/
 structure StageState (rb : Nat) where
   /-- XOR of the hashed materials of each level. -/
-  levelSum : Nat → Block
+  levelSum : Nat → Label
   /-- `R_j`: `Σ (α mod 2 ^ j) • A^E_α` over the leaves of subtrees expanded at levels `≤ j`. -/
   classSum : Nat → Lanes rb
   /-- `T_j`: `Σ A^E_α` over the same leaves. -/
   castSum : Nat → Lanes rb
   /-- Leaf labels known so far. -/
-  leaves : Nat → Block
+  leaves : Nat → Label
   /-- The active node's label. -/
-  active : Block
+  active : Label
   /-- Bit labels `b_n^E` known so far. -/
-  bits : Nat → Block
+  bits : Nat → Label
 
 /-- The subtree below a closed node at level `start`, slot `slot`: its labels at relative depth
 `depth` (relative slot `t` is absolute slot `slot + 2 ^ start * t`) and the XOR of the hashed
 materials by absolute level. -/
-def subtreeM (treeTag : Nat → Nat → Nat) (start slot : Nat) (label : Block) :
-    (depth : Nat) → CM ((Fin (2 ^ depth) → Block) × (Nat → Block))
+def subtreeM (treeTag : Nat → Nat → Nat) (start slot : Nat) (label : Label) :
+    (depth : Nat) → CM ((Fin (2 ^ depth) → Label) × (Nat → Label))
   | 0 => pure (fun _ => label, fun _ => 0)
   | d + 1 =>
       subtreeM treeTag start slot label d >>= fun previous =>
@@ -96,7 +96,7 @@ def subtreeM (treeTag : Nat → Nat → Nat) (start slot : Nat) (label : Block) 
 
 /-- Expand the closed node at level `start`, slot `slot`, with label `label`: hash its subtree,
 cast its leaves, and add them to the state's sums. -/
-def expandM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (start slot : Nat) (label : Block)
+def expandM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (start slot : Nat) (label : Label)
     (state : StageState rb) : CM (StageState rb) :=
   subtreeM treeTag start slot label (w - start) >>= fun subtree =>
     tableM (2 ^ (w - start)) (fun t =>
@@ -120,7 +120,7 @@ def expandM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (start slot : Nat)
 
 /-- Round `n ≥ 1` of the evaluator. -/
 def stageRoundM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w) (value : Nat)
-    (joins : Nat → Block) (pin : Lanes rb) (n : Nat) (state : StageState rb) :
+    (joins : Nat → Label) (pin : Lanes rb) (n : Nat) (state : StageState rb) :
     CM (StageState rb) :=
   let prefixValue := value % 2 ^ n
   let classSum := materialize (state.classSum n + scaleLanes prefixValue (pin - state.castSum n))
@@ -136,7 +136,7 @@ def stageRoundM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w
 
 /-- Rounds `n, n + 1, ..., n + remaining - 1`. -/
 def stageRoundsM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w) (value : Nat)
-    (joins : Nat → Block) (pin : Lanes rb) : (remaining n : Nat) → StageState rb → CM (StageState rb)
+    (joins : Nat → Label) (pin : Lanes rb) : (remaining n : Nat) → StageState rb → CM (StageState rb)
   | 0, _, state => pure state
   | remaining + 1, n, state =>
       stageRoundM w treeTag castTag sub value joins pin n state >>=
@@ -145,16 +145,16 @@ def stageRoundsM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes 
 /-- What the evaluator obtains from one stage. -/
 structure StageEval (rb w : Nat) where
   /-- Leaf labels (`α < 2 ^ w`). -/
-  leaves : Nat → Block
+  leaves : Nat → Label
   /-- Bit labels `b_n^E` (`n < w`). -/
-  bits : Nat → Block
+  bits : Nat → Label
   /-- Next remainder label. -/
   next : Lanes (rb - w)
 
 /-- The evaluator of one fused stage: `value` is the stage value `s = σ mod 2 ^ w`, `joins` and
 `pin` the stage's published material. -/
 def extStageEvalM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (remainder : Lanes rb)
-    (value : Nat) (joins : Nat → Block) (pin : Lanes rb) : CM (StageEval rb w) :=
+    (value : Nat) (joins : Nat → Label) (pin : Lanes rb) : CM (StageEval rb w) :=
   let sub := materialize (reduceTo w remainder)
   let bit0 := laneBit sub 0
   let start : StageState rb :=
@@ -167,9 +167,9 @@ def extStageEvalM (w : Nat) (treeTag castTag : Nat → Nat → Nat) (remainder :
   expandM w treeTag castTag 1 ((value % 2) ^^^ 1) bit0 start >>= fun afterZero =>
     stageRoundsM w treeTag castTag sub value joins pin (w - 1) 1 afterZero >>= fun final =>
       let upcast := materialize (final.classSum w + scaleLanes value (pin - final.castSum w))
-      let leaves : Fin (2 ^ w) → Block := stored fun leaf =>
+      let leaves : Fin (2 ^ w) → Label := stored fun leaf =>
         if leaf.val = value then final.active else final.leaves leaf.val
-      let bits : Fin w → Block := stored fun n => final.bits n.val
+      let bits : Fin w → Label := stored fun n => final.bits n.val
       pure { leaves := atNat leaves 0
              bits := atNat bits 0
              next := materialize (peelDiv remainder upcast w) }

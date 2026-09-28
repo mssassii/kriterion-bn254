@@ -25,16 +25,16 @@ namespace Kriterion.CRT
 open Cryptography Kriterion.ArgoMAC
 
 /-- The XOR of a finite family of blocks. -/
-def xorFold {count : Nat} (family : Fin count → Block) : Block :=
+def xorFold {count : Nat} (family : Fin count → Label) : Label :=
   Fin.foldl count (fun acc entry => acc ^^^ family entry) 0
 
 /-- The XOR of a finite family of blocks with one entry skipped. -/
-def xorFoldExcept {count : Nat} (skip : Fin count) (family : Fin count → Block) : Block :=
+def xorFoldExcept {count : Nat} (skip : Fin count) (family : Fin count → Label) : Label :=
   Fin.foldl count (fun acc entry => if entry = skip then acc else acc ^^^ family entry) 0
 
 /-- Extend one level: entries `0 .. 2 ^ n - 1` are the left children `parent ⊕ right`, entries
 `2 ^ n .. 2 ^ (n + 1) - 1` the right children `right`. -/
-def extendLevel (n : Nat) (parent right : Fin (2 ^ n) → Block) : Fin (2 ^ (n + 1)) → Block :=
+def extendLevel (n : Nat) (parent right : Fin (2 ^ n) → Label) : Fin (2 ^ (n + 1)) → Label :=
   fun entry =>
     if below : entry.val < 2 ^ n then
       parent ⟨entry.val, below⟩ ^^^ right ⟨entry.val, below⟩
@@ -52,16 +52,16 @@ def activeAt (value n : Nat) : Fin (2 ^ n) :=
 
 /-- The garbler's step at level `n ≥ 1`: hash every slot (ascending) at `tagOf slot`, extend.
 Returns the new level and the XOR of the materials. -/
-def garbleStepM (n : Nat) (tagOf : Nat → Nat) (parent : Fin (2 ^ n) → Block) :
-    CM ((Fin (2 ^ (n + 1)) → Block) × Block) :=
-  tableM (2 ^ n) (fun slot => h128M (parent slot) (tagOf slot.val)) >>= fun materials =>
+def garbleStepM (n : Nat) (tagOf : Nat → Nat) (parent : Fin (2 ^ n) → Label) :
+    CM ((Fin (2 ^ (n + 1)) → Label) × Label) :=
+  tableM (2 ^ n) (fun slot => hLabelM (parent slot) (tagOf slot.val)) >>= fun materials =>
     pure (stored (extendLevel n parent materials), xorFold materials)
 
 /-- The evaluator's step at level `n ≥ 1`: hash every slot but `active` (ascending); the active
 slot's material is `join ⊕ bitLabel ⊕ (XOR of the others)`. -/
-def evalStepM (n : Nat) (tagOf : Nat → Nat) (active : Fin (2 ^ n)) (bitLabel join : Block)
-    (parent : Fin (2 ^ n) → Block) : CM (Fin (2 ^ (n + 1)) → Block) :=
-  tableM (2 ^ n) (fun slot => if slot = active then pure 0 else h128M (parent slot) (tagOf slot.val))
+def evalStepM (n : Nat) (tagOf : Nat → Nat) (active : Fin (2 ^ n)) (bitLabel join : Label)
+    (parent : Fin (2 ^ n) → Label) : CM (Fin (2 ^ (n + 1)) → Label) :=
+  tableM (2 ^ n) (fun slot => if slot = active then pure 0 else hLabelM (parent slot) (tagOf slot.val))
     >>= fun materials =>
       pure (stored (extendLevel n parent fun slot =>
         if slot = active then join ^^^ bitLabel ^^^ xorFoldExcept active materials
@@ -72,8 +72,8 @@ def evalStepM (n : Nat) (tagOf : Nat → Nat) (active : Fin (2 ^ n)) (bitLabel j
 /-- The garbler's tree over `levels` bits from the constant wire `Δ` and the bit-0 label `bit0`:
 the labels of level `levels` and the XOR of the materials of each hashed level `1 .. levels - 1`
 (`0` elsewhere). `tagOf level slot` is the tag of a material. -/
-def treeGarbleM (tagOf : Nat → Nat → Nat) (delta bit0 : Block) :
-    (levels : Nat) → CM ((Fin (2 ^ levels) → Block) × (Nat → Block))
+def treeGarbleM (tagOf : Nat → Nat → Nat) (delta bit0 : Label) :
+    (levels : Nat) → CM ((Fin (2 ^ levels) → Label) × (Nat → Label))
   | 0 => pure (fun _ => delta, fun _ => 0)
   | n + 1 =>
       treeGarbleM tagOf delta bit0 n >>= fun previous =>
@@ -86,8 +86,8 @@ def treeGarbleM (tagOf : Nat → Nat → Nat) (delta bit0 : Block) :
 /-- The evaluator's tree with known bits: `value` is the tree's value (its low `n` bits give the
 active slot of level `n`), `bitLabel n` the evaluator's label of bit `n`, `join n` the published
 join of level `n`. -/
-def treeEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block) :
-    (levels : Nat) → CM (Fin (2 ^ levels) → Block)
+def treeEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label) :
+    (levels : Nat) → CM (Fin (2 ^ levels) → Label)
   | 0 => pure fun _ => 0
   | n + 1 =>
       treeEvalM tagOf value bitLabel join n >>= fun previous =>
@@ -100,8 +100,8 @@ def treeEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat �
 
 /-- The garbler's growth of a one-hot of `2 ^ start` labels by `count` bits at levels
 `start, start + 1, ...`: the grown labels and each level's material XOR. -/
-def growGarbleM (tagOf : Nat → Nat → Nat) (start : Nat) (labels : Fin (2 ^ start) → Block) :
-    (count : Nat) → CM ((Fin (2 ^ (start + count)) → Block) × (Nat → Block))
+def growGarbleM (tagOf : Nat → Nat → Nat) (start : Nat) (labels : Fin (2 ^ start) → Label) :
+    (count : Nat) → CM ((Fin (2 ^ (start + count)) → Label) × (Nat → Label))
   | 0 => pure (labels, fun _ => 0)
   | k + 1 =>
       growGarbleM tagOf start labels k >>= fun previous =>
@@ -109,8 +109,8 @@ def growGarbleM (tagOf : Nat → Nat → Nat) (start : Nat) (labels : Fin (2 ^ s
           pure (step.1, fun level => if level = start + k then step.2 else previous.2 level)
 
 /-- The evaluator's growth with known bits. -/
-def growEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block) (start : Nat)
-    (labels : Fin (2 ^ start) → Block) : (count : Nat) → CM (Fin (2 ^ (start + count)) → Block)
+def growEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label) (start : Nat)
+    (labels : Fin (2 ^ start) → Label) : (count : Nat) → CM (Fin (2 ^ (start + count)) → Label)
   | 0 => pure labels
   | k + 1 =>
       growEvalM tagOf value bitLabel join start labels k >>= fun previous =>

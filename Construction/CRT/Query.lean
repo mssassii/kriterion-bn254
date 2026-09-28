@@ -41,6 +41,16 @@ def h128M (label : Block) (tag : Nat) : CM Block :=
 theorem bounded_h128M (label : Block) (tag : Nat) : (h128M label tag).Bounded 1 :=
   FreeQuery.Bounded.bind (bounded_askN _) fun _ => FreeQuery.Bounded.pure' _ 0
 
+/-- The narrow conversion hash: one raw query at an embedded label. -/
+def hLabelM (label : Label) (tag : Nat) : CM Label :=
+  askN (hashInput (embed label) tag) >>= fun answer => pure (clip answer.1)
+
+@[simp] theorem eval_hLabelM (H : HashN) (label : Label) (tag : Nat) :
+    (hLabelM label tag).eval H = hLabel H label tag := rfl
+
+theorem bounded_hLabelM (label : Label) (tag : Nat) : (hLabelM label tag).Bounded 1 :=
+  FreeQuery.Bounded.bind (bounded_askN _) fun _ => FreeQuery.Bounded.pure' _ 0
+
 /-- The long hash as a program (`count` queries, parts ascending). -/
 def hlongM (label : Block) (tagOf : Nat → Nat) (count : Nat) : CM Nat :=
   FreeQuery.vector count (fun j => askN (hashInput label (tagOf j.val))) >>= fun answers =>

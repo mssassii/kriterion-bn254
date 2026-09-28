@@ -77,7 +77,7 @@ structure Source where
   curve : BaseField × BaseField × BaseField
   rows : Fin digitCount → RowGamma
   exception : Fin digitCount → Exception.Entry
-  joins : Fin 2 → Fin joinCount → Block
+  joins : Fin 2 → Fin joinCount → Label
   pins : Fin 2 → (k : Fin pinCount) → Lanes (pinWidth k)
   recX : Fin xCount → Fin table.product
   recY : Fin yCount → Fin table.product
@@ -85,11 +85,11 @@ structure Source where
   deltas : Fin 2 → Block
 
 /-- A join of the source as a total function of its index. -/
-def Source.joinAt (source : Source) (coord : Fin 2) (index : Nat) : Block :=
+def Source.joinAt (source : Source) (coord : Fin 2) (index : Nat) : Label :=
   atNat (source.joins coord) 0 index
 
 /-- Block `b` of the dense packing of pin `k` (`0` off range). -/
-def Source.pinBlockAt (source : Source) (coord : Fin 2) (k b : Nat) : Block :=
+def Source.pinBlockAt (source : Source) (coord : Fin 2) (k b : Nat) : Label :=
   if inRange : k < pinCount then
     atNat (pinBlocks (source.pins coord ⟨k, inRange⟩)) 0 b
   else 0
@@ -157,10 +157,16 @@ instance blockFinite : Finite Block :=
     intro first second equal
     exact BitVec.eq_of_toNat_eq (congrArg Fin.val equal))
 
+/-- Conversion labels form a finite type without importing privacy infrastructure. -/
+instance labelFinite : Finite Label :=
+  Finite.of_injective (fun label : Label => (⟨label.toNat, label.isLt⟩ : Fin (2 ^ labelBits))) (by
+    intro first second equal
+    exact BitVec.eq_of_toNat_eq (congrArg Fin.val equal))
+
 /-- The data of a source. -/
 abbrev SourceData :=
   (BaseField × BaseField × BaseField) × (Fin digitCount → RowGamma) ×
-    (Fin digitCount → Exception.Entry) × (Fin 2 → Fin joinCount → Block) ×
+    (Fin digitCount → Exception.Entry) × (Fin 2 → Fin joinCount → Label) ×
     (Fin 2 → (k : Fin pinCount) → Lanes (pinWidth k)) × (Fin xCount → Fin table.product) ×
     (Fin yCount → Fin table.product) × (Fin 2 → Fin coordinateBitCount → Block) × (Fin 2 → Block)
 

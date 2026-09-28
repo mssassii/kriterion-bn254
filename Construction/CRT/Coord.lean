@@ -61,38 +61,38 @@ theorem crt_eq_crtWith (T : CrtTable) (residues : Fin T.count → Nat) :
 (`0` off range). -/
 structure ConvPublic where
   /-- Chunk `c`, tree level `n` (`1 ≤ n < w_c`). -/
-  chunkJoin : Nat → Nat → Block
+  chunkJoin : Nat → Nat → Label
   /-- Chunk `c`, pin block `k` (`k < L`). -/
-  chunkPin : Nat → Nat → Block
+  chunkPin : Nat → Nat → Label
   /-- Modulus `i`, stage `q` (0 or 1), level `n` (`1 ≤ n < w_q`). -/
-  stageJoin : Nat → Nat → Nat → Block
+  stageJoin : Nat → Nat → Nat → Label
   /-- Modulus `i`, stage `q`, pin block `k`. -/
-  stagePin : Nat → Nat → Nat → Block
+  stagePin : Nat → Nat → Nat → Label
   /-- Modulus `i`, growth join at bit position `j` (`width0 ≤ j < keep`). -/
-  growJoin : Nat → Nat → Block
+  growJoin : Nat → Nat → Label
   /-- Modulus `i`, fold join at bit position `j` (`keep ≤ j < ell`). -/
-  foldJoin : Nat → Nat → Block
+  foldJoin : Nat → Nat → Label
 
 /-! ### One odd modulus: the conversion -/
 
 /-- What the garbler keeps of one odd modulus's conversion. -/
 structure ConversionGarbled (m : Nat) where
-  stageJoins : Nat → Nat → Block
-  stagePins : Nat → Nat → Block
-  growJoins : Nat → Block
-  foldJoins : Nat → Block
+  stageJoins : Nat → Nat → Label
+  stagePins : Nat → Nat → Label
+  growJoins : Nat → Label
+  foldJoins : Nat → Label
   /-- The final one-hot over `Z_m`, hot at `v mod m`. -/
-  final : Fin m → Block
+  final : Fin m → Label
 
 /-- The bit labels (or masks) of the word, by bit position: stage 0 gives `0 .. width0 - 1`,
 stage 1 `width0 .. width0 + width1 - 1`, stage 2 the last. -/
-def wordBit (row : OddRow) (stage0 stage1 : Nat → Block) (last : Block) (position : Nat) : Block :=
+def wordBit (row : OddRow) (stage0 stage1 : Nat → Label) (last : Label) (position : Nat) : Label :=
   if position < row.width0 then stage0 position
   else if position < row.width0 + row.width1 then stage1 (position - row.width0)
   else last
 
 /-- The garbler's conversion of an odd modulus `m` (index `i`, row `row`) from its word mask. -/
-def conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delta : Block)
+def conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delta : Label)
     (word : Lanes row.ell) : CM (ConversionGarbled m) :=
   extStageGarbleM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) delta word >>= fun g0 =>
     extStageGarbleM row.width1 (extTreeTag coord i 1) (extCastTag coord i 1) delta g0.next
@@ -113,7 +113,7 @@ def conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delta : Block)
 /-- The evaluator's conversion of an odd modulus: from the word label and the word value `σ`, the
 final one-hot and its hot index. -/
 def conversionEvalM (coord i : Nat) (row : OddRow) (m : Nat) (value : Nat) (word : Lanes row.ell)
-    (pub : ConvPublic) : CM ((Fin m → Block) × Nat) :=
+    (pub : ConvPublic) : CM ((Fin m → Label) × Nat) :=
   let value1 := value / 2 ^ row.width0
   extStageEvalM row.width0 (extTreeTag coord i 0) (extCastTag coord i 0) word
       (value % 2 ^ row.width0) (pub.stageJoin i 0)
@@ -131,10 +131,10 @@ def conversionEvalM (coord i : Nat) (row : OddRow) (m : Nat) (value : Nat) (word
 
 /-- What the garbler keeps of one modulus. -/
 structure ModGarbled (S : Nat) where
-  stageJoins : Nat → Nat → Block
-  stagePins : Nat → Nat → Block
-  growJoins : Nat → Block
-  foldJoins : Nat → Block
+  stageJoins : Nat → Nat → Label
+  stagePins : Nat → Nat → Label
+  growJoins : Nat → Label
+  foldJoins : Nat → Label
   body : BodyGarbled S
 
 /-- An empty chunk record (off-range default). -/
@@ -144,7 +144,7 @@ def ChunkGarbled.empty (L : Nat) : ChunkGarbled L := ⟨fun _ => 0, fun _ => 0, 
 def ChunkEval.empty (L : Nat) : ChunkEval L := ⟨fun _ => 0, fun _ => 0⟩
 
 /-- The garbler of modulus index `i`, given the chunks. -/
-def modGarbleM (T : CrtTable) (S coord : Nat) (delta : Block)
+def modGarbleM (T : CrtTable) (S coord : Nat) (delta : Label)
     (chunks : Nat → ChunkGarbled T.castWidth) (i : Fin T.count) : CM (ModGarbled S) :=
   let m := T.modulus i
   let q := T.padAnswers S i
@@ -192,11 +192,11 @@ structure CoordGarbled (T : CrtTable) (S : Nat) where
 
 /-- **The garbler of one coordinate** (phase 1, slope-free): `zeroLabel j` is the zero label of
 coordinate bit `j`, `delta` the coordinate's `Δ`. -/
-def coordGarbleM (T : CrtTable) (S coord : Nat) (delta : Block) (zeroLabel : Nat → Block) :
+def coordGarbleM (T : CrtTable) (S coord : Nat) (delta : Label) (zeroLabel : Nat → Label) :
     CM (CoordGarbled T S) :=
   tableM T.chunkCount (fun c => chunkGarbleM T coord delta zeroLabel c.val) >>= fun chunkTable =>
     let chunks : Nat → ChunkGarbled T.castWidth := atNat chunkTable (ChunkGarbled.empty _)
-    let chunkPins : Fin T.chunkCount → Fin T.castWidth → Block :=
+    let chunkPins : Fin T.chunkCount → Fin T.castWidth → Label :=
       stored fun c => stored (pinBlocks (chunkTable c).pin)
     tableM T.count (modGarbleM T S coord delta chunks) >>= fun mods =>
       let modAt : Nat → Option (ModGarbled S) := fun i =>
@@ -257,7 +257,7 @@ structure CoordEval (T : CrtTable) (S : Nat) where
 /-- **The evaluator of one coordinate**: `pub` and `records` are the published material, `v` the
 coordinate value and `labels j` the evaluator's label of coordinate bit `j`. -/
 def coordEvalM (T : CrtTable) (S coord : Nat) (pub : ConvPublic) (records : Fin S → Nat) (v : Nat)
-    (labels : Nat → Block) : CM (CoordEval T S) :=
+    (labels : Nat → Label) : CM (CoordEval T S) :=
   let product := T.product
   let radix := stored T.radix
   let joins : Fin T.count → Fin S → Nat :=
@@ -291,7 +291,7 @@ def CrtTable.convBlocks (T : CrtTable) : Nat :=
 
 /-- The flat layout: for each chunk its joins then its pin; then for each odd modulus stage 0's
 joins and pin, stage 1's joins and pin, the growth joins and the fold joins. -/
-def ConvPublic.flatten (T : CrtTable) (pub : ConvPublic) : List Block :=
+def ConvPublic.flatten (T : CrtTable) (pub : ConvPublic) : List Label :=
   ((List.range T.chunkCount).flatMap fun c =>
     (List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1)) ++
       (List.range T.castWidth).map (pub.chunkPin c)) ++
@@ -316,8 +316,8 @@ def CrtTable.modBase (T : CrtTable) (i : Nat) : Nat :=
     | none => 0)
 
 /-- Read the published conversion material back from the flat blocks. -/
-def ConvPublic.unflatten (T : CrtTable) (blocks : Array Block) : ConvPublic :=
-  let at_ (index : Nat) : Block := blocks.getD index 0
+def ConvPublic.unflatten (T : CrtTable) (blocks : Array Label) : ConvPublic :=
+  let at_ (index : Nat) : Label := blocks.getD index 0
   let row (i : Nat) : OddRow := match T.kindAt i with
     | some (.odd row) => row
     | _ => ⟨0, 0, 0, 0⟩

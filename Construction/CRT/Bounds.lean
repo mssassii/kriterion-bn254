@@ -86,20 +86,20 @@ theorem sum_ite_val_skip' {count : Nat} (skip : Nat) (inRange : count = 0 ∨ sk
 
 /-! ### Tree steps and trees -/
 
-theorem bounded_garbleStepM (n : Nat) (tagOf : Nat → Nat) (parent : Fin (2 ^ n) → Block) :
+theorem bounded_garbleStepM (n : Nat) (tagOf : Nat → Nat) (parent : Fin (2 ^ n) → Label) :
     (garbleStepM n tagOf parent).Bounded (2 ^ n) :=
-  (Bounded.bind (bounded_tableM (budget := fun _ => 1) fun _ => bounded_h128M _ _) fun _ =>
+  (Bounded.bind (bounded_tableM (budget := fun _ => 1) fun _ => bounded_hLabelM _ _) fun _ =>
     Bounded.pure' _ 0).of_eq (by simp)
 
 theorem bounded_evalStepM (n : Nat) (tagOf : Nat → Nat) (active : Fin (2 ^ n))
-    (bitLabel join : Block) (parent : Fin (2 ^ n) → Block) :
+    (bitLabel join : Label) (parent : Fin (2 ^ n) → Label) :
     (evalStepM n tagOf active bitLabel join parent).Bounded (2 ^ n - 1) :=
   (Bounded.bind (bounded_tableM (budget := fun slot => if slot = active then 0 else 1) fun slot =>
       Bounded.ite (fun same => by rw [if_pos same]; exact Bounded.pure' _ 0)
-        (fun different => by rw [if_neg different]; exact bounded_h128M _ _))
+        (fun different => by rw [if_neg different]; exact bounded_hLabelM _ _))
     fun _ => Bounded.pure' _ 0).of_eq (by rw [FreeQuery.sum_ite_skip]; simp)
 
-theorem bounded_treeGarbleM (tagOf : Nat → Nat → Nat) (delta bit0 : Block) (levels : Nat) :
+theorem bounded_treeGarbleM (tagOf : Nat → Nat → Nat) (delta bit0 : Label) (levels : Nat) :
     (treeGarbleM tagOf delta bit0 levels).Bounded (treeGarbleBudget levels) := by
   induction levels with
   | zero => exact Bounded.pure' _ _
@@ -111,7 +111,7 @@ theorem bounded_treeGarbleM (tagOf : Nat → Nat → Nat) (delta bit0 : Block) (
         exact (Bounded.bind (bounded_garbleStepM n (tagOf n) previous.1) fun _ =>
           Bounded.pure' _ 0).of_eq (by simp)
 
-theorem bounded_treeEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block)
+theorem bounded_treeEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label)
     (levels : Nat) : (treeEvalM tagOf value bitLabel join levels).Bounded (treeEvalBudget levels) := by
   induction levels with
   | zero => exact Bounded.pure' _ _
@@ -122,7 +122,7 @@ theorem bounded_treeEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel 
       · rw [if_neg nonzero]
         exact bounded_evalStepM _ _ _ _ _ _
 
-theorem bounded_growGarbleM (tagOf : Nat → Nat → Nat) (start : Nat) (labels : Fin (2 ^ start) → Block)
+theorem bounded_growGarbleM (tagOf : Nat → Nat → Nat) (start : Nat) (labels : Fin (2 ^ start) → Label)
     (count : Nat) :
     (growGarbleM tagOf start labels count).Bounded (growGarbleBudget start count) := by
   induction count with
@@ -132,8 +132,8 @@ theorem bounded_growGarbleM (tagOf : Nat → Nat → Nat) (start : Nat) (labels 
       exact Bounded.bind ih fun previous =>
         (Bounded.bind (bounded_garbleStepM _ _ previous.1) fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
-theorem bounded_growEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block)
-    (start : Nat) (labels : Fin (2 ^ start) → Block) (count : Nat) :
+theorem bounded_growEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label)
+    (start : Nat) (labels : Fin (2 ^ start) → Label) (count : Nat) :
     (growEvalM tagOf value bitLabel join start labels count).Bounded (growEvalBudget start count) := by
   induction count with
   | zero => exact Bounded.pure' _ _
@@ -143,22 +143,22 @@ theorem bounded_growEvalM (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel 
 
 /-! ### Casts, stores, chunks -/
 
-theorem bounded_castM (l : Nat) (label : Block) (tagOf : Nat → Nat) :
+theorem bounded_castM (l : Nat) (label : Label) (tagOf : Nat → Nat) :
     (castM l label tagOf).Bounded (castAnswers l) :=
   (Bounded.bind (bounded_hlongM _ _ _) fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
 theorem bounded_materializeM {width : Nat} (lanes : Lanes width) :
     (materializeM lanes).Bounded 0 := bounded_storeM lanes
 
-theorem bounded_chunkGarbleM (T : CrtTable) (coord : Nat) (delta : Block) (zeroLabel : Nat → Block)
+theorem bounded_chunkGarbleM (T : CrtTable) (coord : Nat) (delta : Label) (zeroLabel : Nat → Label)
     (c : Nat) : (chunkGarbleM T coord delta zeroLabel c).Bounded (chunkGarbleBudget T c) := by
   unfold chunkGarbleM chunkGarbleBudget
   exact (Bounded.bind (bounded_treeGarbleM _ _ _ _) fun tree =>
     Bounded.bind (bounded_tableM (budget := fun _ => castAnswers T.castWidth) fun _ =>
       bounded_castM _ _ _) fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
-theorem bounded_chunkEvalM (T : CrtTable) (coord : Nat) (labels : Nat → Block) (v : Nat)
-    (joins : Nat → Block) (pin : Lanes T.castWidth) (c : Nat) :
+theorem bounded_chunkEvalM (T : CrtTable) (coord : Nat) (labels : Nat → Label) (v : Nat)
+    (joins : Nat → Label) (pin : Lanes T.castWidth) (c : Nat) :
     (chunkEvalM T coord labels v joins pin c).Bounded (chunkEvalBudget T c) := by
   unfold chunkEvalM chunkEvalBudget
   have inRange : T.chunkValue v c < 2 ^ T.chunkWidth c := Nat.mod_lt _ (Nat.two_pow_pos _)
@@ -172,7 +172,7 @@ theorem bounded_chunkEvalM (T : CrtTable) (coord : Nat) (labels : Nat → Block)
 /-! ### Extraction: the garbler -/
 
 theorem bounded_extStageGarbleM {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat)
-    (delta : Block) (remainder : Lanes rb) :
+    (delta : Label) (remainder : Lanes rb) :
     (extStageGarbleM w treeTag castTag delta remainder).Bounded (extGarbleBudget rb w) := by
   unfold extStageGarbleM extGarbleBudget
   exact (Bounded.bind (bounded_treeGarbleM _ _ _ _) fun tree =>
@@ -181,13 +181,13 @@ theorem bounded_extStageGarbleM {rb : Nat} (w : Nat) (treeTag castTag : Nat → 
 
 /-! ### Folds, body -/
 
-theorem bounded_foldGarbleM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (bitMask : Block)
-    (labels : Fin m → Block) : (foldGarbleM m tagOf shift bitMask labels).Bounded m :=
-  (Bounded.bind (bounded_tableM (budget := fun _ => 1) fun _ => bounded_h128M _ _) fun _ =>
+theorem bounded_foldGarbleM (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (bitMask : Label)
+    (labels : Fin m → Label) : (foldGarbleM m tagOf shift bitMask labels).Bounded m :=
+  (Bounded.bind (bounded_tableM (budget := fun _ => 1) fun _ => bounded_hLabelM _ _) fun _ =>
     Bounded.pure' _ 0).of_eq (by simp)
 
-theorem bounded_foldsGarbleM (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Block) (count : Nat) :
-    ∀ (start : Nat) (labels : Fin m → Block),
+theorem bounded_foldsGarbleM (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Label) (count : Nat) :
+    ∀ (start : Nat) (labels : Fin m → Label),
       (foldsGarbleM m tagOf bitMask count start labels).Bounded (count * m) := by
   induction count with
   | zero => intro start labels; exact Bounded.pure' _ _
@@ -197,17 +197,17 @@ theorem bounded_foldsGarbleM (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : 
       exact (Bounded.bind (bounded_foldGarbleM _ _ _ _ _) fun step =>
         Bounded.bind (ih (start + 1) step.1) fun _ => Bounded.pure' _ 0).of_eq (by ring)
 
-theorem bounded_padVectorM (m S q : Nat) (label : Block) (tagOf : Nat → Nat) :
+theorem bounded_padVectorM (m S q : Nat) (label : Label) (tagOf : Nat → Nat) :
     (padVectorM m S q label tagOf).Bounded q :=
   (Bounded.bind (bounded_hlongM _ _ _) fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
-theorem bounded_bodyGarbleM (m S q coord i : Nat) (final : Fin m → Block) :
+theorem bounded_bodyGarbleM (m S q coord i : Nat) (final : Fin m → Label) :
     (bodyGarbleM m S q coord i final).Bounded (m * q) :=
   (Bounded.bind (bounded_tableM (budget := fun _ => q) fun _ => bounded_padVectorM _ _ _ _ _)
     fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
 /-- The evaluator's body skips the hot slot. -/
-theorem bounded_bodyEvalM (m S q coord i : Nat) (final : Fin m → Block) (hot : Nat)
+theorem bounded_bodyEvalM (m S q coord i : Nat) (final : Fin m → Label) (hot : Nat)
     (inRange : m = 0 ∨ hot < m) (joins : Fin S → Nat) :
     (bodyEvalM m S q coord i final hot joins).Bounded ((m - 1) * q) :=
   (Bounded.bind (bounded_tableM (budget := fun residue => if residue.val = hot then 0 else q)
@@ -217,7 +217,7 @@ theorem bounded_bodyEvalM (m S q coord i : Nat) (final : Fin m → Block) (hot :
 
 /-! ### One coordinate: the garbler -/
 
-theorem bounded_conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delta : Block)
+theorem bounded_conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delta : Label)
     (word : Lanes row.ell) :
     (conversionGarbleM coord i row m delta word).Bounded (conversionGarbleBudget m (.odd row)) := by
   unfold conversionGarbleM conversionGarbleBudget
@@ -227,7 +227,7 @@ theorem bounded_conversionGarbleM (coord i : Nat) (row : OddRow) (m : Nat) (delt
         Bounded.bind (bounded_foldsGarbleM _ _ _ _ _ _) fun _ => Bounded.pure' _ 0).of_eq
     (by ring)
 
-theorem bounded_modGarbleM (T : CrtTable) (S coord : Nat) (delta : Block)
+theorem bounded_modGarbleM (T : CrtTable) (S coord : Nat) (delta : Label)
     (chunks : Nat → ChunkGarbled T.castWidth) (i : Fin T.count) :
     (modGarbleM T S coord delta chunks i).Bounded
       (conversionGarbleBudget (T.modulus i) (T.kind i) + T.modulus i * T.padAnswers S i) := by
@@ -245,7 +245,7 @@ theorem bounded_modGarbleM (T : CrtTable) (S coord : Nat) (delta : Block)
       (by simp)
 
 /-- **The garbler of one coordinate asks exactly `coordGarbleBudget T S` queries.** -/
-theorem bounded_coordGarbleM (T : CrtTable) (S coord : Nat) (delta : Block) (zeroLabel : Nat → Block) :
+theorem bounded_coordGarbleM (T : CrtTable) (S coord : Nat) (delta : Label) (zeroLabel : Nat → Label) :
     (coordGarbleM T S coord delta zeroLabel).Bounded (coordGarbleBudget T S) := by
   unfold coordGarbleM coordGarbleBudget
   exact (Bounded.bind (bounded_tableM fun c => bounded_chunkGarbleM T coord delta zeroLabel c.val)
@@ -309,7 +309,7 @@ theorem stageEvalBudget_eq (rb w : Nat) (positive : 1 ≤ w) :
   simp only [expandBudget, extEvalBudget, Nat.add_sub_cancel] at rounds ⊢
   omega
 
-theorem bounded_subtreeM (treeTag : Nat → Nat → Nat) (start slot : Nat) (label : Block) (depth : Nat) :
+theorem bounded_subtreeM (treeTag : Nat → Nat → Nat) (start slot : Nat) (label : Label) (depth : Nat) :
     (subtreeM treeTag start slot label depth).Bounded (subtreeBudget depth) := by
   induction depth with
   | zero => exact Bounded.pure' _ _
@@ -319,7 +319,7 @@ theorem bounded_subtreeM (treeTag : Nat → Nat → Nat) (start slot : Nat) (lab
         (Bounded.bind (bounded_garbleStepM _ _ previous.1) fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
 theorem bounded_expandM {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat) (start slot : Nat)
-    (label : Block) (state : StageState rb) :
+    (label : Label) (state : StageState rb) :
     (expandM w treeTag castTag start slot label state).Bounded (expandBudget rb w start) := by
   unfold expandM expandBudget
   exact (Bounded.bind (bounded_subtreeM _ _ _ _ _) fun subtree =>
@@ -327,13 +327,13 @@ theorem bounded_expandM {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → 
       bounded_castM _ _ _) fun _ => Bounded.pure' _ 0).of_eq (by simp)
 
 theorem bounded_stageRoundM {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w)
-    (value : Nat) (joins : Nat → Block) (pin : Lanes rb) (n : Nat) (state : StageState rb) :
+    (value : Nat) (joins : Nat → Label) (pin : Lanes rb) (n : Nat) (state : StageState rb) :
     (stageRoundM w treeTag castTag sub value joins pin n state).Bounded (expandBudget rb w (n + 1)) := by
   unfold stageRoundM
   exact Bounded.ite (fun _ => bounded_expandM _ _ _ _ _ _ _) (fun _ => bounded_expandM _ _ _ _ _ _ _)
 
 theorem bounded_stageRoundsM {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w)
-    (value : Nat) (joins : Nat → Block) (pin : Lanes rb) (remaining : Nat) :
+    (value : Nat) (joins : Nat → Label) (pin : Lanes rb) (remaining : Nat) :
     ∀ (n : Nat) (state : StageState rb),
       (stageRoundsM w treeTag castTag sub value joins pin remaining n state).Bounded
         (roundsBudget rb w remaining n) := by
@@ -346,7 +346,7 @@ theorem bounded_stageRoundsM {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat
 
 /-- **One fused stage's evaluator asks exactly `extEvalBudget rb w` queries** (`w ≥ 1`). -/
 theorem bounded_extStageEvalM {rb : Nat} (w : Nat) (positive : 1 ≤ w) (treeTag castTag : Nat → Nat → Nat)
-    (remainder : Lanes rb) (value : Nat) (joins : Nat → Block) (pin : Lanes rb) :
+    (remainder : Lanes rb) (value : Nat) (joins : Nat → Label) (pin : Lanes rb) :
     (extStageEvalM w treeTag castTag remainder value joins pin).Bounded (extEvalBudget rb w) := by
   unfold extStageEvalM
   exact (Bounded.bind (bounded_expandM _ _ _ _ _ _ _) fun afterZero =>
@@ -356,11 +356,11 @@ theorem bounded_extStageEvalM {rb : Nat} (w : Nat) (positive : 1 ≤ w) (treeTag
 /-! ### Folds and body: the evaluator -/
 
 theorem bounded_foldEvalM (m : Nat) (tagOf : Nat → Nat) (shift hot : Nat) (inRange : m = 0 ∨ hot < m)
-    (bitLabel join : Block) (labels : Fin m → Block) :
+    (bitLabel join : Label) (labels : Fin m → Label) :
     (foldEvalM m tagOf shift hot bitLabel join labels).Bounded (m - 1) :=
   (Bounded.bind (bounded_tableM (budget := fun residue => if residue.val = hot then 0 else 1)
       fun residue => Bounded.ite (fun same => by rw [if_pos same]; exact Bounded.pure' _ 0)
-        (fun different => by rw [if_neg different]; exact bounded_h128M _ _))
+        (fun different => by rw [if_neg different]; exact bounded_hLabelM _ _))
     fun _ => Bounded.pure' _ 0).of_eq (by rw [sum_ite_val_skip' _ inRange]; simp)
 
 theorem mod_inRange (x m : Nat) : m = 0 ∨ x % m < m := by
@@ -368,8 +368,8 @@ theorem mod_inRange (x m : Nat) : m = 0 ∨ x % m < m := by
   · exact Or.inl zero
   · exact Or.inr (Nat.mod_lt _ positive)
 
-theorem bounded_foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block)
-    (count : Nat) : ∀ (start x : Nat) (labels : Fin m → Block),
+theorem bounded_foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label)
+    (count : Nat) : ∀ (start x : Nat) (labels : Fin m → Label),
       (foldsEvalM m tagOf value bitLabel join count start (x % m) labels).Bounded (count * (m - 1)) := by
   induction count with
   | zero => intro start x labels; exact Bounded.pure' _ _
@@ -379,8 +379,8 @@ theorem bounded_foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat)
       exact (Bounded.bind (bounded_foldEvalM _ _ _ _ (mod_inRange x m) _ _ _) fun next =>
         ih (start + 1) _ next).of_eq (by ring)
 
-theorem returns_foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Block)
-    (count : Nat) : ∀ (start x : Nat) (labels : Fin m → Block),
+theorem returns_foldsEvalM (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel join : Nat → Label)
+    (count : Nat) : ∀ (start x : Nat) (labels : Fin m → Label),
       Returns (foldsEvalM m tagOf value bitLabel join count start (x % m) labels)
         fun result => m = 0 ∨ result.2 < m := by
   induction count with
@@ -433,7 +433,7 @@ theorem bounded_modEvalM (T : CrtTable) (nonempty : T.StagesNonempty) (S coord :
 
 /-- **The evaluator of one coordinate asks exactly `coordEvalBudget T S` queries.** -/
 theorem bounded_coordEvalM (T : CrtTable) (nonempty : T.StagesNonempty) (S coord : Nat) (pub : ConvPublic)
-    (records : Fin S → Nat) (v : Nat) (labels : Nat → Block) :
+    (records : Fin S → Nat) (v : Nat) (labels : Nat → Label) :
     (coordEvalM T S coord pub records v labels).Bounded (coordEvalBudget T S) := by
   unfold coordEvalM coordEvalBudget
   exact (Bounded.bind (bounded_tableM fun c => bounded_chunkEvalM T coord labels v _ _ c.val)
