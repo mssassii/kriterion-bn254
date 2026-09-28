@@ -259,6 +259,186 @@ theorem nRealOutOff_eq_conv (u : AffineInput) (c : Coins T) (good : GoodScales (
 
 end Real
 
+/-! ### 3. The dynamic bijection -/
+
+variable (T) in
+/-- The compact source: the joins, the `X` constants, the curve constants. -/
+abbrev CSource := Joins T × (Fin 91 → BaseField) × (BaseField × BaseField × BaseField)
+
+/-- The full source of a compact one: `Z` and sign-row constants zero. -/
+def expandSrc (cs : CSource T) : Source T := (cs.1, fun d => ⟨cs.2.1 d, 0, 0⟩, cs.2.2)
+
+/-- The compact source of a full one. -/
+def compressSrc (src : Source T) : CSource T := (src.1, fun d => (src.2.1 d).xC0, src.2.2)
+
+theorem compressSrc_expandSrc (cs : CSource T) : compressSrc (expandSrc cs) = cs := rfl
+
+variable (T) in
+/-- The normalized image on the curve: the field scales, the compact cells and P45's residual. -/
+abbrev NImage (u : AffineInput) := Scales × ((CSource T × Visible T u) × Residual)
+
+variable (T) in
+/-- The normalized image off the curve. -/
+abbrev NImageOff (u : AffineInput) := Scales × ((CSource T × Cold T u) × ResidualOff)
+
+instance nImageFintype (u : AffineInput) : Fintype (NImage T u) := instFintypeProd _ _
+instance nImageOffFintype (u : AffineInput) : Fintype (NImageOff T u) := instFintypeProd _ _
+
+instance cSourceNonempty : Nonempty (CSource T) := ⟨(fun _ _ => 0, fun _ => 0, (0, 0, 0))⟩
+
+instance nImageNonempty (u : AffineInput) : Nonempty (NImage T u) :=
+  ⟨(fun _ => (0, 0), (Classical.arbitrary _, Classical.arbitrary _), Classical.arbitrary _)⟩
+
+instance nImageOffNonempty (u : AffineInput) : Nonempty (NImageOff T u) :=
+  ⟨(fun _ => (0, 0), (Classical.arbitrary _, Classical.arbitrary _), Classical.arbitrary _)⟩
+
+/-- The forward map on the curve: the field scales, and P45's image at their fixed context, compressed. -/
+def nForward (nctx : NContext) (u : AffineInput) (c : Coins T) : NImage T u :=
+  (fsScales nctx c, ((compressSrc (Joint.forward (fsContext nctx (fsScales nctx c)) u c).1.1,
+    (Joint.forward (fsContext nctx (fsScales nctx c)) u c).1.2), (Joint.forward (fsContext nctx (fsScales nctx c)) u c).2))
+
+/-- The forward map off the curve. -/
+def nForwardOff (nctx : NContext) (u : AffineInput) (c : Coins T) : NImageOff T u :=
+  (fsScales nctx c, ((compressSrc (Off.forwardOff (fsContext nctx (fsScales nctx c)) u c).1.1,
+    (Off.forwardOff (fsContext nctx (fsScales nctx c)) u c).1.2), (Off.forwardOff (fsContext nctx (fsScales nctx c)) u c).2))
+
+section Bijection
+
+variable [FieldCertificate] (nctx : NContext) (valid : nctx.Valid)
+
+/-- The inverse on the curve: P45's inverse at the fixed context of the scales. -/
+def nBackward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (x : NImage T u) : Coins T :=
+  Joint.backward (fsContext nctx x.1) u good ((expandSrc x.2.1.1, x.2.1.2), x.2.2)
+
+/-- The inverse off the curve. -/
+def nBackwardOff (u : AffineInput) (x : NImageOff T u) : Coins T :=
+  Off.backwardOff (fsContext nctx x.1) u ((expandSrc x.2.1.1, x.2.1.2), x.2.2)
+
+include valid
+
+theorem expand_compress_fs (c : Coins T) (src : Source T)
+    (gammas : src.2.1 = gamma (fsContext nctx (fsScales nctx c)) c) : expandSrc (compressSrc src) = src := by
+  obtain ⟨J, g, cur⟩ := src
+  simp only at gammas
+  subst gammas
+  unfold expandSrc compressSrc
+  simp only [Prod.mk.injEq, true_and, and_true]
+  funext d
+  exact (gamma_fs nctx valid c d).symm
+
+theorem nBackward_nForward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (c : Coins T) :
+    nBackward nctx u good (nForward nctx u c) = c := by
+  unfold nBackward nForward
+  simp only
+  rw [expand_compress_fs nctx valid c _ rfl]
+  exact Joint.backward_forward _ u good c
+
+theorem nBackwardOff_nForwardOff (u : AffineInput) (c : Coins T) :
+    nBackwardOff nctx (nForwardOff nctx u c) = c := by
+  unfold nBackwardOff nForwardOff
+  simp only
+  rw [expand_compress_fs nctx valid c _ rfl]
+  exact Off.backwardOff_forwardOff _ u c
+
+theorem fsScales_nBackward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (x : NImage T u) :
+    fsScales nctx (nBackward nctx u good x) = x.1 := by
+  funext d
+  unfold fsScales nBackward
+  rw [Joint.rowOffset_backward, Joint.rowOffset_backward]
+  show (solvedK _ u _ _ (.inl .rowZ_x9) * _, solvedK _ u _ _ (.inl .rowY_cubic) * _) = x.1 d
+  simp only [solvedK, fsContext, Rows.scaled, Rows.multiply, expandSrc, sub_zero]
+  rw [mul_assoc, mul_inv_cancel₀ (valid d).1, mul_one, mul_assoc, mul_inv_cancel₀ (valid d).2, mul_one]
+
+theorem fsScales_nBackwardOff (u : AffineInput) (x : NImageOff T u) :
+    fsScales nctx (nBackwardOff nctx u x) = x.1 := by
+  funext d
+  unfold fsScales nBackwardOff
+  rw [Off.rowOffset_backwardOff, Off.rowOffset_backwardOff]
+  simp only [Off.bOff, fsContext, Rows.scaled, Rows.multiply, expandSrc, sub_zero]
+  rw [mul_assoc, mul_inv_cancel₀ (valid d).1, mul_one, mul_assoc, mul_inv_cancel₀ (valid d).2, mul_one]
+
+theorem nForward_nBackward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (x : NImage T u) :
+    nForward nctx u (nBackward nctx u good x) = x := by
+  have scales := fsScales_nBackward nctx valid u good x
+  have image := Joint.forward_backward (fsContext nctx x.1) u good ((expandSrc x.2.1.1, x.2.1.2), x.2.2)
+  unfold nForward
+  rw [scales]
+  unfold nBackward at image ⊢
+  rw [image]
+
+theorem nForwardOff_nBackwardOff (u : AffineInput) (x : NImageOff T u) :
+    nForwardOff nctx u (nBackwardOff nctx u x) = x := by
+  have scales := fsScales_nBackwardOff nctx valid u x
+  have image := Off.forwardOff_backwardOff (fsContext nctx x.1) u ((expandSrc x.2.1.1, x.2.1.2), x.2.2)
+  unfold nForwardOff
+  rw [scales]
+  unfold nBackwardOff at image ⊢
+  rw [image]
+
+variable (T) in
+/-- **The normalized bijection on the curve.** -/
+def nEquiv (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) : Coins T ≃ NImage T u where
+  toFun := nForward nctx u
+  invFun := nBackward nctx u good
+  left_inv := nBackward_nForward nctx valid u good
+  right_inv := nForward_nBackward nctx valid u good
+
+variable (T) in
+/-- **The normalized bijection off the curve.** -/
+def nEquivOff (u : AffineInput) : Coins T ≃ NImageOff T u where
+  toFun := nForwardOff nctx u
+  invFun := nBackwardOff nctx u
+  left_inv := nBackwardOff_nForwardOff nctx valid u
+  right_inv := nForwardOff_nBackwardOff nctx valid u
+
+end Bijection
+
+/-! ### 4. Both sides through the fixed-context ideal outputs -/
+
+/-- **The fixed-context ideal output at field scales `s`**, converted. -/
+def nG (nctx : NContext) (u : AffineInput) (s : Scales) (y : CSource T × Visible T u) : NOut T u :=
+  conv s (idealOut (fsContext nctx s) u (expandSrc y.1, y.2))
+
+/-- The same off the curve. -/
+def nGOff (s : Scales) {u : AffineInput} (y : CSource T × Cold T u) : NOutOff T u :=
+  convOff s (idealOutOff u (expandSrc y.1, y.2))
+
+/-- The window of compact cells. -/
+def CWindow {u : AffineInput} (y : CSource T × Cold T u) : Prop := ∃ e, InWindow T (evalInt u y.1.1 y.2 e)
+
+section Relations
+
+variable [FieldCertificate] (nctx : NContext) (valid : nctx.Valid)
+include valid
+
+/-- **The real outputs on the curve, on the good event and off the window, are `nG` of their image.** -/
+theorem nRealOut_eq_nG (facts : TableFacts T) (u : AffineInput) (onCurve : OnCurve u) (c : Coins T)
+    (good : GoodScales (fsScales nctx c)) (outside : ¬ CWindow ((nForward nctx u c).2.1.1, (nForward nctx u c).2.1.2.1)) :
+    nRealOut nctx u c = nG nctx u (nForward nctx u c).1 (nForward nctx u c).2.1 := by
+  have noWrap : ∀ e, hint c e = false := fun e =>
+    hint_false_of_window facts (fsContext nctx (fsScales nctx c)) u c e fun w => outside ⟨e, w⟩
+  rw [nRealOut_eq_conv nctx valid u c good,
+    bmr_real_eq_ideal T facts (fsContext nctx (fsScales nctx c)) u onCurve c noWrap]
+  unfold nG nForward
+  simp only
+  rw [expand_compress_fs nctx valid c _ rfl]
+  rfl
+
+/-- **The real outputs off the curve, on the good event and off the window, are `nGOff` of their image.** -/
+theorem nRealOutOff_eq_nGOff (facts : TableFacts T) (u : AffineInput) (c : Coins T)
+    (good : GoodScales (fsScales nctx c)) (outside : ¬ CWindow (nForwardOff nctx u c).2.1) :
+    nRealOutOff nctx u c = nGOff (nForwardOff nctx u c).1 (nForwardOff nctx u c).2.1 := by
+  have noWrap : ∀ e, hint c e = false := fun e =>
+    hint_false_of_window facts (fsContext nctx (fsScales nctx c)) u c e fun w => outside ⟨e, w⟩
+  rw [nRealOutOff_eq_conv nctx valid u c good,
+    bmr_real_eq_ideal_off T (fsContext nctx (fsScales nctx c)) u c noWrap]
+  unfold nGOff nForwardOff
+  simp only
+  rw [expand_compress_fs nctx valid c _ rfl]
+  rfl
+
+end Relations
+
 end
 
 end Kriterion.CRT.Privacy.BMR
