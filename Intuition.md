@@ -1,6 +1,6 @@
 # Intuition: the sign row on psivesely's CRT-residue delivery of ArgoMAC
 
-This entry garbles BN254 scalar multiplication with **135,855 bytes** of public ciphertext.
+This entry garbles BN254 scalar multiplication with **130,122 bytes** of public ciphertext.
 Garbling makes at most **964,502** oracle queries (gate 1,759,967) and evaluation at most
 **957,536** (gate 1,055,879). Both figures are the exact bounds in the types of
 `garbleProgram` and `evaluateProgram`.
@@ -311,18 +311,18 @@ Correctness does not use this; privacy does (section 11).
 
 ---
 
-## 8. Why the ciphertext is 135,855 bytes
+## 8. Why the ciphertext is 130,122 bytes
 
 | Field | Contents | Bytes |
 |---|---|---:|
 | `curve` | 3 curve-check constants × 32 | 96 |
-| `rows` | 91 digits × 3 constants × 32 | 8,736 |
+| `rows` | 91 digits × (`xC0` × 32 + one flags byte), the `Z` and sign-row constants normalized to bits | 3,003 |
 | `exception` | 91 digits × one-byte entry | 91 |
 | `crtX` | conversion of `x`: 2,956 labels × 13 | 38,428 |
 | `crtY` | conversion of `y`: 2,956 labels × 13 | 38,428 |
 | `recX` | 367 records × 78 | 28,626 |
 | `recY` | 275 records × 78 | 21,450 |
-| **total** | | **135,855** |
+| **total** | | **130,122** |
 
 Every field has a fixed width and there is no tag, so every public value encodes to the same
 length (`Wire.encoding_length`). The conversion blocks are 58 percent of the total and do not depend
@@ -499,7 +499,7 @@ The error terms, as stated in `Proof/Privacy/CRT/Glue/Budget.lean`:
 | `G0U → G1U` | the curve encodings' wrap window (section 11.1) | `2^-104.74` |
 | `G1U → HW` | stage-1 touches, per stage-1 query | `2^-126` per query |
 | `G1U → HW` | wrap hint and collectors (section 11.3) | `2^-104.74` |
-| `G1U → HW` | exceptional inputs `364/(r − 1)`, coincidences `185/2^128` (section 11.6) | `2^-245.1`, `2^-120.5` |
+| `G1U → HW` | exceptional inputs `364/(r − 1)` and the row normalization's flag `182/p`, within `546/(r − 1)`; coincidences `185/2^128` (section 11.6) | `2^-244.5`, `2^-120.5` |
 | `HW → H` | output kernel `455/(r − 1)` | `2^-244.8` |
 | `I → M` | sampler cutoff | `2^-128` |
 

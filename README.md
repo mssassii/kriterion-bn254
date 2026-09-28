@@ -35,7 +35,7 @@ are xinshu's.
 
 | metric | value | rule |
 |---|---|---|
-| `ciphertextBytes` | **135,855** `= 96 + 91·96 + 91·1 + 2·38,428 + 642·78` | ranked, lower is better |
+| `ciphertextBytes` | **130,122** `= 96 + 91·33 + 91·1 + 2·38,428 + 642·78` | ranked, lower is better |
 | `garbleQueries` | **988,438** `≤ 1,759,967` | acceptance gate |
 | `evaluateQueries` | **981,506** `≤ 1,055,879` (74,373 below) | acceptance gate |
 
@@ -128,6 +128,19 @@ proof inverts the cut digit by digit (`BMR.rowEquiv`): the slopes of `rowY_y8` a
 other's offset, and the inverse divides by `3 − y²`, which is never zero because 3 is not a square
 modulo `p` (`signDet_ne_zero`).
 
+**Row normalization** (`Construction/CRT/Rows.lean`). Only `xC0` is published as a field element. The garbler
+builds the unscaled rows `R*` (randomizer 1; digit zero's sign row is `b·x²`, which has the character of `b = y_R`
+on the curve), reads the offsets `K_z`, `K_c` of the collectors `rowZ_x9`, `rowY_cubic`, sets `ε = [K = 0]`,
+`ρ = (K_z + ε_Z)/z₀`, `κ = (K_c + ε_S)/s₄` and scales `X` by `ρ²`, `Z` by `ρ`, the sign row by `κ`: the published
+`Z` and sign-row constants become the bits `ε_Z`, `ε_S`. With `ν = [χ(κ) = −1]` a digit publishes `xC0` and one
+flags byte `ν + 2ε_Z + 4ε_S` (`NormRow`, 33 bytes). The evaluator uses the flags as the two constants and negates
+the sign row when `ν`, so the old decoder applies to `(−1)^ν κ S*` (a nonzero square times `S*`;
+`EntryCorrect.perfectCorrectness`). Privacy (`Core/BmrNorm.lean`, `NormRows.lean`): the corrected target rows are
+`(ρ²X*, τ²S*, ρZ*)` with `(ρ, τ)` uniform nonzero and independent of the published cells (a bijection of the coins
+through the field scales and the sign split `(τ, ν) ↔ ((−1)^ν τ², [χ(τ) = 1])`), so the opening's kernel bound
+`455/(r − 1)` carries over (digit zero's sign multiplier becomes `x ≠ 0`). The zero event `K_z·K_c = 0` is paid on
+the ideal side by two unpublished uniform cells per digit of the stage-1 source, flagged when zero (`182/p`).
+
 ### 1.6 The second exceptional case
 
 A row decodes through `x_R = X/Z²` and the sign row except where `Z = 0` or `L = 0`. With `P` the input
@@ -178,11 +191,11 @@ no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side th
 | field | contents | bytes |
 |---|---|---:|
 | `curve` | 3 curve-check constants | 96 |
-| `rows` | 91 digits × 3 constants × 32 B | 8,736 |
+| `rows` | 91 digits × (`xC0` 32 B + flags 1 B) | 3,003 |
 | `exception` | 91 digits × one-byte entry | 91 |
 | `crtX`, `crtY` | 2,956 labels × 13 B per coordinate | 76,856 |
 | `recX`, `recY` | 642 records × 78 B (367 of `x`, 275 of `y`) | 50,076 |
-| **total** | | **135,855** |
+| **total** | | **130,122** |
 
 A record is `h_e·M + Σ_i J_{e,i}·Π_{i'<i} m_{i'}`, below `2M < 2^624`. Every field has a fixed width, so
 every public value encodes to the same length (`Entry.Wire.encoding_length`). Against `de8f397`, the sign
@@ -228,7 +241,7 @@ The rows' bijection of the public-first core maps a digit's 7 offsets to its 3 c
 non-collector values, dividing by `3 − y²` (§1.5; `BMR.rowEquiv`, with `bmrEquiv` on the curve and
 `bmrEquivOff` off it). The exceptional event is a digit point `Q + K` equal to `2Q`, `0` or `(3/2)Q`: three
 targets per digit, `364/(r − 1)` (`RowsDoubling.threeTargets_real_le`; the sign row vanishes at `2K`,
-`BmrEntry.sign_double`). The opening lifts a digit point with two scales, `(λ²x, t²y, λ)` (`(λ², 0, 0)` at
+`BmrEntry.sign_double`); with the row normalization's flag `182/p` the exceptional term is `546/(r − 1)`. The opening lifts a digit point with two scales, `(λ²x, t²y, λ)` (`(λ², 0, 0)` at
 the identity); off the exceptional inputs a real row is such a lift with `λ = ρ·(u − a)` and `t = τ·L`, and
 the output kernel is `455/(r − 1)` (`Instance.crtEntry_opening`). The 182 final sites of the digest
 bound a hidden final's coincidence by `182/2^128` (`FinalCoincide.crtEntry_finalCoincide`), so the
@@ -270,7 +283,7 @@ lake env lean Scratch/ProofAudit.lean   # the three axioms over every declaratio
 ```
 
 `Scratch/` is not a Lean library and the verifier ignores it. `Scratch/Audit.lean` fails if the bytes
-(135,855, from the metric and from encoding an all-zero public value), the garbling budget (988,438) or
+(130,122, from the metric and from encoding an all-zero public value), the garbling budget (988,438) or
 the evaluation budget (981,506) differ, or if a budget comes within 500 queries of its gate, and it checks
 the axioms of the solution and of the privacy field. Build time depends strongly on available
 memory; this fallback draft has not been built, and no build-time estimate is claimed here.

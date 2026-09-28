@@ -18,7 +18,7 @@ This branch introduces no admitted proof, but the updated tree must be rebuilt a
 |---|---|---|
 | `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (964,502); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
 | `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (957,536); `Submission.evaluateProgramCorrect` | the same |
-| `ciphertextSize` | `Entry.Wire.encoding_length` (135,855) | `Construction/CRT/Public.lean` |
+| `ciphertextSize` | `Entry.Wire.encoding_length` (130,122) | `Construction/CRT/Public.lean` |
 | `lamportCompatible` | `Lamport.selectedLabels_eq` | `Proof/LamportCompatibility/Labels.lean` |
 | `functionCorrect` | `rfl` | `Submission.lean` |
 | `perfectCorrectness` | `EntryCorrect.perfectCorrectness` | `Proof/Correctness/CRT/EntryCorrect.lean` |
@@ -83,7 +83,10 @@ The sign row and the second exceptional case enter the chain in these modules:
 | `Core/BodyMaskRowParts.lean` | `BMR.rowEquiv`: a digit's 7 row offsets against its 3 published constants and its 4 non-collector values; the inverse divides by `3 − y²` (`signDet_ne_zero`, from `three_not_square` in `Proof/Privacy/Phase3/OnCurveNonzero.lean`) |
 | `Core/BodyMaskRowJoint.lean`, `Core/BodyMaskRowOff.lean` | the rows' bijection with the pads, masks and coins, on the curve (`bmrEquiv`) and off it (`bmrEquivOff`, whose residual holds the offsets of the four encodings that no constant absorbs) |
 | `Core/BmrEntry.lean` | the doubling event of either kind shows in the true rows; the sign row vanishes at `2K` (`sign_double`) |
-| `Flags/RowsDoubling.lean` | the flag of a target row with `Z = 0` or `S = 0`: three targets per digit, `364/#Point ≤ 364/(r − 1)` (`threeTargets_real_le`) |
+| `Flags/RowsDoubling.lean` | the flag of a target row with `Z = 0` or `S = 0` for the normalized rows kernel: three targets per digit, `364/#Point ≤ 364/(r − 1)` (`crtRowsDoubling_le`) |
+| `Flags/NormFlag.lean` | the row normalization's flag (a hidden source cell is zero): `182/p` against every weight on the published value (`normFlag_le`) |
+| `Core/BmrNorm.lean` | the normalized public-first core: the field-scale bijection, the sign split, `nCore_weighted` / `nCoreOff_weighted` |
+| `NormRows.lean` | the rows kernel of the normalized rows (`normRealRows`) and its opening bound `455/#Point` (`normRows_etvDist_le`) |
 | `Core/DigestSplit.lean` | off the doubling event the one-byte entries are uniform, with the finals at the two sites `2o + k` of each digit |
 | `Core/FinalCoincide.lean`, `Flags/CoincidenceSplit.lean` | a hidden final that the evaluator's path reaches: `182/2^128` over the 182 final sites (`crtEntry_finalCoincide`); with the two `Δ = 0` events, `184/2^128 ≤ 185/2^128` (`crtCoincidenceGuess_of`) |
 | `Proof/Privacy/Phase3/Opening.lean`, `OpeningBound.lean` | the lift `(λ²x, t²y, λ)` (`lift`); the real rows are lifts at uniform `(λ, t)` off `Q = K` and `Q = 2K` (`lifts_law`), whose mass is at most `273/#Point` (`bn254_doubling_real_le`); the kernel bound `455/#Point` (`rows_etvDist_le`) |
