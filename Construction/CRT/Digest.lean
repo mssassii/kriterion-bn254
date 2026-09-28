@@ -9,12 +9,12 @@ The exception gadget of configuration E with the per-label hash digest (D9).
 * A nonzero digit has two exceptional inputs: `Q = K` (kind 0, `Exception.exceptionalInput`, where the `X` and `Z`
   rows vanish) and `Q = 2K` (kind 1, `Exception.tripleInput`, where the sign row vanishes). Kind `k` of digit `o` is
   the **final site** `s = 2 o + k`.
-* The mask byte of site `s` at key `key` is the low 8 bits of `(H(hashInput key (tagCode 9 0 0 0 0 s 0))).1`
+* The four-bit mask of site `s` at key `key` is the low 4 bits of `(H(hashInput key (tagCode 9 0 0 0 0 s 0))).1`
   (`finalMask`). The garbler asks it at the key of each exceptional input of a nonzero digit (a zero digit has no
   exceptional input and publishes its pad); the evaluator asks both sites of every digit at its own key. The two
   sites have distinct tags, so the garbler's hash inputs stay tag-injective.
-* The 12-byte entry: the coins' pad with `digitCode d ⊕ mask₀` written at `slotOf false exc_o` and
-  `digitCode d ⊕ mask₁` at `slotOf true triple_o` (`Exception.writeEntry`); the evaluator unlocks both halves with
+* The one-byte entry: the coins' pad with `digitCode d ⊕ mask₀` written at `slotOf false exc_o` and
+  `digitCode d ⊕ mask₁` at `slotOf true triple_o` (`Exception.writeEntry`); the evaluator unlocks both slots with
   `Exception.unlock`.
 
 Budgets (`digestGarbleBudget`, `digestEvalBudget`): garbler `4 * bits + 2 * digits` (a bound: the count is
@@ -63,9 +63,9 @@ def digestKey (H : HashN) (bits : Nat) (labels : Fin 2 → Fin bits → Block) (
   xorFold fun coord : Fin 2 => xorFold fun position : Fin bits =>
     h128 H (labels coord position) (digestLabelTag coord.val position.val (coordBit u coord position.val))
 
-/-- The mask byte of final site `site` at key `key`: the low 8 bits of the final hash's first block. -/
-def finalMask (H : HashN) (key : Block) (site : Nat) : BitVec 8 :=
-  Exception.lowByte (h128 H key (digestFinalTag site))
+/-- The four-bit mask of final site `site` at key `key`: the low 4 bits of the final hash's first block. -/
+def finalMask (H : HashN) (key : Block) (site : Nat) : BitVec 4 :=
+  Exception.lowNibble (h128 H key (digestFinalTag site))
 
 /-- The garbler's entry of one digit: the pad, with the masked digit code at the slots of its two exceptional
 inputs for a nonzero digit, each masked by the final at that input's key. -/
@@ -110,9 +110,9 @@ def digestKeyM (bits : Nat) (labels : Fin 2 → Fin bits → Block) (u : AffineI
       h128M (labels coord position) (digestLabelTag coord.val position.val (coordBit u coord position.val)))
     >>= fun hashes => pure (xorFold fun coord => xorFold (hashes coord))
 
-/-- One final hash as a mask byte. -/
-def finalMaskM (key : Block) (site : Nat) : CM (BitVec 8) :=
-  h128M key (digestFinalTag site) >>= fun block => pure (Exception.lowByte block)
+/-- One final hash as a four-bit mask. -/
+def finalMaskM (key : Block) (site : Nat) : CM (BitVec 4) :=
+  h128M key (digestFinalTag site) >>= fun block => pure (Exception.lowNibble block)
 
 /-- The garbler's entry of one digit (no query for a zero digit, two for a nonzero one). -/
 def garbleEntryM {bits : Nat} (table : Fin 2 → Fin bits → Block × Block) (index : Nat) (digit : Digit)

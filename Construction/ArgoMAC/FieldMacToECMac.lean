@@ -176,11 +176,11 @@ def gadgetDigest (perms : Fin coordinateBitCount → Equiv Cryptography.Block Cr
   Fin.foldl coordinateBitCount
     (fun acc index => acc ^^^ Cryptography.daviesMeyer (perms index) (mac.get index)) 0
 
-/-- `gadgetMask` is the one-time pad byte of one exception gadget slot.
+/-- `gadgetMask` is the four-bit one-time pad of one exception gadget slot.
 It is a digest of the evaluator's own labels, so it is not affine in the input. -/
 def gadgetMask (perms : GadgetPermutations) (output : Fin outputMacCount)
-    (mac : InputMac) : BitVec 8 :=
-  Exception.lowByte (gadgetDigest (perms output .x) mac.x ^^^ gadgetDigest (perms output .y) mac.y)
+    (mac : InputMac) : BitVec 4 :=
+  Exception.lowNibble (gadgetDigest (perms output .x) mac.x ^^^ gadgetDigest (perms output .y) mac.y)
 
 /-- One exceptional slot of an entry: the digit, masked by the digest of the input's labels. -/
 def writeCase (perms : GadgetPermutations) (output : Fin outputMacCount) (key : OutputKey)

@@ -3,26 +3,26 @@ This file defines the Plan B byte layout and proves the ciphertext-size theorem.
 
 The plan source is `2026-09-17-planB.md`, section D.5 and Task 11.
 `Public` carries no `Option` tag, so every inhabitant encodes to exactly
-`ciphertextBytesConstant = 2606820` bytes and the theorem is independent of `garble`.
+`ciphertextBytesConstant = 2605819` bytes and the theorem is independent of `garble`.
 
 | Field       | Encoding                                | Formula        | Bytes   |
 |-------------|-----------------------------------------|----------------|---------|
 | `curve`     | `3 * field`                             | `3 * 32`       | 96      |
 | `rows`      | `Vector rowGamma 91`                    | `91 * 96`      | 8,736   |
-| `exception` | `Vector entry 91`                       | `91 * 12`      | 1,092   |
+| `exception` | `Vector entry 91`                       | `91 * 1`      | 91   |
 | `curveXHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `curveYHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `pointXHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `pointYHot` | `Vector block 127`                      | `127 * 16`     | 2,032   |
 | `scale`     | `Vector chunkWord 127`                  | `127 * 20384`  | 2,588,768 |
-| **total**   |                                         |                | **2,606,820** |
+| **total**   |                                         |                | **2,605,819** |
 
 Rule N: the only fact about the `163072`-bit word is `pow_width`, proved symbolically in
 `Construction/PGS/Packing.lean`; the numeral itself is never formed.
 -/
 
 import Construction.ArgoMAC.Public
-import Encoding
+import Construction.ArgoMAC.ExceptionEncoding
 
 namespace Kriterion.ArgoMAC.PlanB.Wire
 
@@ -55,17 +55,10 @@ private def chunkWord : Encoding (BitVec chunkJoinBits) :=
       apply BitVec.eq_of_toNat_eq
       rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt value.isLt])
 
-/-- One gadget byte. -/
-private def gadgetByte : Encoding (BitVec 8) :=
-  Encoding.byte.map
-    (fun value : BitVec 8 => ⟨value.toNat, value.isLt⟩)
-    (fun value => BitVec.ofNat 8 value.val)
-    (fun value => by simp)
+/-- One digit's exception entry, packed into one byte. -/
+private def entry : Kriterion.Encoding Exception.Entry := Exception.entryEncoding
 
-/-- One digit's gadget entry, `12` bytes. -/
-private def entry : Encoding Exception.Entry := gadgetByte.vector 12
-
-/-- The whole gadget, `91 * 12 = 1092` bytes. -/
+/-- The whole gadget, `91 * 1 = 91` bytes. -/
 private def gadget : Encoding (Vector Exception.Entry digitCount) := entry.vector digitCount
 
 /-- One digit's three published row constants, `3 * 32 = 96` bytes. -/
@@ -139,11 +132,9 @@ private theorem block_sized : SizedBy block 16 := sizedBy_map (sizedBy_natural 1
 private theorem chunkWord_sized : SizedBy chunkWord chunkJoinBytes :=
   sizedBy_map (sizedBy_natural chunkJoinBytes) _ _ _
 
-private theorem gadgetByte_sized : SizedBy gadgetByte 1 := sizedBy_map sizedBy_byte _ _ _
+private theorem entry_sized : SizedBy entry 1 := Exception.entryEncoding_length
 
-private theorem entry_sized : SizedBy entry 12 := sizedBy_vector gadgetByte_sized 12
-
-private theorem gadget_sized : SizedBy gadget 1092 := sizedBy_vector entry_sized digitCount
+private theorem gadget_sized : SizedBy gadget 91 := sizedBy_vector entry_sized digitCount
 
 private theorem rowGamma_sized : SizedBy rowGamma 96 :=
   sizedBy_map (sizedBy_pair field_sized (sizedBy_pair field_sized field_sized)) _ _ _
@@ -160,7 +151,7 @@ private theorem hotVector_sized : SizedBy hotVector 2032 :=
 private theorem scaleVector_sized : SizedBy scaleVector 2588768 :=
   sizedBy_vector chunkWord_sized chunkCount
 
-/-- The complete layout: `96 + 8736 + 1092 + 4 * 2032 + 2588768`. -/
+/-- The complete layout: `96 + 8736 + 91 + 4 * 2032 + 2588768`. -/
 private theorem encoding_sized : SizedBy encoding ciphertextBytesConstant :=
   sizedBy_map (sizedBy_pair curveTriple_sized (sizedBy_pair rowVector_sized
     (sizedBy_pair gadget_sized (sizedBy_pair hotVector_sized
@@ -170,7 +161,7 @@ private theorem encoding_sized : SizedBy encoding ciphertextBytesConstant :=
 /-- The byte table of plan D.5 with Task 19a's four fold-join vectors, as an arithmetic
 identity. -/
 theorem byteArithmetic :
-    3 * 32 + 91 * (3 * 32) + 91 * 12 + 4 * (127 * 16) + 127 * 20384 = 2606820 := by
+    3 * 32 + 91 * (3 * 32) + 91 * 1 + 4 * (127 * 16) + 127 * 20384 = 2605819 := by
   norm_num
 
 /-- **Every** public value encodes to exactly `ciphertextBytesConstant` bytes.
@@ -179,10 +170,10 @@ theorem encoding_length (value : Public) :
     (encoding.encode value).length = ciphertextBytesConstant :=
   encoding_sized value
 
-/-- The construction-facing corollary: the Plan B ciphertext is `2606820` bytes for every
-garbling, whatever the tape, because it is `2606820` bytes for every inhabitant of `Public`. -/
+/-- The construction-facing corollary: the Plan B ciphertext is `2605819` bytes for every
+garbling, whatever the tape, because it is `2605819` bytes for every inhabitant of `Public`. -/
 theorem garble_length (value : Public) :
-    (encoding.encode value).length = 2606820 :=
+    (encoding.encode value).length = 2605819 :=
   encoding_length value
 
 end Kriterion.ArgoMAC.PlanB.Wire

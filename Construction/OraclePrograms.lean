@@ -419,11 +419,11 @@ theorem bounded_gadgetDigestM (output : Fin FieldMacToECMac.outputMacCount)
   (Bounded.bind (Bounded.vector_const fun _ => bounded_hashM _ _) fun _ =>
     Bounded.pure' _ 0).of_eq (by norm_num)
 
-/-- The gadget mask byte of one digit, over the 508 selected labels. -/
-def gadgetMaskM (output : Fin FieldMacToECMac.outputMacCount) (mac : InputMac) : M (BitVec 8) :=
+/-- The four-bit gadget mask of one digit, over the 508 selected labels. -/
+def gadgetMaskM (output : Fin FieldMacToECMac.outputMacCount) (mac : InputMac) : M (BitVec 4) :=
   gadgetDigestM output .x mac.x >>= fun first =>
     gadgetDigestM output .y mac.y >>= fun second =>
-      pure (Exception.lowByte (first ^^^ second))
+      pure (Exception.lowNibble (first ^^^ second))
 
 theorem eval_gadgetMaskM (oracle : Oracle) (output : Fin FieldMacToECMac.outputMacCount)
     (mac : InputMac) :
@@ -841,7 +841,7 @@ theorem transformMacOf_real (encOracle : PermutationOracle EncPRF.PermutationInd
 
 /-- The 91 exception masks of the evaluator's labels; both halves of an entry unlock with the same
 mask. -/
-def unlockM (mac : InputMac) : M (Vector (BitVec 8) FieldMacToECMac.outputMacCount) :=
+def unlockM (mac : InputMac) : M (Vector (BitVec 4) FieldMacToECMac.outputMacCount) :=
   FreeQuery.vector FieldMacToECMac.outputMacCount fun index => gadgetMaskM index mac
 
 theorem eval_unlockM (oracle : Oracle) (mac : InputMac) :

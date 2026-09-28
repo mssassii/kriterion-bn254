@@ -10,13 +10,13 @@ to exactly `ciphertextBytesConstant` bytes; the byte-count theorem therefore doe
 |-------------|------------------------------------------|---------|
 | `curve`     | `3 * Wire.field`                          | 96      |
 | `rows`      | `Vector RowGamma 91`, 3 field elements    | 8,736   |
-| `exception` | `Vector (Vector (BitVec 8) 12) 91`        | 1,092   |
+| `exception` | `Vector (Vector (BitVec 4) 2) 91`        | 91   |
 | `curveXHot` | `Vector Block 127`                        | 2,032   |
 | `curveYHot` | `Vector Block 127`                        | 2,032   |
 | `pointXHot` | `Vector Block 127`                        | 2,032   |
 | `pointYHot` | `Vector Block 127`                        | 2,032   |
 | `scale`     | `Vector (BitVec 163072) 127`              | 2,588,768 |
-| **total**   |                                           | **2,606,820** |
+| **total**   |                                           | **2,605,819** |
 -/
 
 import Construction.ArgoMAC.Exception
@@ -47,7 +47,7 @@ structure Public where
   curve : BaseField × BaseField × BaseField
   /-- The three published row constants of each digit. -/
   rows : Vector RowGamma digitCount
-  /-- The exception gadget, twelve bytes per digit. -/
+  /-- The exception gadget, one byte per digit. -/
   exception : Vector Exception.Entry digitCount
   /-- System A's `bin-to-hot` fold joins on the x coordinate's raw Lamport labels. -/
   curveXHot : Vector Block foldStepCount
@@ -61,6 +61,6 @@ structure Public where
   scale : Vector (BitVec chunkJoinBits) chunkCount
 
 /-- The Plan B ciphertext size in bytes. -/
-def ciphertextBytesConstant : Nat := 2606820
+def ciphertextBytesConstant : Nat := 2605819
 
 end Kriterion.ArgoMAC.PlanB
