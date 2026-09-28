@@ -152,12 +152,12 @@ end Wrap
 /-- **The wrap reveal at one source**: the window, or the source's normalization flag. -/
 theorem wrap_source [FieldCertificate] [GroupCertificate] (source : (Instance.view).Source) (u : AffineInput) :
     (swappedTableLaw crtLayout).toOuterMeasure {T | H8.replayWraps source u T} ≤
-      ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0) := by
+      ENNReal.ofReal smudgeError + NormFlag.badInd source := by
   by_cases bad : H8.normBadSrc source
-  · rw [if_pos bad]
+  · rw [NormFlag.badInd, if_pos bad]
     refine le_trans (le_trans (MeasureTheory.measure_mono (Set.subset_univ _))
       (le_of_eq ((PMF.toOuterMeasure_apply_eq_one_iff _ _).mpr (Set.subset_univ _)))) le_add_self
-  · rw [if_neg bad, add_zero]
+  · rw [NormFlag.badInd, if_neg bad, add_zero]
     have same : {T | H8.replayWraps source u T} = {T | H8.replayWindow source u T} := by
       ext T
       exact ⟨fun w => w.resolve_right bad, Or.inl⟩
@@ -183,13 +183,12 @@ theorem crtWrapTable_le [FieldCertificate] [GroupCertificate] (u : AffineInput)
   rw [ENNReal.ofReal_add smudgeNonneg normError_nonneg, add_mul]
   calc _ ≤ ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source source *
           (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) *
-            (ENNReal.ofReal smudgeError + (if H8.normBadSrc source then 1 else 0))) :=
+            (ENNReal.ofReal smudgeError + NormFlag.badInd source)) :=
         ENNReal.tsum_le_tsum fun source => mul_le_mul' le_rfl (mul_le_mul' le_rfl (wrap_source source u))
     _ = ENNReal.ofReal smudgeError * ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source
             source * weight ((PublicFirst.viewHere Instance.crtEntry).publish source) +
           ∑' source, PMF.uniformOfFintype (PublicFirst.viewHere Instance.crtEntry).Source source *
-            (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) *
-              (if H8.normBadSrc source then 1 else 0)) := by
+            (weight ((PublicFirst.viewHere Instance.crtEntry).publish source) * NormFlag.badInd source) := by
         rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_add]
         refine tsum_congr fun source => ?_
         ring

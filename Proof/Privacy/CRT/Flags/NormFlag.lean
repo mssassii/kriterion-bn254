@@ -22,6 +22,9 @@ noncomputable section
 
 namespace NormFlag
 
+/-- The indicator of the normalization flag. -/
+def badInd (s : Entry.Source) : ℝ≥0∞ := if H8.normBadSrc s then 1 else 0
+
 /-- The hidden cells of a source, `(zC0, yC4)` per digit. -/
 def hiddenOf (s : Entry.Source) : BMR.Scales := fun d => ((s.rows d).zC0, (s.rows d).yC4)
 
@@ -108,7 +111,7 @@ theorem badMass_le [FieldCertificate] :
 /-- **The normalization flag against a weight on the published value**: at most `182/p` times the weight. -/
 theorem normFlag_le [FieldCertificate] [GroupCertificate] (weight : Entry.Public → ℝ≥0∞)
     [Fintype Entry.Source] [Nonempty Entry.Source] :
-    ∑' s, PMF.uniformOfFintype Entry.Source s * (weight (Entry.publish s) * (if H8.normBadSrc s then 1 else 0)) ≤
+    ∑' s, PMF.uniformOfFintype Entry.Source s * (weight (Entry.publish s) * badInd s) ≤
       ENNReal.ofReal normError * ∑' s, PMF.uniformOfFintype Entry.Source s * weight (Entry.publish s) := by
   classical
   have split : ∀ g : Entry.Source → ℝ≥0∞, ∑' s, PMF.uniformOfFintype Entry.Source s * g s =
@@ -121,16 +124,16 @@ theorem normFlag_le [FieldCertificate] [GroupCertificate] (weight : Entry.Public
   refine ENNReal.tsum_le_tsum fun r => ?_
   simp only [publish_withHidden]
   have inner : ∑' h, PMF.uniformOfFintype BMR.Scales h *
-      (weight (Entry.publish r.1) * (if H8.normBadSrc (withHidden r.1 h) then 1 else 0)) =
+      (weight (Entry.publish r.1) * badInd (withHidden r.1 h)) =
       weight (Entry.publish r.1) * ∑' h, PMF.uniformOfFintype BMR.Scales h * (if BMR.GoodScales h then 0 else 1) := by
     rw [← ENNReal.tsum_mul_left]
     refine tsum_congr fun h => ?_
     by_cases good : BMR.GoodScales h
     · have notBad : ¬ H8.normBadSrc (withHidden r.1 h) := fun bad => (normBadSrc_withHidden r.1 h).mp bad good
-      rw [if_neg notBad, if_pos good]
+      rw [badInd, if_neg notBad, if_pos good]
       ring
     · have bad : H8.normBadSrc (withHidden r.1 h) := (normBadSrc_withHidden r.1 h).mpr good
-      rw [if_pos bad, if_neg good]
+      rw [badInd, if_pos bad, if_neg good]
       ring
   rw [inner, BMR.tsum_uniform_const]
   calc PMF.uniformOfFintype Rest r * (weight (Entry.publish r.1) *
