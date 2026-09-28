@@ -102,19 +102,21 @@ theorem crtEntry_designedReached : DesignedReached Instance.crtEntry Entry.table
   have onReach := garble_designed_reached (schemeHash (tableOracle table)) scalar coins u x hx isDesigned
   have transcriptR := transcript_toProgram (publicAnswer (tableOracle (FI := Empty) (EI := Empty) table))
     (EntryReading.reachDecodedM (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table))
-      scalar coins) u (EntryCorrect.labelsFor coins u)) Entry.evaluateBudget
+      scalar coins) u (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u)) Entry.evaluateBudget
     (EntryReading.bounded_reachDecodedM (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty)
-      table)) scalar coins) u (EntryCorrect.labelsFor coins u))
+      table)) scalar coins) u (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u))
   have hgarble : (@Entry.scheme field group).garble parameter scalar (coins, tableOracle table) =
       (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) scalar coins,
-        coins.inputMacKey) := by
+        EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins) := by
     refine (Paths.entry_garble_eval field group parameter scalar coins (tableOracle table)).trans ?_
     unfold Entry.garbleProgram
     rw [FreeQuery.eval_toProgram]
     unfold Entry.garbleM
     rw [eval_liftHash]
     exact EntryCorrect.garbleCM_eval _ scalar coins
-  have hencode : (@Entry.scheme field group).encode coins.inputMacKey u = EntryCorrect.labelsFor coins u := by
+  have hencode : (@Entry.scheme field group).encode
+      (EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins) u =
+      EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u := by
     unfold Entry.scheme EntryCorrect.labelsFor
     rfl
   unfold reachedEntries tapeOracle
