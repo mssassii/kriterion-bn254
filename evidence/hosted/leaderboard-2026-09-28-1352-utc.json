@@ -1,0 +1,53 @@
+{
+  "checkedAtUTC": "2026-09-28 13:52 UTC",
+  "challengeRevision": 16,
+  "position": 1,
+  "submissionId": "89e2b245-1673-4476-a71b-7a4eb84bcc77",
+  "commit": "32f1fb34884ca33a84ac9dd4db687ca30187aeed",
+  "author": "github:mssassii",
+  "metrics": {
+    "metric:ciphertext_bytes": 128276,
+    "metric:garble_queries": 1061622,
+    "metric:evaluate_queries": 1054788
+  },
+  "checks": [
+    {
+      "checkId": "axioms",
+      "result": "pass",
+      "status": "ok",
+      "detail": {
+        "axioms": [
+          "propext",
+          "Classical.choice",
+          "Quot.sound"
+        ]
+      }
+    },
+    {
+      "checkId": "build",
+      "result": "pass",
+      "status": "ok",
+      "detail": {}
+    },
+    {
+      "checkId": "layout",
+      "result": "pass",
+      "status": "ok",
+      "detail": {}
+    },
+    {
+      "checkId": "lint",
+      "result": "pass",
+      "status": "ok",
+      "detail": {}
+    },
+    {
+      "checkId": "obligation",
+      "result": "pass",
+      "status": "ok",
+      "detail": {}
+    }
+  ],
+  "review": "CLEAR",
+  "warnings": []
+}

@@ -8,8 +8,10 @@ Starting from dnctse's **130,122-byte** entry, Astra's selected extraction sched
 of modulus 17 combine to save **1,846 bytes**. The first extraction has width 9 on 26 selected odd
 moduli, and width 8 on the other 57. The remaining modulus 256 reuses the first chunk.
 
-**All combined local checks passed on 2026-09-28: full build, metric/encoding audit, and whole-tree
-axiom audit. No hosted result is claimed for this combined candidate.**
+**Commit `32f1fb34884ca33a84ac9dd4db687ca30187aeed` passed hosted verification at 128,276 bytes,
+with all five checks passing and review CLEAR. It ranks #1 as observed on 28 September 2026 at
+13:52 UTC.** See [hosted results and public submissions](HOSTED_RESULTS.md). Rankings may change.
+The local verification reports below remain historical evidence from before submission.
 
 | metric | value | rule |
 |---|---|---|
