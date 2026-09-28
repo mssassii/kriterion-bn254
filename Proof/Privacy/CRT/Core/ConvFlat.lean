@@ -11,7 +11,10 @@ from its joins and pins (`Construction/CRT/Layout.lean`). This file connects the
 * **B2** (`phi_bijective`, `phi_uniform`): the source's joins and pins of one coordinate are read back by `readPub` as
   a bijection `phi` onto `ConvVals table`. The join and pin positions of `ConvVals` are enumerated by sums and sigmas
   whose `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_chunk`, `jIdx_mod`, `pIdx_mod`), so `phi` is
-  injective; the two sides have `2 ^ (labelBits · 3178)` elements.
+  injective; the two sides have `2 ^ (labelBits · 3178)` elements. **No chunk joins**: the source publishes zero
+  chunk joins (`Source.conv`), so `phi` reads the *full* source material `srcConvFull` (the chunk joins from the
+  retained, unpublished chunk-join cells); the flat vector omits the chunk joins, so it is the same for both
+  (`convVector_srcConv`).
 * `source_joins_pins_uniform`, `source_crt_law`: under a uniform source the joins and pins of coordinate `κ` are
   uniform, so the source's flat vector is `flatOf` of uniform conversion values.
 -/
@@ -143,19 +146,14 @@ same flat list. -/
 theorem flatten_congr (p q : ConvPublic) (h : readPub table p = readPub table q) :
     p.flatten table = q.flatten table := by
   simp only [readPub, Prod.mk.injEq] at h
-  obtain ⟨⟨hj, hp⟩, hm⟩ := h
+  obtain ⟨⟨_, hp⟩, hm⟩ := h
   unfold ConvPublic.flatten
   congr 1
   · apply flatMap_congr'
     intro c hc
     rw [List.mem_range] at hc
     have pins := pinOfBlocks_injective _ (congrFun hp ⟨c, hc⟩)
-    have e1 : (List.range (table.chunkWidth c - 1)).map (fun n => p.chunkJoin c (n + 1)) =
-        (List.range (table.chunkWidth c - 1)).map (fun n => q.chunkJoin c (n + 1)) :=
-      List.map_congr_left fun n hn => congrFun (congrFun hj ⟨c, hc⟩) ⟨n, List.mem_range.mp hn⟩
-    have e2 : (List.range (table.castWidth - 1)).map (p.chunkPin c) = (List.range (table.castWidth - 1)).map (q.chunkPin c) :=
-      List.map_congr_left fun k hk => congrFun pins ⟨k, List.mem_range.mp hk⟩
-    rw [e1, e2]
+    exact List.map_congr_left fun k hk => congrFun pins ⟨k, List.mem_range.mp hk⟩
   · apply flatMap_congr'
     intro i _
     have hi := readMod_parts (congrFun hm i)
@@ -213,13 +211,27 @@ abbrev JP : Type := (Fin joinCount → Label) × ((k : Fin pinCount) → Lanes (
 def srcOf (x : JP) : Source :=
   { (Classical.arbitrary Source) with joins := fun _ => x.1, pins := fun _ => x.2 }
 
-/-- The conversion material that joins and pins publish (`Source.conv`). -/
+/-- The conversion material that joins and pins publish (`Source.conv`: zero chunk joins). -/
 def srcConv (x : JP) : ConvPublic := (srcOf x).conv 0
 
 theorem source_conv_eq (s : Source) (κ : Fin 2) : s.conv κ = srcConv (s.joins κ, s.pins κ) := rfl
 
-/-- **The in-range reading of the source's conversion material.** -/
-def phi (x : JP) : ConvVals table := readPub table (srcConv x)
+/-- The **full** conversion material of joins and pins: `srcConv` with the chunk joins read from the source's
+(retained, unpublished) chunk-join cells. -/
+def srcConvFull (x : JP) : ConvPublic :=
+  { srcConv x with chunkJoin := fun c n => (srcOf x).joinAt 0 (chunkJoinBase c + (n - 1)) }
+
+/-- The flat layout omits the chunk joins: a material and its chunk-join update flatten alike. -/
+theorem flatten_chunkJoin (T : CrtTable) (p : ConvPublic) (f : ℕ → ℕ → Label) :
+    ConvPublic.flatten T { p with chunkJoin := f } = ConvPublic.flatten T p := rfl
+
+/-- The published flat vector of the source's material is that of its full material. -/
+theorem convVector_srcConv (x : JP) : convVector (srcConv x) = convVector (srcConvFull x) := by
+  unfold convVector srcConvFull
+  rw [flatten_chunkJoin]
+
+/-- **The in-range reading of the source's full conversion material.** -/
+def phi (x : JP) : ConvVals table := readPub table (srcConvFull x)
 
 /-! #### Join positions -/
 
@@ -422,12 +434,12 @@ theorem rowI_pos (i : Fin table.count) (row : OddRow) (hk : table.kind i = .odd 
   rw [show rowI i = row from rowOf_table i row hk]
   omega
 
-theorem chunkPin_eq (x : JP) (c k : ℕ) : (srcConv x).chunkPin c k = (srcOf x).pinBlockAt 0 c k := by
-  dsimp only [srcConv, Source.conv]
+theorem chunkPin_eq (x : JP) (c k : ℕ) : (srcConvFull x).chunkPin c k = (srcOf x).pinBlockAt 0 c k := by
+  dsimp only [srcConvFull, srcConv, Source.conv]
 
 theorem stagePin_eq (x : JP) (i s k : ℕ) :
-    (srcConv x).stagePin i s k = (srcOf x).pinBlockAt 0 (modPinBase i + s) k := by
-  dsimp only [srcConv, Source.conv]
+    (srcConvFull x).stagePin i s k = (srcOf x).pinBlockAt 0 (modPinBase i + s) k := by
+  dsimp only [srcConvFull, srcConv, Source.conv]
 
 theorem pins_eq_of_phi {x y : JP} (h : phi x = phi y) : x.2 = y.2 := by
   funext k
@@ -532,10 +544,11 @@ theorem source_joins_pins_uniform [Fintype Source] (κ : Fin 2) :
       obtain ⟨h1, h2⟩ := hs
       simp only [Function.update_idem, ← h1, ← h2, Function.update_eq_self] }
 
-/-- The source's flat vector of coordinate `κ` read through `flatOf`. -/
+/-- The source's flat vector of coordinate `κ` read through `flatOf` (of its full material: the flat vector omits
+the chunk joins). -/
 theorem source_convVector (s : Source) (κ : Fin 2) :
     convVector (s.conv κ) = flatOf (phi (s.joins κ, s.pins κ)) := by
-  rw [convVector_eq_flatOf, source_conv_eq]
+  rw [source_conv_eq, convVector_srcConv, convVector_eq_flatOf]
   rfl
 
 /-- **The source's flat conversion vector of coordinate `κ` is `flatOf` of uniform conversion values.** -/

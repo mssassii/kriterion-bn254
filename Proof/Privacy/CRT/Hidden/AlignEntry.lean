@@ -2,7 +2,8 @@
 **The reach against the garbler for the configuration-E entry** (P2a; `Hidden/Align.lean` for the
 coordinate).
 
-For every hash `H`, scalar, coins and input `u`, with the honest labels and the published value of the garbling:
+For every hash `H`, scalar, coins and input `u`, with the honest labels (the actual key: the chunk joins absorbed into
+the zero labels, `EntryCorrect.keyOf`) and the published value of the garbling:
 
 * `replayConv_aligned`: the conversion layer of both coordinates, both directions, at the cold predicate
   `hotTag table u τ = false`;
@@ -60,27 +61,31 @@ theorem replayConv_aligned (H : HashN) (scalar : BN254.NonZeroScalar) (coins : C
     Aligned (ColdAt fun τ => hotTag table u τ = false)
       (asked H (coordGarbleM table xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))) ++
         asked H (coordGarbleM table yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))))
-      (asked H (replayConv (pubOf H scalar coins) u (labelsFor coins u))) := by
+      (asked H (replayConv (pubOf H scalar coins) u (labelsFor H coins u))) := by
   have progX : coordEvalM table xCount 0 (convOf (pubOf H scalar coins).crtX)
-      (fun e => ((pubOf H scalar coins).recX.get e).val) u.x.val (fun j => clip (labelX (labelsFor coins u) j)) =
+      (fun e => ((pubOf H scalar coins).recX.get e).val) u.x.val (fun j => clip (labelX (labelsFor H coins u) j)) =
       coordEvalM table xCount 0 (gxOf H coins).pub ((gxOf H coins).records fun e => (slXOf H scalar coins e).val)
         u.x.val (fun j => clip (atNat (coins.inputZero .x) 0 j) ^^^ (if u.x.val.testBit j then clip (coins.inputDelta .x) else 0)) := by
     unfold labelsFor
     rw [show (fun e => ((pubOf H scalar coins).recX.get e).val) =
         (gxOf H coins).records (fun e => (slXOf H scalar coins e).val) from funext (pubOf_recX H scalar coins),
-      coordEvalM_labels_congr table xCount 0 _ _ u.x.val _ _
-        (fun j low => clip_labelX_honest _ _ _ (coins_key_x coins) u j low),
       pubOf_crtX, FlatLayout.coordEvalM_congr table xCount 0 _ _ _ u.x.val _ (convAgree_convOf _)]
+    -- no chunk joins: zero joins on the absorbed labels are the joins on the coins' labels
+    exact Absorb.coordEvalM_absorb table SliceC.bn254_correctTable.chunkBits_pos xCount 0 _ _ u.x.val _ _
+      (fun j low => clip_labelX_absorbed _ (coins.inputZero .x)
+        (table.chunkShift (gxOf H coins).pub.chunkJoin) (coins.inputDelta .x) (keyOf_x H coins) u j low)
   have progY : coordEvalM table yCount 1 (convOf (pubOf H scalar coins).crtY)
-      (fun e => ((pubOf H scalar coins).recY.get e).val) u.y.val (fun j => clip (labelY (labelsFor coins u) j)) =
+      (fun e => ((pubOf H scalar coins).recY.get e).val) u.y.val (fun j => clip (labelY (labelsFor H coins u) j)) =
       coordEvalM table yCount 1 (gyOf H coins).pub ((gyOf H coins).records fun e => (slYOf H scalar coins e).val)
         u.y.val (fun j => clip (atNat (coins.inputZero .y) 0 j) ^^^ (if u.y.val.testBit j then clip (coins.inputDelta .y) else 0)) := by
     unfold labelsFor
     rw [show (fun e => ((pubOf H scalar coins).recY.get e).val) =
         (gyOf H coins).records (fun e => (slYOf H scalar coins e).val) from funext (pubOf_recY H scalar coins),
-      coordEvalM_labels_congr table yCount 1 _ _ u.y.val _ _
-        (fun j low => clip_labelY_honest _ _ _ (coins_key_y coins) u j low),
       pubOf_crtY, FlatLayout.coordEvalM_congr table yCount 1 _ _ _ u.y.val _ (convAgree_convOf _)]
+    -- no chunk joins: zero joins on the absorbed labels are the joins on the coins' labels
+    exact Absorb.coordEvalM_absorb table SliceC.bn254_correctTable.chunkBits_pos yCount 1 _ _ u.y.val _ _
+      (fun j low => clip_labelY_absorbed _ (coins.inputZero .y)
+        (table.chunkShift (gyOf H coins).pub.chunkJoin) (coins.inputDelta .y) (keyOf_y H coins) u j low)
   have tagsX := coordTags_cold table u xCount 0 (by norm_num) (Paths.bn254_ranges _ (by decide))
   have tagsY := coordTags_cold table u yCount 1 (by norm_num) (Paths.bn254_ranges _ (by decide))
   rw [coordValue_zero] at tagsX
@@ -255,13 +260,13 @@ theorem triple_some (scalar : BN254.NonZeroScalar) (coins : Coins) (o : Fin digi
 in its digest. -/
 theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins : Coins) (u : BN254.AffineInput) :
     ∀ x ∈ asked H (garbleCM scalar coins), designTag table (exceptional scalar coins) u (x / 2 ^ 128) = true →
-      x ∈ asked H (replayConv (pubOf H scalar coins) u (labelsFor coins u)) ∨
+      x ∈ asked H (replayConv (pubOf H scalar coins) u (labelsFor H coins u)) ∨
       (BN254.validate u = true ∧
         (x ∈ asked H (keyM (curveOutput (pubOf H scalar coins) u
-            ((replayConv (pubOf H scalar coins) u (labelsFor coins u)).eval H))) ∨
+            ((replayConv (pubOf H scalar coins) u (labelsFor H coins u)).eval H))) ∨
           x ∈ asked H (maskAnswersM ((keyM (curveOutput (pubOf H scalar coins) u
-            ((replayConv (pubOf H scalar coins) u (labelsFor coins u)).eval H))).eval H) digitCount))) ∨
-      x ∈ asked H (digestEvalM coordinateBitCount digitCount (labelsOf (labelsFor coins u)) u
+            ((replayConv (pubOf H scalar coins) u (labelsFor H coins u)).eval H))).eval H) digitCount))) ∨
+      x ∈ asked H (digestEvalM coordinateBitCount digitCount (labelsOf (labelsFor H coins u)) u
         (fun o => (pubOf H scalar coins).exception.get o)) := by
   intro x inside designed
   have conv := replayConv_aligned H scalar coins u
@@ -327,7 +332,7 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
         rw [hashInput_div, designTag_label _ _ _ hf, hcoord, hslot, hpart, inputBit_eq_coordBit,
           beq_iff_eq] at designed
         refine ⟨c, p, ?_⟩
-        rw [labelsOf_honest coins u c p, ← designed]
+        rw [labelsOf_honest H coins u c p, ← designed]
         simp
       · subst same
         obtain ⟨hf, hcoord, hslot, hpart⟩ := digestLabelTag_fields (b := 1) c.isLt (lt_of_lt_of_le p.isLt (by decide))
@@ -335,7 +340,7 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
         rw [hashInput_div, designTag_label _ _ _ hf, hcoord, hslot, hpart, inputBit_eq_coordBit,
           beq_iff_eq] at designed
         refine ⟨c, p, ?_⟩
-        rw [labelsOf_honest coins u c p, ← designed]
+        rw [labelsOf_honest H coins u c p, ← designed]
         simp
     · -- a final: designed only at the digit's exceptional input
       right
@@ -355,8 +360,8 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
           rw [hashInput_div, designTag_final _ _ _ hf, hslot, beq_iff_eq,
             exceptional_some scalar coins o phi selected, Option.some.injEq] at designed
           rw [List.mem_cons, eval_digestTableM,
-            DigestUnlock.digestKey_honest H coordinateBitCount (zeroOf coins) (deltaOf coins) _ u
-              (labelsOf_honest coins u), designed]
+            DigestUnlock.digestKey_honest H coordinateBitCount (keyZero H coins) (deltaOf coins) _ u
+              (labelsOf_honest H coins u), designed]
           exact Or.inl rfl
         · subst inEntry
           obtain ⟨hf, hslot⟩ := digestFinalTag_fields (o := 2 * o.val + 1)
@@ -364,14 +369,14 @@ theorem garble_designed_parts (H : HashN) (scalar : BN254.NonZeroScalar) (coins 
           rw [hashInput_div, designTag_final _ _ _ hf, hslot, beq_iff_eq,
             triple_some scalar coins o phi selected, Option.some.injEq] at designed
           rw [List.mem_cons, List.mem_singleton, eval_digestTableM,
-            DigestUnlock.digestKey_honest H coordinateBitCount (zeroOf coins) (deltaOf coins) _ u
-              (labelsOf_honest coins u), designed]
+            DigestUnlock.digestKey_honest H coordinateBitCount (keyZero H coins) (deltaOf coins) _ u
+              (labelsOf_honest H coins u), designed]
           exact Or.inr rfl
 
 /-- **Every designed garbler input is the reach's** (`Entry.reachCM`, the reach on the curve; for every hash). -/
 theorem garble_designed_reached (H : HashN) (scalar : BN254.NonZeroScalar) (coins : Coins) (u : BN254.AffineInput) :
     ∀ x ∈ asked H (garbleCM scalar coins), designTag table (exceptional scalar coins) u (x / 2 ^ 128) = true →
-      x ∈ asked H (reachCM (pubOf H scalar coins) u (labelsFor coins u)) := by
+      x ∈ asked H (reachCM (pubOf H scalar coins) u (labelsFor H coins u)) := by
   intro x inside designed
   unfold reachCM replay
   simp only [asked_bind, asked_pure, List.append_nil, List.mem_append]
