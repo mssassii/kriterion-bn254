@@ -8,8 +8,8 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 |---|---|---|
 | `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row constants `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
 | `bytes` | `exceptionBase + index`, `index < 1092` | release-r1's `bytes` (8 coins each) |
-| `joins` | `sourceJoin κ index`, `index < joinCount` | 128 coins |
-| `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 128` | `pinWidth k` coins (one lane per word) |
+| `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins |
+| `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 85` | bounded rejection below `m_i` over `digitWidth m_i` coins |
 | `zeros` | `keyBase + 2 j`, `j < 508` (`Z_j`) | 128 coins |
 | `deltas` | `deltaCell κ` | 128 coins |
@@ -77,18 +77,18 @@ def bytes : Prog := Stage1.bytes
 /-- The joins of both coordinates, flat: `n = κ · joinCount + index`. -/
 def joins : Prog :=
   Prog.rep (2 * Entry.joinCount) fun n =>
-    Stage1.wordCell 128 (Layout.sourceJoin (n / Entry.joinCount) (n % Entry.joinCount))
+    Stage1.wordCell labelBits (Layout.sourceJoin (n / Entry.joinCount) (n % Entry.joinCount))
 
-/-- The pin of lane word `n = (κ · pinCount + k) · 128 + lane`. -/
-def pinOf (n : Nat) : Nat := n / 128 % Entry.pinCount
+/-- The pin of lane word `n = (κ · pinCount + k) · 104 + lane`. -/
+def pinOf (n : Nat) : Nat := n / laneCount % Entry.pinCount
 
 /-- The coordinate of lane word `n`. -/
-def pinCoord (n : Nat) : Nat := n / (Entry.pinCount * 128)
+def pinCoord (n : Nat) : Nat := n / (Entry.pinCount * laneCount)
 
 /-- The pins of both coordinates, one lane per word, flat. -/
 def pins : Prog :=
-  Prog.rep (2 * (Entry.pinCount * 128)) fun n =>
-    Stage1.wordCell (pinWidthAt (pinOf n)) (Layout.sourcePin (pinCoord n) (pinOf n) (n % 128))
+  Prog.rep (2 * (Entry.pinCount * laneCount)) fun n =>
+    Stage1.wordCell (pinWidthAt (pinOf n)) (Layout.sourcePin (pinCoord n) (pinOf n) (n % laneCount))
 
 /-- The records, `x` then `y`. -/
 def recordCount : Nat := Entry.xCount + Entry.yCount
@@ -131,11 +131,11 @@ deriving Inhabited
 
 /-- `count` joins of coordinate `κ` from index `start`. -/
 def joinPieces (κ start count : Nat) : List Piece :=
-  (List.range count).map fun n => .word (Layout.sourceJoin κ (start + n)) 128
+  (List.range count).map fun n => .word (Layout.sourceJoin κ (start + n)) labelBits
 
-/-- Pin `k` of coordinate `κ`: its 128 lanes. -/
+/-- Pin `k` of coordinate `κ`: its 104 active lanes (the reserved RAM stride remains 128). -/
 def pinPieces (κ k : Nat) : List Piece :=
-  (List.range 128).map fun lane => .word (Layout.sourcePin κ k lane) (pinWidthAt k)
+  (List.range laneCount).map fun lane => .word (Layout.sourcePin κ k lane) (pinWidthAt k)
 
 /-- The conversion blocks of coordinate `κ`, in the order of `ConvPublic.flatten`. -/
 def convPieces (κ : Nat) : List Piece :=

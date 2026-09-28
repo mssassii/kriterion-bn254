@@ -174,19 +174,19 @@ theorem digitAbort_le (m : Nat) (fits : m ≤ 2 ^ digitWidth m) (half : 2 ^ digi
 /-! ### The exact draws and their law -/
 
 /-- A lane word of pin `pinOf n`. -/
-abbrev PinWord (n : Fin (2 * (Entry.pinCount * 128))) : Type := Fin (2 ^ pinWidthAt (pinOf n.val))
+abbrev PinWord (n : Fin (2 * (Entry.pinCount * laneCount))) : Type := Fin (2 ^ pinWidthAt (pinOf n.val))
 
 /-- A digit below its modulus. -/
 abbrev DigitVal (n : Fin (recordCount * moduliCount)) : Type := Fin (modulusAt (n.val % moduliCount))
 
-instance pinWordNonempty (n : Fin (2 * (Entry.pinCount * 128))) : Nonempty (PinWord n) :=
+instance pinWordNonempty (n : Fin (2 * (Entry.pinCount * laneCount))) : Nonempty (PinWord n) :=
   ⟨⟨0, Nat.two_pow_pos _⟩⟩
 
 instance digitValNonempty (n : Fin (recordCount * moduliCount)) : Nonempty (DigitVal n) :=
   ⟨⟨0, modulusAt_pos _⟩⟩
 
 /-- The pin lanes of exact draws. -/
-abbrev Pins : Type := (n : Fin (2 * (Entry.pinCount * 128))) → PinWord n
+abbrev Pins : Type := (n : Fin (2 * (Entry.pinCount * laneCount))) → PinWord n
 
 /-- The record digits of exact draws. -/
 abbrev Digits : Type := (n : Fin (recordCount * moduliCount)) → DigitVal n
@@ -198,7 +198,7 @@ instance digitsNonempty : Nonempty Digits := inferInstance
 
 /-- **The exact draws**: field cells, bytes, joins, pin lanes, record digits, zero labels, offsets. -/
 abbrev Exact : Type := (Fin fieldCount → BaseField) × (Fin exceptionByteCount → Fin (2 ^ 8)) ×
-  (Fin (2 * Entry.joinCount) → Fin (2 ^ 128)) × Pins × Digits × (Fin labelCount → Fin (2 ^ 128)) ×
+  (Fin (2 * Entry.joinCount) → Fin (2 ^ labelBits)) × Pins × Digits × (Fin labelCount → Fin (2 ^ 128)) ×
   (Fin 2 → Fin (2 ^ 128))
 
 /-- Exact draws as the machine's draws. -/
@@ -278,7 +278,7 @@ theorem idealFields_eq :
   optionProduct_uniform fieldCount
 
 theorem pinsLaw_eq : pinsLaw = (PMF.uniformOfFintype Pins).map fun P => some fun n => (P n).val := by
-  have each : ∀ n : Fin (2 * (Entry.pinCount * 128)), (wordLaw (pinWidthAt (pinOf n.val))).map some =
+  have each : ∀ n : Fin (2 * (Entry.pinCount * laneCount)), (wordLaw (pinWidthAt (pinOf n.val))).map some =
       (PMF.uniformOfFintype (PinWord n)).map fun v => some v.val := fun n => by
     unfold wordLaw
     rw [PMF.map_comp]
@@ -294,11 +294,11 @@ theorem idealDigits_eq : idealDigits = (PMF.uniformOfFintype Digits).map fun D =
 theorem idealDrawLaw_eq : idealDrawLaw = (PMF.uniformOfFintype Exact).map fun D => some (embed D) := by
   unfold idealDrawLaw
   rw [idealFields_eq, show bytesLaw = _ from wordProduct_eq exceptionByteCount 8,
-    show joinsLaw = _ from wordProduct_eq (2 * Entry.joinCount) 128, pinsLaw_eq, idealDigits_eq,
+    show joinsLaw = _ from wordProduct_eq (2 * Entry.joinCount) labelBits, pinsLaw_eq, idealDigits_eq,
     show zerosLaw = _ from wordProduct_eq labelCount 128, show deltasLaw = _ from wordProduct_eq 2 128]
   simp only [optBind_map_some, optBind_map_some_id]
   rw [← uniform_product (A := Fin fieldCount → BaseField), ← uniform_product (A := Fin exceptionByteCount → Fin (2 ^ 8)),
-    ← uniform_product (A := Fin (2 * Entry.joinCount) → Fin (2 ^ 128)), ← uniform_product (A := Pins),
+    ← uniform_product (A := Fin (2 * Entry.joinCount) → Fin (2 ^ labelBits)), ← uniform_product (A := Pins),
     ← uniform_product (A := Digits), ← uniform_product (A := Fin labelCount → Fin (2 ^ 128))]
   simp only [PMF.map_bind, PMF.map_comp]
   rfl
@@ -342,16 +342,16 @@ theorem joinIndex_lt (n : Fin (2 * Entry.joinCount)) : n.val % Entry.joinCount <
   Nat.mod_lt _ (by have := n.isLt; omega)
 
 /-- The joins of a source. -/
-def exJoins (s : Entry.Source) (n : Fin (2 * Entry.joinCount)) : Fin (2 ^ 128) :=
+def exJoins (s : Entry.Source) (n : Fin (2 * Entry.joinCount)) : Fin (2 ^ labelBits) :=
   (s.joins ⟨n.val / Entry.joinCount, joinCoord_lt n⟩ ⟨n.val % Entry.joinCount, joinIndex_lt n⟩).toFin
 
-theorem pinCoord_lt (n : Fin (2 * (Entry.pinCount * 128))) : pinCoord n.val < 2 := by
-  show n.val / (Entry.pinCount * 128) < 2
-  exact Nat.div_lt_of_lt_mul (lt_of_lt_of_eq n.isLt (Nat.mul_comm 2 (Entry.pinCount * 128)))
+theorem pinCoord_lt (n : Fin (2 * (Entry.pinCount * laneCount))) : pinCoord n.val < 2 := by
+  show n.val / (Entry.pinCount * laneCount) < 2
+  exact Nat.div_lt_of_lt_mul (lt_of_lt_of_eq n.isLt (Nat.mul_comm 2 (Entry.pinCount * laneCount)))
 
-theorem pinOf_lt (n : Fin (2 * (Entry.pinCount * 128))) : pinOf n.val < Entry.pinCount := by
-  show n.val / 128 % Entry.pinCount < Entry.pinCount
-  have small : n.val < 2 * (Entry.pinCount * 128) := n.isLt
+theorem pinOf_lt (n : Fin (2 * (Entry.pinCount * laneCount))) : pinOf n.val < Entry.pinCount := by
+  show n.val / laneCount % Entry.pinCount < Entry.pinCount
+  have small : n.val < 2 * (Entry.pinCount * laneCount) := n.isLt
   exact Nat.mod_lt _ (by omega)
 
 instance twoPowNeZero (w : Nat) : NeZero (2 ^ w) := ⟨pow_ne_zero _ two_ne_zero⟩
@@ -359,7 +359,7 @@ instance twoPowNeZero (w : Nat) : NeZero (2 ^ w) := ⟨pow_ne_zero _ two_ne_zero
 /-- The pin lanes of a source. -/
 def exPins (s : Entry.Source) : Pins := fun n =>
   ⟨(s.pins ⟨pinCoord n.val, pinCoord_lt n⟩ ⟨pinOf n.val, pinOf_lt n⟩
-      ⟨n.val % 128, Nat.mod_lt _ (by decide)⟩).val, by
+      ⟨n.val % laneCount, Nat.mod_lt _ (by decide)⟩).val, by
     rw [CrtConv.pinWidthAt_eq _ (pinOf_lt n)]
     exact ZMod.val_lt _⟩
 
@@ -475,7 +475,7 @@ theorem read_exception (s : Entry.Source) : (readSource (exOf s)).exception = s.
 
 theorem read_joins (s : Entry.Source) : (readSource (exOf s)).joins = s.joins := by
   funext κ i
-  show BitVec.ofNat 128 (total 0 (fun n => (exJoins s n).val) (κ.val * Entry.joinCount + i.val)) = s.joins κ i
+  show BitVec.ofNat labelBits (total 0 (fun n => (exJoins s n).val) (κ.val * Entry.joinCount + i.val)) = s.joins κ i
   have fd := flat_div_mod (J := Entry.joinCount) (κ := κ.val) i.isLt
   have le : κ.val * Entry.joinCount ≤ 1 * Entry.joinCount := Nat.mul_le_mul_right _ (by omega)
   have is := i.isLt
@@ -485,29 +485,29 @@ theorem read_joins (s : Entry.Source) : (readSource (exOf s)).joins = s.joins :=
   rw [bitVec_ofNat_toNat]
   exact congrArg₂ s.joins (Fin.ext fd.1) (Fin.ext fd.2)
 
-theorem pins_val (s : Entry.Source) (a b c : Nat) (ha : a < 2) (hb : b < Entry.pinCount) (hc : c < 128) (κ : Fin 2)
-    (k : Fin Entry.pinCount) (lane : Fin 128) (h1 : a = κ.val) (h2 : b = k.val) (h3 : c = lane.val) :
+theorem pins_val (s : Entry.Source) (a b c : Nat) (ha : a < 2) (hb : b < Entry.pinCount) (hc : c < laneCount) (κ : Fin 2)
+    (k : Fin Entry.pinCount) (lane : Fin laneCount) (h1 : a = κ.val) (h2 : b = k.val) (h3 : c = lane.val) :
     (s.pins ⟨a, ha⟩ ⟨b, hb⟩ ⟨c, hc⟩).val = (s.pins κ k lane).val := by
   subst h1 h2 h3
   rfl
 
 theorem read_pins (s : Entry.Source) : (readSource (exOf s)).pins = s.pins := by
   funext κ k lane
-  show (((total 0 (fun n => (exPins s n).val) ((κ.val * Entry.pinCount + k.val) * 128 + lane.val) : Nat)) :
+  show (((total 0 (fun n => (exPins s n).val) ((κ.val * Entry.pinCount + k.val) * laneCount + lane.val) : Nat)) :
     ZMod (2 ^ Entry.pinWidth k)) = s.pins κ k lane
-  have fd1 := flat_div_mod (J := 128) (κ := κ.val * Entry.pinCount + k.val) lane.isLt
+  have fd1 := flat_div_mod (J := laneCount) (κ := κ.val * Entry.pinCount + k.val) lane.isLt
   have fd2 := flat_div_mod (J := Entry.pinCount) (κ := κ.val) k.isLt
   have le : κ.val * Entry.pinCount ≤ 1 * Entry.pinCount := Nat.mul_le_mul_right _ (by omega)
   have ks := k.isLt
-  have ls : lane.val < 128 := lane.isLt
+  have ls : lane.val < laneCount := lane.isLt
   rw [total_apply _ _ _ (by omega)]
   unfold exPins
   simp only
-  have c1 : pinCoord ((κ.val * Entry.pinCount + k.val) * 128 + lane.val) = κ.val := by
-    show ((κ.val * Entry.pinCount + k.val) * 128 + lane.val) / (Entry.pinCount * 128) = κ.val
-    rw [Nat.mul_comm Entry.pinCount 128, ← Nat.div_div_eq_div_mul, fd1.1, fd2.1]
-  have c2 : pinOf ((κ.val * Entry.pinCount + k.val) * 128 + lane.val) = k.val := by
-    show ((κ.val * Entry.pinCount + k.val) * 128 + lane.val) / 128 % Entry.pinCount = k.val
+  have c1 : pinCoord ((κ.val * Entry.pinCount + k.val) * laneCount + lane.val) = κ.val := by
+    show ((κ.val * Entry.pinCount + k.val) * laneCount + lane.val) / (Entry.pinCount * laneCount) = κ.val
+    rw [Nat.mul_comm Entry.pinCount laneCount, ← Nat.div_div_eq_div_mul, fd1.1, fd2.1]
+  have c2 : pinOf ((κ.val * Entry.pinCount + k.val) * laneCount + lane.val) = k.val := by
+    show ((κ.val * Entry.pinCount + k.val) * laneCount + lane.val) / laneCount % Entry.pinCount = k.val
     rw [fd1.1, fd2.2]
   rw [pins_val s _ _ _ _ _ _ κ k lane c1 c2 fd1.2, ZMod.natCast_zmod_val]
 
@@ -642,21 +642,21 @@ theorem exJoins_read (D : Exact) : exJoins (readSource D) = D.2.2.1 := by
   apply Fin.ext
   unfold exJoins
   simp only [BitVec.val_toFin]
-  show (BitVec.ofNat 128 (total 0 (fun m => (D.2.2.1 m).val)
+  show (BitVec.ofNat labelBits (total 0 (fun m => (D.2.2.1 m).val)
     (n.val / Entry.joinCount * Entry.joinCount + n.val % Entry.joinCount))).toNat = (D.2.2.1 n).val
   rw [Nat.div_add_mod', total_apply _ _ _ n.isLt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (D.2.2.1 n).isLt]
 
-theorem pin_index (P m : Nat) : (m / (P * 128) * P + m / 128 % P) * 128 + m % 128 = m := by
-  rw [Nat.mul_comm P 128, ← Nat.div_div_eq_div_mul, Nat.div_add_mod', Nat.div_add_mod']
+theorem pin_index (P m : Nat) : (m / (P * laneCount) * P + m / laneCount % P ) * laneCount + m % laneCount = m := by
+  rw [Nat.mul_comm P laneCount, ← Nat.div_div_eq_div_mul, Nat.div_add_mod', Nat.div_add_mod']
 
 theorem exPins_read (D : Exact) : exPins (readSource D) = D.2.2.2.1 := by
   funext n
   apply Fin.ext
   unfold exPins
   show ((((total 0 (fun m => (D.2.2.2.1 m).val)
-      ((pinCoord n.val * Entry.pinCount + pinOf n.val) * 128 + n.val % 128) : Nat)) :
+      ((pinCoord n.val * Entry.pinCount + pinOf n.val ) * laneCount + n.val % laneCount) : Nat)) :
       ZMod (2 ^ Entry.pinWidth ⟨pinOf n.val, pinOf_lt n⟩))).val = (D.2.2.2.1 n).val
-  have idx : (pinCoord n.val * Entry.pinCount + pinOf n.val) * 128 + n.val % 128 = n.val :=
+  have idx : (pinCoord n.val * Entry.pinCount + pinOf n.val ) * laneCount + n.val % laneCount = n.val :=
     pin_index Entry.pinCount n.val
   rw [ZMod.val_natCast, idx, total_apply _ _ _ n.isLt]
   exact Nat.mod_eq_of_lt (lt_of_lt_of_eq (D.2.2.2.1 n).isLt (by rw [CrtConv.pinWidthAt_eq _ (pinOf_lt n)]))

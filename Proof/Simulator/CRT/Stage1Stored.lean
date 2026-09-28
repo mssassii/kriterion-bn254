@@ -58,7 +58,7 @@ theorem joinAddr_range (n : Nat) (small : n < 2 * joinCount) :
   rw [joinCount_eq] at *
   constructor <;> omega
 
-theorem pinAddr_range (n : Nat) (small : n < 2 * (pinCount * 128)) :
+theorem pinAddr_range (n : Nat) (small : n < 2 * (pinCount * laneCount)) :
     2 ^ 52 ≤ pinAddr n ∧ pinAddr n < 2 ^ 52 + 2 ^ 25 := by
   unfold pinAddr pinCoord pinOf Layout.sourcePin
   rw [pinCount_eq] at *
@@ -80,8 +80,8 @@ theorem joinAddr_injective (first second : Nat) (firstSmall : first < 2 * joinCo
     rw [joinCount_eq] at *
     omega
 
-theorem pinAddr_injective (first second : Nat) (firstSmall : first < 2 * (pinCount * 128))
-    (secondSmall : second < 2 * (pinCount * 128)) (different : first ≠ second) :
+theorem pinAddr_injective (first second : Nat) (firstSmall : first < 2 * (pinCount * laneCount))
+    (secondSmall : second < 2 * (pinCount * laneCount)) (different : first ≠ second) :
     word (pinAddr first) ≠ word (pinAddr second) := by
   apply word_ne
   · have := pinAddr_range first firstSmall; omega
@@ -131,7 +131,7 @@ theorem stored_ram_upto_joins (memory : Memory) (d : Draw) (target : Nat) (small
         (by unfold keyBase labelCount at *; omega)),
     foldStore_ram_off _ (fun n => word (digitAddr n)) _ (fun n => cellStore_ram _) (recordCount * moduliCount) _ _ _
       (fun n bound => by have := digitAddr_range n bound; exact word_ne small (by omega) (by omega)),
-    foldStore_ram_off _ (fun n => word (pinAddr n)) _ (fun n => wordStore_ram _) (2 * (pinCount * 128)) _ _ _
+    foldStore_ram_off _ (fun n => word (pinAddr n)) _ (fun n => wordStore_ram _) (2 * (pinCount * laneCount)) _ _ _
       (fun n bound => by have := pinAddr_range n bound; exact word_ne small (by omega) (by omega))]
 
 theorem stored_deltas (memory : Memory) (d : Draw) (κ : Fin 2) :
@@ -166,7 +166,7 @@ theorem stored_digits (memory : Memory) (d : Draw) (n : Fin (recordCount * modul
     digitAddr_injective _ _ n
 
 set_option maxRecDepth 400000 in
-theorem stored_pins (memory : Memory) (d : Draw) (n : Fin (2 * (pinCount * 128))) :
+theorem stored_pins (memory : Memory) (d : Draw) (n : Fin (2 * (pinCount * laneCount))) :
     (storedMem memory d).ram (word (pinAddr n.val)) = BitVec.ofNat 256 (d.pins n) := by
   have range := pinAddr_range n.val n.isLt
   unfold storedMem
@@ -177,7 +177,7 @@ theorem stored_pins (memory : Memory) (d : Draw) (n : Fin (2 * (pinCount * 128))
         (by unfold keyBase labelCount at *; omega)),
     foldStore_ram_off _ (fun n => word (digitAddr n)) _ (fun n => cellStore_ram _) (recordCount * moduliCount) _ _ _
       (fun k bound => by have := digitAddr_range k bound; exact word_ne (by omega) (by omega) (by omega))]
-  exact foldStore_ram_at _ (fun n => word (pinAddr n)) _ (fun n => wordStore_ram _) (2 * (pinCount * 128))
+  exact foldStore_ram_at _ (fun n => word (pinAddr n)) _ (fun n => wordStore_ram _) (2 * (pinCount * laneCount))
     pinAddr_injective _ _ n
 
 theorem stored_joins (memory : Memory) (d : Draw) (n : Fin (2 * joinCount)) :

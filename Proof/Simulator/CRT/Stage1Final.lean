@@ -27,7 +27,7 @@ noncomputable section
 /-- **What a drawn value satisfies.** -/
 structure DrawValid (d : Draw) : Prop where
   bytes : ∀ n, d.bytes n < 2 ^ 8
-  joins : ∀ n, d.joins n < 2 ^ 128
+  joins : ∀ n, d.joins n < 2 ^ labelBits
   pins : ∀ n, d.pins n < 2 ^ pinWidthAt (pinOf n.val)
   digits : ∀ n, d.digits n < modulusAt (n.val % moduliCount)
   zeros : ∀ n, d.zeros n < 2 ^ 128
@@ -66,7 +66,7 @@ theorem drawValid_of_support (d : Draw) (member : some d ∈ drawLaw.support) : 
   unfold deltasLaw at dlm
   exact
     { bytes := fun n => wordLaw_support 8 _ (optionProduct_support _ _ b bm n)
-      joins := fun n => wordLaw_support 128 _ (optionProduct_support _ _ j jm n)
+      joins := fun n => wordLaw_support labelBits _ (optionProduct_support _ _ j jm n)
       pins := fun n => wordLaw_support _ _ (optionProduct_support _ _ p pm n)
       digits := fun n => by
         have accepted := (rejectLaw_support _ _ _ _ (optionProduct_support _ _ g gm n)).1
