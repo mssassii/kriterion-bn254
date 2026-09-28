@@ -61,6 +61,7 @@ theorem joinAddr_range (n : Nat) (small : n < 2 * joinCount) :
 theorem pinAddr_range (n : Nat) (small : n < 2 * (pinCount * laneCount)) :
     2 ^ 52 ≤ pinAddr n ∧ pinAddr n < 2 ^ 52 + 2 ^ 25 := by
   unfold pinAddr pinCoord pinOf Layout.sourcePin
+  simp only [laneCount, Narrow.labelBits] at *
   rw [pinCount_eq] at *
   constructor <;> omega
 
@@ -87,6 +88,7 @@ theorem pinAddr_injective (first second : Nat) (firstSmall : first < 2 * (pinCou
   · have := pinAddr_range first firstSmall; omega
   · have := pinAddr_range second secondSmall; omega
   · unfold pinAddr pinCoord pinOf Layout.sourcePin
+    simp only [laneCount, Narrow.labelBits] at *
     rw [pinCount_eq] at *
     omega
 
