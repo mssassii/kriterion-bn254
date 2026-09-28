@@ -20,7 +20,7 @@ are frozen. `LazyAbstractSimulator` and `abstractIdealGame` are xinshu's (`Glue/
 -/
 
 import Proof.Privacy.CRT.Glue.Shapes
-import Proof.Privacy.CRT.Core.BodyMaskRow
+import Proof.Privacy.CRT.Core.BmrNorm
 
 namespace Kriterion.CRT.Privacy
 
@@ -84,8 +84,8 @@ structure RouteMView [FieldCertificate] (Public : Type) where
   /-- The evaluator's non-collector mask sites at the key `K` (inputs `K + 2^128 · maskTag`, labelled; 546
   queries): the non-collector masks. -/
   nonCollectorReplay : Block → CM (BMR.NonCollector → BaseField)
-  /-- The published row constants. -/
-  gammaOf : Public → Fin 91 → RowGamma
+  /-- The published row data (normalized rows: the `X` constant, the flags, the sign). -/
+  gammaOf : Public → Fin 91 → NormRow
   /-- The rows kernels: the construction's true rows under its coin law (`HW`), and the tail, head clamp and lift
   sampler (`H`, `I`); `none` is a sampler abort. -/
   realRows : NonZeroScalar → AffineInput → Point → PMF (Option (Fin 91 → FieldMacToECMac.HomogeneousValue))
@@ -119,11 +119,11 @@ def replayRowValues (out : ReplayOut) (d : Fin 91) : Biquadratic.Values := fun e
   if collector : BMR.IsCollector element then 0
   else out.delivered (BMR.rowEnc (d, element)) - out.masks ⟨(d, element), collector⟩
 
-/-- **Route M's collector masks** `π_c = v_c − τ_c`, `τ_c` the solve at the target rows. -/
-def collectorMasks (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → RowGamma)
+/-- **Route M's collector masks** `π_c = v_c − τ_c`, `τ_c` the normalized solve at the (corrected) target rows. -/
+def collectorMasks (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → NormRow)
     (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (c : BMR.Collector) : BaseField :=
   out.delivered (BMR.rowEnc c.1) -
-    BMR.collectorSolve (targets c.1.1) (gamma c.1.1) u (replayRowValues out c.1.1) c.1.2
+    BMR.nCollectorSolve (targets c.1.1) (gamma c.1.1) u (replayRowValues out c.1.1) c.1.2
 
 /-- Independent draws over a list; any abort aborts. -/
 def drawAll {α β : Type} (sample : α → PMF (Option β)) : List α → PMF (Option (List (α × β)))

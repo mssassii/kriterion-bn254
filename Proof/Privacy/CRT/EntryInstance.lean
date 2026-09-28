@@ -25,6 +25,7 @@ import Proof.Privacy.CRT.Core.EncIndex
 import Construction.CRT.Entry
 import Construction.CRT.Layout
 import Proof.Privacy.Phase3.Opened
+import Proof.Privacy.CRT.NormRows
 
 /-! ### The entry's programs as the privacy chain reads them
 
@@ -147,7 +148,7 @@ def view [FieldCertificate] [GroupCertificate] : RouteMView Kriterion.CRT.Entry.
   keyInput pub u conv := Kriterion.CRT.EntryReading.keyField (Kriterion.CRT.Entry.curveOutput pub u conv)
   nonCollectorReplay key := Kriterion.CRT.EntryReading.nonCollectorReplay key >>= fun masks => pure (toMasks masks)
   gammaOf := Kriterion.CRT.Entry.gammaOf
-  realRows scalar := Security.Phase3.realRows scalar
+  realRows scalar := NormRows.normRealRows scalar
   simRows _ := Security.Phase3.simulatedRows
   preimage value := (Phase3.Glue.idealPreimage value).map some
   fourth := (PMF.uniformOfFintype Block).map some

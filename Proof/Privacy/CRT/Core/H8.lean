@@ -291,10 +291,19 @@ def inWrapWindow (w : ℕ) : Prop :=
   w + 1 < Kriterion.CRT.Entry.table.wrapBound ∨
     Kriterion.CRT.Entry.table.product - Kriterion.CRT.Entry.table.wrapBound < w
 
-/-- The wrap reveal: some encoding's CRT value in the two-sided window. -/
-def replayWraps (source : (view).Source) (u : AffineInput) (table : TagTable) : Prop :=
+/-- The window event: some encoding's CRT value in the two-sided window. -/
+def replayWindow (source : (view).Source) (u : AffineInput) (table : TagTable) : Prop :=
   (∃ e, inWrapWindow ((replayCrtValues source u table).1 e)) ∨
     ∃ e, inWrapWindow ((replayCrtValues source u table).2 e)
+
+/-- **The normalization flag of a source**: one of the two hidden cells of a digit (`zC0`, `yC4`, never published)
+is zero. It pays for the bad event of the row normalization (a zero collector offset, `Rows.zeroFlag`), whose coins
+the real side publishes with a set flag (`Core/BmrNorm.lean`). -/
+def normBadSrc (source : (view).Source) : Prop := ∃ d, (source.rows d).zC0 = 0 ∨ (source.rows d).yC4 = 0
+
+/-- **The wrap reveal**: the window event, or the source's normalization flag. -/
+def replayWraps (source : (view).Source) (u : AffineInput) (table : TagTable) : Prop :=
+  replayWindow source u table ∨ normBadSrc source
 
 end Shadow
 
@@ -385,7 +394,7 @@ abbrev BmrTags (T : CrtTable) (u : AffineInput) :=
 /-- The part of the view P45 governs: the curve and row constants, the records, the answers at the body, mask and
 key tags (disjoint from `RestTags`, so the rest split applies to it). -/
 def bmrPart (T : CrtTable) (u : AffineInput) (v : CoreView crtEntry T u) :
-    (BaseField × BaseField × BaseField) × Vector RowGamma digitCount ×
+    (BaseField × BaseField × BaseField) × Vector NormRow digitCount ×
       Vector Kriterion.CRT.Entry.Record Kriterion.CRT.Entry.xCount ×
       Vector Kriterion.CRT.Entry.Record Kriterion.CRT.Entry.yCount × (BmrTags T u → Block × Block) :=
   (v.1.curve, v.1.rows, v.1.recX, v.1.recY, fun tag => v.2.2 tag.1)
