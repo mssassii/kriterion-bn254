@@ -13,7 +13,7 @@ except the 30 casts 49 to 63 of chunk 31 (`NeverHotCast`), has a tag that is hot
   `t = y`, stage 1 `t = 2^width0 · y`, growth `t = s`, folds `t = ρ`), every target at most `need m ell`.
 * **The many-chunk decomposition** (`word_target`): `v = Σ_{c<32} α_c · 256^c` with `α_c < 256` (`α_31 < 48`, so
   `v < 48 · 256^31 ≤ p`) has chunk values `α_c` and word value `Σ_c (α_c · 2^(8c) mod m)`; the reachable word values
-  grow chunk by chunk (`reach_succ`) along a per-modulus certificate (`certs`) checked once over the 85 rows by
+  grow chunk by chunk (`reach_succ`) along a per-modulus certificate (`certs`) checked once over the 84 rows by
   `decide +kernel` (`rows_ok`: small closed arithmetic, no 623-bit number, no sum over lanes or moduli).
 -/
 
@@ -294,8 +294,7 @@ def rowOK (m packed : ℕ) : Bool :=
 
 
 def certs : List ℕ :=
-  [28380414028753969466561515933501938199330878594519746088102349021547335696,
-    5356159782354996159058407140328605834666614213386387414388290269938716418,
+  [5356159782354996159058407140328605834666614213386387414388290269938716418,
     24867289702936142177752702957698539574018934046971618254123839226060539151,
     23121014972235923574959129362337296924313416753440270628126013273081189894,
     47912546278464114962189002777923851147714813538444749835165452940840079131,
@@ -381,7 +380,8 @@ def certs : List ℕ :=
     84530146115462480339348247492334092200132410577346111770347391072018339585]
 
 
-/-- **The certificate check over the 85 rows** (small closed arithmetic, by the kernel). -/
+/-- **The certificate check over the 84 rows** (small closed arithmetic, by the kernel; modulus 17's certificate was
+removed with the modulus). -/
 theorem rows_ok : ∀ i : Fin bn254Table.count, bn254Table.modulus i ≠ 256 →
     rowOK (bn254Table.modulus i) (certs.getD i.val 0) = true := by
   decide +kernel

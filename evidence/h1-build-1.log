@@ -1,0 +1,150 @@
+$ lake build
+# HEAD 42a1b4bd84be1cfa9c3e2418752beed4072dc9b9
+# tracked changes:
+
+⚠ [2686/2801] Replayed Cryptography.RandomOracle
+warning: formal/Cryptography/RandomOracle.lean:19:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/RandomOracle.lean:20:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/RandomOracle.lean:23:8: This simp argument is unused:
+  OptionT.lift
+
+Hint: Omit it from the simp argument list.
+  [apply] simp [PMF.map_bind, PMF.pure_map, PMF.bind_pure]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+⚠ [3382/3453] Replayed BN254
+warning: formal/BN254.lean:178:2: Try this: 
+  haveI̵
+
+The goal is a proposition, so `have` is preferred over `haveI`.
+The difference between `have` and `haveI` is that `haveI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+⚠ [3394/3453] Replayed Cryptography.Primitives
+warning: formal/Cryptography/Primitives.lean:21:0: `OracleSpec`: universes `uAnswer`, `uQuery` only occur together. This usually means there is a `max` expression in the type where none of these universes appear on their own.
+
+Note: This linter can be disabled with `set_option linter.checkUnivs false`
+✔ [3406/3453] Built Construction.CRT.Label (433ms)
+✔ [3407/3461] Built Construction.ArgoMAC.NormRow (8.8s)
+✔ [3408/3461] Built Construction.ArgoMAC.Algebra (8.9s)
+✔ [3410/3461] Built Construction.PGS.Params (8.8s)
+⚠ [3412/3461] Built Construction.ArgoMAC.Coordinates (8.9s)
+warning: Construction/ArgoMAC/Coordinates.lean:135:44: Variable name `inputOnCurve` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _inputOnCurve
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+⚠ [3414/3461] Built Construction.CRT.LabelLanes (2.6s)
+warning: Construction/CRT/LabelLanes.lean:55:37: Variable name `hB` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _hB
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+✔ [3415/3461] Built Construction.CRT.LabelEncoding (3.6s)
+✔ [3416/3461] Built Construction.PGS.Elements (3.7s)
+✔ [3417/3483] Built Construction.QueryMonad (5.3s)
+⚠ [3418/3483] Replayed Cryptography.Permutation
+warning: formal/Cryptography/Permutation.lean:131:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/Permutation.lean:134:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+⚠ [3419/3483] Replayed Cryptography.OperationalOracle
+warning: formal/Cryptography/OperationalOracle.lean:160:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/OperationalOracle.lean:161:2: Try this: 
+  letI̵
+
+The goal is a proposition, so `let` is preferred over `letI`.
+The difference between `let` and `letI` is that `letI` inlines the value.
+But this is not relevant for proofs because of proof irrelevance.
+
+Note: This linter can be disabled with `set_option linter.style.haveILetI false`
+warning: formal/Cryptography/OperationalOracle.lean:487:32: This simp argument is unused:
+  List.lookup
+
+Hint: Omit it from the simp argument list.
+  [apply] simp [program]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+✔ [3422/3483] Built Construction.ArgoMAC.BitAdaptor (4.3s)
+✔ [3423/3483] Built Construction.CRT.Interface (3.5s)
+✔ [3424/3483] Built Construction.ArgoMAC.Base7 (4.2s)
+✔ [3425/3483] Built Construction.Simulator.Layout (2.0s)
+✔ [3426/3483] Built Construction.Simulator.Prog (3.8s)
+✔ [3427/3483] Built Construction.ArgoMAC.Offsets (3.1s)
+✔ [3428/3483] Built Construction.ArgoMAC.Input (3.8s)
+✔ [3429/3483] Built Construction.CRT.Params (3.7s)
+✔ [3430/3483] Built Construction.Simulator.CRT.Frame (2.6s)
+✔ [3431/3483] Built Construction.ArgoMAC.RandomizedEncoding (2.8s)
+✔ [3432/3483] Built Construction.ArgoMAC.CurveMembership (2.9s)
+✔ [3433/3483] Built Construction.Simulator.Blocks (2.0s)
+⚠ [3434/3483] Built Construction.ArgoMAC.Biquadratic (2.6s)
+warning: Construction/ArgoMAC/Biquadratic.lean:120:38: Variable name `x` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _x
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Construction/ArgoMAC/Biquadratic.lean:120:56: Variable name `y` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _y
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Construction/ArgoMAC/Biquadratic.lean:120:74: Variable name `z` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _z
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+warning: Construction/ArgoMAC/Biquadratic.lean:160:32: Variable name `input` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _input
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+⚠ [3435/3483] Built Construction.CRT.Lanes (2.8s)
+warning: Construction/CRT/Lanes.lean:61:21: This simp argument is unused:
+  vector_get_ofFn
+
+Hint: Omit it from the simp argument list.
+  [apply] simp [materialize]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+✔ [3436/3483] Built Construction.ArgoMAC.EncPRF (2.9s)
+✔ [3437/3483] Built Construction.Simulator.CRT.Layout (2.7s)

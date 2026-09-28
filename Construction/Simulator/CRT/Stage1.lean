@@ -10,7 +10,7 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 | `bytes` | `exceptionBase + index`, `index < 182` | independent exception nibbles (4 coins each) |
 | `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins (the chunk-join cells are drawn but neither serialized nor read) |
 | `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
-| `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 85` | bounded rejection below `m_i` over `digitWidth m_i` coins |
+| `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 84` | bounded rejection below `m_i` over `digitWidth m_i` coins |
 | `zeros` | `keyBase + 2 j`, `j < 508` (`Z_j`) | 128 coins |
 | `deltas` | `deltaCell κ` | 128 coins |
 | `signs` | `Layout.signCell d`, `d < 91` (the sign bits `ν`) | one coin |
@@ -55,9 +55,10 @@ def digitWidth (m : Nat) : Nat := Nat.log2 (m - 1) + 1
 def pinWidthAt (k : Nat) : Nat := Entry.pinWidths.getD k 0
 
 /-- The moduli. -/
-def moduliCount : Nat := 85
+def moduliCount : Nat := 84
 
-/-- The limbs of a record under construction (five 128-bit limbs, `624` bits used). -/
+/-- The limbs of a record under construction (five 128-bit limbs, `624` bits emitted; records are below
+`2 M < 2 ^ 620`). -/
 def recordLimb (k : Nat) : Nat := tmpBase + 64 + k
 
 /-- Limbs of a record. -/
@@ -103,7 +104,7 @@ def recordCoord (r : Nat) : Nat := if r < Entry.xCount then 0 else 1
 /-- The encoding of record `r` inside its coordinate. -/
 def recordIndex (r : Nat) : Nat := if r < Entry.xCount then r else r - Entry.xCount
 
-/-- The records' digits, record by record, flat: `n = r · 85 + i`. -/
+/-- The records' digits, record by record, flat: `n = r · 84 + i`. -/
 def digits : Prog :=
   Prog.rep (recordCount * moduliCount) fun n =>
     digitCell (modulusAt (n % moduliCount))

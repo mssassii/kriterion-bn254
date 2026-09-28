@@ -1,0 +1,6 @@
+$ python3 Scratch/opus_gen_budget.py check
+# HEAD 42a1b4bd84be1cfa9c3e2418752beed4072dc9b9
+# tracked changes:
+
+legacy constant (units): 0.037657618379490436
+byte-identical to e37c4db: True

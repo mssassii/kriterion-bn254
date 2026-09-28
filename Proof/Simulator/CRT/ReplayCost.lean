@@ -262,7 +262,7 @@ theorem size_coordProg_le (κ S : Nat) (sLe : S ≤ 512) (convLe : ∀ i, (convP
   have mods := size_rep_le Entry.table.count _ (2 ^ 37) fun i _ => size_modProg_le κ S sLe convLe i
   have decode := size_decodeAll_le (decodeCells κ) (modNat Entry.table) Entry.table.count
     Entry.table.wrapBound 6 S (by rw [TableFacts.count]; norm_num) (by norm_num) sLe
-  have cnt : Entry.table.count = 85 := TableFacts.count
+  have cnt : Entry.table.count = 84 := TableFacts.count
   omega
 
 /-- Every conversion of the real table is below `2 ^ 36` (`size_conversionReplay_le`). -/

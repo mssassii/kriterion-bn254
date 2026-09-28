@@ -2,23 +2,24 @@
 
 This map covers the CRT entry with the sign row against the challenge library `aaf2789`. The top-level
 `README.md` explains the construction and the argument, and `Intuition.md` the ideas. This file says which
-module supplies which proof obligation. **Draft status:** the fallback 7/8-bit schedule has not
-been built; the updated proof terms, metrics, and axiom audits require validation on the build VM.
+module supplies which proof obligation. **Current status:** the combined 84-modulus, selected width-8/9 tree has passed its full build,
+metric/encoding audit and whole-tree axiom audit (23,742 declarations; the three permitted axioms).
+See the root README for evidence.
 
 `Proof.lean` imports `Proof.Correctness.CRT.EntryCorrect`, `Proof.LamportCompatibility.Labels` and
 `Proof.Privacy.CRT.Final`, and `Construction.lean` imports the entry and the simulator machine, so a bare
 `lake build` compiles every module named here and every module they import. `Submission.lean` names the
 fields. The baseline proved every field without admissions and passed the three-axiom audit.
-This branch introduces no admitted proof, but the updated tree must be rebuilt and audited
-(`Scratch/ProofAudit.lean`).
+The combined tree introduces no admitted proof. Its current audit is `Scratch/CombinedAudit.lean`,
+with `Scratch/ProofAudit.lean` checking every construction and proof declaration.
 
 ## 1. The fields of `Kriterion.Solution`
 
 | field | proved by | where |
 |---|---|---|
-| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (988,438); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
-| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (981,506); `Submission.evaluateProgramCorrect` | the same |
-| `ciphertextSize` | `Entry.Wire.encoding_length` (130,122) | `Construction/CRT/Public.lean` |
+| `garbleProgram`, `garbleQueries`, `garbleProgramCorrect` | `Entry.garbleProgram` at `Entry.garbleBudget` (1,061,622); `Submission.garbleProgramCorrect` | `Construction/CRT/Entry.lean`, `Bounds.lean`, `BudgetFacts.lean`; `Submission.lean` |
+| `evaluateProgram`, `evaluateQueries`, `evaluateProgramCorrect` | `Entry.evaluateProgram` at `Entry.evaluateBudget` (1,054,788); `Submission.evaluateProgramCorrect` | the same |
+| `ciphertextSize` | `Entry.Wire.encoding_length` (128,276) | `Construction/CRT/Public.lean` |
 | `lamportCompatible` | `Lamport.selectedLabels_eq` | `Proof/LamportCompatibility/Labels.lean` |
 | `functionCorrect` | `rfl` | `Submission.lean` |
 | `perfectCorrectness` | `EntryCorrect.perfectCorrectness` | `Proof/Correctness/CRT/EntryCorrect.lean` |
@@ -41,7 +42,7 @@ answer tables.
 | `BodyStep.lean` | the body: `L = R + (v mod m)·a mod m` |
 | `Arith.lean`, `Record.lean` | lane arithmetic, the wrap hint (`wrapHint_exact`), the per-encoding records |
 | `Delivery.lean` | one coordinate delivers `a_e·v + O_e` for every encoding |
-| `RealTable.lean` | the 85-row table satisfies the delivery conditions (by `decide +kernel`) |
+| `RealTable.lean` | the 84-row table satisfies the delivery conditions (by `decide +kernel`) |
 | `FlatLayout.lean` | the evaluator reads exactly the published cells, and the flat layout round-trips |
 | `EntryDelivery.lean` | both coordinates on the entry's published value |
 | `DigestUnlock.lean` | the hash digest unlocks the digit of an exceptional input of either kind (`digestUnlock_exceptional` at `Q = K`, `digestUnlock_triple` at `Q = 2K`) |

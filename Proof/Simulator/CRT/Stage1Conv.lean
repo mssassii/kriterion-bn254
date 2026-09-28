@@ -6,7 +6,7 @@ conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatte
 block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
-`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2906` for every `ConvPublic` (no chunk
+`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2885` for every `ConvPublic` (no chunk
 joins: a chunk contributes its half-pin only; the source's chunk-join cells are drawn but not serialized).
 -/
 
@@ -159,9 +159,9 @@ theorem joins_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds :
   rw [holds.joins (start + n) (by omega), same n small, Source.joinAt, atNat, dif_pos (by omega), word,
     bitRun_ofNat _ _ (by norm_num)]
 
-theorem pinWidth_small : ∀ k : Fin 200, pinWidthAt k ≤ 14 := by decide +kernel
+theorem pinWidth_small : ∀ k : Fin 198, pinWidthAt k ≤ 14 := by decide +kernel
 
-theorem pinCount_eq : pinCount = 200 := by decide +kernel
+theorem pinCount_eq : pinCount = 198 := by decide +kernel
 
 theorem pin_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : ConvHolds ram source κ)
     (k : Nat) (inside : k < pinCount) (f : Nat → Label)

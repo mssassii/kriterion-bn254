@@ -1,0 +1,44 @@
+{
+  "source_manifest_sha256": "b302e8d44cbfdaf85544a5c2ae1ae886c3f9ba6560d53a77ab0c555a8235729b",
+  "source_files": 446,
+  "metrics": {
+    "ciphertext_bytes": 128276,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788,
+    "evaluation_headroom": 1091
+  },
+  "full_build": {
+    "command": "env LEAN_NUM_THREADS=6 lake build",
+    "exit_code": 0,
+    "jobs": 3844,
+    "log": "build-first.log"
+  },
+  "metric_audit": {
+    "command": "env LEAN_NUM_THREADS=3 lake env lean Scratch/CombinedAudit.lean",
+    "exit_code": 0,
+    "log": "audit.log"
+  },
+  "axiom_audit": {
+    "command": "env LEAN_NUM_THREADS=3 lake env lean Scratch/ProofAudit.lean",
+    "exit_code": 0,
+    "declarations": 23742,
+    "axioms": [
+      "Quot.sound",
+      "Classical.choice",
+      "propext"
+    ],
+    "log": "proof-audit.log"
+  },
+  "arithmetic_model": {
+    "command": "python3 -B Scratch/check_combined.py",
+    "exit_code": 0,
+    "log": "cost-model.log"
+  },
+  "provenance": {
+    "base": "e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05",
+    "a1": "719b09effea8b5ef544b8243dd9cd840636f963c",
+    "h1_source": "42a1b4bd84be1cfa9c3e2418752beed4072dc9b9",
+    "h1_verified": "a020614bc1ba5271c0e4d3522365a8b1fbbad447"
+  },
+  "hosted_verification": false
+}

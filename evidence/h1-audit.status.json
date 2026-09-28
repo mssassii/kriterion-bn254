@@ -1,0 +1,13 @@
+{
+  "command": [
+    "lake",
+    "env",
+    "lean",
+    "Scratch/OpusH1Audit.lean"
+  ],
+  "head": "42a1b4bd84be1cfa9c3e2418752beed4072dc9b9",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 17.1,
+  "log": "evidence/h1-audit.log"
+}

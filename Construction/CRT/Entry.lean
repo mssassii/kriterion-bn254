@@ -271,7 +271,7 @@ def garbleBudgetOf (T : CrtTable) : Nat :=
     digestGarbleBudget coordinateBitCount digitCount)))
 
 /-- The garbler's budget. It is stated through `garbleBudgetOf` so that its equation lemmas never
-make the kernel compare the closed sum with the constant, which evaluates the 85-row sums. -/
+make the kernel compare the closed sum with the constant, which evaluates the 84-row sums. -/
 def garbleBudget : Nat := garbleBudgetOf table
 
 /-! ### The evaluator -/

@@ -20,9 +20,9 @@ noncomputable section
 
 /-! ### Counts -/
 
-theorem joinCount_eq : joinCount = 1425 := by decide +kernel
+theorem joinCount_eq : joinCount = 1415 := by decide +kernel
 
-theorem pinCount_eq : pinCount = 200 := CrtConv.pinCount_eq
+theorem pinCount_eq : pinCount = 198 := CrtConv.pinCount_eq
 
 theorem recordCount_eq : recordCount = 642 := rfl
 
@@ -71,7 +71,7 @@ theorem pinAddr_range (n : Nat) (small : n < 2 * (pinCount * laneCount)) :
 theorem digitAddr_range (n : Nat) (small : n < recordCount * moduliCount) :
     2 ^ 53 ≤ digitAddr n ∧ digitAddr n < 2 ^ 53 + 2 ^ 25 := by
   unfold digitAddr recordCoord recordIndex Layout.residueCell
-  simp only [show recordCount = 642 from rfl, show moduliCount = 85 from rfl, show Entry.xCount = 367 from rfl] at *
+  simp only [show recordCount = 642 from rfl, show moduliCount = 84 from rfl, show Entry.xCount = 367 from rfl] at *
   constructor <;> split_ifs <;> omega
 
 theorem joinAddr_injective (first second : Nat) (firstSmall : first < 2 * joinCount)
@@ -102,7 +102,7 @@ theorem digitAddr_injective (first second : Nat) (firstSmall : first < recordCou
   · have := digitAddr_range first firstSmall; omega
   · have := digitAddr_range second secondSmall; omega
   · unfold digitAddr recordCoord recordIndex Layout.residueCell
-    simp only [show recordCount = 642 from rfl, show moduliCount = 85 from rfl,
+    simp only [show recordCount = 642 from rfl, show moduliCount = 84 from rfl,
       show Entry.xCount = 367 from rfl] at *
     split_ifs <;> omega
 

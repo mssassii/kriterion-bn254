@@ -6,7 +6,8 @@
 | `G0 → G0T` | `tCollisionError = 1,759,967 / p` (`t` equal to a labelled garbler input) | `2^-232.85` |
 | `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `637 δ₃` | `2^-113.5` |
 | `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (4/2^104 + 1/(p − 1))` | linear |
-| `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-104.74` + ... |
+| `G0U → G1U` | `hiddenWindowError = smudgeError` (the curve encodings' wrap window) | `2^-100.65` |
+| `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-100.65` + ... |
 | `HW → H` | `outputKernelError = 455/(r − 1)` | `2^-244.8` |
 | `H → I` | `padSwapError` (untouched sites only, no per-query term; F4) | `2^-113.51` |
 | `I → M` | `machineCutoffError = 2^-128` | `2^-128` |
@@ -14,7 +15,9 @@
 Every term is a fraction of two naturals (`frac`), so its share of the unit reduces to one closed `Nat.ble` of
 the generated `BudgetData` (decided by `decide +kernel`, no axiom), and the readable forms
 (`crtHiddenCharge_eq`, ...) are separate lemmas. `chainError_budget` closes with every constant below a thousandth
-of its unit except the smudge term (a twentieth), and every per-query coefficient below a third.
+of its unit except the smudge term and the hidden window (seven tenths each), and every per-query coefficient below a
+third. The constant part is closed against **two** units: the challenge's allowance is
+`steps + 1 = size + 2 + firstFuel + secondFuel ≥ q₁ + q₂ + 2` (`BoundedMachine.Adversary.steps`).
 -/
 
 import Proof.Privacy.CRT.Glue.BudgetFacts
@@ -48,6 +51,16 @@ theorem frac_share {a b c : ℕ} (le : a * 2 ^ 100 * c ≤ b) (hb : 0 < b) (hc :
   unfold frac
   rw [div_mul_eq_mul_div, div_le_iff₀ bpos, one_div, inv_mul_eq_div, le_div_iff₀ cpos]
   exact leR
+
+/-- **A share `c / d` of the unit** from one closed inequality of naturals: `a · 2^100 · d ≤ c · b`. -/
+theorem frac_share_le {a b c d : ℕ} (le : a * 2 ^ 100 * d ≤ c * b) (hb : 0 < b) (hd : 0 < d) :
+    frac a b * 2 ^ 100 ≤ (c : ℝ) / d := by
+  have leR : (a : ℝ) * 2 ^ 100 * d ≤ c * b := by exact_mod_cast le
+  have bpos : (0 : ℝ) < b := by exact_mod_cast hb
+  have dpos : (0 : ℝ) < d := by exact_mod_cast hd
+  unfold frac
+  rw [div_mul_eq_mul_div, div_le_div_iff₀ bpos dpos]
+  linarith
 
 /-! ### The moduli agree with the challenge's -/
 
@@ -163,7 +176,8 @@ theorem collision_share : 1759967 * 2 ^ 100 * 1000 ≤ BudgetData.p := by decide
 
 theorem padSwap_share : BudgetData.padSwapNumer * 2 ^ 100 * 1000 ≤ BudgetData.padSwapDenom := by decide +kernel
 
-theorem smudge_share : (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 20 ≤ BudgetData.M := by decide +kernel
+theorem smudge_share : (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 10 ≤ 7 * BudgetData.M := by
+  decide +kernel
 
 theorem exceptional_share : 546 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
 
@@ -208,10 +222,11 @@ theorem padSwapError_le : padSwapError * 2 ^ 100 ≤ 1 / 1000 := by
   unfold padSwapError
   exact this
 
-theorem smudgeError_le : smudgeError * 2 ^ 100 ≤ 1 / 20 := by
-  have := frac_share (c := 20) smudge_share M_pos (by norm_num)
+theorem smudgeError_le : smudgeError * 2 ^ 100 ≤ 7 / 10 := by
+  have share := frac_share_le (c := 7) (d := 10) smudge_share M_pos (by norm_num)
   unfold smudgeError
-  exact this
+  calc _ ≤ ((7 : ℕ) : ℝ) / ((10 : ℕ) : ℝ) := share
+    _ = 7 / 10 := by norm_num
 
 theorem exceptionalError_le : exceptionalError * 2 ^ 100 ≤ 1 / 1000 := by
   have := frac_share (c := 1000) exceptional_share (Nat.sub_pos_of_lt one_lt_r) (by norm_num)
@@ -233,7 +248,7 @@ theorem machineCutoffError_le : machineCutoffError * 2 ^ 100 ≤ 1 / 1000 := by
   unfold machineCutoffError
   exact this
 
-theorem hiddenWindowError_le : hiddenWindowError * 2 ^ 100 ≤ 1 / 20 := smudgeError_le
+theorem hiddenWindowError_le : hiddenWindowError * 2 ^ 100 ≤ 7 / 10 := smudgeError_le
 
 theorem hiddenWindowError_nonneg : 0 ≤ hiddenWindowError := by
   unfold hiddenWindowError smudgeError
@@ -251,11 +266,12 @@ theorem stageOneTouchCharge_le : stageOneTouchCharge * 2 ^ 100 ≤ 1 / 3 :=
 
 /-! ### The closing inequality -/
 
-/-- **The closing inequality.** Below `2^100` queries the whole chain costs at most `(q₁ + q₂ + 1) / 2^100`: the
+/-- **The closing inequality.** Below `2^100` queries the whole chain costs at most `(q₁ + q₂ + 2) / 2^100`: the
 constant part (three swaps, the smudge term, the hidden hop's window term, the collision, the doubling, the kernel,
-the coincidences, the cutoff) is below `108/1000` of one unit and the linear part below `2/3` of a unit per query. -/
+the coincidences, the cutoff) is below `1408/1000` of one unit and the linear part below `2/3` of a unit per query.
+The second unit is the challenge's: `steps + 1 = size + 2 + firstFuel + secondFuel` (`Shapes.lean`). -/
 theorem chainError_budget (first second : ℕ) (_small : first + second < 2 ^ 100) :
-    chainError first second * 2 ^ 100 ≤ (first : ℝ) + (second : ℝ) + 1 := by
+    chainError first second * 2 ^ 100 ≤ (first : ℝ) + (second : ℝ) + 2 := by
   have c0 := tCollisionError_le
   have c1 := padSwapError_le
   have c2 := smudgeError_le

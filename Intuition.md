@@ -1,22 +1,25 @@
-# Selective width-9 extraction: delta and inherited background
+# Combined extraction schedule and modulus-removal delta
 
-This fork of dnctse's `e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05` changes only the first extraction
-width for 25 odd CRT moduli, from 8 to 9. The locally proved candidate is 128,822 bytes,
-1,062,022 garbling queries and 1,055,144 evaluation queries. The full build and both audits passed;
-see `README.md` and `evidence/verification.md` for evidence. Hosted verification has not been run.
+This fork starts at dnctse's `e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05`. Astra's first checkpoint widens
+25 first extraction stages and proves a 128,822-byte construction. Opus's independent H1 removes modulus
+17 using the existing challenge allowance `steps + 1 ≥ firstFuel + secondFuel + 2`. Combining H1 with
+26 widened rows (adding modulus 397) gives the locally verified **128,276 / 1,061,622 / 1,054,788** figures.
+The complete combined build and both audits have passed; evidence is recorded in `README.md`.
 
-For an odd modulus, the published conversion size is `4ℓ − 2w0 − 5` labels. Increasing `w0` by one
-therefore saves two 13-byte labels in each coordinate. The selected 25 rows save `25 × 2 × 2 × 13 = 1,300`
-bytes and spend 73,638 additional evaluation queries, leaving 735 below the fixed gate.
+For one odd row the published conversion size is `4ℓ − 2w0 − 5` labels. Each widened first stage saves
+two 13-byte labels per coordinate. The 26 rows save 1,352 bytes, and modulus 17 saves another 494.
+The evaluation gate retains 1,091 queries of headroom. All 83 remaining reach certificates are unchanged.
 
-The word width, modulus product, pads, label width, external Lamport labels, records and privacy errors
-are unchanged. The proof update checks the new rows and establishes that the wider first-stage targets
-lie within the existing reachability certificates; all later conversion and simulator obligations remain
-part of the complete solution build. This is an optimization of the executable garbled construction.
+The smaller product has 619 bits, so the smudge and hidden-window terms each use about 0.635803 units
+of `2^-100`. Counting both and every other constant term gives about 1.271864 units, within the two
+units already present in the original security definition. The 104-bit labels, external 128-bit
+Lamport labels, pad slack, record count and public codecs retain their original types and meanings.
+The full solution still proves every-input correctness, fixed full-public encoding length and adaptive
+privacy with its executable finite simulator.
 
-The note below is preserved from the upstream commit and describes its **130,122-byte baseline**.
-Its historical metric and schedule statements apply to that baseline; current candidate values and the
-exact source changes are documented above and in `README.md`.
+The note below is preserved from upstream and describes its **130,122-byte baseline**. Its historical
+metric and schedule statements apply to that baseline; current values and proof deltas are above and
+in `README.md`. Hosted verification of this combination has not been claimed.
 
 ---
 

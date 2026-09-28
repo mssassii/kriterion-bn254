@@ -135,15 +135,15 @@ theorem convHolds_extract (ram : Word → Word) (valid : CellsValid ram) (κ : F
     have active : laneCount = 104 := rfl
     have laneSmall : lane < 104 := small
     have kSmall := κ.isLt
-    have pins200 : pinCount = 200 := CrtConv.pinCount_eq
+    have pinsEq : pinCount = 198 := CrtConv.pinCount_eq
     have n_in : (κ.val * pinCount + k) * laneCount + lane < 2 * (pinCount * laneCount) := by
-      rw [pins200] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
+      rw [pinsEq] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
     have pinIs : pinOf ((κ.val * pinCount + k) * laneCount + lane) = k := by
-      unfold pinOf; rw [pins200] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
+      unfold pinOf; rw [pinsEq] at inside ⊢; simp only [laneCount, Narrow.labelBits] at *; omega
     have addr : pinAddr ((κ.val * pinCount + k) * laneCount + lane) = Layout.sourcePin κ k lane := by
       unfold pinAddr pinCoord
       rw [pinIs]
-      rw [pins200] at inside ⊢
+      rw [pinsEq] at inside ⊢
       simp only [laneCount, Narrow.labelBits] at *
       congr 1 <;> omega
     have bound := valid.pins _ n_in
@@ -157,7 +157,7 @@ theorem convHolds_extract (ram : Word → Word) (valid : CellsValid ram) (κ : F
 
 theorem digit_cell (ram : Word → Word) (κ e i : Nat) (hκ : κ < 2) (he : e < encCount κ) (hi : i < moduliCount) :
     digitAddr ((if κ = 0 then e else Entry.xCount + e) * moduliCount + i) = Layout.residueCell κ i e := by
-  have : moduliCount = 85 := rfl
+  have : moduliCount = 84 := rfl
   have : Entry.xCount = 367 := rfl
   unfold digitAddr recordCoord recordIndex
   unfold encCount at he
@@ -172,14 +172,14 @@ theorem digitsSmall_of_valid (ram : Word → Word) (valid : CellsValid ram) : Cr
   have n_in : (if κ = 0 then e else Entry.xCount + e) * moduliCount + i < recordCount * moduliCount := by
     have := CrtSerial.encCount_le κ
     unfold encCount at he
-    have : moduliCount = 85 := rfl
+    have : moduliCount = 84 := rfl
     have : recordCount = 642 := rfl
     have : Entry.xCount = 367 := rfl
     have : Entry.yCount = 275 := rfl
     split_ifs at he ⊢ <;> simp only [*] at * <;> nlinarith
   have bound := valid.digits _ n_in
   rw [digit_cell ram κ e i hκ he hi, show ((if κ = 0 then e else Entry.xCount + e) * moduliCount + i) %
-    moduliCount = i by have : moduliCount = 85 := rfl; rw [this] at hi ⊢; omega] at bound
+    moduliCount = i by have : moduliCount = 84 := rfl; rw [this] at hi ⊢; omega] at bound
   exact bound
 
 theorem recordNat_eq (ram : Word → Word) (κ e : Nat) (hκ : κ < 2) (he : e < encCount κ) :
@@ -189,7 +189,7 @@ theorem recordNat_eq (ram : Word → Word) (κ e : Nat) (hκ : κ < 2) (he : e <
   have hi := Finset.mem_range.mp member
   have n_in : (if κ = 0 then e else Entry.xCount + e) * moduliCount + i < recordCount * moduliCount := by
     unfold encCount at he
-    have : moduliCount = 85 := rfl
+    have : moduliCount = 84 := rfl
     have : recordCount = 642 := rfl
     have : Entry.xCount = 367 := rfl
     have : Entry.yCount = 275 := rfl

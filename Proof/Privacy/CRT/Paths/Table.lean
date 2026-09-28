@@ -1,7 +1,7 @@
 /-
 **The real table's fields fit `tagCode`**: `TableRanges bn254Table S` for every `S ≤ 1000` (the
 coordinates have `S = 367` and `275`). Big numbers are never evaluated: the pad counts are bounded symbolically
-(`m < 2 ^ 9`, so `bitLength (m ^ S) ≤ 9 S`), the moduli and the rows by `decide +kernel` on the 85 small moduli
+(`m < 2 ^ 9`, so `bitLength (m ^ S) ≤ 9 S`), the moduli and the rows by `decide +kernel` on the 84 small moduli
 (`bn254_odd`).
 -/
 
@@ -27,7 +27,7 @@ theorem castAnswers_le (width : Nat) : castAnswers width ≤ 64 := by
 
 theorem bn254_modulus_le : ∀ i, bn254Table.modulus i ≤ 439 := by decide +kernel
 
-theorem bn254_count : bn254Table.count = 85 := by decide +kernel
+theorem bn254_count : bn254Table.count = 84 := by decide +kernel
 
 theorem bn254_chunkCount : bn254Table.chunkCount = 32 := by decide +kernel
 

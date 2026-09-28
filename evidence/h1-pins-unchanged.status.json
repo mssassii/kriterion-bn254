@@ -1,0 +1,19 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--exit-code",
+    "e37c4db3cdbf11c741ff812ed1b0d5ae7c7b3b05",
+    "--",
+    "lakefile.toml",
+    "lake-manifest.json",
+    "lean-toolchain",
+    "Scratch/Audit.lean",
+    "Scratch/ProofAudit.lean"
+  ],
+  "head": "42a1b4bd84be1cfa9c3e2418752beed4072dc9b9",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 0.0,
+  "log": "evidence/h1-pins-unchanged.log"
+}

@@ -9,7 +9,7 @@ by `recordJoin` (`record % M / Π_{i' < i} m_{i'} % m_i`). This file proves, for
    prefix products are the table's `radix`), with the digit read-back `digit_mixedRadix`;
 2. **L19** (`record_roundtrip`): every record is below `2 M`, and its hint and joins read back exactly;
    `records_roundtrip` states it for `CoordGarbled.records` and `recordJoin`;
-3. the byte facts for the real table: `2 M < 2 ^ 624 = 256 ^ 78`, so every record is a value of
+3. the byte facts for the real table: `2 M < 2 ^ 620 ≤ 256 ^ 78`, so every record is a value of
    `Encoding.natural 78` (`bn254RecordFin`), which encodes to 78 bytes and decodes back;
 4. the stage-1 law: a uniform record below `M` (hint 0) reads as a uniform residue vector
    (`uniform_recordJoin`).
@@ -153,12 +153,12 @@ end CrtTable
 
 /-! ### Byte facts for the real table -/
 
-/-- The product of the real table, as a literal (623 bits). -/
+/-- The product of the real table, as a literal (619 bits). -/
 theorem bn254Table_product :
-    bn254Table.product = 20850318928028413860828711030581874022902576943204098960177768088742326647660786513024210333309284587568633087730150628716356489962542122205451605410463643270320257283625500522100622112000 := by
+    bn254Table.product = 1226489348707553756519335942975404354288386879012005821186927534631901567509458030177894725488781446327566652219420625218609205291914242482673623847674331957077662193154441207182389536000 := by
   decide +kernel
 
-/-- `2 M < 2 ^ 624 = 256 ^ 78`: a record fits 78 bytes. -/
+/-- `2 M < 2 ^ 620 ≤ 2 ^ 624 = 256 ^ 78`: a record fits 78 bytes. -/
 theorem bn254Table_record_fits : 2 * bn254Table.product ≤ 256 ^ 78 := by
   rw [bn254Table_product]
   decide +kernel

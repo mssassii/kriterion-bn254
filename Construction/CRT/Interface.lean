@@ -154,12 +154,14 @@ def wrapHint (M B offset : Nat) : Bool := decide (M - B < offset)
 def wrapDecode (M B : Nat) (hint : Bool) (value : Nat) : Nat :=
   if hint && decide (value < B) then value + M else value
 
-/-! ### The real table: the 85 moduli and schedule T9 (D4) -/
+/-! ### The real table: the 84 moduli and schedule T9 (D4) -/
 
-/-- The 85 moduli in index order: every prime from 17 to 439, the prime powers 49, 81, 121, 125,
-169, and 256 (index 53). -/
+/-- The 84 moduli in index order: every prime from 19 to 439, the prime powers 49, 81, 121, 125,
+169, and 256 (index 52). Modulus 17 of the pinned entry is dropped (Opus, H1): the product `M` falls from 623
+to 619 bits, which the privacy budget pays for with the challenge's second unit of work
+(`Proof/Privacy/CRT/Glue/Budget.lean`). -/
 def bn254Moduli : Array Nat :=
-  #[17, 19, 23, 29, 31, 37, 41, 43, 47, 49, 53, 59, 61, 67, 71, 73, 79, 81, 83, 89, 97, 101, 103,
+  #[19, 23, 29, 31, 37, 41, 43, 47, 49, 53, 59, 61, 67, 71, 73, 79, 81, 83, 89, 97, 101, 103,
     107, 109, 113, 121, 125, 127, 131, 137, 139, 149, 151, 157, 163, 167, 169, 173, 179, 181, 191,
     193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 256, 257, 263, 269, 271, 277, 281, 283,
     293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409,

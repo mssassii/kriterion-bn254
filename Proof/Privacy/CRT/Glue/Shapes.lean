@@ -282,9 +282,10 @@ theorem chain_oracleAdaptivePrivacy [fixedFinite : Finite FI] [encFinite : Finit
     real field group adversary parameter scalar
   have queries : adversary.firstQueryBudget parameter = adversaryMachine.firstFuel ∧
       adversary.secondQueryBudget parameter = adversaryMachine.secondFuel := ⟨rfl, rfl⟩
-  have steps : (adversaryMachine.firstFuel : ℝ) + (adversaryMachine.secondFuel : ℝ) + 1 ≤
+  -- `steps + 1 = size + 2 + firstFuel + secondFuel`: both the program size's `+ 1` and the challenge's `+ 1`.
+  have steps : (adversaryMachine.firstFuel : ℝ) + (adversaryMachine.secondFuel : ℝ) + 2 ≤
       ((adversaryMachine.steps + 1 : ℕ) : ℝ) := by
-    have work : adversaryMachine.firstFuel + adversaryMachine.secondFuel + 1 ≤ adversaryMachine.steps + 1 := by
+    have work : adversaryMachine.firstFuel + adversaryMachine.secondFuel + 2 ≤ adversaryMachine.steps + 1 := by
       unfold BoundedMachine.Adversary.steps
       omega
     exact_mod_cast work
@@ -308,7 +309,7 @@ theorem chain_oracleAdaptivePrivacy [fixedFinite : Finite FI] [encFinite : Finit
     unfold Assumptions.WorkPerAdvantage
     calc _ ≤ chainError adversaryMachine.firstFuel adversaryMachine.secondFuel * 2 ^ 100 :=
           mul_le_mul_of_nonneg_right (by linarith) (by positivity)
-      _ ≤ (adversaryMachine.firstFuel : ℝ) + (adversaryMachine.secondFuel : ℝ) + 1 := budget
+      _ ≤ (adversaryMachine.firstFuel : ℝ) + (adversaryMachine.secondFuel : ℝ) + 2 := budget
       _ ≤ ((adversaryMachine.steps + 1 : ℕ) : ℝ) := steps
   · unfold Assumptions.WorkPerAdvantage
     have large : (2 : ℝ) ^ 100 ≤ (adversaryMachine.firstFuel : ℝ) + (adversaryMachine.secondFuel : ℝ) := by

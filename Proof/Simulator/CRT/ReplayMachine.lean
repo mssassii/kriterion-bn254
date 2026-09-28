@@ -86,7 +86,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
       ((coordProg κ S).tree memory)
       (liftHash (coordEvalM Entry.table S κ conv records v (fun j => clip (labelsOf j)))) := by
   have cc32 : Entry.table.chunkCount = 32 := TableFacts.chunkCount
-  have cnt85 : Entry.table.count = 85 := TableFacts.count
+  have cntMod : Entry.table.count = 84 := TableFacts.count
   have ca := TableFacts.castAnswers_le
   have R : Layout.replayScratch κ = 2 ^ 60 + 2 ^ 40 * κ := rfl
   have chain : CoordChain (coordCells κ) Entry.table.chunkCount Entry.table.castWidth := by
@@ -105,7 +105,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
     · omega
     · omega
   have dchain : DecodeChain (decodeCells κ) Entry.table.count 6 S := by
-    rw [cnt85]
+    rw [cntMod]
     refine ⟨?_, fun i ib => ?_, fun i ib => ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [decodeCells, windowOut, windowAt, modBase, R, Layout.hintCell, Layout.decodedCell] <;>
       omega
@@ -120,9 +120,9 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
     TableFacts.product_le TableFacts.wrapBound_lt
     (by simp only [decodeCells, coordCells, R, Layout.decodedCell]; omega)
     (by simp only [coordCells, modBase, R]; rw [cc32]; omega)
-    (by simp only [decodeCells, modBase, R]; rw [cnt85]; omega)
+    (by simp only [decodeCells, modBase, R]; rw [cntMod]; omega)
     (fun i ib => by
-      rw [cnt85] at ib
+      rw [cntMod] at ib
       simp only [decodeCells, windowOut, windowAt, modBase, R]
       constructor <;> omega)
     memory reads.coordVal
@@ -144,16 +144,16 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
     (fun c cb => by rw [TableFacts.chunkOffset, cc32] at *; omega)
     (fun c cb => TableFacts.shape.widthSmall c cb)
     (fun i ρ j ρb jb => TableFacts.bodyTag_small κ i.val ρ j κLt
-      (by have := lt_of_lt_of_eq i.isLt cnt85; omega)
+      (by have := lt_of_lt_of_eq i.isLt cntMod; omega)
       (by have := TableFacts.modulus_le i; omega) (by have := TableFacts.padAnswers_lt S sSmall i; omega))
     (by simp only [coordCells, modBase, R]; rw [cc32]; omega)
-    (by simp only [modBase, R]; rw [cnt85]; omega)
-    (fun i ib => by simp only [joinBaseOf, coordCells, R, Layout.residueCell]; rw [cnt85] at ib; omega)
+    (by simp only [modBase, R]; rw [cntMod]; omega)
+    (fun i ib => by simp only [joinBaseOf, coordCells, R, Layout.residueCell]; rw [cntMod] at ib; omega)
     (fun i ib => by
       have modLe : modNat Entry.table i ≤ 439 := by
         simp only [modNat, dif_pos ib]; exact TableFacts.modulus_le _
       simp only [windowAt, modBase, R]
-      rw [cnt85] at ib
+      rw [cntMod] at ib
       refine ⟨by omega, by omega, by omega⟩)
     memory reads.coordVal (fun i e => reads.residues i e)
     (fun i e => by
@@ -164,7 +164,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
   -- the conversions
   intro i row kind m0 lanes sigma below
   have ib := i.isLt
-  have iLt : i.val < 85 := lt_of_lt_of_eq ib cnt85
+  have iLt : i.val < 84 := lt_of_lt_of_eq ib cntMod
   obtain ⟨w0Pos, w1Pos, ellEq, keepGe, keepLe, ellLe, countLt⟩ := TableFacts.odd_facts i row kind
   have rowEq : Entry.rowAt i.val = row := IndexFacts.rowAt_eq i.val ib row kind
   have joinBase := IndexFacts.modJoinBase_le i.val
@@ -224,14 +224,14 @@ end Coord
 theorem coordWrites_high (κ S : Nat) (κLt : κ < 2) (sSmall : S ≤ 512) (x : Nat) (xLow : x < 2 ^ 56) :
     ¬ coordWrites κ S (word x) := by
   have cc32 : Entry.table.chunkCount = 32 := TableFacts.chunkCount
-  have cnt85 : Entry.table.count = 85 := TableFacts.count
+  have cntMod : Entry.table.count = 84 := TableFacts.count
   rintro ((⟨y, yLow, yHigh, same⟩ | ⟨y, yLow, yHigh, same⟩) | (⟨y, yLow, yHigh, same⟩ | ⟨k, kb, same⟩))
   · simp only [coordCells, Layout.replayScratch] at yLow yHigh
     rw [cc32] at yHigh
     have := word_inj (by omega) (by omega) same
     omega
   · simp only [modBase, Layout.replayScratch] at yLow yHigh
-    rw [cnt85] at yHigh
+    rw [cntMod] at yHigh
     have := word_inj (by omega) (by omega) same
     omega
   · simp only [decodeCells, Layout.replayScratch] at yLow yHigh
@@ -244,7 +244,7 @@ theorem coordWrites_high (κ S : Nat) (κLt : κ < 2) (sSmall : S ≤ 512) (x : 
 theorem xDecoded_safe (e : Nat) (eLt : e < 1024) :
     ¬ coordWrites 1 Entry.yCount (word (Layout.decodedCell 0 e)) := by
   have cc32 : Entry.table.chunkCount = 32 := TableFacts.chunkCount
-  have cnt85 : Entry.table.count = 85 := TableFacts.count
+  have cntMod : Entry.table.count = 84 := TableFacts.count
   have yc : Entry.yCount = 275 := rfl
   simp only [Layout.decodedCell]
   rintro ((⟨y, yLow, yHigh, same⟩ | ⟨y, yLow, yHigh, same⟩) | (⟨y, yLow, yHigh, same⟩ | ⟨k, kb, same⟩))
@@ -253,7 +253,7 @@ theorem xDecoded_safe (e : Nat) (eLt : e < 1024) :
     have := word_inj (by omega) (by omega) same
     omega
   · simp only [modBase, Layout.replayScratch] at yLow yHigh
-    rw [cnt85] at yHigh
+    rw [cntMod] at yHigh
     have := word_inj (by omega) (by omega) same
     omega
   · simp only [decodeCells, Layout.replayScratch] at yLow yHigh
@@ -270,7 +270,7 @@ theorem CoordReads.transport {κ S : Nat} {conv : ConvPublic} {records : Fin S �
     (reads : CoordReads κ S conv records v labelsOf memory)
     (agree : ∀ x, x < 2 ^ 56 → m1.ram (word x) = memory.ram (word x)) :
     CoordReads κ S conv records v labelsOf m1 := by
-  have cnt85 : Entry.table.count = 85 := TableFacts.count
+  have cntMod : Entry.table.count = 84 := TableFacts.count
   have lc : laneCount = 104 := rfl
   have rowFacts : ∀ i : Nat, (Entry.rowAt i).width0 ≤ 12 ∧ (Entry.rowAt i).width1 ≤ 12 ∧
       (Entry.rowAt i).keep ≤ 14 := fun i => by
@@ -288,38 +288,38 @@ theorem CoordReads.transport {κ S : Nat} {conv : ConvPublic} {records : Fin S �
   · rw [agree _ (by simp only [Layout.sourcePin]; omega)]
     exact reads.chunkPins c cb i ib
   · have := IndexFacts.modJoinBase_le i.val
-    have := lt_of_lt_of_eq i.isLt cnt85
+    have := lt_of_lt_of_eq i.isLt cntMod
     have := rowFacts i.val
     have row0 := (TableFacts.odd_facts i row kind)
     rw [agree _ (by simp only [stageJoin, Layout.sourceJoin]; split <;> omega)]
     exact reads.stageJoins0 i row kind n n1 nb
   · have := IndexFacts.modJoinBase_le i.val
-    have := lt_of_lt_of_eq i.isLt cnt85
+    have := lt_of_lt_of_eq i.isLt cntMod
     have := rowFacts i.val
     have row0 := (TableFacts.odd_facts i row kind)
     rw [agree _ (by simp only [stageJoin, Layout.sourceJoin]; split <;> omega)]
     exact reads.stageJoins1 i row kind n n1 nb
   · have := IndexFacts.modPinBase_le i.val
-    have := lt_of_lt_of_eq i.isLt cnt85
+    have := lt_of_lt_of_eq i.isLt cntMod
     have := j.isLt
     rw [agree _ (by simp only [stagePin, Layout.sourcePin]; omega)]
     exact reads.stagePins0 i row kind j
   · have := IndexFacts.modPinBase_le i.val
-    have := lt_of_lt_of_eq i.isLt cnt85
+    have := lt_of_lt_of_eq i.isLt cntMod
     have := j.isLt
     rw [agree _ (by simp only [stagePin, Layout.sourcePin]; omega)]
     exact reads.stagePins1 i row kind j
   · have := IndexFacts.modJoinBase_le i.val
-    have := lt_of_lt_of_eq i.isLt cnt85
+    have := lt_of_lt_of_eq i.isLt cntMod
     have := rowFacts i.val
     rw [agree _ (by simp only [growJoin, Layout.sourceJoin]; omega)]
     exact reads.growJoins i row kind n n0 nb
   · have := IndexFacts.modJoinBase_le i.val
-    have := lt_of_lt_of_eq i.isLt cnt85
+    have := lt_of_lt_of_eq i.isLt cntMod
     have := rowFacts i.val
     rw [agree _ (by simp only [foldJoin, Layout.sourceJoin]; omega)]
     exact reads.foldJoins i row kind n n0 nb
-  · have := lt_of_lt_of_eq i.isLt cnt85
+  · have := lt_of_lt_of_eq i.isLt cntMod
     have := e.isLt
     rw [agree _ (by simp only [Layout.residueCell]; omega)]
     exact reads.residues i e

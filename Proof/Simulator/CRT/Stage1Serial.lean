@@ -28,7 +28,7 @@ def PieceSafe : Piece → Prop
   | .record κ e => κ < 2 ∧ e < encCount κ
 
 theorem pinWidthAt_le (k : Nat) : pinWidthAt k ≤ 14 := by
-  by_cases inside : k < 200
+  by_cases inside : k < 198
   · exact pinWidth_small ⟨k, inside⟩
   · unfold pinWidthAt
     rw [List.getD_eq_getElem?_getD, List.getElem?_eq_none (by rw [← pinCount_eq] at *; unfold pinCount at *; omega)]
@@ -49,7 +49,7 @@ theorem pinPieces_safe (κ k : Nat) (small : κ < 2) (inside : k < pinCount) :
   simp only [pinPieces, List.mem_map, List.mem_range] at member
   obtain ⟨lane, bound, same⟩ := member
   subst same
-  have pins : pinCount = 200 := pinCount_eq
+  have pins : pinCount = 198 := pinCount_eq
   have active : laneCount = 104 := rfl
   exact ⟨by unfold Layout.sourcePin; omega, Or.inr (by unfold Layout.sourcePin tmpBase; omega),
     le_trans (pinWidthAt_le k) (by norm_num)⟩
@@ -115,7 +115,7 @@ theorem encCount_le (κ : Nat) : encCount κ ≤ 367 := by
 theorem residue_not_limb (κ e i : Nat) (hκ : κ < 2) (he : e < encCount κ) (hi : i < moduliCount) :
     ¬ LimbCell (word (Layout.residueCell κ i e)) := by
   have := encCount_le κ
-  have : i < 85 := hi
+  have : i < 84 := hi
   exact not_limbCell _ (by unfold Layout.residueCell; omega) (Or.inr (by unfold Layout.residueCell tmpBase; omega))
 
 /-- Every stored digit is below its modulus. -/

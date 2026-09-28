@@ -1,0 +1,5 @@
+$ python3 Scratch/opus_check_h1.py
+# HEAD 42a1b4bd84be1cfa9c3e2418752beed4072dc9b9
+# tracked changes:
+
+H1 static check passed: 84 moduli, log2 M = 618.173, 83 certificates (min slack 112), 129628 B / 985094 / 978204, constant 1.2719 units (bound used in Lean: 1.408), smudge share 0.6358

@@ -205,7 +205,7 @@ theorem padModulus_fin (i : Fin bn254Table.count) : Layout.padModulus i.val = bn
   unfold Layout.padModulus
   rw [dif_pos i.isLt]
 
-theorem pad_mem_sites {κ i ρ : Nat} (κLt : κ < 2) (iLt : i < 85) (ρLt : ρ < Layout.padModulus i) :
+theorem pad_mem_sites {κ i ρ : Nat} (κLt : κ < 2) (iLt : i < 84) (ρLt : ρ < Layout.padModulus i) :
     SiteId.pad κ i ρ ∈ crtLayout.sites := by
   refine List.mem_append.mpr (Or.inl ?_)
   simp only [Layout.padSites, List.mem_flatMap, List.mem_map, List.mem_range]
@@ -222,7 +222,7 @@ theorem coordEvalKeys_sites (S coord : Nat) (coordLt : coord < 2) :
     rw [hk] at isSite
     obtain rfl := Option.some.inj isSite
     refine ⟨pad_mem_sites (by omega) ?_ ?_, notCollector_of range (Or.inl (by omega))⟩
-    · have count : Entry.table.count = 85 := bn254_count
+    · have count : Entry.table.count = 84 := bn254_count
       have := i.isLt
       omega
     · rw [kIdx, padModulus_fin i]

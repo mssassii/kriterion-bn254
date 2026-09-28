@@ -202,7 +202,7 @@ theorem mask_family {st site part : ℕ} (hst : st < 4) (hsite : site < 65536) (
 theorem cold_congr (u : AffineInput) (t t' : TagTable) (agree : ∀ p : Fin (2 ^ 40), tagFamily p.val = 6 → t p = t' p) :
     bmrColdOf t u = bmrColdOf t' u := by
   funext i e ρ
-  have hi : i.val < 85 := PadLaw.count_eq ▸ i.isLt
+  have hi : i.val < 84 := PadLaw.count_eq ▸ i.isLt
   have hρ : ρ.1.val < Kriterion.CRT.Entry.table.modulus i := ZMod.val_lt ρ.1
   have facts : ∀ κ, κ < 2 → Layout.padModulus i.val < 65536 ∧ Layout.padCount κ i.val < 64 := fun κ hκ =>
     ⟨(Layout.tableFacts κ hκ i.val hi).2.2.2.2.1, (Layout.tableFacts κ hκ i.val hi).2.2.2.2.2⟩

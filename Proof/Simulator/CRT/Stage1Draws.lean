@@ -162,7 +162,7 @@ def tail : Prog := Prog.seqList [serialize, keyTrue, clearLimbs, zeroRegs allReg
 
 theorem pinWidthAt_small (k : Nat) : pinWidthAt k ≤ 256 := le_trans (CrtSerial.pinWidthAt_le k) (by norm_num)
 
-theorem digitWidth_small_fin : ∀ i : Fin 85, digitWidth (modulusAt i) ≤ 256 ∧ modulusAt i < 2 ^ 256 := by
+theorem digitWidth_small_fin : ∀ i : Fin 84, digitWidth (modulusAt i) ≤ 256 ∧ modulusAt i < 2 ^ 256 := by
   decide +kernel
 
 theorem digitWidth_small (n : Nat) : digitWidth (modulusAt (n % moduliCount)) ≤ 256 ∧

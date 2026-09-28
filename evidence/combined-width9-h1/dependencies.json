@@ -1,0 +1,86 @@
+[
+  {
+    "package": "bn254-scalar-multiplication",
+    "expected": "aaf278948a4127f99ee6752c7cec4b9f9bd43615",
+    "actual": "aaf278948a4127f99ee6752c7cec4b9f9bd43615",
+    "source_clean": true
+  },
+  {
+    "package": "mathlib",
+    "expected": "0df444a360eaa60ab8c11dca51a86af692955474",
+    "actual": "0df444a360eaa60ab8c11dca51a86af692955474",
+    "source_clean": true
+  },
+  {
+    "package": "VCVio",
+    "expected": "bda0be2da973b1304e016589bb794b22ca299f45",
+    "actual": "bda0be2da973b1304e016589bb794b22ca299f45",
+    "source_clean": true
+  },
+  {
+    "package": "plausible",
+    "expected": "b7eb3304aeae834b12dda98993a37f6a41f6f0bb",
+    "actual": "b7eb3304aeae834b12dda98993a37f6a41f6f0bb",
+    "source_clean": true
+  },
+  {
+    "package": "LeanSearchClient",
+    "expected": "5f4d51b81cbd3f6b32b156bfad9056621a040404",
+    "actual": "5f4d51b81cbd3f6b32b156bfad9056621a040404",
+    "source_clean": true
+  },
+  {
+    "package": "importGraph",
+    "expected": "16f02aa7642864af59f1ff0e384a015994db9118",
+    "actual": "16f02aa7642864af59f1ff0e384a015994db9118",
+    "source_clean": true
+  },
+  {
+    "package": "proofwidgets",
+    "expected": "4be2e3d5087eeb272cf5a8853b8f9dd025ef5957",
+    "actual": "4be2e3d5087eeb272cf5a8853b8f9dd025ef5957",
+    "source_clean": true
+  },
+  {
+    "package": "aesop",
+    "expected": "3448c0bcc5ce01b2d1546e483ec3620e32df3d0e",
+    "actual": "3448c0bcc5ce01b2d1546e483ec3620e32df3d0e",
+    "source_clean": true
+  },
+  {
+    "package": "Qq",
+    "expected": "92c15be17b7caf78c2ad767ec40f89052d908d81",
+    "actual": "92c15be17b7caf78c2ad767ec40f89052d908d81",
+    "source_clean": true
+  },
+  {
+    "package": "batteries",
+    "expected": "4488d40d070b9700d4d5a6aa342f0d40c31b2a2d",
+    "actual": "4488d40d070b9700d4d5a6aa342f0d40c31b2a2d",
+    "source_clean": true
+  },
+  {
+    "package": "PolyFun",
+    "expected": "c0c923693fc827a41d17116579a0c16ed4873b19",
+    "actual": "c0c923693fc827a41d17116579a0c16ed4873b19",
+    "source_clean": true
+  },
+  {
+    "package": "loom2",
+    "expected": "2f65f311fae959c302586b07aa45390999b935d4",
+    "actual": "2f65f311fae959c302586b07aa45390999b935d4",
+    "source_clean": true
+  },
+  {
+    "package": "Cli",
+    "expected": "6130a47896ce867c6a4a55373441e59e565bad0f",
+    "actual": "6130a47896ce867c6a4a55373441e59e565bad0f",
+    "source_clean": true
+  },
+  {
+    "package": "cslib",
+    "expected": "98e395a701f2027a413ad24729e1a11a6c772eb4",
+    "actual": "98e395a701f2027a413ad24729e1a11a6c772eb4",
+    "source_clean": true
+  }
+]

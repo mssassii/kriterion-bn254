@@ -18,7 +18,7 @@ namespace TableFacts
 theorem inputBits : Entry.table.inputBits = 254 := rfl
 theorem chunkBits : Entry.table.chunkBits = 8 := rfl
 theorem castWidth : Entry.table.castWidth = 14 := rfl
-theorem count : Entry.table.count = 85 := rfl
+theorem count : Entry.table.count = 84 := rfl
 theorem chunkCount : Entry.table.chunkCount = 32 := rfl
 
 theorem chunkOffset (c : Nat) : Entry.table.chunkOffset c = 8 * c := rfl

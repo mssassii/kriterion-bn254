@@ -1,10 +1,10 @@
 /-
-**One record on the wire** (M2): `recordProg κ e` computes the record of encoding `e` by Horner's rule over its 85
+**One record on the wire** (M2): `recordProg κ e` computes the record of encoding `e` by Horner's rule over its 84
 digits into five 128-bit limbs, then emits its 624 bits.
 
-* `hornerSuffix`: `H(k) = Σ_{k ≤ i < 85} J_i Π_{k ≤ i' < i} m_{i'}`, with `H(k) = J_k + m_k H(k + 1)` and
+* `hornerSuffix`: `H(k) = Σ_{k ≤ i < 84} J_i Π_{k ≤ i' < i} m_{i'}`, with `H(k) = J_k + m_k H(k + 1)` and
   `H(0) = Σ_i J_i · radix_i`; `H(k) < 2 ^ 624` when every digit is below its modulus;
-* `exec_clearLimbs`, `exec_hornerStep`, `exec_horner`: the limbs hold `H(0)` after the 85 steps;
+* `exec_clearLimbs`, `exec_hornerStep`, `exec_horner`: the limbs hold `H(0)` after the 84 steps;
 * `memSem_recordProg`: the record program pushes `lsbs 624 (recordValue ram κ e)` and changes RAM only in the five
   limb cells.
 -/
@@ -27,7 +27,7 @@ namespace CrtRecord
 def hornerSuffix (digit : Nat → Nat) (k : Nat) : Nat :=
   ∑ i ∈ Finset.Ico k moduliCount, digit i * ∏ j ∈ Finset.Ico k i, modulusAt j
 
-/-- The suffix product `Π_{k ≤ j < 85} m_j`. -/
+/-- The suffix product `Π_{k ≤ j < 84} m_j`. -/
 def suffixProduct (k : Nat) : Nat := ∏ j ∈ Finset.Ico k moduliCount, modulusAt j
 
 theorem hornerSuffix_step (digit : Nat → Nat) (k : Nat) (small : k < moduliCount) :
@@ -70,7 +70,7 @@ theorem hornerSuffix_lt (digit : Nat → Nat) (small : ∀ i, i < moduliCount �
         _ = modulusAt k * (hornerSuffix digit (k + 1) + 1) := by ring
         _ ≤ modulusAt k * suffixProduct (k + 1) := Nat.mul_le_mul_left _ rest
 
-theorem modulusAt_pos_fin : ∀ j : Fin 85, 0 < modulusAt j := by decide +kernel
+theorem modulusAt_pos_fin : ∀ j : Fin 84, 0 < modulusAt j := by decide +kernel
 
 theorem modulusAt_pos (j : Nat) (small : j < moduliCount) : 0 < modulusAt j :=
   modulusAt_pos_fin ⟨j, small⟩
@@ -94,7 +94,7 @@ theorem hornerSuffix_small (digit : Nat → Nat) (small : ∀ i, i < moduliCount
   lt_of_lt_of_le (hornerSuffix_lt digit small (moduliCount - k) k (by omega))
     (le_trans (suffixProduct_le k inside) (le_of_lt suffixProduct_zero_lt))
 
-theorem modulusAt_small : ∀ j : Fin 85, modulusAt j < 2 ^ 128 := by decide +kernel
+theorem modulusAt_small : ∀ j : Fin 84, modulusAt j < 2 ^ 128 := by decide +kernel
 
 /-! ### The limbs -/
 
@@ -172,7 +172,7 @@ theorem exec_hornerStep (κ e i : Nat) (memory : Memory) (X digit : Nat) (inside
   · rw [← recordLimb_add, cells k kb, value]
   · rw [frame address fun k kb same => outside ⟨k, kb, by rw [same, recordLimb_add]⟩, readyRam]
 
-/-- **Horner's rule**: after the 85 steps the limbs hold the record `H(0)`. -/
+/-- **Horner's rule**: after the 84 steps the limbs hold the record `H(0)`. -/
 theorem exec_horner (κ e : Nat) (memory : Memory) (digit : Nat → Nat)
     (small : ∀ i, i < moduliCount → digit i < modulusAt i)
     (cells : ∀ i, i < moduliCount → memory.ram (word (Layout.residueCell κ i e)) = word (digit i))
@@ -187,7 +187,7 @@ theorem exec_horner (κ e : Nat) (memory : Memory) (digit : Nat → Nat)
       (∀ address, ¬ LimbCell address → current.ram address = memory.ram address) ∧ current.bits = memory.bits)
     moduliCount
     (fun n bound current ⟨limbs, off, bitsSame⟩ => by
-      have nb : n < 85 := bound
+      have nb : n < 84 := bound
       set i := moduliCount - 1 - n with iDef
       have iSmall : i < moduliCount := by unfold moduliCount at *; omega
       obtain ⟨next, run, limbsNext, offNext, bitsNext⟩ := exec_hornerStep κ e i current

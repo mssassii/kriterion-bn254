@@ -1,6 +1,6 @@
 /-
 C7: the real table satisfies the delivery conditions (`CorrectTable`), row by row,
-by kernel evaluation (`decide +kernel`; the 623-bit `M` and the pairwise gcds of the 85 moduli are
+by kernel evaluation (`decide +kernel`; the 619-bit `M` and the pairwise gcds of the 84 moduli are
 computed by the kernel's GMP-backed `Nat` operations, never by the elaborator).
 -/
 

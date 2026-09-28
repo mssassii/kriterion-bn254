@@ -33,12 +33,12 @@ noncomputable section
 
 /-! ### The moduli -/
 
-theorem moduli_pos_fin : ∀ i : Fin 85, 0 < modulusAt i := by decide +kernel
+theorem moduli_pos_fin : ∀ i : Fin 84, 0 < modulusAt i := by decide +kernel
 
-theorem moduli_size : bn254Moduli.size = 85 := by decide
+theorem moduli_size : bn254Moduli.size = 84 := by decide
 
 theorem modulusAt_pos (i : Nat) : 0 < modulusAt i := by
-  by_cases inside : i < 85
+  by_cases inside : i < 84
   · exact moduli_pos_fin ⟨i, inside⟩
   · have outside : ¬ i < bn254Moduli.size := by rw [moduli_size]; exact inside
     unfold modulusAt Array.getD
@@ -48,7 +48,7 @@ theorem modulusAt_pos (i : Nat) : 0 < modulusAt i := by
 instance modulusAtNeZero (i : Nat) : NeZero (modulusAt i) := ⟨(modulusAt_pos i).ne'⟩
 
 /-- Every modulus fits its digit width, and more than half the draws at that width are accepted. -/
-theorem digitFacts_fin : ∀ i : Fin 85,
+theorem digitFacts_fin : ∀ i : Fin 84,
     modulusAt i ≤ 2 ^ digitWidth (modulusAt i) ∧ 2 ^ digitWidth (modulusAt i) ≤ 2 * modulusAt i := by
   decide +kernel
 

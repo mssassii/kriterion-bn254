@@ -1,0 +1,13 @@
+{
+  "command": [
+    "lake",
+    "env",
+    "lean",
+    "Scratch/ProofAudit.lean"
+  ],
+  "head": "42a1b4bd84be1cfa9c3e2418752beed4072dc9b9",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 31.8,
+  "log": "evidence/h1-proof-audit.log"
+}

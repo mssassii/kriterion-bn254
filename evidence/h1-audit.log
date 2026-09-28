@@ -1,0 +1,12 @@
+$ lake env lean Scratch/OpusH1Audit.lean
+# HEAD 42a1b4bd84be1cfa9c3e2418752beed4072dc9b9
+# tracked changes:
+
+'Submission.solution' depends on axioms: [propext, Classical.choice, Quot.sound]
+axiom check passed: only propext, Classical.choice, Quot.sound
+Privacy.chainError_budget : ∀ (first second : ℕ),
+  first + second < 2 ^ 100 → Privacy.chainError first second * 2 ^ 100 ≤ ↑first + ↑second + 2
+129628
+985094
+978204
+129628

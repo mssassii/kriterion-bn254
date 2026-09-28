@@ -46,7 +46,7 @@ def padsOfDraws (A : SiteId → List (Block × Block)) : BMR.Pads Entry.table :=
   | .inl x => readList 0 i (A (.pad 0 i ρ.val)) ⟨(BMR.xFlat x).val, by simp [Layout.padS]⟩
   | .inr y => readList 1 i (A (.pad 1 i ρ.val)) ⟨(BMR.yFlat y).val, by simp [Layout.padS]⟩
 
-theorem count_eq : Entry.table.count = 85 := by decide +kernel
+theorem count_eq : Entry.table.count = 84 := by decide +kernel
 
 theorem padModulus_eq (i : Fin Entry.table.count) : Layout.padModulus i.val = Entry.table.modulus i := by
   unfold Layout.padModulus
@@ -54,7 +54,7 @@ theorem padModulus_eq (i : Fin Entry.table.count) : Layout.padModulus i.val = En
 
 theorem pad_mem_padSites {κ : ℕ} (hκ : κ < 2) (i : Fin Entry.table.count) {ρ : ℕ}
     (hρ : ρ < Entry.table.modulus i) : SiteId.pad κ i.val ρ ∈ Layout.padSites := by
-  have hi : i.val < 85 := count_eq ▸ i.isLt
+  have hi : i.val < 84 := count_eq ▸ i.isLt
   simp only [Layout.padSites, List.mem_flatMap, List.mem_range, List.mem_map]
   exact ⟨κ, hκ, i.val, hi, ρ, by rw [padModulus_eq]; exact hρ, rfl⟩
 
@@ -215,7 +215,7 @@ theorem padSiteLaw_read {κ : ℕ} (hκ : κ < 2) (i : Fin Entry.table.count)
     (E : Set (Fin (Layout.padS κ) → ZMod (Entry.table.modulus i))) :
     (Layout.padSiteLaw (Layout.padS κ) (Layout.padModulus i.val) (Layout.padCount κ i.val)).toOuterMeasure
         {a | readList κ i a ∈ E} = (PMF.uniformOfFintype _).toOuterMeasure E := by
-  have hi : i.val < 85 := count_eq ▸ i.isLt
+  have hi : i.val < 84 := count_eq ▸ i.isLt
   obtain ⟨pos, fits, -⟩ := Layout.tableFacts κ hκ i.val hi
   rw [padModulus_eq] at pos fits ⊢
   unfold Layout.padSiteLaw

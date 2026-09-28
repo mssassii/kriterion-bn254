@@ -1,0 +1,6 @@
+$ lake env lean Scratch/ProofAudit.lean
+# HEAD 42a1b4bd84be1cfa9c3e2418752beed4072dc9b9
+# tracked changes:
+
+audited 23730 declarations; union of their axioms: [Quot.sound, Classical.choice, propext]
+proof audit passed

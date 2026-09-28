@@ -1,0 +1,11 @@
+{
+  "command": [
+    "lake",
+    "build"
+  ],
+  "head": "42a1b4bd84be1cfa9c3e2418752beed4072dc9b9",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 428.3,
+  "log": "evidence/h1-build-2.log"
+}

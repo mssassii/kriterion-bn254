@@ -2,7 +2,7 @@
 **the real site layout and its swap facts** (row H3 with `Swap/Hop.lean`).
 
 `crtLayout`:
-* sites: the pad sites `.pad κ i ρ` for `κ < 2`, `i < 85`, `ρ < m_i` (the modulus 256 included), then the mask sites
+* sites: the pad sites `.pad κ i ρ` for `κ < 2`, `i < 84`, `ρ < m_i` (the modulus 256 included), then the mask sites
   `.mask 0 k` for `k < 273` and `.mask 1 k` for `k < 182`;
 * answers: `bn254Table.padAnswers S_κ i` for a pad site (`S_x = 367`, `S_y = 275`, D5), 2 for `.mask 0 k`, 3 for
   `.mask 1 k` (D8; the 364 non-collector masks fill 182 pair sites, no single site);
@@ -169,8 +169,8 @@ def padModulus (i : ℕ) : ℕ := if h : i < bn254Table.count then bn254Table.mo
 /-- The pad answers of coordinate `κ` and modulus `i` (D5; 0 off range). -/
 def padCount (κ i : ℕ) : ℕ := if h : i < bn254Table.count then bn254Table.padAnswers (padS κ) ⟨i, h⟩ else 0
 
-/-- The closed facts of the 170 rows, decided by the kernel. -/
-theorem tableFacts : ∀ κ, κ < 2 → ∀ i, i < 85 →
+/-- The closed facts of the 168 rows, decided by the kernel. -/
+theorem tableFacts : ∀ κ, κ < 2 → ∀ i, i < 84 →
     0 < padModulus i ∧ padModulus i ^ padS κ ≤ 2 ^ (256 * padCount κ i) ∧ 256 * padCount κ i ≤ 4352 ∧
       (padModulus i = 256 → 8 * padS κ ≤ 256 * padCount κ i) ∧ padModulus i < 65536 ∧ padCount κ i < 64 := by
   decide +kernel
@@ -181,7 +181,7 @@ def padNum (κ i : ℕ) : ℕ :=
 
 /-- **The pad rows' numerators sum to `padSwapNum`** (each row counted `m` times, once per slot). -/
 theorem padNum_sum :
-    ((List.range 2).map fun κ => ((List.range 85).map fun i => padModulus i * padNum κ i).sum).sum
+    ((List.range 2).map fun κ => ((List.range 84).map fun i => padModulus i * padNum κ i).sum).sum
       = BudgetData.padSwapNum := by
   decide +kernel
 
@@ -195,7 +195,7 @@ theorem padSwapDenom_eq' : BudgetData.padSwapDenom = 2 ^ 4352 := by
 
 /-- The pad sites. -/
 def padSites : List SiteId :=
-  (List.range 2).flatMap fun κ => (List.range 85).flatMap fun i =>
+  (List.range 2).flatMap fun κ => (List.range 84).flatMap fun i =>
     (List.range (padModulus i)).map fun ρ => SiteId.pad κ i ρ
 
 /-- The mask sites. -/
@@ -237,7 +237,7 @@ namespace Layout
 /-! ### The facts -/
 
 theorem mem_padSites {site : SiteId} (mem : site ∈ padSites) :
-    ∃ κ i ρ, site = .pad κ i ρ ∧ κ < 2 ∧ i < 85 ∧ ρ < padModulus i := by
+    ∃ κ i ρ, site = .pad κ i ρ ∧ κ < 2 ∧ i < 84 ∧ ρ < padModulus i := by
   simp only [padSites, List.mem_flatMap, List.mem_map, List.mem_range] at mem
   obtain ⟨κ, hκ, i, hi, ρ, hρ, rfl⟩ := mem
   exact ⟨κ, i, ρ, rfl, hκ, hi, hρ⟩
@@ -271,7 +271,7 @@ theorem crtLayout_nodup : ∀ site ∈ crtLayout.sites, ((siteTags crtLayout sit
     · exact nodup_tags Family.mask 0 0 0 k 2 (by omega) (by omega) (by omega) (by omega) (by omega) (by decide)
     · exact nodup_tags Family.mask 0 0 1 k 3 (by omega) (by omega) (by omega) (by omega) (by omega) (by decide)
 
-theorem pad_close (κ i ρ : ℕ) (hκ : κ < 2) (hi : i < 85) :
+theorem pad_close (κ i ρ : ℕ) (hκ : κ < 2) (hi : i < 84) :
     (layoutLaw (.pad κ i ρ)).etvDist (uniformAnswers (layoutAnswers (.pad κ i ρ))) ≤ layoutBias (.pad κ i ρ) := by
   obtain ⟨pos, fits, small, pow2, -, -⟩ := tableFacts κ hκ i hi
   simp only [layoutLaw, layoutAnswers, layoutBias, padNum]
@@ -340,8 +340,8 @@ theorem padSites_sum : (padSites.map layoutBias).sum = (BudgetData.padSwapNum : 
   rw [sum_flatMap']
   simp only [sum_flatMap', inner]
   rw [← padNum_sum]
-  have outer : ∀ κ, ((List.range 85).map fun i => ((padModulus i * padNum κ i : ℕ) : ℝ≥0∞) / 2 ^ 4352).sum
-      = ((((List.range 85).map fun i => padModulus i * padNum κ i).sum : ℕ) : ℝ≥0∞) / 2 ^ 4352 :=
+  have outer : ∀ κ, ((List.range 84).map fun i => ((padModulus i * padNum κ i : ℕ) : ℝ≥0∞) / 2 ^ 4352).sum
+      = ((((List.range 84).map fun i => padModulus i * padNum κ i).sum : ℕ) : ℝ≥0∞) / 2 ^ 4352 :=
     fun κ => sum_map_div _ (fun i => padModulus i * padNum κ i) _
   simp only [outer]
   exact sum_map_div _ _ _
