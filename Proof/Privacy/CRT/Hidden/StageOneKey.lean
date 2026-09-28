@@ -500,8 +500,9 @@ theorem moved (x : Entry.Coins × BMR.Pads table) (m : NZ) (R : TagTable) :
 theorem moveCoins_offsets (c : Entry.Coins) (m : NZ) : (moveCoins c m).offsets = c.offsets := rfl
 
 theorem ctx_move (scalar : NonZeroScalar) (c : Entry.Coins) (m : NZ) :
-    BmrEntry.bmrContextOf scalar (moveCoins c m) = BmrEntry.bmrContextOf scalar c :=
-  BmrSplit.bmrContextOf_congr scalar (moveCoins_offsets c m)
+    BmrEntry.bmrContextOf scalar (moveCoins c m) = BmrEntry.bmrContextOf scalar c := by
+  unfold BmrEntry.bmrContextOf NormRows.nctxOf Kriterion.CRT.Entry.outputKeysOf
+  rw [moveCoins_offsets]
 theorem moveCoins_exceptionPad (c : Entry.Coins) (m : NZ) : (moveCoins c m).exceptionPad = c.exceptionPad := rfl
 theorem moveCoins_inputZero (c : Entry.Coins) (m : NZ) : (moveCoins c m).inputZero = c.inputZero := rfl
 theorem moveCoins_inputDelta (c : Entry.Coins) (m : NZ) : (moveCoins c m).inputDelta = c.inputDelta := rfl
@@ -520,23 +521,15 @@ theorem gy_move (H : HashN) (c : Entry.Coins) (m : NZ) :
 /-- **The published value does not change along a move.** -/
 theorem pubParts_move (scalar : NonZeroScalar) (x : Entry.Coins × BMR.Pads table) (m : NZ) (R : TagTable) :
     pubParts scalar (move x m).1 (move x m).2 R = pubParts scalar x.1 x.2 R := by
+  have mv : (move x m).1 = moveCoins x.1 m := rfl
   have h := moved x m R
+  rw [mv] at h
   have e1 := h.curveTable
   have e2 := h.nGamma (BmrEntry.bmrContextOf scalar x.1)
   have e3 := h.nJoin (BmrEntry.bmrContextOf scalar x.1)
   have e4 := h.hint
   unfold pubParts
-  show (⟨BMR.curveTable (bcOf (move x m).1 (move x m).2 R),
-      Vector.ofFn fun d => BMR.nGamma (BmrEntry.bmrContextOf scalar (moveCoins x.1 m)) (bcOf (move x m).1 (move x m).2 R) d,
-      Vector.ofFn (EntryCorrect.entriesOf (H8.tagHash R) scalar (moveCoins x.1 m)),
-      convVector (EntryCorrect.gxOf (H8.tagHash R) (moveCoins x.1 m)).pub,
-      convVector (EntryCorrect.gyOf (H8.tagHash R) (moveCoins x.1 m)).pub,
-      Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar (moveCoins x.1 m))
-        (bcOf (move x m).1 (move x m).2 R)) (BMR.hint (bcOf (move x m).1 (move x m).2 R)) (.inl (BMR.xEncEquiv.symm e))),
-      Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar (moveCoins x.1 m))
-        (bcOf (move x m).1 (move x m).2 R)) (BMR.hint (bcOf (move x m).1 (move x m).2 R)) (.inr (BMR.yEncEquiv.symm e)))⟩ :
-      Entry.Public) = _
-  rw [ctx_move, entries_move, gx_move, gy_move, e1, e2, e3, e4]
+  rw [mv, ctx_move, entries_move, gx_move, gy_move, e1, e2, e3, e4]
 
 /-! ### P5. Counting along the orbits -/
 
