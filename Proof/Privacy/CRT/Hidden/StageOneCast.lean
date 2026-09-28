@@ -319,6 +319,7 @@ theorem map_mass {Ω V : Type} (μ : PMF Ω) (f : Ω → V) (v : V) :
   rw [← PMF.toOuterMeasure_apply_singleton, PMF.toOuterMeasure_map_apply]
   rfl
 
+set_option linter.constructorNameAsVariable false in
 /-- The raw first-block fibre includes 24 unused high bits; the second block is arbitrary. -/
 theorem clip_answer_card (g : Label) [DecidablePred fun a : Block × Block => clip a.1 = g] :
     (Finset.univ.filter fun a : Block × Block => clip a.1 = g).card ≤ 2 ^ (256 - labelBits) := by
@@ -365,7 +366,7 @@ theorem rest_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 32)
       (by rw [treePos_family κ.isLt (by omega)]; decide)
       (by rw [treePos_family κ.isLt (by omega)]; decide)))
     (fun c T => restPub κ (pubT scalar c T)) ?_
-    (fun _ _ a => clip a.1 = g) (2 ^ (256 - labelBits)) (fun _ _ => clip_answer_card g) v
+    (fun _ _ a => clip a.1 = g) (2 ^ (256 - labelBits)) (fun _ _ => @clip_answer_card g (fun _ => Classical.propDecidable _)) v
   intro c A A' agree
   apply restPub_congr κ scalar c A A'
   intro p hp

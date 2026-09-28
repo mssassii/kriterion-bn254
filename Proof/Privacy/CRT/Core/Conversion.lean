@@ -1,27 +1,20 @@
 /-
-**CRT privacy core: the conversion layer of one coordinate is a bijection of its hidden values.**
+The parity conversion layer is a bijection of its independent hidden data.
 
-At input `u` with coordinate value `v`, every gadget of the conversion layer (the chunk trees and casts, the two fused
-extraction stages, the growth and the folds of every odd modulus) has one hidden value at its hot slot: a material
-(one 104-bit label, `clip` of `.1` of the hot answer) per hashed tree, growth or fold level, and a cast (`Lanes l`) per pin. The
-published conversion material has exactly the same shape: one join per hashed level, one pin per cast family. Both
-are `ConvVals tbl`.
+Each hashed tree, growth, or fold level contributes one hidden 104-bit material.
+Each cast contributes only its independent upper `l - 1` planes; its low plane is
+computed from the actual leaf label. The public tuple has the same shape: joins
+and half-pins whose omitted low plane is proved zero.
 
-On the answer-table reading (`ConvTable.lean`) the published material is an explicit function `convPublish` of the rest
-(the table's readings at the cold slots, the zero labels, `Δ`) and of the hidden values, which enter by slot
-comparison (as `overrideHot` for the stages). It is triangular in two phases:
+For chunks, published joins first determine the hidden tree materials. Those
+materials determine every leaf label, after which the half-pin determines the
+hot cast's upper planes. Each fused extraction stage uses restricted publication
+injectivity, with hidden data equal to its hot tree materials and hot cast upper
+planes. The old full-width stage injection is used only as an algebraic kernel;
+full-width uniformity is never asserted for the parity cast.
 
-* every **pin** is its own hidden cast plus a function of the rest;
-* every **join** is its own hidden material XOR a function of the rest and of the hidden casts only (the word, the
-  class sums, the peeled remainder).
-
-So `convPublish` is injective (`convPublish_injective`), hence a bijection of `ConvVals tbl`, and uniform hidden values
-publish uniform material independent of the rest (`conversion_uniform`, the form of `Core/Inversion.lean`'s
-`bind_map_uniform_of_injective`). The extraction stages use `spec_publish_injective`.
-
-Malformed schedule rows are normalised away by `rowOf` (a row that fails `RowWF` or has modulus `0` reads
-as the empty row), so the statements hold for every table; the link to the real garbler (`garbler_conv_eq`) assumes
-the table well formed.
+Malformed rows retain the empty-row singleton convention. The actual-garbler
+link reads independent upper data from the original full-width raw hash packing.
 -/
 
 import Proof.Privacy.CRT.Core.ConvTable

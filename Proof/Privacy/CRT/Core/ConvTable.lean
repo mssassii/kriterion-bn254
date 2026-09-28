@@ -1,23 +1,14 @@
 /-
-**CRT privacy core: the conversion garbler on an answer table.**
+The parity conversion garbler on an answer table.
 
-On the answer-table reading of the oracle a labelled query is answered by
-its tag alone (`hLabel_tableHash`, `hlong_tableHash`), so the garbler's published conversion material of one coordinate
-is an explicit function of the table's readings (a tree, growth or fold material clips `.1` of one answer; a cast reads
-`castAnswers l` answers by D11), the zero labels and `Δ`, and never of the tree labels. This file computes it, gadget by
-gadget, for the frozen programs (`Construction/CRT/{Tree, Chunk, Extract, Fold, Coord}.lean`):
+Raw hashes depend only on tags on this table reading. Tree materials therefore
+ignore their control labels, but arithmetic casts keep their leaf label in the
+low plane. Their independent upper planes use the original full-width hash
+reading with its old low random plane discarded.
 
-* `treeGarbleM_levelSum_table`, `growGarbleM_levelSum_table`, `foldsGarbleM_join_table`: a tree, growth or fold join is
-  the XOR of the table's materials of its level, XOR the bit mask;
-* `castM_table`: a cast is the table's cast reading `castRd`;
-* `chunk_table`: a chunk's joins, casts and pin;
-* `tableStage`, `hashStage_table`: an extraction stage on a table is `ExtractSpec`'s stage with label-free materials
-  and casts (`extStageGarbleM_eval` then gives the program);
-* `conversion_table`: one odd modulus's stage joins and pins, growth and fold joins;
-* `coord_pub_chunk`, `coord_pub_mod`: the coordinate's published material read from its chunks and moduli.
-
-Every statement holds for every table `A`; the hidden values of the core (`Conversion.lean`) are readings of `A` at the
-hot slots.
+The material-tree bridge reconstructs every actual leaf before its parity cast
+is evaluated. Published pins serialize only their upper planes. Extraction
+stages use the same label-aware cast rule through `tableStage`.
 -/
 
 import Proof.Correctness.CRT.ChunkStep
@@ -40,6 +31,13 @@ def castRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) : Lanes 
 /-- The independent upper planes retain the original hash readings. -/
 def upperRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) : Lanes (l - 1) :=
   Parity.pinHalf l (castRd A l tagOf)
+
+theorem upperRd_congr (A A' : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ)
+    (same : ∀ j : Fin (castAnswers l), A (tagOf j.val) = A' (tagOf j.val)) :
+    upperRd A l tagOf = upperRd A' l tagOf := by
+  unfold upperRd castRd
+  congr 3
+  exact funext same
 
 /-- The cast on a tag table still derives its low plane from its leaf label. -/
 def parityRd (A : ℕ → Block × Block) (l : ℕ) (tagOf : ℕ → ℕ) (G : Label) : Lanes l :=
