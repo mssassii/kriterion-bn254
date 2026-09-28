@@ -51,9 +51,9 @@ run_cmd do
 #eval Entry.evaluateBudget
 
 /-- The expected numbers of this entry (85 moduli, width-8 extraction on every odd row, parity casts with half-pins, pad slack 120, 104-bit internal conversion labels, block-aligned cast
-lanes, per-encoding 78-byte records with the wrap hint, sign rows with three published constants
+lanes, per-encoding 78-byte records with the wrap hint, normalized rows publishing one constant and one flags byte
 per digit, the hash digest with two packed exceptional nibbles). -/
-def expectedBytes : Nat := 141627
+def expectedBytes : Nat := 135894
 def expectedGarble : Nat := 988438
 def expectedEvaluate : Nat := 981506
 
@@ -70,7 +70,7 @@ def expectedEvaluate : Nat := 981506
 /-- An all-zero public value, to measure the encoding by computation. -/
 def zeroPublic : Entry.Public where
   curve := (0, 0, 0)
-  rows := Vector.replicate PlanB.digitCount ⟨0, 0, 0⟩
+  rows := Vector.replicate PlanB.digitCount ⟨0, false, false, false⟩
   exception := Vector.replicate PlanB.digitCount (Vector.replicate 2 0)
   crtX := Vector.replicate convCount 0
   crtY := Vector.replicate convCount 0
