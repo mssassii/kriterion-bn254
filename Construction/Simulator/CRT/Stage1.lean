@@ -6,13 +6,14 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 
 | block | cells | sampler |
 |---|---|---|
-| `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row constants `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
+| `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row cells `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
 | `bytes` | `exceptionBase + index`, `index < 182` | independent exception nibbles (4 coins each) |
 | `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins |
 | `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 85` | bounded rejection below `m_i` over `digitWidth m_i` coins |
 | `zeros` | `keyBase + 2 j`, `j < 508` (`Z_j`) | 128 coins |
 | `deltas` | `deltaCell κ` | 128 coins |
+| `signs` | `Layout.signCell d`, `d < 91` (the sign bits `ν`) | one coin |
 | `keyTrue` | `keyBase + 2 j + 1 := Z_j ⊕ Δ_{j / 254}` (after the serializer) | deterministic |
 
 The record of encoding `e` is the mixed-radix integer of its digits, `Σ_i J_i · Π_{i' < i} m_{i'}`; the digits are
@@ -68,7 +69,10 @@ def recordLimbCount : Nat := 5
 def digitCell (m address : Nat) : Prog :=
   .seq (bounded (digitWidth m) (testBelow m) attempts (storeAt address rOut)) (zeroRegs samplerScratch)
 
-/-- The curve and row constants. -/
+/-- The sign bits `ν`, one coin each. -/
+def signs : Prog := Prog.rep 91 fun d => Stage1.wordCell 1 (Layout.signCell d)
+
+/-- The curve constants and the row cells. -/
 def fields : Prog := Prog.rep fieldCount fun index => Stage1.fieldCell (fieldBase + index)
 
 /-- The exception nibbles (two per digit). -/
@@ -155,9 +159,14 @@ def convPieces (κ : Nat) : List Piece :=
 /-- The records of coordinate `κ`. -/
 def recordPieces (κ : Nat) : List Piece := (List.range (encCount κ)).map fun e => .record κ e
 
+/-- The rows: per digit its `X` constant (a field cell) and its flags byte, the sign bit's cell (both
+normalization flags clear). -/
+def rowPieces : List Piece :=
+  ((List.range 91).map fun d => [.word (fieldBase + (3 + 3 * d)) 256, .word (Layout.signCell d) 8]).flatten
+
 /-- **The wire, piece by piece**: curve, rows, exception, `crtX`, `crtY`, `recX`, `recY`. -/
 def pieces : List Piece :=
-  (List.range fieldCount).map (fun index => .word (fieldBase + index) 256) ++
+  (List.range curveCellCount).map (fun index => .word (fieldBase + index) 256) ++ rowPieces ++
   (List.range exceptionCellCount).map (fun index => .word (exceptionBase + index) 4) ++
   convPieces 0 ++ convPieces 1 ++ recordPieces 0 ++ recordPieces 1
 
@@ -191,7 +200,7 @@ def serialize : Prog :=
 /-- **Stage 1**: the draws, the wire, the true labels; then the record limbs and every register are cleared, so
 the retained configuration is a function of the draws. -/
 def program : Prog :=
-  Prog.seqList [fields, bytes, joins, pins, digits, zeros, deltas, serialize, keyTrue, clearLimbs,
+  Prog.seqList [fields, bytes, joins, pins, digits, zeros, deltas, signs, serialize, keyTrue, clearLimbs,
     zeroRegs allRegisters]
 
 end CrtStage1

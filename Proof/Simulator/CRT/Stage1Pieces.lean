@@ -1,8 +1,8 @@
 /-
 **The serializer's pieces are the wire** (M2).
 
-`SourceHolds ram source`: RAM holds the source's field cells, exception nibbles, joins, pins and records (as their
-mixed-radix digits). `pieces_bits`: then the bits of `CrtStage1.pieces`, piece by piece, are exactly the byte bits of
+`SourceHolds ram source`: RAM holds the source's field cells, sign bits, exception nibbles, joins, pins and records (as
+their mixed-radix digits). `pieces_bits`: then the bits of `CrtStage1.pieces`, piece by piece, are exactly the byte bits of
 `Wire.encoding.encode (publish source)`.
 -/
 
@@ -36,6 +36,7 @@ def recordOf (source : Source) (κ e : Nat) : Nat :=
 /-- **RAM holds the source** (the cells the serializer reads). -/
 structure SourceHolds (ram : Word → Word) (source : Source) : Prop where
   fields : ∀ index, index < fieldCount → ram (word (fieldBase + index)) = fieldWord (fieldOf source index)
+  signs : ∀ d : Fin 91, ram (word (Layout.signCell d.val)) = word (source.signs d).toNat
   bytes : ∀ (d : Fin 91) (b : Fin 2),
     ram (word (exceptionBase + (2 * d.val + b.val))) = word (source.exception d)[b.val].toNat
   conv : ∀ κ, ConvHolds ram source κ
@@ -43,50 +44,50 @@ structure SourceHolds (ram : Word → Word) (source : Source) : Prop where
 
 /-! ### The segments -/
 
-theorem fields_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
-    pieceListBits ram ((List.range fieldCount).map fun index => Piece.word (fieldBase + index) 256) =
-      lsbs 256 source.curve.1.val ++ lsbs 256 source.curve.2.1.val ++ lsbs 256 source.curve.2.2.val ++
-      (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 3 =>
-            lsbs 256 (CrtWire.rowField (Entry.publish source).rows[digit.val] index.val).val).flatten).flatten := by
+theorem curve_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
+    pieceListBits ram ((List.range curveCellCount).map fun index => Piece.word (fieldBase + index) 256) =
+      lsbs 256 source.curve.1.val ++ lsbs 256 source.curve.2.1.val ++ lsbs 256 source.curve.2.2.val := by
   unfold pieceListBits
   rw [List.map_map, map_range_eq_ofFn]
-  have cell : ∀ index, index < fieldCount →
-      (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 256) index =
-        lsbs 256 (fieldOf source index).val := by
-    intro index inside
+  have cell : ∀ index : Fin curveCellCount,
+      (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 256) index.val =
+        lsbs 256 (fieldOf source index.val).val := by
+    intro index
+    have small : index.val < 3 := index.isLt
     simp only [Function.comp_apply, pieceBits]
-    rw [holds.fields index inside, fieldWord, bitRun_ofNat _ _ le_rfl]
-  rw [show fieldCount = 3 + digitCount * 3 from rfl, flatten_ofFn_add]
-  have rows : (List.ofFn fun index : Fin (digitCount * 3) =>
-      (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 256) (Fin.natAdd 3 index).val).flatten =
+    rw [holds.fields index.val (by unfold fieldCount curveCellCount rowCellCount; omega), fieldWord,
+      bitRun_ofNat _ _ le_rfl]
+  simp only [cell]
+  simp only [curveCellCount, List.ofFn_succ, List.ofFn_zero, List.flatten_cons, List.flatten_nil, List.append_nil,
+    Fin.val_zero, Fin.val_succ, fieldOf, List.append_assoc]
+  rfl
+
+/-- The flags byte of a published source row is its sign bit. -/
+theorem flagsOf_publish (source : Source) (d : Fin digitCount) :
+    CrtWire.flagsOf (Entry.publish source).rows[d.val] = (source.signs d).toNat := by
+  simp only [Entry.publish, Vector.getElem_ofFn, Entry.Source.normRow, CrtWire.flagsOf, NormRow.flagByte]
+  cases source.signs d <;> rfl
+
+theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
+    pieceListBits ram rowPieces =
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 3 =>
-            lsbs 256 (CrtWire.rowField (Entry.publish source).rows[digit.val] index.val).val).flatten).flatten := by
-    rw [flatten_ofFn_mul]
-    refine congrArg List.flatten (congrArg List.ofFn (funext fun digit => ?_))
-    refine congrArg List.flatten (congrArg List.ofFn (funext fun index => ?_))
-    have digitSmall : digit.val < 91 := digit.isLt
-    have indexSmall := index.isLt
-    simp only [Fin.val_natAdd]
-    rw [cell _ (by unfold fieldCount curveCellCount rowCellCount; omega)]
-    unfold fieldOf
-    rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), dif_pos (by omega)]
-    simp only [Entry.publish, Vector.getElem_ofFn]
-    have key : 3 + (digit.val * 3 + index.val) - 3 = digit.val * 3 + index.val := by omega
-    simp only [key, show (digit.val * 3 + index.val) / 3 = digit.val by omega,
-      show (digit.val * 3 + index.val) % 3 = index.val by omega]
-  have first : ∀ index : Fin 3, (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 256)
-      (Fin.castAdd (digitCount * 3) index).val = lsbs 256 (fieldOf source index.val).val := fun index =>
-    cell _ (by have := index.isLt; unfold fieldCount curveCellCount rowCellCount; simp only [Fin.val_castAdd]; omega)
-  have three : (List.ofFn fun index : Fin 3 => (pieceBits ram ∘ fun index => Piece.word (fieldBase + index) 256)
-      (Fin.castAdd (digitCount * 3) index).val).flatten =
-      lsbs 256 source.curve.1.val ++ lsbs 256 source.curve.2.1.val ++ lsbs 256 source.curve.2.2.val := by
-    simp only [first]
-    simp only [List.ofFn_succ, List.ofFn_zero, List.flatten_cons, List.flatten_nil, List.append_nil,
-      Fin.val_zero, Fin.val_succ, fieldOf, List.append_assoc]
-    rfl
-  rw [rows, three]
+          lsbs 256 (Entry.publish source).rows[digit.val].xC0.val ++
+            lsbs 8 (CrtWire.flagsOf (Entry.publish source).rows[digit.val])).flatten := by
+  unfold pieceListBits rowPieces
+  rw [List.map_flatten, List.flatten_flatten, List.map_map, map_range_eq_ofFn]
+  refine congrArg List.flatten (congrArg List.ofFn (funext fun digit => ?_))
+  have digitSmall : digit.val < 91 := digit.isLt
+  simp only [Function.comp_apply, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil,
+    List.append_nil, pieceBits]
+  rw [holds.fields (3 + 3 * digit.val) (by unfold fieldCount curveCellCount rowCellCount; omega), fieldWord,
+    bitRun_ofNat _ _ le_rfl, holds.signs digit, bitRun_ofNat _ _ (by norm_num), flagsOf_publish]
+  congr 2
+  unfold fieldOf
+  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), dif_pos (by omega)]
+  simp only [Entry.publish, Vector.getElem_ofFn, Entry.Source.normRow]
+  rw [show 3 + 3 * digit.val - 3 = 3 * digit.val by omega, show 3 * digit.val / 3 = digit.val by omega,
+    show 3 * digit.val % 3 = 0 by omega]
+  rfl
 
 theorem bytes_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
     pieceListBits ram ((List.range exceptionCellCount).map fun index => Piece.word (exceptionBase + index) 4) =
@@ -135,7 +136,7 @@ theorem pieces_bits (ram : Word → Word) (source : Source) (holds : SourceHolds
   rw [CrtWire.wire_bits]
   unfold pieces
   simp only [pieceListBits_append]
-  rw [fields_bits ram source holds, bytes_bits ram source holds]
+  rw [curve_bits ram source holds, rows_bits ram source holds, bytes_bits ram source holds]
   have conv0 := conv_bits ram source 0 (holds.conv 0)
   have conv1 := conv_bits ram source 1 (holds.conv 1)
   rw [show ((0 : Fin 2) : Nat) = 0 from rfl] at conv0

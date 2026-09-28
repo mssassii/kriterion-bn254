@@ -81,12 +81,19 @@ theorem convPieces_safe (κ : Nat) (small : κ < 2) : ∀ p ∈ convPieces κ, P
 theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
   intro p member
   simp only [pieces, List.mem_append] at member
-  rcases member with ((((inFields | inBytes) | inConv0) | inConv1) | inRec0) | inRec1
+  rcases member with (((((inFields | inRows) | inBytes) | inConv0) | inConv1) | inRec0) | inRec1
   · simp only [List.mem_map, List.mem_range] at inFields
     obtain ⟨index, bound, same⟩ := inFields
     subst same
-    have : index < 276 := bound
+    have : index < 3 := bound
     exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), le_rfl⟩
+  · simp only [rowPieces, List.mem_flatten, List.mem_map, List.mem_range] at inRows
+    obtain ⟨list, ⟨d, bound, rfl⟩, inList⟩ := inRows
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at inList
+    rcases inList with same | same <;> subst same
+    · exact ⟨by unfold fieldBase; omega, Or.inl (by unfold fieldBase tmpBase; omega), le_rfl⟩
+    · exact ⟨by unfold Layout.signCell fieldBase; omega, Or.inl (by unfold Layout.signCell fieldBase tmpBase; omega),
+        by norm_num⟩
   · simp only [List.mem_map, List.mem_range] at inBytes
     obtain ⟨index, bound, same⟩ := inBytes
     subst same

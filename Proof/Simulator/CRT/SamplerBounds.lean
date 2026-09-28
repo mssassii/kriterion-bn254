@@ -26,7 +26,7 @@ open Kriterion.ArgoMAC.Phase3.Glue (optionProduct)
 open Kriterion.CRT.SimMachine.CrtStage1 (fieldCount modulusAt digitWidth moduliCount recordCount pinOf pinCoord
   pinWidthAt)
 open Kriterion.CRT.SimMachine.CrtDraws (Draw drawLaw optBind digitLaw fieldsLaw bytesLaw joinsLaw pinsLaw digitsLaw
-  zerosLaw deltasLaw)
+  zerosLaw deltasLaw signsLaw)
 open scoped ENNReal
 
 noncomputable section
@@ -196,15 +196,16 @@ instance digitsFintype : Fintype Digits := inferInstance
 instance pinsNonempty : Nonempty Pins := inferInstance
 instance digitsNonempty : Nonempty Digits := inferInstance
 
-/-- **The exact draws**: field cells, nibbles, joins, pin lanes, record digits, zero labels, offsets. -/
+/-- **The exact draws**: field cells, nibbles, joins, pin lanes, record digits, zero labels, offsets, sign bits. -/
 abbrev Exact : Type := (Fin fieldCount → BaseField) × (Fin exceptionCellCount → Fin (2 ^ 4)) ×
   (Fin (2 * Entry.joinCount) → Fin (2 ^ labelBits)) × Pins × Digits × (Fin labelCount → Fin (2 ^ 128)) ×
-  (Fin 2 → Fin (2 ^ 128))
+  (Fin 2 → Fin (2 ^ 128)) × (Fin 91 → Fin (2 ^ 1))
 
 /-- Exact draws as the machine's draws. -/
 def embed (D : Exact) : Draw :=
   ⟨D.1, fun n => (D.2.1 n).val, fun n => (D.2.2.1 n).val, fun n => (D.2.2.2.1 n).val,
-    fun n => (D.2.2.2.2.1 n).val, fun n => (D.2.2.2.2.2.1 n).val, fun n => (D.2.2.2.2.2.2 n).val⟩
+    fun n => (D.2.2.2.2.1 n).val, fun n => (D.2.2.2.2.2.1 n).val, fun n => (D.2.2.2.2.2.2.1 n).val,
+    fun n => (D.2.2.2.2.2.2.2 n).val⟩
 
 /-- Exact field cells. -/
 def idealFields : PMF (Option (Fin fieldCount → BaseField)) :=
@@ -217,8 +218,8 @@ def idealDigits : PMF (Option (Fin (recordCount * moduliCount) → Nat)) :=
 /-- **The exact draws' law**: the machine's draws with exact field cells and exact digits. -/
 def idealDrawLaw : PMF (Option Draw) :=
   optBind idealFields fun f => optBind bytesLaw fun b => optBind joinsLaw fun j => optBind pinsLaw fun p =>
-    optBind idealDigits fun d => optBind zerosLaw fun z => optBind deltasLaw fun dl =>
-      PMF.pure (some ⟨f, b, j, p, d, z, dl⟩)
+    optBind idealDigits fun d => optBind zerosLaw fun z => optBind deltasLaw fun dl => optBind signsLaw fun sg =>
+      PMF.pure (some ⟨f, b, j, p, d, z, dl, sg⟩)
 
 /-- Abort-or-value binds are abort-close when their parts are. -/
 theorem optBind_close {α β : Type} {ε ε' : ℝ≥0∞} {law law' : PMF (Option α)} {next next' : α → PMF (Option β)}
@@ -230,7 +231,7 @@ theorem optBind_close {α β : Type} {ε ε' : ℝ≥0∞} {law law' : PMF (Opti
 /-- The extra abort mass of the stage-1 draws: the field cells' and the digits'. -/
 def drawsMass : ℝ≥0∞ :=
   (fieldCount : ℝ≥0∞) * rejectLaw fieldWidth (fun value => decide (value < pNat)) attempts none +
-    (0 + (0 + (0 + (((recordCount * moduliCount : Nat) : ℝ≥0∞) * ((2 : ℝ≥0∞) ^ 256)⁻¹ + (0 + (0 + 0))))))
+    (0 + (0 + (0 + (((recordCount * moduliCount : Nat) : ℝ≥0∞) * ((2 : ℝ≥0∞) ^ 256)⁻¹ + (0 + (0 + (0 + 0)))))))
 
 /-- **The machine's draws are abort-close to the exact draws.** -/
 theorem draws_close : AbortClose drawsMass drawLaw idealDrawLaw := by
@@ -244,7 +245,7 @@ theorem draws_close : AbortClose drawsMass drawLaw idealDrawLaw := by
   exact optBind_close fields fun f => optBind_close (AbortClose.refl _) fun b =>
     optBind_close (AbortClose.refl _) fun j => optBind_close (AbortClose.refl _) fun p =>
       optBind_close digits fun d => optBind_close (AbortClose.refl _) fun z =>
-        optBind_close (AbortClose.refl _) fun dl => AbortClose.refl _
+        optBind_close (AbortClose.refl _) fun dl => optBind_close (AbortClose.refl _) fun sg => AbortClose.refl _
 
 /-- **The draws' extra abort mass is below `2^-130`.** -/
 theorem drawsMass_le : drawsMass ≤ ((2 : ℝ≥0∞) ^ 130)⁻¹ := by
@@ -295,11 +296,13 @@ theorem idealDrawLaw_eq : idealDrawLaw = (PMF.uniformOfFintype Exact).map fun D 
   unfold idealDrawLaw
   rw [idealFields_eq, show bytesLaw = _ from wordProduct_eq exceptionCellCount 4,
     show joinsLaw = _ from wordProduct_eq (2 * Entry.joinCount) labelBits, pinsLaw_eq, idealDigits_eq,
-    show zerosLaw = _ from wordProduct_eq labelCount 128, show deltasLaw = _ from wordProduct_eq 2 128]
+    show zerosLaw = _ from wordProduct_eq labelCount 128, show deltasLaw = _ from wordProduct_eq 2 128,
+    show signsLaw = _ from wordProduct_eq 91 1]
   simp only [optBind_map_some, optBind_map_some_id]
   rw [← uniform_product (A := Fin fieldCount → BaseField), ← uniform_product (A := Fin exceptionCellCount → Fin (2 ^ 4)),
     ← uniform_product (A := Fin (2 * Entry.joinCount) → Fin (2 ^ labelBits)), ← uniform_product (A := Pins),
-    ← uniform_product (A := Digits), ← uniform_product (A := Fin labelCount → Fin (2 ^ 128))]
+    ← uniform_product (A := Digits), ← uniform_product (A := Fin labelCount → Fin (2 ^ 128)),
+    ← uniform_product (A := Fin 2 → Fin (2 ^ 128))]
   simp only [PMF.map_bind, PMF.map_comp]
   rfl
 
@@ -382,8 +385,12 @@ def exZeros (s : Entry.Source) (n : Fin labelCount) : Fin (2 ^ 128) :=
 /-- The offsets of a source. -/
 def exDeltas (s : Entry.Source) (n : Fin 2) : Fin (2 ^ 128) := (s.deltas n).toFin
 
+/-- The sign bits of a source. -/
+def exSigns (s : Entry.Source) (n : Fin 91) : Fin (2 ^ 1) := ⟨(s.signs n).toNat, Bool.toNat_lt _⟩
+
 /-- **The exact draws of a source.** -/
-def exOf (s : Entry.Source) : Exact := (exFields s, exBytes s, exJoins s, exPins s, exDigits s, exZeros s, exDeltas s)
+def exOf (s : Entry.Source) : Exact :=
+  (exFields s, exBytes s, exJoins s, exPins s, exDigits s, exZeros s, exDeltas s, exSigns s)
 
 /-! #### The mixed radix -/
 
@@ -586,11 +593,17 @@ theorem read_deltas (s : Entry.Source) : (readSource (exOf s)).deltas = s.deltas
   simp only [BitVec.val_toFin]
   exact bitVec_ofNat_toNat _
 
+theorem read_signs (s : Entry.Source) : (readSource (exOf s)).signs = s.signs := by
+  funext d
+  show decide ((exSigns s d).val = 1) = s.signs d
+  unfold exSigns
+  cases s.signs d <;> rfl
+
 /-- **Every source is the reading of its exact draws.** -/
 theorem readSource_exOf (s : Entry.Source) : readSource (exOf s) = s := by
   apply Entry.Source.data_injective
   unfold Entry.Source.data
-  rw [read_curve, read_rows, read_exception, read_joins, read_pins, read_recX, read_recY, read_zeros,
+  rw [read_curve, read_rows, read_signs, read_exception, read_joins, read_pins, read_recX, read_recY, read_zeros,
     read_deltas]
 
 /-! #### Reading back exact draws -/
@@ -707,19 +720,27 @@ theorem exZeros_read (D : Exact) : exZeros (readSource D) = D.2.2.2.2.2.1 := by
   rw [show 254 * (n.val / 254) + n.val % 254 = n.val by omega, total_apply _ _ _ n.isLt, BitVec.toNat_ofNat,
     Nat.mod_eq_of_lt (D.2.2.2.2.2.1 n).isLt]
 
-theorem exDeltas_read (D : Exact) : exDeltas (readSource D) = D.2.2.2.2.2.2 := by
+theorem exDeltas_read (D : Exact) : exDeltas (readSource D) = D.2.2.2.2.2.2.1 := by
   funext n
   apply Fin.ext
   unfold exDeltas
   simp only [BitVec.val_toFin]
-  show (BitVec.ofNat 128 (total 0 (fun m => (D.2.2.2.2.2.2 m).val) n.val)).toNat = (D.2.2.2.2.2.2 n).val
+  show (BitVec.ofNat 128 (total 0 (fun m => (D.2.2.2.2.2.2.1 m).val) n.val)).toNat = (D.2.2.2.2.2.2.1 n).val
   rw [total_apply _ _ _ n.isLt, BitVec.toNat_ofNat]
   exact Nat.mod_eq_of_lt (Fin.isLt _)
+
+theorem exSigns_read (D : Exact) : exSigns (readSource D) = D.2.2.2.2.2.2.2 := by
+  funext n
+  apply Fin.ext
+  show (decide ((D.2.2.2.2.2.2.2 n).val = 1)).toNat = (D.2.2.2.2.2.2.2 n).val
+  have small : (D.2.2.2.2.2.2.2 n).val < 2 := (D.2.2.2.2.2.2.2 n).isLt
+  generalize (D.2.2.2.2.2.2.2 n).val = v at small ⊢
+  interval_cases v <;> rfl
 
 /-- **Every exact draw is the draw of its reading.** -/
 theorem exOf_readSource (D : Exact) : exOf (readSource D) = D :=
   Prod.ext (exFields_read D) (Prod.ext (exBytes_read D) (Prod.ext (exJoins_read D) (Prod.ext (exPins_read D)
-    (Prod.ext (exDigits_read D) (Prod.ext (exZeros_read D) (exDeltas_read D))))))
+    (Prod.ext (exDigits_read D) (Prod.ext (exZeros_read D) (Prod.ext (exDeltas_read D) (exSigns_read D)))))))
 
 /-- **Reading exact draws is a bijection onto the sources.** -/
 def readEquiv : Exact ≃ Entry.Source where

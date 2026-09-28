@@ -6,6 +6,7 @@ serializer's sense (`CrtPieces.SourceHolds`) whenever every cell is in range (`C
 
 import Proof.Simulator.CRT.Stage1Stored
 import Proof.Simulator.CutoffSource
+import Construction.CRT.Rows
 
 namespace Kriterion.CRT.SimMachine
 
@@ -29,6 +30,7 @@ def sourceOf (d : Draw) : Source where
   curve := (total 0 d.fields 0, total 0 d.fields 1, total 0 d.fields 2)
   rows g := ⟨total 0 d.fields (3 + 3 * g.val), total 0 d.fields (3 + 3 * g.val + 1),
     total 0 d.fields (3 + 3 * g.val + 2)⟩
+  signs g := decide (d.signs g = 1)
   exception g := Vector.ofFn fun b : Fin 2 => BitVec.ofNat 4 (total 0 d.bytes (2 * g.val + b.val))
   joins κ i := BitVec.ofNat labelBits (total 0 d.joins (κ.val * joinCount + i.val))
   pins κ k lane := ((total 0 d.pins ((κ.val * pinCount + k.val) * laneCount + lane.val) : Nat) : ZMod (2 ^ pinWidth k))
@@ -48,6 +50,7 @@ structure CellsValid (ram : Word → Word) : Prop where
   pins : ∀ n, n < 2 * (pinCount * laneCount) → (ram (word (pinAddr n))).toNat < 2 ^ pinWidthAt (pinOf n)
   digits : ∀ n, n < recordCount * moduliCount →
     (ram (word (digitAddr n))).toNat < modulusAt (n % moduliCount)
+  signs : ∀ n, n < 91 → (ram (word (Layout.signCell n))).toNat < 2
 
 /-! ### The product of the moduli -/
 
@@ -83,6 +86,25 @@ theorem field_cell (ram : Word → Word) (valid : CellsValid ram) (index : Nat) 
   simp only [readDraw, fieldWord]
   rw [ZMod.val_natCast, Nat.mod_eq_of_lt (valid.fields index inside)]
   exact (CrtSerial.word_toNat_self _).symm
+
+/-- A sign cell holds its extracted sign bit. -/
+theorem sign_cell (ram : Word → Word) (valid : CellsValid ram) (d : Fin 91) :
+    ram (word (Layout.signCell d.val)) = word ((extract ram).signs d).toNat := by
+  have small := valid.signs d.val d.isLt
+  show ram (word (Layout.signCell d.val)) =
+    word (decide ((ram (word (Layout.signCell d.val))).toNat = 1)).toNat
+  generalize ram (word (Layout.signCell d.val)) = x at small ⊢
+  apply BitVec.eq_of_toNat_eq
+  rcases (show x.toNat = 0 ∨ x.toNat = 1 by omega) with h | h <;> simp [h]
+
+/-- A bit's field word is its word. -/
+theorem fieldWord_flagValue (b : Bool) : fieldWord (Rows.flagValue b) = word b.toNat := by
+  cases b
+  · show fieldWord 0 = word 0
+    unfold fieldWord
+    rw [ZMod.val_zero]
+  · show fieldWord 1 = word 1
+    exact fieldWord_one
 
 theorem byte_cell (ram : Word → Word) (valid : CellsValid ram) (d : Fin 91) (b : Fin 2) :
     ram (word (exceptionBase + (2 * d.val + b.val))) = word ((extract ram).exception d)[b.val].toNat := by
@@ -189,6 +211,7 @@ theorem recordValue_lt (ram : Word → Word) (valid : CellsValid ram) (κ e : Na
 /-- **RAM holds its extracted source**, cell by cell, when every cell is in range. -/
 theorem sourceHolds_extract (ram : Word → Word) (valid : CellsValid ram) : SourceHolds ram (extract ram) where
   fields index inside := field_cell ram valid index inside
+  signs d := sign_cell ram valid d
   bytes d b := byte_cell ram valid d b
   conv κ := convHolds_extract ram valid κ
   records κ e hκ he := by

@@ -177,6 +177,10 @@ theorem readDraw_keeps (ram ram' : Word → Word) (agree : ∀ n, Kept n → ram
     have := κ.isLt
     rw [agree _ (kept _ (by unfold Layout.deltaCell; omega)
       (Or.inr (by unfold Layout.deltaCell labelBase labelCount; omega)))]
+  · funext d
+    have := d.isLt
+    rw [agree _ (kept _ (by unfold Layout.signCell fieldBase; omega)
+      (Or.inl (by unfold Layout.signCell fieldBase requestBase; omega)))]
 
 omit [FieldCertificate] in
 /-- The stage-1 cells are in range on a RAM that agrees on the kept cells. -/
@@ -185,7 +189,8 @@ theorem cellsValid_keeps (ram ram' : Word → Word) (agree : ∀ n, Kept n → r
   have kept : ∀ n, n < 2 ^ 256 → (n < requestBase ∨ labelBase + labelCount ≤ n) → Kept n := by
     intro n small side
     refine ⟨small, ?_, ?_⟩ <;> unfold requestBase labelBase labelCount at * <;> omega
-  refine ⟨fun index inside => ?_, fun n inside => ?_, fun n inside => ?_, fun n inside => ?_, fun n inside => ?_⟩
+  refine ⟨fun index inside => ?_, fun n inside => ?_, fun n inside => ?_, fun n inside => ?_, fun n inside => ?_,
+    fun n inside => ?_⟩
   · rw [agree _ (kept _ (by unfold fieldBase CrtStage1.fieldCount curveCellCount rowCellCount at *; omega)
       (Or.inl (by unfold fieldBase requestBase CrtStage1.fieldCount curveCellCount rowCellCount at *; omega)))]
     exact valid.fields index inside
@@ -201,6 +206,9 @@ theorem cellsValid_keeps (ram ram' : Word → Word) (agree : ∀ n, Kept n → r
   · have := CrtStored.digitAddr_range n inside
     rw [agree _ (kept _ (by omega) (Or.inr (by unfold labelBase labelCount; omega)))]
     exact valid.digits n inside
+  · rw [agree _ (kept _ (by unfold Layout.signCell fieldBase; omega)
+      (Or.inl (by unfold Layout.signCell fieldBase requestBase; omega)))]
+    exact valid.signs n inside
 
 end Prefix
 
@@ -211,10 +219,10 @@ section Start
 variable [FieldCertificate]
 
 omit [FieldCertificate] in
-/-- A published row constant is the source's. -/
+/-- A published row is the source's: its `X` constant, the flags clear, its sign. -/
 theorem gammaOf_publish (src : Kriterion.CRT.Entry.Source) (d : Fin digitCount) :
-    Kriterion.CRT.Entry.gammaOf (Kriterion.CRT.Entry.publish src) d = src.rows d := by
-  show (Vector.ofFn src.rows).get d = src.rows d
+    Kriterion.CRT.Entry.gammaOf (Kriterion.CRT.Entry.publish src) d = src.normRow d := by
+  show (Vector.ofFn src.normRow).get d = src.normRow d
   rw [Vector.get_eq_getElem, Vector.getElem_ofFn]
 
 omit [FieldCertificate] in
@@ -269,7 +277,8 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
     exact CrtSource.field_cell memory.ram retained.cells index inside
   refine
     { readsX := ?_, readsY := ?_, reqXCell := xCell, reqYCell := yCell, c0Cell := ?_, c1Cell := ?_, c2Cell := ?_,
-      outputCells := outCells, rowCells := fun d => ?_, labelCells := labelAt, empty := empty }
+      outputCells := outCells, rowCells := fun d => ?_, rowFlags := fun d => ?_, labelCells := labelAt,
+      empty := empty }
   · have reads := SourceCells.coordReadsX_extract middle valid (fun e he => hints 0 e (by decide) he)
       input.x.val (Kriterion.CRT.Entry.labelX (Kriterion.CRT.Entry.labels (CrtSource.extract memory.ram) input))
       xCell (fun j low => by
@@ -295,11 +304,16 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
       rw [show Opening.rowCell d.val slot = fieldBase + (3 + 3 * d.val + slot) by
           unfold Opening.rowCell curveCellCount; omega,
         field _ (by omega)]
-    rw [cell 0 (by decide), cell 1 (by decide), cell 2 (by decide)]
+    have signCell : middle.ram (word (Layout.signCell d.val)) =
+        word ((CrtSource.extract memory.ram).signs d).toNat := by
+      rw [keeps _ (keptLow _ (by unfold Layout.signCell; omega))]
+      exact CrtSource.sign_cell memory.ram retained.cells d
+    rw [cell 0 (by decide), signCell, ← CrtSource.fieldWord_flagValue]
     generalize CrtSource.extract memory.ram = src
-    rw [gammaOf_publish src d, fieldOf_row src d 0 (by decide), fieldOf_row src d 1 (by decide),
-      fieldOf_row src d 2 (by decide)]
-    exact ⟨rfl, rfl, rfl⟩
+    rw [gammaOf_publish src d, fieldOf_row src d 0 (by decide)]
+    exact ⟨rfl, rfl⟩
+  · rw [gammaOf_publish]
+    exact ⟨rfl, rfl⟩
 
 end Start
 

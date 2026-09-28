@@ -3,8 +3,8 @@
 draws followed by its deterministic tail (the true labels, the wire, the clears).
 
 * `Draw`, `drawLaw`: the field cells, the exception nibbles, the joins, the pin lanes, the records' digits, the zero
-  labels and the offsets, each block an `optionProduct` of its cell laws (flat indices as `memSem_rep_nest` makes
-  them);
+  labels, the offsets and the sign bits, each block an `optionProduct` of its cell laws (flat indices as
+  `memSem_rep_nest` makes them);
 * `storedMem`: the memory after the draws, a fold of stores per block;
 * `program_law`: `program.memSem memory = optBind drawLaw fun d => tail.memSem (storedMem memory d)`.
 -/
@@ -117,7 +117,9 @@ structure Draw where
   digits : Fin (recordCount * moduliCount) → Nat
   zeros : Fin labelCount → Nat
   deltas : Fin 2 → Nat
+  signs : Fin 91 → Nat
 
+def signsLaw : PMF (Option (Fin 91 → Nat)) := optionProduct 91 fun _ => (wordLaw 1).map some
 def fieldsLaw : PMF (Option (Fin fieldCount → BaseField)) := optionProduct fieldCount fun _ => fieldCellLaw
 def bytesLaw : PMF (Option (Fin exceptionCellCount → Nat)) :=
   optionProduct exceptionCellCount fun _ => (wordLaw 4).map some
@@ -132,8 +134,8 @@ def deltasLaw : PMF (Option (Fin 2 → Nat)) := optionProduct 2 fun _ => (wordLa
 /-- **The law of the draws.** -/
 def drawLaw : PMF (Option Draw) :=
   optBind fieldsLaw fun f => optBind bytesLaw fun b => optBind joinsLaw fun j => optBind pinsLaw fun p =>
-    optBind digitsLaw fun d => optBind zerosLaw fun z => optBind deltasLaw fun dl =>
-      PMF.pure (some ⟨f, b, j, p, d, z, dl⟩)
+    optBind digitsLaw fun d => optBind zerosLaw fun z => optBind deltasLaw fun dl => optBind signsLaw fun sg =>
+      PMF.pure (some ⟨f, b, j, p, d, z, dl, sg⟩)
 
 /-- The address of join word `n`. -/
 def joinAddr (n : Nat) : Nat := Layout.sourceJoin (n / joinCount) (n % joinCount)
@@ -145,14 +147,15 @@ def digitAddr (n : Nat) : Nat :=
 
 /-- **The memory after the draws.** -/
 def storedMem (memory : Memory) (d : Draw) : Memory :=
-  foldStore (fun n => wordStore (Layout.deltaCell n)) 2
-    (foldStore (fun n => wordStore (keyBase + 2 * n)) labelCount
-      (foldStore (fun n => cellStore (digitAddr n)) (recordCount * moduliCount)
-        (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * laneCount))
-          (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount)
-            (foldStore (wordStep exceptionBase) exceptionCellCount
-              (foldStore (cellStep fieldBase) fieldCount memory d.fields) d.bytes) d.joins) d.pins) d.digits)
-      d.zeros) d.deltas
+  foldStore (fun n => wordStore (Layout.signCell n)) 91
+    (foldStore (fun n => wordStore (Layout.deltaCell n)) 2
+      (foldStore (fun n => wordStore (keyBase + 2 * n)) labelCount
+        (foldStore (fun n => cellStore (digitAddr n)) (recordCount * moduliCount)
+          (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * laneCount))
+            (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount)
+              (foldStore (wordStep exceptionBase) exceptionCellCount
+                (foldStore (cellStep fieldBase) fieldCount memory d.fields) d.bytes) d.joins) d.pins) d.digits)
+        d.zeros) d.deltas) d.signs
 
 /-- The deterministic tail: the wire, the true labels, the clears. -/
 def tail : Prog := Prog.seqList [serialize, keyTrue, clearLimbs, zeroRegs allRegisters]
@@ -165,6 +168,11 @@ theorem digitWidth_small_fin : ∀ i : Fin 85, digitWidth (modulusAt i) ≤ 256 
 theorem digitWidth_small (n : Nat) : digitWidth (modulusAt (n % moduliCount)) ≤ 256 ∧
     modulusAt (n % moduliCount) < 2 ^ 256 :=
   digitWidth_small_fin ⟨n % moduliCount, Nat.mod_lt _ (by decide)⟩
+
+theorem seq_signs (rest : Prog) (memory : Memory) :
+    (Prog.seq signs rest).memSem memory =
+      optBind signsLaw fun sg => rest.memSem (foldStore (fun n => wordStore (Layout.signCell n)) 91 memory sg) :=
+  memSem_seq_law _ _ _ _ _ (memSem_wordCells 91 (fun _ => 1) Layout.signCell (fun _ => by norm_num) memory)
 
 theorem seq_fields (rest : Prog) (memory : Memory) :
     (Prog.seq fields rest).memSem memory =
@@ -211,7 +219,7 @@ theorem program_law (memory : Memory) :
     program.memSem memory = optBind drawLaw fun d => tail.memSem (storedMem memory d) := by
   unfold program tail
   simp only [Prog.seqList]
-  simp only [seq_fields, seq_bytes, seq_joins, seq_pins, seq_digits, seq_zeros, seq_deltas]
+  simp only [seq_fields, seq_bytes, seq_joins, seq_pins, seq_digits, seq_zeros, seq_deltas, seq_signs]
   simp only [drawLaw, optBind_assoc, optBind_pure]
   rfl
 

@@ -64,6 +64,11 @@ theorem cells_keep {final stored : Memory}
     rw [CrtStage1Law.off_far off (digitAddr n) (by omega) (Or.inr (by unfold tmpBase; omega))
       (Or.inr (by unfold keyBase; omega))]
     exact valid.digits n inside
+  signs n inside := by
+    rw [CrtStage1Law.off_far off (Layout.signCell n) (by unfold Layout.signCell fieldBase; omega)
+      (Or.inl (by unfold Layout.signCell fieldBase tmpBase; omega))
+      (Or.inl (by unfold Layout.signCell fieldBase keyBase; omega))]
+    exact valid.signs n inside
 
 omit [FieldCertificate] in
 /-- The encodings of a coordinate number at most `367`. -/
@@ -100,7 +105,8 @@ theorem retained_finalOf (start : Memory)
       (Or.inr (by unfold Layout.hintCell; omega))
       (Or.inr (by unfold Layout.hintCell; omega))
       (Or.inr (by unfold Layout.hintCell exceptionBase exceptionCellCount; omega))
-      (Or.inr (by unfold Layout.hintCell fieldBase fieldCount curveCellCount rowCellCount; omega))]
+      (Or.inr (by unfold Layout.hintCell fieldBase fieldCount curveCellCount rowCellCount; omega))
+      (Or.inr (by unfold Layout.hintCell fieldBase; omega))]
     exact hintsZero κ hκ e he
   · intro j hj
     rw [evenKeep j hj, deltaKeep (j / 254) (by unfold labelCount at hj; omega)]

@@ -15,7 +15,7 @@ import Proof.Privacy.CRT.Core.EncIndex
 namespace Kriterion.CRT.SimMachine
 
 open BN254 Cryptography Cryptography.BoundedMachine Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB.SimMachine
-open Kriterion.ArgoMAC.PlanB (RowGamma XElement YElement xElementIndex yElementIndex)
+open Kriterion.ArgoMAC.PlanB (NormRow XElement YElement xElementIndex yElementIndex)
 open Kriterion.CRT.Privacy (ReplayOut)
 
 noncomputable section
@@ -112,9 +112,11 @@ theorem pyOf_eq (out : ReplayOut) (d : Fin 91) (y : YElement) :
 
 variable [FieldCertificate]
 
-/-- **The collector masks agree**: `Solve.maskFormula` on the replay's cells is `collectorMasks`. -/
-theorem maskFormula_eq (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → RowGamma)
-    (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (d : Fin 91) (c : Fin 3) :
+/-- **The collector masks agree**: `Solve.maskFormula` on the replay's cells is `collectorMasks`, at published rows
+with the normalization flags clear. -/
+theorem maskFormula_eq (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → NormRow)
+    (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (d : Fin 91) (c : Fin 3)
+    (flags : (gamma d).zFlag = false ∧ (gamma d).sFlag = false) :
     Solve.maskFormula u.x u.y (gamma d) (targets d) (dxOf out) (pxOf out) (dyOf out) (pyOf out) d.val c =
       Privacy.collectorMasks u out gamma targets (Programs.collectorAt d c) := by
   have x7 : dxOf out (4 * d.val) = out.delivered (Privacy.BMR.rowEnc (d, .inl .rowX_x7)) :=
@@ -138,13 +140,13 @@ theorem maskFormula_eq (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → R
   have q10y : pyOf out (3 * d.val + 2) = out.masks ⟨(d, .inr .rowY_y10), yPlain _⟩ := pyOf_eq out d .rowY_y10
   fin_cases c
   · simp only [Solve.maskFormula, x7, x9, p7, y10, q10]
-    simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.collectorSolve,
+    simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.nCollectorSolve,
       Privacy.replayRowValues, Privacy.BMR.IsCollector]
   · simp only [Solve.maskFormula, xc, y8, q8, y10y, q10y]
-    simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.collectorSolve,
-      Privacy.replayRowValues, Privacy.BMR.IsCollector, sq]
+    simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.nCollectorSolve,
+      Privacy.replayRowValues, Privacy.BMR.IsCollector, sq, flags.2, Rows.flagValue]
   · simp only [Solve.maskFormula, x9z]
-    simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.collectorSolve]
+    simp [Privacy.collectorMasks, Programs.collectorAt, Privacy.BMR.nCollectorSolve, flags.1, Rows.flagValue]
 
 /-! ### The solve's cells from the replay's outputs -/
 
@@ -186,12 +188,11 @@ theorem maskY_holds (out : ReplayOut) (memory : Memory) (holds : OutHolds out me
 
 omit [FieldCertificate] in
 /-- **The solve's cells**, from the replay's outputs, the request, the row constants and the target rows. -/
-theorem digitCells_of_out (out : ReplayOut) (memory : Memory) (u : AffineInput) (gamma : Fin 91 → RowGamma)
+theorem digitCells_of_out (out : ReplayOut) (memory : Memory) (u : AffineInput) (gamma : Fin 91 → NormRow)
     (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (holds : OutHolds out memory)
     (hx : memory.ram (word reqX) = fieldWord u.x) (hy : memory.ram (word reqY) = fieldWord u.y)
     (rows : ∀ d : Fin 91, memory.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
-      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0)
+      memory.ram (word (Layout.signCell d)) = fieldWord (Rows.flagValue (gamma d).sign))
     (rowTargets : ∀ d : Fin 91, memory.ram (word (openRow d)) = fieldWord (targets d).x ∧
       memory.ram (word (openRow d + 1)) = fieldWord (targets d).y ∧
       memory.ram (word (openRow d + 2)) = fieldWord (targets d).z)
@@ -200,8 +201,7 @@ theorem digitCells_of_out (out : ReplayOut) (memory : Memory) (u : AffineInput) 
   reqXCell := hx
   reqYCell := hy
   row0 := (rows d).1
-  row1 := (rows d).2.1
-  row2 := (rows d).2.2
+  sign := (rows d).2
   decXCell k small := decodedX_holds out memory holds _ (by have := d.isLt; omega)
   maskX0 := maskX_holds out memory holds d .rowX_x7 (by simp [Privacy.BMR.IsCollector])
   decYCell k small := decodedY_holds out memory holds _ (by have := d.isLt; omega)

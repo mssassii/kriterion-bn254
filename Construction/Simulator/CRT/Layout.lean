@@ -5,8 +5,9 @@ The regions of xinshu's `Construction/Simulator/Layout.lean` are kept where the 
 that the verbatim blocks (request, label selection and emission, the opening's tail, Horner, lambdas, lifts,
 preimage limbs) run unchanged:
 
-* `fieldBase` (`2^40`): the curve constants (cells `0 .. 2`) and the row constants (`3 + 3 d + slot`,
-  `xC0, yC4, zC0`, `Opening.rowCell`);
+* `fieldBase` (`2^40`): the curve constants (cells `0 .. 2`) and the row cells (`3 + 3 d + slot`,
+  `xC0, yC4, zC0`, `Opening.rowCell`; only `xC0` is published, `yC4` and `zC0` are the source's hidden cells), then
+  the `91` sign bits (`signCell d = fieldBase + 276 + d`);
 * `exceptionBase` (`2^41`): the `91 · 2` exception nibbles (`2 d + kind`);
 * `requestBase` (`2^43`), `labelBase` (`2^44`, the `508` selected labels), `tmpBase` (`2^48`), `openBase` (`2^49`),
   `keyBase` (`2^50`: `keyBase + 2 i + b` is label `b` of input bit `i`, stored as `Z_i` and `Z_i ⊕ Δ`).
@@ -40,6 +41,9 @@ namespace Kriterion.CRT.SimMachine
 open Cryptography.BoundedMachine Kriterion.ArgoMAC.PlanB.SimMachine
 
 namespace Layout
+
+/-- The sign bit `ν` of digit `d` (`Source.signs d`, a word `0` or `1`), just after the `276` field cells. -/
+def signCell (d : Nat) : Nat := fieldBase + 276 + d
 
 /-- A published join of coordinate `κ` (flat index of the source). -/
 def sourceJoin (κ index : Nat) : Nat := 2 ^ 51 + 2 ^ 24 * κ + index

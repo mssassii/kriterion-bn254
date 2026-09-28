@@ -34,7 +34,7 @@ namespace Kriterion.CRT.SimMachine
 
 open BN254 Cryptography Cryptography.BoundedMachine GarbledCircuit
 open Kriterion.ArgoMAC Kriterion.ArgoMAC.PlanB.SimMachine Kriterion.ArgoMAC.PlanB.SimMachine.Blocks
-open Kriterion.ArgoMAC.PlanB (RowGamma)
+open Kriterion.ArgoMAC.PlanB (NormRow)
 open Kriterion.ArgoMAC.Phase3.Glue (optionProduct targetRows digitPoints)
 open Kriterion.CRT.Privacy (ReplayOut lazyReader routeMReplay collectorMasks drawAll collectorList programHashAll
   programRequests)
@@ -397,7 +397,7 @@ abbrev afterRowsProg : Prog :=
 
 /-- The abstract simulator after the rows (route M's `drawAll` of the bounded preimages and the exact fourth block,
 then `programHashAll`). -/
-def abstractAfterRows (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → RowGamma) (labels : LamportSignature)
+def abstractAfterRows (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → NormRow) (labels : LamportSignature)
     (targets : Fin 91 → FieldMacToECMac.HomogeneousValue) (oracle : OState FI EI) :
     PMF (Option (LamportSignature × OState FI EI)) :=
   (drawAll (fun c => Preimages.siteSample (collectorMasks u out gamma targets c)) collectorList).map fun drawn =>
@@ -407,13 +407,13 @@ def abstractAfterRows (u : AffineInput) (out : ReplayOut) (gamma : Fin 91 → Ro
 
 /-- **After the rows**: from a memory that holds the replay's outputs, the request, the row constants and the labels,
 and after the rows (`RowsPost`), the rest of the valid arm with the parse is the abstract continuation. -/
-theorem afterRows_law (out : ReplayOut) (u : AffineInput) (gamma : Fin 91 → RowGamma) (labels : LamportSignature)
+theorem afterRows_law (out : ReplayOut) (u : AffineInput) (gamma : Fin 91 → NormRow) (labels : LamportSignature)
     (memory next : Memory) (targets : Fin 91 → FieldMacToECMac.HomogeneousValue)
     (post : RowsPost memory next targets) (holds : OutCells.OutHolds out memory)
     (reqXCell : memory.ram (word reqX) = fieldWord u.x) (reqYCell : memory.ram (word reqY) = fieldWord u.y)
     (rowCells : ∀ d : Fin 91, memory.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
-      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0)
+      memory.ram (word (Layout.signCell d)) = fieldWord (Rows.flagValue (gamma d).sign))
+    (rowFlags : ∀ d : Fin 91, (gamma d).zFlag = false ∧ (gamma d).sFlag = false)
     (labelCells : ∀ (i : Nat) (bound : i < 508), memory.ram (word (labelBase + i)) = blockWord (labels[i]'bound))
     (empty : memory.bits 3 = []) (oracle : OState FI EI) :
     (afterRowsProg.sem next oracle).bind finishK = abstractAfterRows u out gamma labels targets oracle := by
@@ -427,13 +427,12 @@ theorem afterRows_law (out : ReplayOut) (u : AffineInput) (gamma : Fin 91 → Ro
   have hy : next.ram (word reqY) = fieldWord u.y :=
     (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans reqYCell
   have rowsN : ∀ d : Fin 91, next.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      next.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
-      next.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0 := fun d => by
+      next.ram (word (Layout.signCell d)) = fieldWord (Rows.flagValue (gamma d).sign) := fun d => by
     have := d.isLt
-    refine ⟨?_, ?_, ?_⟩
+    refine ⟨?_, ?_⟩
     · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).1
-    · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).2.1
-    · exact (post.same _ (not_openCell _ (by addr_arith) (by addr_arith))).trans (rowCells d).2.2
+    · exact (post.same _ (not_openCell _ (by unfold Layout.signCell; addr_arith)
+        (by unfold Layout.signCell; addr_arith))).trans (rowCells d).2
   have labelsN : ∀ (i : Nat) (bound : i < 508), next.ram (word (labelBase + i)) = blockWord (labels[i]'bound) :=
     fun i bound => (post.same _ (not_openCell _ (by unfold labelBase openBase; omega)
       (by unfold labelBase tmpM tmpBase; omega))).trans (labelCells i bound)
@@ -448,7 +447,7 @@ theorem afterRows_law (out : ReplayOut) (u : AffineInput) (gamma : Fin 91 → Ro
   have cells : ∀ (d : Fin 91) (c : Fin 3), after.ram (word (openTarget d c)) =
       fieldWord (collectorMasks u out gamma targets (Programs.collectorAt d c)) := fun d c => by
     rw [written d.val c d.isLt, atFin_val gamma d, atFin_val targets d,
-      OutCells.maskFormula_eq u out gamma targets d c]
+      OutCells.maskFormula_eq u out gamma targets d c (rowFlags d)]
   have keyCell : after.ram (word Layout.keyCell) = blockWord out.key :=
     (frameSolve _ fun d c dSmall cSmall => keyCell_ne_openTarget d c dSmall cSmall).trans holdsN.key
   obtain ⟨finalMem, frames, law⟩ :=
@@ -501,29 +500,29 @@ abbrev restProg : Prog :=
     Request.emitLabels]
 
 /-- The abstract simulator after the replay, at the machine's bounded samplers. -/
-def afterReplay (u : AffineInput) (target : Point) (gamma : Fin 91 → RowGamma) (labels : LamportSignature)
+def afterReplay (u : AffineInput) (target : Point) (gamma : Fin 91 → NormRow) (labels : LamportSignature)
     (ran : ReplayOut × OState FI EI) : PMF (Option (LamportSignature × OState FI EI)) :=
   optBind (CrtBounded.rows u target) fun targets => abstractAfterRows u ran.1 gamma labels targets ran.2
 
 /-- **The continuation law**: from the replay's outputs in RAM, the request, the output cells, the row constants,
 the labels and an empty response stack, the rest of the valid arm with the parse is route M's stage 2 after its
 replay, with the bounded rows, the bounded preimages and the exact fourth block. -/
-theorem continuation_law (out : ReplayOut) (u : AffineInput) (target : Point) (gamma : Fin 91 → RowGamma)
+theorem continuation_law (out : ReplayOut) (u : AffineInput) (target : Point) (gamma : Fin 91 → NormRow)
     (labels : LamportSignature) (memory : Memory) (holds : OutCells.OutHolds out memory)
     (reqXCell : memory.ram (word reqX) = fieldWord u.x) (reqYCell : memory.ram (word reqY) = fieldWord u.y)
     (request : readWords (memory.ram (word reqTag0), memory.ram (word reqQX), memory.ram (word reqQY)) =
       some target)
     (rowCells : ∀ d : Fin 91, memory.ram (word (Opening.rowCell d 0)) = fieldWord (gamma d).xC0 ∧
-      memory.ram (word (Opening.rowCell d 1)) = fieldWord (gamma d).yC4 ∧
-      memory.ram (word (Opening.rowCell d 2)) = fieldWord (gamma d).zC0)
+      memory.ram (word (Layout.signCell d)) = fieldWord (Rows.flagValue (gamma d).sign))
+    (rowFlags : ∀ d : Fin 91, (gamma d).zFlag = false ∧ (gamma d).sFlag = false)
     (labelCells : ∀ (i : Nat) (bound : i < 508), memory.ram (word (labelBase + i)) = blockWord (labels[i]'bound))
     (empty : memory.bits 3 = []) (oracle : OState FI EI) :
     (restProg.sem memory oracle).bind finishK = afterReplay u target gamma labels (out, oracle) := by
   show ((Prog.seq Design.rowsProgram afterRowsProg).sem memory oracle).bind finishK = _
   rw [sem_seq_free _ _ rows_noOracle, optBind_bind _ _ finishK rfl]
   exact rows_bind memory u target request _ _ fun next targets post =>
-    afterRows_law out u gamma labels memory next targets post holds reqXCell reqYCell rowCells labelCells empty
-      oracle
+    afterRows_law out u gamma labels memory next targets post holds reqXCell reqYCell rowCells rowFlags labelCells
+      empty oracle
 
 end Continuation
 
@@ -545,8 +544,8 @@ structure ValidStart [FieldCertificate] (pub : Entry.Public) (input : AffineInpu
   c2Cell : middle.ram (word (fieldBase + 2)) = fieldWord pub.curve.2.2
   outputCells : (middle.ram (word reqTag0), middle.ram (word reqQX), middle.ram (word reqQY)) = outputWords target
   rowCells : ∀ d : Fin 91, middle.ram (word (Opening.rowCell d 0)) = fieldWord (Entry.gammaOf pub d).xC0 ∧
-    middle.ram (word (Opening.rowCell d 1)) = fieldWord (Entry.gammaOf pub d).yC4 ∧
-    middle.ram (word (Opening.rowCell d 2)) = fieldWord (Entry.gammaOf pub d).zC0
+    middle.ram (word (Layout.signCell d)) = fieldWord (Rows.flagValue (Entry.gammaOf pub d).sign)
+  rowFlags : ∀ d : Fin 91, (Entry.gammaOf pub d).zFlag = false ∧ (Entry.gammaOf pub d).sFlag = false
   labelCells : ∀ (i : Nat) (bound : i < 508), middle.ram (word (labelBase + i)) = blockWord (labels[i]'bound)
   empty : middle.bits 3 = []
 
@@ -623,10 +622,10 @@ theorem valid_law (source : Entry.Source) (input : AffineInput) (target : Point)
         readWords_outputWords])
     (fun d => by
       have := d.isLt
-      refine ⟨?_, ?_, ?_⟩
+      refine ⟨?_, ?_⟩
       · exact (keep _ (by addr_arith)).trans (start.rowCells d).1
-      · exact (keep _ (by addr_arith)).trans (start.rowCells d).2.1
-      · exact (keep _ (by addr_arith)).trans (start.rowCells d).2.2)
+      · exact (keep _ (by unfold Layout.signCell; addr_arith)).trans (start.rowCells d).2)
+    start.rowFlags
     (fun i bound => (keep _ (by unfold labelBase; omega)).trans (start.labelCells i bound))
     (by rw [frame.bits]; exact start.empty) o
 

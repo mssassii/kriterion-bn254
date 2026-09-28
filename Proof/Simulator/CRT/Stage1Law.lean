@@ -59,6 +59,11 @@ theorem noOracle_pieceProg : ∀ piece : Piece, (pieceProg piece).NoOracle
       ⟨noOracle_emitWord _ _, noOracle_emitWord _ _, noOracle_emitWord _ _, noOracle_emitWord _ _,
         noOracle_emitWord _ _, trivial⟩, trivial⟩
 
+theorem noOracle_signs : CrtStage1.signs.NoOracle := by
+  unfold CrtStage1.signs
+  refine noOracle_rep _ _ fun _ _ => ?_
+  exact noOracle_wordCell _ _
+
 theorem noOracle_fields : CrtStage1.fields.NoOracle := by
   unfold CrtStage1.fields
   refine noOracle_rep _ _ fun _ _ => ?_
@@ -105,8 +110,8 @@ theorem stage1_noOracle : CrtStage1.program.NoOracle := by
   unfold CrtStage1.program
   simp only [Prog.seqList]
   exact ⟨noOracle_fields, noOracle_bytes, noOracle_joins, noOracle_pins, noOracle_digits, noOracle_zeros,
-    noOracle_deltas, noOracle_serialize, noOracle_of_det _ det_keyTrue, noOracle_of_det _ det_clearLimbs,
-    noOracle_zeroRegs _, trivial⟩
+    noOracle_deltas, noOracle_signs, noOracle_serialize, noOracle_of_det _ det_keyTrue,
+    noOracle_of_det _ det_clearLimbs, noOracle_zeroRegs _, trivial⟩
 
 /-! ### The protocol's stage-1 request -/
 
@@ -146,7 +151,8 @@ theorem cellStore_bits (address : Nat) (memory : Memory) (value : Nat) :
 
 theorem storedMem_bits (memory : Memory) (d : Draw) : (storedMem memory d).bits = memory.bits := by
   unfold storedMem
-  rw [foldStore_bits (fun n => wordStore (Layout.deltaCell n)) (fun _ _ _ => wordStore_bits _ _ _),
+  rw [foldStore_bits (fun n => wordStore (Layout.signCell n)) (fun _ _ _ => wordStore_bits _ _ _),
+    foldStore_bits (fun n => wordStore (Layout.deltaCell n)) (fun _ _ _ => wordStore_bits _ _ _),
     foldStore_bits (fun n => wordStore (keyBase + 2 * n)) (fun _ _ _ => wordStore_bits _ _ _),
     foldStore_bits (fun n => cellStore (digitAddr n)) (fun _ _ _ => cellStore_bits _ _ _),
     foldStore_bits (fun n => wordStore (pinAddr n)) (fun _ _ _ => wordStore_bits _ _ _),
@@ -185,7 +191,7 @@ theorem off_far (x : Nat) (fits : x < 2 ^ 256) (awayLimb : x < tmpBase ∨ tmpBa
 theorem readDraw_final : readDraw final.ram = readDraw stored.ram := by
   simp only [readDraw, Draw.mk.injEq]
   refine ⟨funext fun n => ?_, funext fun n => ?_, funext fun n => ?_, funext fun n => ?_, funext fun n => ?_,
-    funext fun n => ?_, funext fun n => ?_⟩
+    funext fun n => ?_, funext fun n => ?_, funext fun n => ?_⟩
   · have := n.isLt
     rw [off_far off (fieldBase + n.val) (by unfold fieldCount curveCellCount rowCellCount fieldBase at *; omega)
       (Or.inl (by unfold fieldCount curveCellCount rowCellCount fieldBase tmpBase at *; omega))
@@ -208,6 +214,10 @@ theorem readDraw_final : readDraw final.ram = readDraw stored.ram := by
   · have := n.isLt
     rw [off_far off (Layout.deltaCell n.val) (by unfold Layout.deltaCell; omega)
       (Or.inr (by unfold Layout.deltaCell tmpBase; omega)) (Or.inr (by unfold Layout.deltaCell keyBase; omega))]
+  · have := n.isLt
+    rw [off_far off (Layout.signCell n.val) (by unfold Layout.signCell fieldBase; omega)
+      (Or.inl (by unfold Layout.signCell fieldBase tmpBase; omega))
+      (Or.inl (by unfold Layout.signCell fieldBase keyBase; omega))]
 
 end Read
 

@@ -32,6 +32,7 @@ structure DrawValid (d : Draw) : Prop where
   digits : ∀ n, d.digits n < modulusAt (n.val % moduliCount)
   zeros : ∀ n, d.zeros n < 2 ^ 128
   deltas : ∀ n, d.deltas n < 2 ^ 128
+  signs : ∀ n, d.signs n < 2 ^ 1
 
 /-- A value of an `optBind` is a value of the continuation at a value of the first law. -/
 theorem mem_optBind {α β : Type} (law : PMF (Option α)) (next : α → PMF (Option β)) (value : β)
@@ -56,14 +57,16 @@ theorem drawValid_of_support (d : Draw) (member : some d ∈ drawLaw.support) : 
   obtain ⟨g, gm, m5⟩ := mem_optBind _ _ _ m4
   obtain ⟨z, zm, m6⟩ := mem_optBind _ _ _ m5
   obtain ⟨dl, dlm, m7⟩ := mem_optBind _ _ _ m6
-  rw [PMF.mem_support_pure_iff, Option.some.injEq] at m7
-  subst m7
+  obtain ⟨sg, sgm, m8⟩ := mem_optBind _ _ _ m7
+  rw [PMF.mem_support_pure_iff, Option.some.injEq] at m8
+  subst m8
   unfold bytesLaw at bm
   unfold joinsLaw at jm
   unfold pinsLaw at pm
   unfold digitsLaw at gm
   unfold zerosLaw at zm
   unfold deltasLaw at dlm
+  unfold signsLaw at sgm
   exact
     { bytes := fun n => wordLaw_support 4 _ (optionProduct_support _ _ b bm n)
       joins := fun n => wordLaw_support labelBits _ (optionProduct_support _ _ j jm n)
@@ -72,7 +75,8 @@ theorem drawValid_of_support (d : Draw) (member : some d ∈ drawLaw.support) : 
         have accepted := (rejectLaw_support _ _ _ _ (optionProduct_support _ _ g gm n)).1
         exact of_decide_eq_true accepted
       zeros := fun n => wordLaw_support 128 _ (optionProduct_support _ _ z zm n)
-      deltas := fun n => wordLaw_support 128 _ (optionProduct_support _ _ dl dlm n) }
+      deltas := fun n => wordLaw_support 128 _ (optionProduct_support _ _ dl dlm n)
+      signs := fun n => wordLaw_support 1 _ (optionProduct_support _ _ sg sgm n) }
 
 omit [FieldCertificate] in
 theorem pow_le_256 {width : Nat} (small : width ≤ 256) : 2 ^ width ≤ 2 ^ 256 :=
@@ -86,6 +90,7 @@ theorem DrawValid.small {d : Draw} (valid : DrawValid d) : DrawSmall d where
   digits n := lt_trans (valid.digits n) (digitWidth_small n.val).2
   zeros n := lt_of_lt_of_le (valid.zeros n) (pow_le_256 (by norm_num))
   deltas n := lt_of_lt_of_le (valid.deltas n) (pow_le_256 (by norm_num))
+  signs n := lt_of_lt_of_le (valid.signs n) (pow_le_256 (by norm_num))
 
 /-- **The stores of a valid draw leave every source cell in range.** -/
 theorem cellsValid_stored (memory : Memory) (d : Draw) (valid : DrawValid d) :
@@ -116,6 +121,11 @@ theorem cellsValid_stored (memory : Memory) (d : Draw) (valid : DrawValid d) :
     dsimp only at cell
     rw [cell, toNat_ofNat_small _ (valid.small.digits _)]
     exact valid.digits ⟨n, inside⟩
+  signs n inside := by
+    have cell := stored_signs memory d ⟨n, inside⟩
+    dsimp only at cell
+    rw [cell, toNat_ofNat_small _ (valid.small.signs _)]
+    exact valid.signs ⟨n, inside⟩
 
 /-! ### Cells the stores and the tail leave alone -/
 
@@ -127,9 +137,10 @@ theorem stored_off (memory : Memory) (d : Draw) (target : Nat) (small : target <
     (offPins : target < 2 ^ 52 ∨ 2 ^ 52 + 2 ^ 25 ≤ target)
     (offJoins : target < 2 ^ 51 ∨ 2 ^ 51 + 2 ^ 25 ≤ target)
     (offBytes : target < exceptionBase ∨ exceptionBase + exceptionCellCount ≤ target)
-    (offFields : target < fieldBase ∨ fieldBase + fieldCount ≤ target) :
+    (offFields : target < fieldBase ∨ fieldBase + fieldCount ≤ target)
+    (offSigns : target < fieldBase + 276 ∨ fieldBase + 276 + 91 ≤ target) :
     (storedMem memory d).ram (word target) = memory.ram (word target) := by
-  rw [stored_ram_upto_joins memory d target small offDeltas offZeros offDigits offPins,
+  rw [stored_ram_upto_joins memory d target small offDeltas offZeros offDigits offPins offSigns,
     foldStore_ram_off _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * Entry.joinCount) _ _ _
       (fun k bound => by
         have := joinAddr_range k bound

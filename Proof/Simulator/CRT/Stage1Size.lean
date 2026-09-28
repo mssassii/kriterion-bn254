@@ -56,9 +56,9 @@ theorem size_pieceProg (p : Piece) (safe : CrtSerial.PieceSafe p) : (pieceProg p
       omega
   | record κ e => exact size_recordProg κ e
 
--- The concrete material list has 1,100 non-conversion pieces, 2,900 joins, and 41,600 pin lanes.
+-- The concrete material list has 1,009 non-conversion pieces, 2,900 joins, and 41,600 pin lanes.
 set_option maxRecDepth 200000 in
-theorem pieces_length : pieces.length = 45600 := by decide +kernel
+theorem pieces_length : pieces.length = 45509 := by decide +kernel
 
 theorem size_serializeList (list : List Piece) (safeAll : ∀ p ∈ list, CrtSerial.PieceSafe p) :
     (Prog.rep list.length fun n => pieceProg (list.getD (list.length - 1 - n) default)).size ≤
@@ -77,8 +77,8 @@ theorem size_cons (first : Prog) (rest : List Prog) :
 
 /-- The program as its list of blocks (one delta step). -/
 theorem program_eq : CrtStage1.program = Prog.seqList [CrtStage1.fields, CrtStage1.bytes, CrtStage1.joins,
-    CrtStage1.pins, CrtStage1.digits, CrtStage1.zeros, CrtStage1.deltas, CrtStage1.serialize, CrtStage1.keyTrue,
-    CrtStage1.clearLimbs, zeroRegs allRegisters] := rfl
+    CrtStage1.pins, CrtStage1.digits, CrtStage1.zeros, CrtStage1.deltas, CrtStage1.signs, CrtStage1.serialize,
+    CrtStage1.keyTrue, CrtStage1.clearLimbs, zeroRegs allRegisters] := rfl
 
 /-- **The size of stage 1 is the sum of its blocks.** The proof term is a chain of `size_cons` and `congrArg`
 whose types match syntactically. Any other route (`simp`, `rw`, `rfl` on differing sums) makes the kernel
@@ -86,44 +86,48 @@ reduce `Nat.add` of block sizes to literals, which unfolds the whole program: th
 irreducibility. -/
 theorem size_program_eq : CrtStage1.program.size =
     CrtStage1.fields.size + (CrtStage1.bytes.size + (CrtStage1.joins.size + (CrtStage1.pins.size +
-        (CrtStage1.digits.size + (CrtStage1.zeros.size + (CrtStage1.deltas.size + (CrtStage1.serialize.size +
-        (CrtStage1.keyTrue.size + (CrtStage1.clearLimbs.size + ((zeroRegs allRegisters).size +
-        ((Prog.seqList []).size))))))))))) :=
+        (CrtStage1.digits.size + (CrtStage1.zeros.size + (CrtStage1.deltas.size + (CrtStage1.signs.size +
+        (CrtStage1.serialize.size + (CrtStage1.keyTrue.size + (CrtStage1.clearLimbs.size +
+        ((zeroRegs allRegisters).size + ((Prog.seqList []).size)))))))))))) :=
   (congrArg Prog.size program_eq).trans
     ((size_cons CrtStage1.fields [CrtStage1.bytes, CrtStage1.joins, CrtStage1.pins, CrtStage1.digits,
-        CrtStage1.zeros, CrtStage1.deltas, CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs,
-        zeroRegs allRegisters]).trans
+        CrtStage1.zeros, CrtStage1.deltas, CrtStage1.signs, CrtStage1.serialize, CrtStage1.keyTrue,
+        CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
       (congrArg (HAdd.hAdd CrtStage1.fields.size) ((size_cons CrtStage1.bytes [CrtStage1.joins, CrtStage1.pins,
-          CrtStage1.digits, CrtStage1.zeros, CrtStage1.deltas, CrtStage1.serialize, CrtStage1.keyTrue,
-          CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
+          CrtStage1.digits, CrtStage1.zeros, CrtStage1.deltas, CrtStage1.signs, CrtStage1.serialize,
+          CrtStage1.keyTrue, CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
       (congrArg (HAdd.hAdd CrtStage1.bytes.size) ((size_cons CrtStage1.joins [CrtStage1.pins, CrtStage1.digits,
-          CrtStage1.zeros, CrtStage1.deltas, CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs,
-          zeroRegs allRegisters]).trans
+          CrtStage1.zeros, CrtStage1.deltas, CrtStage1.signs, CrtStage1.serialize, CrtStage1.keyTrue,
+          CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
       (congrArg (HAdd.hAdd CrtStage1.joins.size) ((size_cons CrtStage1.pins [CrtStage1.digits, CrtStage1.zeros,
-          CrtStage1.deltas, CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs,
+          CrtStage1.deltas, CrtStage1.signs, CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs,
           zeroRegs allRegisters]).trans
       (congrArg (HAdd.hAdd CrtStage1.pins.size) ((size_cons CrtStage1.digits [CrtStage1.zeros, CrtStage1.deltas,
+          CrtStage1.signs, CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs,
+          zeroRegs allRegisters]).trans
+      (congrArg (HAdd.hAdd CrtStage1.digits.size) ((size_cons CrtStage1.zeros [CrtStage1.deltas, CrtStage1.signs,
           CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
-      (congrArg (HAdd.hAdd CrtStage1.digits.size) ((size_cons CrtStage1.zeros [CrtStage1.deltas,
+      (congrArg (HAdd.hAdd CrtStage1.zeros.size) ((size_cons CrtStage1.deltas [CrtStage1.signs,
           CrtStage1.serialize, CrtStage1.keyTrue, CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
-      (congrArg (HAdd.hAdd CrtStage1.zeros.size) ((size_cons CrtStage1.deltas [CrtStage1.serialize,
+      (congrArg (HAdd.hAdd CrtStage1.deltas.size) ((size_cons CrtStage1.signs [CrtStage1.serialize,
           CrtStage1.keyTrue, CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
-      (congrArg (HAdd.hAdd CrtStage1.deltas.size) ((size_cons CrtStage1.serialize [CrtStage1.keyTrue,
+      (congrArg (HAdd.hAdd CrtStage1.signs.size) ((size_cons CrtStage1.serialize [CrtStage1.keyTrue,
           CrtStage1.clearLimbs, zeroRegs allRegisters]).trans
       (congrArg (HAdd.hAdd CrtStage1.serialize.size) ((size_cons CrtStage1.keyTrue [CrtStage1.clearLimbs,
           zeroRegs allRegisters]).trans
       (congrArg (HAdd.hAdd CrtStage1.keyTrue.size) ((size_cons CrtStage1.clearLimbs [zeroRegs allRegisters]).trans
-      (congrArg (HAdd.hAdd CrtStage1.clearLimbs.size) (size_cons (zeroRegs allRegisters) [])))))))))))))))))))))
+      (congrArg (HAdd.hAdd CrtStage1.clearLimbs.size) (size_cons (zeroRegs allRegisters) [])))))))))))))))))))))))
 
 theorem size_nil : (Prog.seqList []).size = 0 := rfl
 
 /-- The arithmetic of the stage-1 bound, over free variables (no program is in sight). -/
-theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 : Nat)
-    (eq : total = a0 + (a1 + (a2 + (a3 + (a4 + (a5 + (a6 + (a7 + (a8 + (a9 + (a10 + a11)))))))))))
+theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a6' a7 a8 a9 a10 a11 : Nat)
+    (eq : total = a0 + (a1 + (a2 + (a3 + (a4 + (a5 + (a6 + (a6' + (a7 + (a8 + (a9 + (a10 + a11))))))))))))
     (h0 : a0 ≤ fieldCount * 457231) (h1 : a1 ≤ exceptionCellCount * 34) (h2 : a2 ≤ 2 * Entry.joinCount * 734)
     (h3 : a3 ≤ 2 * (Entry.pinCount * laneCount) * 104) (h4 : a4 ≤ recordCount * moduliCount * 20000)
-    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h7 : a7 ≤ 45600 * 6000) (h8 : a8 ≤ labelCount * 7)
-    (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) : total ≤ 2 ^ 55 := by
+    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h6' : a6' ≤ 91 * 13) (h7 : a7 ≤ 45509 * 6000)
+    (h8 : a8 ≤ labelCount * 7) (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) :
+    total ≤ 2 ^ 55 := by
   rewrite [CrtStored.joinCount_eq] at h2
   rewrite [CrtConv.pinCount_eq] at h3
   simp only [laneCount, Narrow.labelBits] at h3
@@ -149,19 +153,21 @@ theorem size_program : CrtStage1.program.size ≤ 2 ^ 55 := by
     CostFacts.size_rep_le _ _ _ fun _ _ => by rw [Stage1.size_wordCell]
   have deltasSize : CrtStage1.deltas.size ≤ 2 * 902 :=
     CostFacts.size_rep_le _ _ _ fun _ _ => by rw [Stage1.size_wordCell]
+  have signsSize : CrtStage1.signs.size ≤ 91 * 13 :=
+    CostFacts.size_rep_le _ _ _ fun _ _ => by rw [Stage1.size_wordCell]
   have keySize : CrtStage1.keyTrue.size ≤ labelCount * 7 :=
     CostFacts.size_rep_le _ _ _ fun _ _ => by
       simp only [keyXor, Prog.seqList, Prog.size_seq, size_loadAt, size_storeAt, ar, Prog.size]; omega
   have clearSize : CrtStage1.clearLimbs.size = recordLimbCount * 3 :=
     Prog.size_rep _ _ _ fun _ _ => by simp only [Prog.size_seq, size_cst, size_storeAt]
-  have serialSize : CrtStage1.serialize.size ≤ 45600 * 6000 := by
+  have serialSize : CrtStage1.serialize.size ≤ 45509 * 6000 := by
     have bound := size_serialize
     rewrite [pieces_length] at bound
     exact bound
   have regs : (zeroRegs allRegisters).size = 16 := by
     rewrite [size_zeroRegs]; rfl
-  exact bound_arith _ _ _ _ _ _ _ _ _ _ _ _ _ size_program_eq fieldsSize.le bytesSize.le joinsSize pinsSize
-    digitsSize zerosSize deltasSize serialSize keySize clearSize.le regs.le size_nil
+  exact bound_arith _ _ _ _ _ _ _ _ _ _ _ _ _ _ size_program_eq fieldsSize.le bytesSize.le joinsSize pinsSize
+    digitsSize zerosSize deltasSize signsSize serialSize keySize clearSize.le regs.le size_nil
 
 theorem cost_program : CrtStage1.program.cost ≤ 2 ^ 55 :=
   le_trans (CostFacts.cost_le_size _) size_program

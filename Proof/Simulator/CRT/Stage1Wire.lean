@@ -3,7 +3,8 @@
 
 `Wire.encoding`'s field, block, byte, entry, row, curve and record encoders are private to
 `Construction/CRT/Public.lean`; `encoding_eq` restates the encoding with public copies (`rfl`). `wire_bits`: the
-byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × 3 × 256`), the exception
+byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × (256 + 8)`: the `X` constant
+and the flags byte), the exception
 nibbles (`91 × 2 × 4`), the two conversion vectors (`3178 × 104` bits each) and the records (`624` bits each), least
 significant first.
 -/
@@ -41,11 +42,11 @@ def gadgetByte : Kriterion.Encoding (BitVec 8) :=
 /-- One exception entry. -/
 def entry : Kriterion.Encoding Exception.Entry := Exception.entryEncoding
 
-/-- One digit's row constants. -/
-def rowGamma : Kriterion.Encoding RowGamma :=
-  (field.pair (field.pair field)).map
-    (fun value => (value.xC0, value.yC4, value.zC0))
-    (fun ⟨xC0, yC4, zC0⟩ => ⟨xC0, yC4, zC0⟩)
+/-- One digit's normalized row data: the `X` constant, then the flags byte. -/
+def normRow : Kriterion.Encoding NormRow :=
+  (field.pair NormRow.flagsEncoding).map
+    (fun value => (value.xC0, value.zFlag, value.sFlag, value.sign))
+    (fun value => ⟨value.1, value.2.1, value.2.2.1, value.2.2.2⟩)
     (fun _ => rfl)
 
 /-- The curve constants. -/
@@ -56,7 +57,7 @@ def record : Kriterion.Encoding Record := Kriterion.Encoding.natural recordBytes
 
 /-- The encoding with the public copies. -/
 def encoding : Kriterion.Encoding Entry.Public :=
-  (curveTriple.pair ((rowGamma.vector digitCount).pair ((entry.vector digitCount).pair
+  (curveTriple.pair ((normRow.vector digitCount).pair ((entry.vector digitCount).pair
     ((block.vector convCount).pair ((block.vector convCount).pair
       ((record.vector xCount).pair (record.vector yCount))))))).map
     (fun value => (value.curve, value.rows, value.exception, value.crtX, value.crtY, value.recX,
@@ -102,30 +103,36 @@ theorem entry_bits (value : Exception.Entry) :
   rw [sum] at bits
   exact bits
 
-/-- The three row constants of a digit by slot. -/
+/-- The three row cells of a digit by slot (the stage-1 source's `xC0` and its two hidden cells). -/
 def rowField (gamma : RowGamma) : Nat → BaseField
   | 0 => gamma.xC0
   | 1 => gamma.yC4
   | _ => gamma.zC0
 
-theorem rowGamma_bits (value : RowGamma) :
-    byteBits (encodeOf rowGamma value) =
-      (List.ofFn fun index : Fin 3 => lsbs 256 (rowField value index.val).val).flatten := by
-  rw [show rowGamma = (field.pair (field.pair field)).map
-      (fun value : RowGamma => (value.xC0, value.yC4, value.zC0))
-      (fun ⟨xC0, yC4, zC0⟩ => ⟨xC0, yC4, zC0⟩)
-      (fun _ => rfl) from rfl, encodeOf_map]
-  rw [encodeOf_pair, encodeOf_pair]
-  simp only [byteBits_append, field_bits]
-  simp [List.ofFn_succ, rowField]
+/-- The flags byte of a normalized row. -/
+def flagsOf (value : NormRow) : Nat := (NormRow.flagByte value.zFlag value.sFlag value.sign).val
+
+theorem flags_bits (flags : Bool × Bool × Bool) :
+    byteBits (encodeOf NormRow.flagsEncoding flags) =
+      lsbs 8 (NormRow.flagByte flags.1 flags.2.1 flags.2.2).val := by
+  show SimulatorProtocol.bits 8 (NormRow.flagByte flags.1 flags.2.1 flags.2.2).val ++ [] = _
+  rw [List.append_nil, bits_eq_lsbs]
+
+theorem normRow_bits (value : NormRow) :
+    byteBits (encodeOf normRow value) = lsbs 256 value.xC0.val ++ lsbs 8 (flagsOf value) := by
+  rw [show normRow = (field.pair NormRow.flagsEncoding).map
+      (fun value : NormRow => (value.xC0, value.zFlag, value.sFlag, value.sign))
+      (fun value => ⟨value.1, value.2.1, value.2.2.1, value.2.2.2⟩)
+      (fun _ => rfl) from rfl, encodeOf_map, encodeOf_pair]
+  simp only [byteBits_append, field_bits, flags_bits]
+  rfl
 
 /-- **The bits of the wire encoding.** -/
 theorem wire_bits (value : Entry.Public) :
     byteBits (Entry.Wire.encoding.encode value) =
       lsbs 256 value.curve.1.val ++ lsbs 256 value.curve.2.1.val ++ lsbs 256 value.curve.2.2.val ++
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 3 =>
-            lsbs 256 (rowField value.rows[digit.val] index.val).val).flatten).flatten ++
+          lsbs 256 value.rows[digit.val].xC0.val ++ lsbs 8 (flagsOf value.rows[digit.val])).flatten ++
       (List.ofFn fun digit : Fin digitCount =>
           (List.ofFn fun index : Fin 2 =>
             lsbs 4 value.exception[digit.val][index.val].toNat).flatten).flatten ++
@@ -142,7 +149,7 @@ theorem wire_bits (value : Entry.Public) :
   rw [field_bits, field_bits, field_bits]
   rw [byteBits_vector, byteBits_vector, byteBits_vector, byteBits_vector, byteBits_vector,
     byteBits_vector]
-  simp only [rowGamma_bits, entry_bits, block_bits, record_bits, List.append_assoc]
+  simp only [normRow_bits, entry_bits, block_bits, record_bits, List.append_assoc]
 
 end CrtWire
 

@@ -1,6 +1,7 @@
 /-
 **The memory after stage 1's draws** (M2): `readDraw` reads the draws back from RAM, and `readDraw_stored` says the
-storedMem memory holds exactly the draws (every block writes its own region: field cells at `2^40`, bytes at `2^41`,
+storedMem memory holds exactly the draws (every block writes its own region: field cells at `2^40` and the sign bits
+after them, bytes at `2^41`,
 zero labels at `2^50`, joins at `2^51`, lanes at `2^52`, digits at `2^53`, offsets at `2^55`).
 -/
 
@@ -36,6 +37,7 @@ def readDraw (ram : Word → Word) : Draw where
   digits n := (ram (word (digitAddr n.val))).toNat
   zeros j := (ram (word (keyBase + 2 * j.val))).toNat
   deltas κ := (ram (word (Layout.deltaCell κ.val))).toNat
+  signs d := (ram (word (Layout.signCell d.val))).toNat
 
 /-- Every drawn natural fits a word. -/
 structure DrawSmall (d : Draw) : Prop where
@@ -45,6 +47,7 @@ structure DrawSmall (d : Draw) : Prop where
   digits : ∀ n, d.digits n < 2 ^ 256
   zeros : ∀ n, d.zeros n < 2 ^ 256
   deltas : ∀ n, d.deltas n < 2 ^ 256
+  signs : ∀ n, d.signs n < 2 ^ 256
 
 /-! ### The regions -/
 
@@ -120,13 +123,17 @@ theorem stored_ram_upto_joins (memory : Memory) (d : Draw) (target : Nat) (small
     (offDeltas : target < 2 ^ 55 ∨ 2 ^ 55 + 2 ≤ target)
     (offZeros : target < keyBase ∨ keyBase + 2 * labelCount ≤ target)
     (offDigits : target < 2 ^ 53 ∨ 2 ^ 53 + 2 ^ 25 ≤ target)
-    (offPins : target < 2 ^ 52 ∨ 2 ^ 52 + 2 ^ 25 ≤ target) :
+    (offPins : target < 2 ^ 52 ∨ 2 ^ 52 + 2 ^ 25 ≤ target)
+    (offSigns : target < fieldBase + 276 ∨ fieldBase + 276 + 91 ≤ target) :
     (storedMem memory d).ram (word target) =
       (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount)
         (foldStore (wordStep exceptionBase) exceptionCellCount
           (foldStore (cellStep fieldBase) fieldCount memory d.fields) d.bytes) d.joins).ram (word target) := by
   unfold storedMem
-  rw [foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
+  rw [foldStore_ram_off _ (fun n => word (Layout.signCell n)) _ (fun n => wordStore_ram _) 91 _ _ _
+      (fun n bound => word_ne small (by unfold Layout.signCell fieldBase; omega)
+        (by unfold Layout.signCell at *; omega)),
+    foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
       (fun n bound => word_ne small (by unfold Layout.deltaCell; omega) (by unfold Layout.deltaCell; omega)),
     foldStore_ram_off _ (fun n => word (keyBase + 2 * n)) _ (fun n => wordStore_ram _) labelCount _ _ _
       (fun n bound => word_ne small (by unfold keyBase labelCount at *; omega)
@@ -138,7 +145,11 @@ theorem stored_ram_upto_joins (memory : Memory) (d : Draw) (target : Nat) (small
 
 theorem stored_deltas (memory : Memory) (d : Draw) (κ : Fin 2) :
     (storedMem memory d).ram (word (Layout.deltaCell κ.val)) = BitVec.ofNat 256 (d.deltas κ) := by
+  have small : κ.val < 2 := κ.isLt
   unfold storedMem
+  rw [foldStore_ram_off _ (fun n => word (Layout.signCell n)) _ (fun n => wordStore_ram _) 91 _ _ _
+      (fun k bound => word_ne (by unfold Layout.deltaCell; omega) (by unfold Layout.signCell fieldBase; omega)
+        (by unfold Layout.deltaCell Layout.signCell fieldBase; omega))]
   exact foldStore_ram_at _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2
     (fun first second fb sb ne => word_ne (by unfold Layout.deltaCell; omega) (by unfold Layout.deltaCell; omega)
       (by unfold Layout.deltaCell; omega)) _ _ κ
@@ -147,7 +158,10 @@ theorem stored_zeros (memory : Memory) (d : Draw) (j : Fin labelCount) :
     (storedMem memory d).ram (word (keyBase + 2 * j.val)) = BitVec.ofNat 256 (d.zeros j) := by
   have jSmall : j.val < 508 := j.isLt
   unfold storedMem
-  rw [foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
+  rw [foldStore_ram_off _ (fun n => word (Layout.signCell n)) _ (fun n => wordStore_ram _) 91 _ _ _
+      (fun k bound => word_ne (by unfold keyBase; omega) (by unfold Layout.signCell fieldBase; omega)
+        (by unfold keyBase Layout.signCell fieldBase; omega)),
+    foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
       (fun n bound => word_ne (by unfold keyBase; omega) (by unfold Layout.deltaCell; omega)
         (by unfold keyBase Layout.deltaCell; omega))]
   exact foldStore_ram_at _ (fun n => word (keyBase + 2 * n)) _ (fun n => wordStore_ram _) labelCount
@@ -159,7 +173,10 @@ theorem stored_digits (memory : Memory) (d : Draw) (n : Fin (recordCount * modul
     (storedMem memory d).ram (word (digitAddr n.val)) = BitVec.ofNat 256 (d.digits n) := by
   have range := digitAddr_range n.val n.isLt
   unfold storedMem
-  rw [foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
+  rw [foldStore_ram_off _ (fun n => word (Layout.signCell n)) _ (fun n => wordStore_ram _) 91 _ _ _
+      (fun k bound => word_ne (by omega) (by unfold Layout.signCell fieldBase; omega)
+        (by unfold Layout.signCell fieldBase; omega)),
+    foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
       (fun k bound => word_ne (by omega) (by unfold Layout.deltaCell; omega) (by unfold Layout.deltaCell; omega)),
     foldStore_ram_off _ (fun n => word (keyBase + 2 * n)) _ (fun n => wordStore_ram _) labelCount _ _ _
       (fun k bound => word_ne (by omega) (by unfold keyBase labelCount at *; omega)
@@ -172,7 +189,10 @@ theorem stored_pins (memory : Memory) (d : Draw) (n : Fin (2 * (pinCount * laneC
     (storedMem memory d).ram (word (pinAddr n.val)) = BitVec.ofNat 256 (d.pins n) := by
   have range := pinAddr_range n.val n.isLt
   unfold storedMem
-  rw [foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
+  rw [foldStore_ram_off _ (fun n => word (Layout.signCell n)) _ (fun n => wordStore_ram _) 91 _ _ _
+      (fun k bound => word_ne (by omega) (by unfold Layout.signCell fieldBase; omega)
+        (by unfold Layout.signCell fieldBase; omega)),
+    foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
       (fun k bound => word_ne (by omega) (by unfold Layout.deltaCell; omega) (by unfold Layout.deltaCell; omega)),
     foldStore_ram_off _ (fun n => word (keyBase + 2 * n)) _ (fun n => wordStore_ram _) labelCount _ _ _
       (fun k bound => word_ne (by omega) (by unfold keyBase labelCount at *; omega)
@@ -186,7 +206,7 @@ theorem stored_joins (memory : Memory) (d : Draw) (n : Fin (2 * joinCount)) :
     (storedMem memory d).ram (word (joinAddr n.val)) = BitVec.ofNat 256 (d.joins n) := by
   have range := joinAddr_range n.val n.isLt
   rw [stored_ram_upto_joins memory d _ (by omega) (by omega) (by unfold keyBase labelCount; omega) (by omega)
-    (by omega)]
+    (by omega) (by unfold fieldBase; omega)]
   exact foldStore_ram_at _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount)
     joinAddr_injective _ _ n
 
@@ -194,7 +214,8 @@ theorem stored_bytes (memory : Memory) (d : Draw) (n : Fin exceptionCellCount) :
     (storedMem memory d).ram (word (exceptionBase + n.val)) = BitVec.ofNat 256 (d.bytes n) := by
   have small : n.val < 182 := n.isLt
   rw [stored_ram_upto_joins memory d _ (by unfold exceptionBase; omega) (by unfold exceptionBase; omega)
-      (by unfold exceptionBase keyBase labelCount; omega) (by unfold exceptionBase; omega) (by unfold exceptionBase; omega),
+      (by unfold exceptionBase keyBase labelCount; omega) (by unfold exceptionBase; omega) (by unfold exceptionBase; omega)
+      (by unfold exceptionBase fieldBase; omega),
     foldStore_ram_off _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount) _ _ _
       (fun k bound => by
         have := joinAddr_range k bound
@@ -207,7 +228,8 @@ theorem stored_fields (memory : Memory) (d : Draw) (n : Fin fieldCount) :
     (storedMem memory d).ram (word (fieldBase + n.val)) = BitVec.ofNat 256 (d.fields n).val := by
   have small : n.val < 276 := n.isLt
   rw [stored_ram_upto_joins memory d _ (by unfold fieldBase; omega) (by unfold fieldBase; omega)
-      (by unfold fieldBase keyBase labelCount; omega) (by unfold fieldBase; omega) (by unfold fieldBase; omega),
+      (by unfold fieldBase keyBase labelCount; omega) (by unfold fieldBase; omega) (by unfold fieldBase; omega)
+      (Or.inl (by omega)),
     foldStore_ram_off _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount) _ _ _
       (fun k bound => by
         have := joinAddr_range k bound
@@ -220,16 +242,23 @@ theorem stored_fields (memory : Memory) (d : Draw) (n : Fin fieldCount) :
     (fun first second fb sb ne => word_ne (by unfold fieldBase fieldCount curveCellCount rowCellCount at *; omega)
       (by unfold fieldBase fieldCount curveCellCount rowCellCount at *; omega) (by omega)) _ _ n
 
+theorem stored_signs (memory : Memory) (d : Draw) (n : Fin 91) :
+    (storedMem memory d).ram (word (Layout.signCell n.val)) = BitVec.ofNat 256 (d.signs n) := by
+  unfold storedMem
+  exact foldStore_ram_at _ (fun n => word (Layout.signCell n)) _ (fun n => wordStore_ram _) 91
+    (fun first second fb sb ne => word_ne (by unfold Layout.signCell fieldBase; omega)
+      (by unfold Layout.signCell fieldBase; omega) (by unfold Layout.signCell; omega)) _ _ n
+
 theorem toNat_ofNat_small (value : Nat) (small : value < 2 ^ 256) : (BitVec.ofNat 256 value).toNat = value := by
   rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt small]
 
 /-- **The stored memory holds exactly the draws.** -/
 theorem readDraw_stored (memory : Memory) (d : Draw) (small : DrawSmall d) :
     readDraw (storedMem memory d).ram = d := by
-  obtain ⟨f, b, j, p, g, z, dl⟩ := d
+  obtain ⟨f, b, j, p, g, z, dl, sg⟩ := d
   simp only [readDraw, Draw.mk.injEq]
   refine ⟨funext fun n => ?_, funext fun n => ?_, funext fun n => ?_, funext fun n => ?_, funext fun n => ?_,
-    funext fun n => ?_, funext fun n => ?_⟩
+    funext fun n => ?_, funext fun n => ?_, funext fun n => ?_⟩
   · rw [stored_fields, toNat_ofNat_small _ (lt_trans (f n).val_lt (by unfold baseFieldModulus; norm_num))]
     exact ZMod.natCast_zmod_val _
   · rw [stored_bytes, toNat_ofNat_small _ (small.bytes n)]
@@ -238,6 +267,7 @@ theorem readDraw_stored (memory : Memory) (d : Draw) (small : DrawSmall d) :
   · rw [stored_digits, toNat_ofNat_small _ (small.digits n)]
   · rw [stored_zeros, toNat_ofNat_small _ (small.zeros n)]
   · rw [stored_deltas, toNat_ofNat_small _ (small.deltas n)]
+  · rw [stored_signs, toNat_ofNat_small _ (small.signs n)]
 
 end
 
