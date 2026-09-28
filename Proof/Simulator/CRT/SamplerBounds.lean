@@ -402,8 +402,8 @@ theorem mixed_sum (x : Fin Entry.table.product) :
 def resOf (digits : Nat → Nat) (small : ∀ n, digits n < modulusAt (n % moduliCount)) (r : Nat) :
     Entry.table.Residues := fun i => ⟨digits (r * moduliCount + i.val), by
   rw [SourceCells.modulus_eq]
-  have := small (r * moduliCount + i.val)
-  rwa [(flat_div_mod (J := moduliCount) (κ := r) (lt_of_lt_of_eq i.isLt TableFacts.count)).2] at this⟩
+  have hi : i.val < moduliCount := i.isLt
+  simpa only [(flat_div_mod (J := moduliCount) (κ := r) hi).2] using small (r * moduliCount + i.val)⟩
 
 /-- Sums over the moduli, by `Fin` or by range. -/
 theorem sum_count (f : Nat → Nat) : ∑ i : Fin Entry.table.count, f i.val = ∑ i ∈ Finset.range moduliCount, f i :=
