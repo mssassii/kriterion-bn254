@@ -126,11 +126,11 @@ def chunkMatH (c : Fin tbl.chunkCount) (n slot : ℕ) : Label := clip (r.table (
 
 /-- Leaf labels of the chunk tree, from the table. -/
 def chunkTreeH (c : Fin tbl.chunkCount) : Fin (2 ^ tbl.chunkWidth c.val) → Label :=
-  materialTree (chunkMatH tbl coord v r c) r.delta (r.zero (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val)
+  materialTree (chunkMatH tbl coord r c) r.delta (r.zero (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val)
 
 /-- Each cast retains the tree's leaf label in its low plane. -/
 def chunkCastH (h : ChunkVals tbl) (c : Fin tbl.chunkCount) (leaf : ℕ) : Lanes tbl.castWidth :=
-  let label := atNat (chunkTreeH tbl coord v r c) 0 leaf
+  let label := atNat (chunkTreeH tbl coord r c) 0 leaf
   if leaf = tbl.chunkValue v c.val then Parity.liftUpper tbl.castWidth (h c) label
   else parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf) label
 
@@ -237,7 +237,7 @@ theorem stageVals_empty_eq (a b : StageVals emptyRow) : a = b := by
 theorem chunkFullPinH_even (tbl : CrtTable) (coord v : ℕ) (r : ConvRest)
     (h : ChunkVals tbl) (c : Fin tbl.chunkCount) :
     Parity.EvenLanes (chunkFullPinH tbl coord v r h c) := by
-  apply SliceC.pin_even_of_leaf_xor_total _ (chunkTreeH tbl coord v r c) r.delta
+  apply SliceC.pin_even_of_leaf_xor_total _ (chunkTreeH tbl coord r c) r.delta
   · intro positive leaf
     unfold chunkCastH
     rw [SliceC.atNat_of_lt _ _ leaf.isLt]
@@ -307,9 +307,9 @@ theorem convPublish_injective (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) :
         chunkCastH tbl coord v r pins c leaf.val =
           if leaf.val = tbl.chunkValue v c.val then
             Parity.liftUpper tbl.castWidth (pins c)
-              (atNat (chunkTreeH tbl coord v r c) 0 (tbl.chunkValue v c.val))
+              (atNat (chunkTreeH tbl coord r c) 0 (tbl.chunkValue v c.val))
           else parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf.val)
-            (atNat (chunkTreeH tbl coord v r c) 0 leaf.val) := by
+            (atNat (chunkTreeH tbl coord r c) 0 leaf.val) := by
       intro pins leaf
       unfold chunkCastH
       split_ifs with hit
@@ -317,10 +317,10 @@ theorem convPublish_injective (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) :
       · rfl
     simp only [fixed] at sums
     apply Parity.liftUpper_injective tbl.castWidth
-      (atNat (chunkTreeH tbl coord v r c) 0 (tbl.chunkValue v c.val))
+      (atNat (chunkTreeH tbl coord r c) 0 (tbl.chunkValue v c.val))
     exact sum_hot_cancel _ hot _ _
       (fun leaf => parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf)
-        (atNat (chunkTreeH tbl coord v r c) 0 leaf)) sums
+        (atNat (chunkTreeH tbl coord r c) 0 leaf)) sums
   subst pins
   have mods : hM = hM' := funext fun i =>
     modPublish_injective _ _ _ _ _ _ _ _ _ _ (rowOf_cases _ _) (congrArg (fun x => x.2 i) same)
@@ -406,9 +406,9 @@ def readHot (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) : Conv
       (tbl.wordValue (tbl.modulus i) v))
 
 /-- The chunk tree is the table's complete tree. -/
-theorem chunkTreeH_self (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block)
+theorem chunkTreeH_self (tbl : CrtTable) (coord : ℕ) (T : ℕ → Block × Block)
     (Z : ℕ → Label) (Δ : Label) (c : Fin tbl.chunkCount) :
-    chunkTreeH tbl coord v ⟨T, Z, Δ⟩ c =
+    chunkTreeH tbl coord ⟨T, Z, Δ⟩ c =
       materialTree (fun n slot => clip (T (chunkTreeTag coord c.val n slot)).1)
         Δ (Z (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val) := rfl
 

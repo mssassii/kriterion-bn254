@@ -643,7 +643,7 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
     convPublish tbl coord v ⟨tagRead A, Z, Δ⟩ h = convPublish tbl coord v ⟨tagRead A', Z, Δ⟩ h := by
   have cold := cold_at tbl range coord v hc A A' agree
   have trees : ∀ c : Fin tbl.chunkCount,
-      chunkTreeH tbl coord v ⟨tagRead A, Z, Δ⟩ c = chunkTreeH tbl coord v ⟨tagRead A', Z, Δ⟩ c := by
+      chunkTreeH tbl coord ⟨tagRead A, Z, Δ⟩ c = chunkTreeH tbl coord ⟨tagRead A', Z, Δ⟩ c := by
     intro c
     apply materialTree_congr
     intro n hn1 hn2 slot hslot
