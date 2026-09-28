@@ -60,6 +60,18 @@ theorem runReader_pure (reader : Reader FI EI) {α : Type} (value : α) (state :
 
 variable [FieldCertificate] [GroupCertificate]
 
+/-- The replay's result adapters are the privacy instance's (the simulator keeps its own copies so that it
+does not import the privacy glue). -/
+theorem replayView_toDelivered_eq (conv : Entry.ConvOut) :
+    ReplayView.toDelivered conv = Instance.toDelivered conv := by
+  funext e
+  cases e <;> rfl
+
+theorem replayView_toMasks_eq (masks : Entry.RowEncoding → BaseField) :
+    ReplayView.toMasks masks = Instance.toMasks masks := by
+  funext n
+  obtain ⟨⟨d, x | y⟩, h⟩ := n <;> rfl
+
 /-- **The lazy-oracle link**: the lifted route-M replay, read in the tier-2 index, is `routeMReplay` of
 the entry's view with the lazy reader. -/
 theorem runT_replayRouteM (pub : Entry.Public) (u : AffineInput) (labels : GarbledCircuit.LamportSignature)
@@ -82,8 +94,8 @@ theorem runT_replayRouteM (pub : Entry.Public) (u : AffineInput) (labels : Garbl
   simp only [Instance.view, EntryReading.nonCollectorReplay, TreeLaws.monad_bind, TreeLaws.monad_pure,
     runReader_bind, runReader_pure, PMF.bind_bind, PMF.pure_bind, PMF.map_bind, PMF.pure_map]
   refine congrArg (PMF.bind _) (funext fun masked => ?_)
-  simp only [routeView, ReplayView.toDelivered, ReplayView.toMasks, ReplayView.nonCollectorValues,
-    Instance.toDelivered, Instance.toMasks, EntryReading.nonCollectorValues]
+  simp only [routeView, ReplayView.nonCollectorValues, EntryReading.nonCollectorValues,
+    replayView_toDelivered_eq, replayView_toMasks_eq]
 
 end Lazy
 
