@@ -121,9 +121,9 @@ abbrev StageRead (row : OddRow) : Type :=
   PairRead row.width0 row.ell ⊕ (PairRead row.width1 (row.ell - row.width0) ⊕
     (Fin (row.keep - row.width0) ⊕ Fin (row.ell - row.keep)))
 
-/-- The hot reads of the chunks: the hashed levels' materials and the hot casts' answers. -/
-abbrev ChunkRead (tbl : CrtTable) : Type :=
-  (Σ c : Fin tbl.chunkCount, Fin (tbl.chunkWidth c.val - 1)) ⊕ (Σ c : Fin tbl.chunkCount, Fin (castAnswers tbl.castWidth))
+/-- The hot reads of the chunks: the hot casts' answers. (No chunk joins: the hashed tree levels' hot materials are
+not read by the conversion payload; they are absorbed into the Lamport labels.) -/
+abbrev ChunkRead (tbl : CrtTable) : Type := Σ c : Fin tbl.chunkCount, Fin (castAnswers tbl.castWidth)
 
 /-- **Every hot read of one coordinate**: one index per answer the garbler's hidden values read. -/
 abbrev HotRead (tbl : CrtTable) : Type :=
@@ -152,11 +152,6 @@ def tailRho (row : OddRow) (g : (PairRead row.width1 (row.ell - row.width0) ⊕
 def stageRho (row : OddRow) (g : StageRead row → Block × Block) : StageVals row :=
   (pairRho row.width0 row.ell fun r => g (.inl r), tailRho row fun r => g (.inr r))
 
-/-- The chunks' tree materials from their reads. -/
-def chunkJoinRho (tbl : CrtTable) (g : (Σ c : Fin tbl.chunkCount, Fin (tbl.chunkWidth c.val - 1)) → Block × Block) :
-    (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label :=
-  fun c => fstRho _ fun k => g ⟨c, k⟩
-
 /-- The chunks' hot casts from their reads. -/
 def chunkPinRho (tbl : CrtTable) (g : (Σ c : Fin tbl.chunkCount, Fin (castAnswers tbl.castWidth)) → Block × Block) :
     Fin tbl.chunkCount → Lanes (tbl.castWidth - 1) :=
@@ -164,7 +159,7 @@ def chunkPinRho (tbl : CrtTable) (g : (Σ c : Fin tbl.chunkCount, Fin (castAnswe
 
 /-- The chunks' hidden values from their reads. -/
 def chunkRho (tbl : CrtTable) (g : ChunkRead tbl → Block × Block) : ChunkVals tbl :=
-  (chunkJoinRho tbl fun r => g (.inl r), chunkPinRho tbl fun r => g (.inr r))
+  chunkPinRho tbl g
 
 /-- The moduli's hidden values from their reads. -/
 def modsRho (tbl : CrtTable) (g : (Σ i : Fin tbl.count, StageRead (rowOf (tbl.kind i) (tbl.modulus i))) → Block × Block) :
@@ -205,11 +200,9 @@ theorem stageRho_uniform (row : OddRow) (hl : row.ell ≤ 128) :
 theorem chunkRho_uniform (tbl : CrtTable) (hL : tbl.castWidth ≤ 128) :
     (PMF.uniformOfFintype (ChunkRead tbl → Block × Block)).map (chunkRho tbl) =
       PMF.uniformOfFintype (ChunkVals tbl) :=
-  sum_map_uniform (chunkJoinRho tbl) (chunkPinRho tbl)
-    (sigma_map_uniform (β := fun c : Fin tbl.chunkCount => Fin (tbl.chunkWidth c.val - 1))
-      (fun _ => fstRho _) fun _ => fstRho_uniform _)
-    (sigma_map_uniform (β := fun _ : Fin tbl.chunkCount => Fin (castAnswers tbl.castWidth))
-      (fun _ g => Parity.pinHalf tbl.castWidth (castLanes tbl.castWidth (packAnswers (castAnswers tbl.castWidth) g))) fun _ => upperRead_uniform _ hL)
+  sigma_map_uniform (β := fun _ : Fin tbl.chunkCount => Fin (castAnswers tbl.castWidth))
+    (fun _ g => Parity.pinHalf tbl.castWidth (castLanes tbl.castWidth (packAnswers (castAnswers tbl.castWidth) g)))
+    fun _ => upperRead_uniform _ hL
 
 /-- **The hidden values of uniform hot reads are uniform** (cast widths at most `128`). -/
 theorem rho_uniform (tbl : CrtTable) (hL : tbl.castWidth ≤ 128)
@@ -240,8 +233,7 @@ def stageReadTag (coord i : ℕ) (row : OddRow) (m σ : ℕ) : StageRead row →
 
 /-- **The tag of every hot read of coordinate `coord` at value `v`.** -/
 def readTag (tbl : CrtTable) (coord v : ℕ) : HotRead tbl → ℕ
-  | .inl (.inl ⟨c, k⟩) => chunkTreeTag coord c.val (k.val + 1) (tbl.chunkValue v c.val % 2 ^ (k.val + 1))
-  | .inl (.inr ⟨c, j⟩) => chunkCastTag coord c.val (tbl.chunkValue v c.val) j.val
+  | .inl ⟨c, j⟩ => chunkCastTag coord c.val (tbl.chunkValue v c.val) j.val
   | .inr ⟨i, s⟩ => stageReadTag coord i.val (rowOf (tbl.kind i) (tbl.modulus i)) (tbl.modulus i)
       (tbl.wordValue (tbl.modulus i) v) s
 
@@ -274,8 +266,7 @@ structure ConvTagRange (tbl : CrtTable) : Prop where
 
 /-- The fields `(family, idx, stage, level, slot, part)` of a hot read's tag. -/
 def hotField (tbl : CrtTable) (v : ℕ) : HotRead tbl → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
-  | .inl (.inl ⟨c, k⟩) => (0, c.val, 0, k.val + 1, tbl.chunkValue v c.val % 2 ^ (k.val + 1), 0)
-  | .inl (.inr ⟨c, j⟩) => (1, c.val, 0, 0, tbl.chunkValue v c.val, j.val)
+  | .inl ⟨c, j⟩ => (1, c.val, 0, 0, tbl.chunkValue v c.val, j.val)
   | .inr ⟨i, .inl (.inl k)⟩ => (2, i.val, 0, k.val + 1,
       tbl.wordValue (tbl.modulus i) v % 2 ^ (rowOf (tbl.kind i) (tbl.modulus i)).width0 % 2 ^ (k.val + 1), 0)
   | .inr ⟨i, .inl (.inr j)⟩ => (3, i.val, 0, 0,
@@ -294,7 +285,7 @@ def hotField (tbl : CrtTable) (v : ℕ) : HotRead tbl → ℕ × ℕ × ℕ × �
 theorem readTag_eq_field (tbl : CrtTable) (coord v : ℕ) (r : HotRead tbl) :
     readTag tbl coord v r = tagCode (hotField tbl v r).1 coord (hotField tbl v r).2.1 (hotField tbl v r).2.2.1
       (hotField tbl v r).2.2.2.1 (hotField tbl v r).2.2.2.2.1 (hotField tbl v r).2.2.2.2.2 := by
-  rcases r with (⟨c, k⟩ | ⟨c, j⟩) | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;> rfl
+  rcases r with ⟨c, j⟩ | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;> rfl
 
 theorem pow_le_pow15 {a : ℕ} (h : a ≤ 15) : 2 ^ a ≤ 2 ^ 15 := Nat.pow_le_pow_right (by norm_num) h
 
@@ -304,13 +295,7 @@ theorem hotField_range (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : �
     TagInRange coord (hotField tbl v r).2.1 (hotField tbl v r).2.2.1 (hotField tbl v r).2.2.2.1
       (hotField tbl v r).2.2.2.2.1 (hotField tbl v r).2.2.2.2.2 ∧ (hotField tbl v r).1 < 16 := by
   have e15 : (2 : ℕ) ^ 15 = 32768 := by norm_num
-  rcases r with (⟨c, k⟩ | ⟨c, j⟩) | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩
-  · have hw := range.chunkWidth c.val c.isLt
-    have hk := k.isLt
-    have hs := Nat.mod_lt (tbl.chunkValue v c.val) (Nat.two_pow_pos (k.val + 1))
-    have hp := pow_le_pow15 (show k.val + 1 ≤ 15 by omega)
-    exact ⟨⟨hc, by have := c.isLt; have := range.chunkCount; simp only [hotField]; omega, by simp [hotField],
-      by simp only [hotField]; omega, by simp only [hotField]; omega, by simp [hotField]⟩, by simp [hotField]⟩
+  rcases r with ⟨c, j⟩ | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩
   · have hw := range.chunkWidth c.val c.isLt
     have hs : tbl.chunkValue v c.val < 2 ^ tbl.chunkWidth c.val := Nat.mod_lt _ (Nat.two_pow_pos _)
     have hp := pow_le_pow15 hw
@@ -353,8 +338,8 @@ theorem hotKey_injective (tbl : CrtTable) (v : ℕ) {r r' : HotRead tbl}
     (h3 : (hotField tbl v r).2.2.1 = (hotField tbl v r').2.2.1)
     (h4 : (hotField tbl v r).2.2.2.1 = (hotField tbl v r').2.2.2.1)
     (h6 : (hotField tbl v r).2.2.2.2.2 = (hotField tbl v r').2.2.2.2.2) : r = r' := by
-  rcases r with (⟨c, k⟩ | ⟨c, j⟩) | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;>
-    rcases r' with (⟨c', k'⟩ | ⟨c', j'⟩) | ⟨i', ((k' | j') | ((k' | j') | (k' | k')))⟩ <;>
+  rcases r with ⟨c, j⟩ | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;>
+    rcases r' with ⟨c', j'⟩ | ⟨i', ((k' | j') | ((k' | j') | (k' | k')))⟩ <;>
     simp only [hotField] at h1 h2 h3 h4 h6 <;>
     (try omega)
   all_goals
@@ -419,6 +404,35 @@ theorem tag40_not_hot (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : ℕ
   have same := hotKey_injective tbl v fam e2 e3 e4 e6
   subst same
   exact hne e5.symm
+
+/-- No hot read is a chunk-tree read: the hot reads have families `1` to `5`. -/
+theorem hotField_family_pos (tbl : CrtTable) (v : ℕ) (r : HotRead tbl) : 1 ≤ (hotField tbl v r).1 := by
+  rcases r with ⟨c, j⟩ | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;> simp [hotField]
+
+/-- **No hot read's tag is a chunk-tree tag** (no chunk joins: the chunk trees are read from the table). -/
+theorem tree_not_hot (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : ℕ) (hc : coord < 2) (c n slot : ℕ)
+    (hcc : c < tbl.chunkCount) (hn : n ≤ 15) (hslot : slot < 65536) :
+    ∀ r, tag40 (readTag tbl coord v r) ≠ tag40 (chunkTreeTag coord c n slot) := by
+  intro r e
+  obtain ⟨hr, hf⟩ := hotField_range tbl range coord v hc r
+  have hin : TagInRange coord c 0 n slot 0 :=
+    ⟨hc, by have := range.chunkCount; omega, by omega, by omega, hslot, by omega⟩
+  have lt0 : chunkTreeTag coord c n slot < 2 ^ 40 := by
+    have := hin.coord; have := hin.idx; have := hin.level; have := hin.slot
+    unfold chunkTreeTag tagCode Family.chunkTree
+    omega
+  have ev : readTag tbl coord v r = chunkTreeTag coord c n slot := by
+    have := congrArg Fin.val e
+    simp only [tag40, Nat.mod_eq_of_lt (readTag_lt tbl range coord v hc r), Nat.mod_eq_of_lt lt0] at this
+    exact this
+  rw [readTag_eq_field] at ev
+  have fam := congrArg tagFamily ev
+  rw [tagFamily_tagCode hr] at fam
+  have zero : tagFamily (chunkTreeTag coord c n slot) = Family.chunkTree := tagFamily_tagCode hin
+  have pos := hotField_family_pos tbl v r
+  rw [zero] at fam
+  unfold Family.chunkTree at fam
+  omega
 
 /-! ### `convPublish` reads the table at cold tags only -/
 
@@ -629,18 +643,14 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
     convPublish tbl coord v ⟨tagRead A, Z, Δ⟩ h = convPublish tbl coord v ⟨tagRead A', Z, Δ⟩ h := by
   have cold := cold_at tbl range coord v hc A A' agree
   have trees : ∀ c : Fin tbl.chunkCount,
-      chunkTreeH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.1 c =
-        chunkTreeH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.1 c := by
+      chunkTreeH tbl coord v ⟨tagRead A, Z, Δ⟩ c = chunkTreeH tbl coord v ⟨tagRead A', Z, Δ⟩ c := by
     intro c
     apply materialTree_congr
     intro n hn1 hn2 slot hslot
     unfold chunkMatH
-    split_ifs with hit
-    · rfl
-    · obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
-      have cw := range.chunkWidth c.val c.isLt
-      exact congrArg (fun a => clip a.1) (cold (.inl (.inl ⟨c, ⟨k, by omega⟩⟩)) slot
-        (lt_of_lt_of_le hslot (le_of_lt (two_pow_lt_65536 (by omega)))) hit)
+    have cw := range.chunkWidth c.val c.isLt
+    exact congrArg (fun a => clip a.1) (agree _ (tree_not_hot tbl range coord v hc c.val n slot c.isLt (by omega)
+      (lt_of_lt_of_le hslot (le_of_lt (two_pow_lt_65536 (by omega))))))
   -- the chunks' casts
   have casts : ∀ (c : Fin tbl.chunkCount) (leaf : ℕ), leaf < 2 ^ tbl.chunkWidth c.val →
       chunkCastH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 c leaf = chunkCastH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 c leaf := by
@@ -653,7 +663,7 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
       apply congrArg (fun upper => Parity.liftUpper tbl.castWidth upper _)
       apply upperRd_congr
       intro j
-      exact cold (.inl (.inr ⟨c, j⟩)) leaf
+      exact cold (.inl ⟨c, j⟩) leaf
         (lt_of_lt_of_le hleaf (le_of_lt (two_pow_lt_65536 (range.chunkWidth c.val c.isLt)))) e
   have word : ∀ m ell, wordH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 m ell =
       wordH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 m ell := by
@@ -663,18 +673,7 @@ theorem convPublish_cold (tbl : CrtTable) (range : ConvTagRange tbl) (coord v : 
     funext lane
     refine Finset.sum_congr rfl fun c _ => Finset.sum_congr rfl fun leaf _ => ?_
     rw [casts c leaf.val leaf.isLt]
-  refine Prod.ext (Prod.ext (funext fun c => funext fun k => ?_) (funext fun c => ?_)) (funext fun i => ?_)
-  · show chunkJoinH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1.1 c k = chunkJoinH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1.1 c k
-    unfold chunkJoinH
-    congr 1
-    congr 1
-    funext slot
-    split_ifs with e
-    · rfl
-    · have hk := k.isLt
-      have hw := range.chunkWidth c.val c.isLt
-      exact congrArg (fun a => clip a.1) (cold (.inl (.inl ⟨c, k⟩)) slot.val
-        (lt_of_lt_of_le slot.isLt (le_of_lt (two_pow_lt_65536 (by omega)))) e)
+  refine Prod.ext (funext fun c => ?_) (funext fun i => ?_)
   · show chunkPinH tbl coord v ⟨tagRead A, Z, Δ⟩ h.1 c = chunkPinH tbl coord v ⟨tagRead A', Z, Δ⟩ h.1 c
     unfold chunkPinH chunkFullPinH
     rw [Finset.sum_congr rfl fun leaf _ => casts c leaf.val leaf.isLt]

@@ -204,18 +204,32 @@ theorem convVector_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ 
       Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
   rw [Flat.convVector_eq_flatOf, Flat.convVector_eq_flatOf, readPub_coord S coord hS hc Δ Z agree]
 
+/-- **A coordinate's in-range chunk joins** are the same on two hashes that agree at families 0 to 5. -/
+theorem joins_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
+    {H H' : HashN} (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
+    KeyZero.JoinsAgree ((coordGarbleM Entry.table S coord Δ Z).eval H).pub
+      ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
+  intro c hcc n _ _
+  have ranges := Paths.bn254_ranges S hS
+  have chunk := (tagged_congr (Paths.chunkGarbleM_tagged Entry.table coord Δ Z c hc
+    (lt_of_lt_of_le hcc ranges.chunkCount) (ranges.chunkWidth c hcc) ranges.castAnswers) (chunk_keys coord c) agree).2
+  obtain ⟨fJ, -⟩ := SliceC.coordGarbleM_fields H Entry.table S coord Δ Z
+  obtain ⟨fJ', -⟩ := SliceC.coordGarbleM_fields H' Entry.table S coord Δ Z
+  rw [fJ c, fJ' c, SliceC.atNat_of_lt _ _ hcc, SliceC.atNat_of_lt _ _ hcc]
+  exact congrArg (fun g : ChunkGarbled Entry.table.castWidth => g.joins n) chunk
+
 /-- **No chunk joins: the actual key** is the same for coins that agree on the label keys, on two hashes that agree
-at families 0 to 5 (its absorbed chunk joins are in-range readings, `KeyZero.keyOf_congr`). -/
+at families 0 to 5 (its absorbed chunk joins are in-range chunk joins, `KeyZero.keyOf_congr`). -/
 theorem keyZero_low {c1 c2 : Entry.Coins} (hZero : c1.inputZero = c2.inputZero)
     (hDelta : c1.inputDelta = c2.inputDelta) {H H' : HashN} (low : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
     EntryCorrect.keyZero H c1 = EntryCorrect.keyZero H' c2 := by
   refine KeyZero.keyZero_congr hZero ?_ ?_
   · unfold EntryCorrect.gxOf
     rw [hDelta, hZero]
-    exact readPub_coord _ _ (by decide) (by norm_num) _ _ low
+    exact joins_coord _ _ (by decide) (by norm_num) _ _ low
   · unfold EntryCorrect.gyOf
     rw [hDelta, hZero]
-    exact readPub_coord _ _ (by decide) (by norm_num) _ _ low
+    exact joins_coord _ _ (by decide) (by norm_num) _ _ low
 
 theorem keyOf_low {c1 c2 : Entry.Coins} (hZero : c1.inputZero = c2.inputZero)
     (hDelta : c1.inputDelta = c2.inputDelta) {H H' : HashN} (low : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :

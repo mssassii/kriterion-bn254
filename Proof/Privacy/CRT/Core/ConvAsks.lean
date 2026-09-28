@@ -260,13 +260,10 @@ theorem readPub_congr (tbl : CrtTable) (S coord : ℕ) (Δ : Label) (Z : ℕ →
   rw [← hchunks] at d3 d4 d5 d6
   unfold readPub
   congr 1
-  · congr 1
-    · funext c k
-      rw [c1 c.val c.isLt, d1 c.val c.isLt, hchunk c.val c.isLt]
-    · funext c
-      congr 1
-      funext j
-      rw [c2 c.val c.isLt, d2 c.val c.isLt, hchunk c.val c.isLt]
+  · funext c
+    congr 1
+    funext j
+    rw [c2 c.val c.isLt, d2 c.val c.isLt, hchunk c.val c.isLt]
   · funext i
     obtain ⟨e1, e2, e3, e4⟩ := modFields_congr tbl S coord Δ _ H H' hconv i
     unfold readMod

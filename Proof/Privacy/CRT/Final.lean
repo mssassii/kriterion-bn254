@@ -139,7 +139,7 @@ theorem coreBelow_of (ideal : ∀ [FieldCertificate] [GroupCertificate], BmrSpli
     (off : Laws.IdealFactorOff Entry.table) :
     H8.CrtCoreBelow Instance.crtEntry Entry.table H8.crtRevealOn H8.crtRevealOff :=
   Laws.coreBelow_of_factors Entry.table (ConvSplit.crtConvSplit 0) (ConvSplit.crtConvSplit 1)
-    DigestSplit.digestSplit (bmr_of ideal) bmrOff (Laws.crtRestSplit_of _ Laws.labelsSplit) reads on off
+    DigestSplit.digestSplit (bmr_of ideal) bmrOff (Laws.crtRestSplit_of Laws.labelsSplit) reads on off
 
 /-- **`CrtPrivacy crtEntry` from the leaves** (the touch
 row is `Flags.crtTouchGuess` from H6, the core row, the on-curve decomposition `decomp` (which also feeds the middle

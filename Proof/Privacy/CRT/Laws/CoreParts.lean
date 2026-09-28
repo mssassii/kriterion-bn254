@@ -170,19 +170,18 @@ materials, the exception entries and the rest part, and the real P45 marginal. T
 the parts that remain after each split. -/
 theorem realCore_factor (T : CrtTable) (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput)
     (convX : CrtConvSplit T 0) (convY : CrtConvSplit T 1) (digest : CrtDigestSplit) (rest : CrtRestSplit T)
-    (reads₁ : ReadsOff Eq (hotConvTag T u 0) fun tape =>
+    (reads₁ : ReadsOff Eq (hotPayloadTag T u 0) fun tape =>
       if Doubling crtEntry scalar tape u then none
       else some ((realGarbled crtEntry parameter scalar tape).1.crtY,
         (realGarbled crtEntry parameter scalar tape).1.exception, realRest T parameter scalar u tape,
         realBmr T parameter scalar u tape))
-    (reads₂ : ReadsOff Eq (hotConvTag T u 1) fun tape =>
+    (reads₂ : ReadsOff Eq (hotPayloadTag T u 1) fun tape =>
       if Doubling crtEntry scalar tape u then none
       else some ((realGarbled crtEntry parameter scalar tape).1.exception, realRest T parameter scalar u tape,
         realBmr T parameter scalar u tape))
     (reads₃ : ReadsOff SameOffExceptionPad (hiddenDigestTag u) fun tape =>
       (realRest T parameter scalar u tape, realBmr T parameter scalar u tape))
-    (reads₄ : ReadsOff SameOffLabels (fun tag => visTag T u tag.val = true ∧ (tagFamily tag.val ≤ 5 ∨
-      tagFamily tag.val = 8)) fun tape => realBmr T parameter scalar u tape)
+    (reads₄ : ReadsOff SameOffLabels (restHidden T u) fun tape => realBmr T parameter scalar u tape)
     (v : CoreView crtEntry T u) :
     letI := (view).sourceFintype
     haveI := (view).sourceNonempty
@@ -227,18 +226,18 @@ open Classical in
 tags and coins. -/
 def RealReads (T : CrtTable) : Prop :=
   ∀ [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput),
-    (ReadsOff Eq (hotConvTag T u 0) fun tape =>
+    (ReadsOff Eq (hotPayloadTag T u 0) fun tape =>
       if Doubling crtEntry scalar tape u then none
       else some ((realGarbled crtEntry parameter scalar tape).1.crtY,
         (realGarbled crtEntry parameter scalar tape).1.exception, realRest T parameter scalar u tape,
         realBmr T parameter scalar u tape)) ∧
-    (ReadsOff Eq (hotConvTag T u 1) fun tape =>
+    (ReadsOff Eq (hotPayloadTag T u 1) fun tape =>
       if Doubling crtEntry scalar tape u then none
       else some ((realGarbled crtEntry parameter scalar tape).1.exception, realRest T parameter scalar u tape,
         realBmr T parameter scalar u tape)) ∧
     (ReadsOff SameOffExceptionPad (hiddenDigestTag u) fun tape =>
       (realRest T parameter scalar u tape, realBmr T parameter scalar u tape)) ∧
-    ReadsOff SameOffLabels (fun tag => visTag T u tag.val = true ∧ (tagFamily tag.val ≤ 5 ∨ tagFamily tag.val = 8))
+    ReadsOff SameOffLabels (restHidden T u)
       fun tape => realBmr T parameter scalar u tape
 
 /-- **The ideal view law factors on the curve** (named input): the product of the same four ideal laws and the ideal

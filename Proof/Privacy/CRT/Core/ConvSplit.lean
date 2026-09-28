@@ -34,7 +34,11 @@ noncomputable section
 /-! ### The hot tags -/
 
 theorem hotField_fam (v : ℕ) (r : HotRead table) : (hotField table v r).1 ≤ 5 := by
-  rcases r with (⟨c, k⟩ | ⟨c, j⟩) | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;> simp [hotField]
+  rcases r with ⟨c, j⟩ | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;> simp [hotField]
+
+/-- No hot read of the payload is a chunk-tree read (family `0`). -/
+theorem hotField_fam_pos (v : ℕ) (r : HotRead table) : 1 ≤ (hotField table v r).1 := by
+  rcases r with ⟨c, j⟩ | ⟨i, ((k | j) | ((k | j) | (k | k)))⟩ <;> simp [hotField]
 
 theorem tag40_val (κ v : ℕ) (hκ : κ < 2) (r : HotRead table) :
     (tag40 (readTag table κ v r)).val = readTag table κ v r :=
@@ -74,8 +78,7 @@ theorem hotTag_readTag (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (r : HotRead 
   unfold hotTag
   simp only [tagFamily_tagCode hin, tagCoord_tagCode hin, tagIdx_tagCode hin, tagLevel_tagCode hin,
     tagSlot_tagCode hin, tagStage_tagCode hin]
-  rcases r with (⟨c, k⟩ | ⟨c, j⟩) | ⟨i, s⟩
-  · simp [hotField]
+  rcases r with ⟨c, j⟩ | ⟨i, s⟩
   · simp [hotField]
   · obtain ⟨row, hk⟩ := odd_of_read i s
     obtain ⟨wf, hm⟩ := bn254Table_wf.rows i row hk
@@ -83,12 +86,13 @@ theorem hotTag_readTag (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (r : HotRead 
     rcases s with ((k | j) | ((k | j) | (k | k))) <;>
       simp [hotField, i.isLt, hk, hrow, stageValue]
 
-/-- **The hot reads' tags are hidden** (`H8.hotConvTag`). -/
+/-- **The hot reads' tags are hidden** (`H8.hotPayloadTag`: families `1` to `5`). -/
 theorem hot_hidden (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (r : HotRead table) :
-    H8.hotConvTag table u κ (tag40 (readTag table κ (coordValue u κ) r)) := by
-  unfold H8.hotConvTag
+    H8.hotPayloadTag table u κ (tag40 (readTag table κ (coordValue u κ) r)) := by
+  unfold H8.hotPayloadTag
   rw [tag40_val κ _ hκ]
-  exact ⟨by rw [family_readTag κ _ hκ]; exact hotField_fam _ r, coord_readTag κ _ hκ r, hotTag_readTag u κ hκ r⟩
+  exact ⟨by rw [family_readTag κ _ hκ]; exact hotField_fam_pos _ r,
+    by rw [family_readTag κ _ hκ]; exact hotField_fam _ r, coord_readTag κ _ hκ r, hotTag_readTag u κ hκ r⟩
 
 /-- A site tag of family above 5 is not a hot read's position. -/
 theorem site_ne (κ v : ℕ) (hκ : κ < 2) (r : HotRead table) {fam coord idx stage level slot part : ℕ}
@@ -253,7 +257,7 @@ theorem partSplit_of (u : AffineInput) (κ : ℕ) (hκ : κ < 2) (S : ℕ) (Δof
       (Zof tape.1)).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2))).pub)
     (ideal : PMF (Vector Label convCount))
     (hideal : ideal = (PMF.uniformOfFintype (ConvVals table)).map Flat.flatOf) :
-    H8.PartSplit Eq (H8.hotConvTag table u κ) (fun _ => False) part ideal := by
+    H8.PartSplit Eq (H8.hotPayloadTag table u κ) (fun _ => False) part ideal := by
   intro α g hg b a
   simp only [↓reduceIte]
   have hL : (fun tape : TableTape crtEntry => some (part tape, g tape)) = fun tape =>

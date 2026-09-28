@@ -7,16 +7,24 @@ This file preserves a full raw residual, uniform and independent of a view finer
 The downstream bounds are `2^-104` for the projected conversion guess and `2^-128` for the full digest guess:
 
 * the **fine view** `fine` of a tape: coordinate `κ`'s published conversion material, the coins with `κ`'s zero
-  labels replaced by `u`'s labels `E_κ = Z_κ ⊕ u·Δ_κ` and `Δ_κ` by `0` (`eCoins`), and the table outside the hot
-  conversion tags of `κ` at `u` (`maskTable`);
+  labels replaced by `u`'s labels `E_κ = Z_κ ⊕ u·Δ_κ` and `Δ_κ` by `0` (`eCoins`), the table outside the hot
+  conversion tags of `κ` at `u` (`maskTable`), and (no chunk joins) the **actual selected labels** of `u`
+  (`labelsAt`: the coins' zero labels with the chunk-tree level sums installed, `Laws.LabelsSplitProof.tapeLabels_eq`).
+  With `E_κ` they fix `κ`'s chunk joins (`NoJoins.clip_selZ_actual`), which the flat vector omits;
 * **independence** (`fine_split`): the law of `(fine, Δ_κ)` is the law of `fine` times the uniform law on blocks.
-  The conversion material is uniform and independent of everything off its hot tags, the coins included (`crtConvSplit`), and the coin `Δ_κ` has a setter that keeps `u`'s labels (`setDelta`), so under the uniform coin law
-  it is uniform and independent of `eCoins` (`split_sum`).
+  The conversion material is uniform and independent of everything off its hot payload tags (families `1` to `5`),
+  the coins, the chunk-tree answers and the labels included (`crtConvSplit`). The coin `Δ_κ` has a setter that keeps
+  `u`'s coin labels (`setDelta`); refilling `κ`'s hot chunk-tree answers (uniform under the swapped table law,
+  `HiddenGuess.swappedTableLaw_fill`) and shifting them by `u_j · clip (Δ_κ ⊕ Δ'_κ)` keeps the actual labels
+  (`labelsAt_setDelta`), so the fill-averaged label mass does not read `Δ_κ` (`fillMass_setDelta`) and under the
+  uniform coin law `Δ_κ` is uniform and independent of the rest (`split_sum`). The high part of `Δ_κ` is never
+  conditioned on: the full 128-bit residual stays uniform.
 -/
 
 import Proof.Privacy.CRT.Hidden.StageTwo
 import Proof.Privacy.CRT.Core.ConvSplit
 import Proof.Privacy.CRT.Laws.LabelsSplit
+import Proof.Privacy.CRT.NoJoins.View
 
 set_option linter.unusedSectionVars false
 set_option autoImplicit false
@@ -27,7 +35,7 @@ open BN254 Cryptography GarbledCircuit Kriterion.ArgoMAC Kriterion.CRT
 open Kriterion.CRT.Privacy.Instance (crtEntry)
 open Kriterion.CRT.Privacy.Laws (coinLaw swappedTableTape_eq tape_map_apply map_apply_inj map_apply_notMem)
 open Kriterion.CRT.Privacy.Laws.LabelsSplitProof (LabelKeys coinKeys withKeys coinKeys_withKeys withKeys_coinKeys
-  withKeys_withKeys split_sum coinLaw_eq)
+  withKeys_withKeys split_sum coinLaw_eq zeroOfC deltaOfC zeroOfC_eq_coinKeys)
 open Kriterion.CRT.Privacy.Align (asked)
 open Kriterion.ArgoMAC.PlanB (digitCount)
 open scoped ENNReal
@@ -168,8 +176,146 @@ theorem maskTable_eq (u : AffineInput) (κ : Fin 2) (table : TagTable) (tag : Fi
   unfold maskTable
   rw [if_neg cold]
 
+/-- **The labels of `u`** of a tape (no chunk joins): the actual selected labels, the source-form labels of the
+coins' zero labels with the table's chunk-tree level sums installed (`Laws.LabelsSplitProof.tapeLabels_eq`). -/
+def labelsAt (u : AffineInput) (tape : TableTape crtEntry) : LamportSignature :=
+  NoJoins.sourceLabels (NoJoins.actualZeros (NoJoins.tableAnswers tape.2) (zeroOfC tape.1)) (deltaOfC tape.1) u
+
+/-- The type of the rest of the fine view: the coins through `u`'s labels, the masked table, the labels. -/
+abbrev RType := Entry.Coins × TagTable × LamportSignature
+
 /-- The type of the fine view. -/
-abbrev WType := Vector Label Entry.convCount × Entry.Coins × TagTable
+abbrev WType := Vector Label Entry.convCount × RType
+
+/-! ### The labels through the hot chunk-tree answers of `κ` -/
+
+/-- The labels read the table at the chunk-tree tags only (family `0`). -/
+theorem labelsAt_congr (u : AffineInput) {c : crtEntry.Coins} {t t' : TagTable}
+    (agree0 : ∀ p : Fin (2 ^ 40), tagFamily p.val = 0 → t p = t' p) : labelsAt u (c, t) = labelsAt u (c, t') := by
+  unfold labelsAt
+  dsimp only
+  rw [NoJoins.actualZeros_family0 agree0]
+
+/-- An indicator with the classical decision. -/
+def indP (P : Prop) : ℝ≥0∞ := @ite _ P (Classical.propDecidable P) 1 0
+
+theorem indP_pos {P : Prop} (h : P) : indP P = 1 := by
+  unfold indP
+  rw [if_pos h]
+
+theorem indP_neg {P : Prop} (h : ¬ P) : indP P = 0 := by
+  unfold indP
+  rw [if_neg h]
+
+theorem indP_and (P Q : Prop) : indP (P ∧ Q) = indP P * indP Q := by
+  by_cases p : P
+  · by_cases q : Q
+    · rw [indP_pos ⟨p, q⟩, indP_pos p, indP_pos q, mul_one]
+    · rw [indP_neg fun h => q h.2, indP_neg q, mul_zero]
+  · rw [indP_neg fun h => p h.1, indP_neg p, zero_mul]
+
+theorem map_apply_indP {X Y : Type} (μ : PMF X) (F : X → Y) (y : Y) :
+    (μ.map F) y = ∑' x, μ x * indP (F x = y) := by
+  rw [PMF.map_apply]
+  refine tsum_congr fun x => ?_
+  by_cases h : F x = y
+  · rw [if_pos h.symm, indP_pos h, mul_one]
+  · rw [if_neg fun e => h e.symm, indP_neg h, mul_zero]
+
+/-- Coordinate `κ`'s hot chunk-tree positions at `u`, filled with `f`. -/
+abbrev fillOne (u : AffineInput) (κ : Fin 2) (f : NoJoins.Bits → Block × Block) (t : TagTable) : TagTable :=
+  HiddenGuess.fillAt (NoJoins.hotPosOf u κ) f t
+
+/-- **The hot chunk-tree answers of `κ` refill uniformly** under the swapped table law. -/
+theorem table_fill (u : AffineInput) (κ : Fin 2) (W : TagTable → ℝ≥0∞) :
+    ∑' t, swappedTableLaw crtLayout t * W t =
+      ∑' t, swappedTableLaw crtLayout t * ∑' f, PMF.uniformOfFintype (NoJoins.Bits → Block × Block) f *
+        W (fillOne u κ f t) := by
+  have fill := HiddenGuess.swappedTableLaw_fill crtLayout (NoJoins.hotPosOf u κ) (NoJoins.hotPosOf_injective u κ)
+    (NoJoins.hotPosOf_away u κ)
+  conv_lhs => rw [← fill]
+  rw [NoJoins.tsum_bind_mul]
+  exact tsum_congr fun t => congrArg _ (NoJoins.tsum_map_mul _ _ W)
+
+/-- The mask does not read the hot chunk-tree answers of `κ` (they are hot conversion tags of `κ`). -/
+theorem maskTable_fillOne (u : AffineInput) (κ : Fin 2) (f : NoJoins.Bits → Block × Block) (t : TagTable) :
+    maskTable u κ (fillOne u κ f t) = maskTable u κ t := by
+  funext tag
+  unfold maskTable
+  split_ifs with hot
+  · rfl
+  · refine HiddenGuess.fillAt_apply_of_not_mem _ _ _ _ ?_
+    rintro ⟨j, rfl⟩
+    refine hot ⟨?_, NoJoins.hotPos_coord u (κ, j), NoJoins.hotPos_hot u (κ, j)⟩
+    show tagFamily (NoJoins.hotPos u (κ, j)).val ≤ 5
+    rw [NoJoins.hotPos_family]
+    omega
+
+theorem bitOf_eq_uBit (u : AffineInput) (κ : Fin 2) (j : NoJoins.Bits) : NoJoins.bitOf u κ j = uBit u κ j.val := by
+  fin_cases κ <;> simp [NoJoins.bitOf, uBit]
+
+/-- The per-bit selected labels of label keys are `u`'s labels. -/
+theorem selZ_eq_eLabel (u : AffineInput) (κ : Fin 2) (keys : LabelKeys) (j : Fin coordinateBitCount) :
+    NoJoins.selZ keys.1 keys.2 u κ j = eLabel u κ keys j := by
+  rw [NoJoins.selZ_apply, bitOf_eq_uBit]
+  rfl
+
+theorem deltaOfC_eq_coinKeys (x : crtEntry.Coins) : deltaOfC x = (coinKeys x).2 := by
+  funext κ
+  fin_cases κ <;> rfl
+
+theorem coinKeys_setDelta (u : AffineInput) (κ : Fin 2) (x : Entry.Coins) (d : Block) :
+    coinKeys (setDelta u κ x d) = shiftKeys u κ (coinKeys x) d := by
+  unfold setDelta
+  rw [coinKeys_withKeys]
+
+theorem zeroOfC_setDelta (u : AffineInput) (κ : Fin 2) (x : crtEntry.Coins) (d : Block) :
+    zeroOfC (setDelta u κ x d) = (shiftKeys u κ (coinKeys x) d).1 := by
+  have keys := coinKeys_setDelta u κ x d
+  have e : zeroOfC (setDelta u κ x d) = (coinKeys (setDelta u κ x d)).1 := by
+    funext κ'
+    fin_cases κ' <;> rfl
+  exact e.trans (congrArg Prod.fst keys)
+
+theorem deltaOfC_setDelta (u : AffineInput) (κ : Fin 2) (x : crtEntry.Coins) (d : Block) :
+    deltaOfC (setDelta u κ x d) = (shiftKeys u κ (coinKeys x) d).2 := by
+  have keys := coinKeys_setDelta u κ x d
+  have e : deltaOfC (setDelta u κ x d) = (coinKeys (setDelta u κ x d)).2 := by
+    funext κ'
+    fin_cases κ' <;> rfl
+  exact e.trans (congrArg Prod.snd keys)
+
+/-- **Resetting `Δ_κ` is shifting `κ`'s hot chunk-tree answers**: the labels of the tape with `Δ_κ` set to `d` and
+`κ`'s hot positions filled with `f` are those of the tape with the hot answers shifted by `u_j · clip (Δ_κ ⊕ d)`. -/
+theorem labelsAt_setDelta (u : AffineInput) (κ : Fin 2) (x : crtEntry.Coins) (d : Block)
+    (f : NoJoins.Bits → Block × Block) (t : TagTable) :
+    labelsAt u (setDelta u κ x d, fillOne u κ f t) =
+      labelsAt u (x, fillOne u κ (NoJoins.shiftAns u κ (clip (deltaAt κ x ^^^ d)) f) t) := by
+  unfold labelsAt
+  apply NoJoins.labels_of_selZ
+  dsimp only
+  rw [zeroOfC_setDelta, deltaOfC_setDelta, zeroOfC_eq_coinKeys, deltaOfC_eq_coinKeys]
+  have δ : deltaAt κ x ^^^ d = (coinKeys x).2 κ ^^^ (shiftKeys u κ (coinKeys x) d).2 κ := by
+    rw [shiftKeys_delta]
+    rfl
+  rw [δ]
+  refine NoJoins.selZ_fillOne_shift u κ t _ _ _ _ (fun j => ?_) (fun κ' ne => ?_) (fun κ' ne => ?_) f
+  · rw [selZ_eq_eLabel, selZ_eq_eLabel, eLabel_shiftKeys]
+  · simp only [shiftKeys, Function.update_of_ne ne]
+  · simp only [shiftKeys, Function.update_of_ne ne]
+
+/-- The mass of the labels `l` at coins `x`, averaged over `κ`'s hot chunk-tree answers. -/
+def fillMass (u : AffineInput) (κ : Fin 2) (x : crtEntry.Coins) (t : TagTable) (l : LamportSignature) : ℝ≥0∞ :=
+  ∑' f, PMF.uniformOfFintype (NoJoins.Bits → Block × Block) f * indP (labelsAt u (x, fillOne u κ f t) = l)
+
+/-- **The fill-averaged label mass does not read `Δ_κ`.** -/
+theorem fillMass_setDelta (u : AffineInput) (κ : Fin 2) (x : crtEntry.Coins) (d : Block) (t : TagTable)
+    (l : LamportSignature) : fillMass u κ (setDelta u κ x d) t l = fillMass u κ x t l := by
+  unfold fillMass
+  simp only [labelsAt_setDelta, PMF.uniformOfFintype_apply]
+  exact (NoJoins.shiftEquiv u κ (clip (deltaAt κ x ^^^ d))).tsum_eq
+    (fun f => (↑(Fintype.card (NoJoins.Bits → Block × Block)) : ℝ≥0∞)⁻¹ *
+      indP (labelsAt u (x, fillOne u κ f t) = l))
 
 section Fine
 
@@ -181,9 +327,10 @@ def crtPart (parameter : ℕ) (scalar : NonZeroScalar) (κ : Fin 2) (tape : Tabl
   if κ = 0 then (H8.realGarbled crtEntry parameter scalar tape).1.crtX
   else (H8.realGarbled crtEntry parameter scalar tape).1.crtY
 
-/-- The rest of the fine view: the coins through `u`'s labels, the table off the hot conversion tags. -/
-def restOf (u : AffineInput) (κ : Fin 2) (tape : TableTape crtEntry) : Entry.Coins × TagTable :=
-  (eCoins u κ tape.1, maskTable u κ tape.2)
+/-- The rest of the fine view: the coins through `u`'s labels, the table off the hot conversion tags, and the
+actual selected labels of `u`. -/
+def restOf (u : AffineInput) (κ : Fin 2) (tape : TableTape crtEntry) : RType :=
+  (eCoins u κ tape.1, maskTable u κ tape.2, labelsAt u tape)
 
 /-- **The fine view** of a tape at `u` for coordinate `κ`. -/
 def fine (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (κ : Fin 2) (tape : TableTape crtEntry) :
@@ -206,7 +353,7 @@ theorem map_some_apply {X Y : Type} (μ : PMF X) (h : X → Y) (y : Y) :
 open Classical in
 /-- the split with the flag `False`, without the option wrapper. -/
 theorem conv_split (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (κ : Fin 2) {α : Type}
-    (g : TableTape crtEntry → α) (reads : H8.ReadsOff Eq (H8.hotConvTag Entry.table u κ.val) g)
+    (g : TableTape crtEntry → α) (reads : H8.ReadsOff Eq (H8.hotPayloadTag Entry.table u κ.val) g)
     (b : Vector Label Entry.convCount) (a : α) :
     ((swappedTableTape crtEntry).map fun tape => (crtPart parameter scalar κ tape, g tape)) (b, a) =
       ((@PMF.uniformOfFintype _ (Instance.view).sourceFintype (Instance.view).sourceNonempty).map fun source =>
@@ -218,93 +365,80 @@ theorem conv_split (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) 
   exact split
 
 theorem restOf_reads (u : AffineInput) (κ : Fin 2) :
-    H8.ReadsOff Eq (H8.hotConvTag Entry.table u κ.val) (restOf u κ) := by
-  intro tape tape' sameCoins agree
-  unfold restOf
-  rw [sameCoins]
-  congr 1
-  funext tag
-  unfold maskTable
-  split_ifs with hot
-  · rfl
-  · exact agree tag hot
+    H8.ReadsOff Eq (H8.hotPayloadTag Entry.table u κ.val) (restOf u κ) := by
+  rintro ⟨c, t⟩ ⟨c', t'⟩ sameCoins agree
+  dsimp only at sameCoins agree
+  subst sameCoins
+  have mask : maskTable u κ t = maskTable u κ t' := by
+    funext tag
+    unfold maskTable
+    split_ifs with hot
+    · rfl
+    · exact agree tag fun payload => hot (H8.hotPayloadTag_hotConvTag payload)
+  have labels : labelsAt u (c, t) = labelsAt u (c, t') :=
+    labelsAt_congr u fun p zero => agree p fun payload => by
+      have one := payload.1
+      omega
+  show (eCoins u κ c, maskTable u κ t, labelsAt u (c, t)) = (eCoins u κ c, maskTable u κ t', labelsAt u (c, t'))
+  rw [mask, labels]
 
 theorem restRes_reads (u : AffineInput) (κ : Fin 2) :
-    H8.ReadsOff Eq (H8.hotConvTag Entry.table u κ.val) (fun tape => (restOf u κ tape, res κ tape)) := by
+    H8.ReadsOff Eq (H8.hotPayloadTag Entry.table u κ.val) (fun tape => (restOf u κ tape, res κ tape)) := by
   intro tape tape' sameCoins agree
   show (restOf u κ tape, res κ tape) = (restOf u κ tape', res κ tape')
   rw [restOf_reads u κ tape tape' sameCoins agree]
   unfold res
   rw [sameCoins]
 
-open Classical in
-/-- The table part of a tape's image, pulled out of the coins. -/
-theorem table_map_apply (x : Entry.Coins) (y : Block) (c : Entry.Coins × TagTable) (r : Block)
-    (u : AffineInput) (κ : Fin 2) :
-    ((swappedTableLaw crtLayout).map fun table => ((x, maskTable u κ table), y)) (c, r) =
-      if x = c.1 ∧ y = r then ((swappedTableLaw crtLayout).map (maskTable u κ)) c.2 else 0 := by
-  by_cases same : x = c.1 ∧ y = r
-  · rw [if_pos same]
-    obtain ⟨hx, hy⟩ := same
-    have point : (c, r) = ((x, c.2), y) := Prod.ext (Prod.ext hx.symm rfl) hy.symm
-    have comp : ((swappedTableLaw crtLayout).map fun table => ((x, maskTable u κ table), y)) =
-        ((swappedTableLaw crtLayout).map (maskTable u κ)).map fun t => ((x, t), y) := by
-      rw [PMF.map_comp]
-      rfl
-    rw [point, comp]
-    exact map_apply_inj _ (φ := fun t => ((x, t), y)) (fun a b h => by simpa using h) c.2
-  · rw [if_neg same]
-    refine map_apply_notMem _ _ _ fun table h => same ?_
-    have first := congrArg (fun p => p.1.1) h
-    have second := congrArg (fun p => p.2) h
-    exact ⟨first, second⟩
-
-open Classical in
-theorem table_map_apply' (x : Entry.Coins) (c : Entry.Coins × TagTable) (u : AffineInput) (κ : Fin 2) :
-    ((swappedTableLaw crtLayout).map fun table => (x, maskTable u κ table)) c =
-      if x = c.1 then ((swappedTableLaw crtLayout).map (maskTable u κ)) c.2 else 0 := by
-  by_cases same : x = c.1
-  · rw [if_pos same]
-    have point : c = (x, c.2) := Prod.ext same.symm rfl
-    have comp : ((swappedTableLaw crtLayout).map fun table => (x, maskTable u κ table)) =
-        ((swappedTableLaw crtLayout).map (maskTable u κ)).map fun t => (x, t) := by
-      rw [PMF.map_comp]
-      rfl
-    rw [point, comp]
-    exact map_apply_inj _ (φ := fun t => (x, t)) (fun a b h => by simpa using h) c.2
-  · rw [if_neg same]
-    exact map_apply_notMem _ _ _ fun table h => same (congrArg Prod.fst h)
-
-open Classical in
 /-- **The coin split**: `Δ_κ` is uniform and independent of the rest of the fine view. -/
-theorem rest_split (u : AffineInput) (κ : Fin 2) (c : Entry.Coins × TagTable) (r : Block) :
+theorem rest_split (u : AffineInput) (κ : Fin 2) (c : RType) (r : Block) :
     ((swappedTableTape crtEntry).map fun tape => (restOf u κ tape, res κ tape)) (c, r) =
       ((swappedTableTape crtEntry).map (restOf u κ)) c * PMF.uniformOfFintype Block r := by
-  rw [tape_map_apply, tape_map_apply, coinLaw_eq, tsum_fintype, tsum_fintype]
-  set q := ((swappedTableLaw crtLayout).map (maskTable u κ)) c.2 with hq
-  have each : ∀ x : crtEntry.Coins,
-      ((swappedTableLaw crtLayout).map fun table => (restOf u κ (x, table), res κ (x, table))) (c, r) =
-        (if eCoins u κ x = c.1 then q else 0) * (if deltaAt κ x = r then 1 else 0) := by
+  let Q : crtEntry.Coins → ℝ≥0∞ := fun x => indP (eCoins u κ x = c.1) *
+    ∑' t, swappedTableLaw crtLayout t * (indP (maskTable u κ t = c.2.1) * fillMass u κ x t c.2.2)
+  have pointRest : ∀ (x : crtEntry.Coins) t f, indP (restOf u κ (x, fillOne u κ f t) = c) =
+      indP (eCoins u κ x = c.1) *
+        (indP (maskTable u κ t = c.2.1) * indP (labelsAt u (x, fillOne u κ f t) = c.2.2)) := by
+    intro x t f
+    rw [← indP_and, ← indP_and]
+    congr 1
+    obtain ⟨c1, c2, c3⟩ := c
+    show ((eCoins u κ x, maskTable u κ (fillOne u κ f t), labelsAt u (x, fillOne u κ f t)) = (c1, c2, c3)) = _
+    rw [maskTable_fillOne]
+    simp only [Prod.mk.injEq]
+  have inner : ∀ x : crtEntry.Coins,
+      ∑' t, swappedTableLaw crtLayout t * indP (restOf u κ (x, t) = c) = Q x := by
     intro x
-    have := table_map_apply (eCoins u κ x) (deltaAt κ x) c r u κ
-    refine this.trans ?_
-    by_cases h1 : eCoins u κ x = c.1
-    · by_cases h2 : deltaAt κ x = r
-      · rw [if_pos ⟨h1, h2⟩, if_pos h1, if_pos h2, mul_one]
-      · rw [if_neg fun h => h2 h.2, if_neg h2, mul_zero]
-    · rw [if_neg fun h => h1 h.1, if_neg h1, zero_mul]
-  have each' : ∀ x : crtEntry.Coins,
-      ((swappedTableLaw crtLayout).map fun table => restOf u κ (x, table)) c =
-        if eCoins u κ x = c.1 then q else 0 :=
-    fun x => table_map_apply' (eCoins u κ x) c u κ
-  rw [Finset.sum_congr rfl fun x _ => congrArg _ (each x), Finset.sum_congr rfl fun x _ => congrArg _ (each' x)]
+    rw [table_fill u κ]
+    simp only [pointRest, Q, fillMass]
+    simp_rw [← ENNReal.tsum_mul_left]
+    exact tsum_congr fun t => tsum_congr fun f => by ring
+  have lhs : ((swappedTableTape crtEntry).map fun tape => (restOf u κ tape, res κ tape)) (c, r) =
+      ∑' x, coinLaw x * (Q x * indP (deltaAt κ x = r)) := by
+    rw [map_apply_indP, Laws.tsum_tape]
+    refine tsum_congr fun x => congrArg _ ?_
+    have split : ∀ t, indP ((restOf u κ (x, t), res κ (x, t)) = (c, r)) =
+        indP (restOf u κ (x, t) = c) * indP (deltaAt κ x = r) := by
+      intro t
+      rw [← indP_and]
+      congr 1
+      exact Prod.mk.injEq _ _ _ _
+    simp only [split]
+    rw [← inner x, ← ENNReal.tsum_mul_right]
+    exact tsum_congr fun t => by ring
+  have rhs : ((swappedTableTape crtEntry).map (restOf u κ)) c = ∑' x, coinLaw x * Q x := by
+    rw [map_apply_indP, Laws.tsum_tape]
+    exact tsum_congr fun x => congrArg _ (inner x)
+  have hQ : ∀ (x : crtEntry.Coins) d, Q (setDelta u κ x d) = Q x := by
+    intro x d
+    have e : eCoins u κ (setDelta u κ x d) = eCoins u κ x := eCoins_setDelta u κ x d
+    simp only [Q, e, fillMass_setDelta]
+  rw [lhs, rhs, coinLaw_eq, tsum_fintype, tsum_fintype]
   have split := split_sum (X := crtEntry.Coins) (deltaAt κ) (setDelta u κ) (deltaAt_setDelta u κ)
-    (setDelta_deltaAt u κ) (setDelta_setDelta u κ) (fun x => if eCoins u κ x = c.1 then q else 0)
-    (fun x d => congrArg (fun e => if e = c.1 then q else 0) (eCoins_setDelta u κ x d))
-    (fun d => if d = r then 1 else 0)
+    (setDelta_deltaAt u κ) (setDelta_setDelta u κ) Q hQ (fun d => indP (d = r))
   refine split.trans ?_
-  rw [Finset.sum_eq_single (ι := Block) r (fun d _ ne => by rw [if_neg ne, mul_zero])
-    (fun h => absurd (Finset.mem_univ r) h), if_pos rfl, mul_one]
+  rw [Finset.sum_eq_single (ι := Block) r (fun d _ ne => by rw [indP_neg ne, mul_zero])
+    (fun h => absurd (Finset.mem_univ r) h), indP_pos rfl, mul_one]
 
 /-- **Independence**: the law of `(fine, Δ_κ)` is the law of the fine view times the uniform law on blocks. -/
 theorem fine_split (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (κ : Fin 2) :
@@ -318,7 +452,7 @@ theorem fine_split (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) 
         (crtPart parameter scalar κ tape, (restOf u κ tape, res κ tape))).map fun p => ((p.1, p.2.1), p.2.2) := by
     rw [PMF.map_comp]
     rfl
-  have assocInj : Function.Injective fun p : Vector Label Entry.convCount × (Entry.Coins × TagTable) × Block =>
+  have assocInj : Function.Injective fun p : Vector Label Entry.convCount × RType × Block =>
       ((p.1, p.2.1), p.2.2) := by
     rintro ⟨a1, a2, a3⟩ ⟨b1, b2, b3⟩ h
     simp only [Prod.mk.injEq] at h
@@ -505,25 +639,30 @@ theorem RelAsked.of_constant {hot : ℕ → Prop} {δ raw : Block} {A B : List �
     rw [same a List.mem_cons_self]
     exact head.2.2 h
 
-/-- **The garbler's tail after the two coordinates**: the key, the masks, the digest. -/
-def tailM (scalar : NonZeroScalar) (coins : Entry.Coins) :
+/-- **The garbler's tail after the two coordinates**: the key, the masks, the digest. No chunk joins: the digest
+reads the actual zero labels `zero` (the coins' zero labels with the coordinates' chunk joins absorbed,
+`Entry.keyZeroOf`), which the garbler computes from the two coordinate garblings. -/
+def tailM (scalar : NonZeroScalar) (coins : Entry.Coins) (zero : Fin 2 → Fin coordinateBitCount → Block) :
     CM (MaskValues digitCount × (Fin digitCount → Exception.Entry)) :=
   keyM coins.bridgeKey >>= fun K =>
     maskAnswersM K digitCount >>= fun masks =>
-      digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
+      digestGarbleM coordinateBitCount digitCount zero (Entry.deltaOf coins)
           (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)
           (fun o => ((Entry.outputKeysOf scalar coins).get o).offset.coordinates)
           (fun o => coins.exceptionPad.get o) >>= fun entries =>
         pure (masks, entries)
 
-/-- **The tail's relation** (`Hidden/DeltaTail.lean`): two coins with the same fine
-coins and two tables with the same masks give related tail question lists and the same tail values. -/
+/-- **The tail's relation** (`Hidden/DeltaTail.lean`): two coins with the same fine coins, two tables with the same
+masks and two actual zero labels with the same selected labels of `u` give related tail question lists and the same
+tail values. -/
 def TailRel : Prop :=
-  ∀ (scalar : NonZeroScalar) (u : AffineInput) (κ : Fin 2) (c c' : Entry.Coins) (t t' : TagTable),
+  ∀ (scalar : NonZeroScalar) (u : AffineInput) (κ : Fin 2) (c c' : Entry.Coins)
+    (z z' : Fin 2 → Fin coordinateBitCount → Block) (t t' : TagTable),
     eCoins u κ c = eCoins u κ c' → maskTable u κ t = maskTable u κ t' →
-      RelAsked (Shifted u κ) (deltaAt κ c ^^^ deltaAt κ c') (asked (hashOf t) (tailM scalar c))
-          (asked (hashOf t') (tailM scalar c')) ∧
-        (tailM scalar c).eval (hashOf t) = (tailM scalar c').eval (hashOf t')
+    NoJoins.sourceLabels z (Entry.deltaOf c) u = NoJoins.sourceLabels z' (Entry.deltaOf c') u →
+      RelAsked (Shifted u κ) (deltaAt κ c ^^^ deltaAt κ c') (asked (hashOf t) (tailM scalar c z))
+          (asked (hashOf t') (tailM scalar c' z')) ∧
+        (tailM scalar c z).eval (hashOf t) = (tailM scalar c' z').eval (hashOf t')
 
 
 end
