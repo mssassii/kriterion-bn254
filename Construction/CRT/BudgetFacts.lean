@@ -9,24 +9,24 @@ import Construction.CRT.Entry
 namespace Kriterion.CRT.Entry
 
 set_option maxRecDepth 100000 in
-theorem coordGarbleBudget_x : coordGarbleBudget table xCount = 555527 := by decide +kernel
+theorem coordGarbleBudget_x : coordGarbleBudget table xCount = 506759 := by decide +kernel
 
 set_option maxRecDepth 100000 in
-theorem coordGarbleBudget_y : coordGarbleBudget table yCount = 504220 := by decide +kernel
+theorem coordGarbleBudget_y : coordGarbleBudget table yCount = 455452 := by decide +kernel
 
 set_option maxRecDepth 100000 in
-theorem coordEvalBudget_x : coordEvalBudget table xCount = 551934 := by decide +kernel
+theorem coordEvalBudget_x : coordEvalBudget table xCount = 503417 := by decide +kernel
 
 set_option maxRecDepth 100000 in
-theorem coordEvalBudget_y : coordEvalBudget table yCount = 500853 := by decide +kernel
+theorem coordEvalBudget_y : coordEvalBudget table yCount = 452336 := by decide +kernel
 
-/-- **The garbler asks 1,062,038 queries** (gate 1,759,967). -/
-theorem garbleBudget_eq : garbleBudget = 1062038 := by
+/-- **The garbler asks 964,502 queries** (gate 1,759,967). -/
+theorem garbleBudget_eq : garbleBudget = 964502 := by
   rw [garbleBudget, garbleBudgetOf, coordGarbleBudget_x, coordGarbleBudget_y]
   decide +kernel
 
-/-- **The evaluator asks 1,054,570 queries** (gate 1,055,879). -/
-theorem evaluateBudget_eq : evaluateBudget = 1054570 := by
+/-- **The evaluator asks 957,536 queries** (gate 1,055,879). -/
+theorem evaluateBudget_eq : evaluateBudget = 957536 := by
   rw [evaluateBudget, evaluateBudgetOf, coordEvalBudget_x, coordEvalBudget_y]
   decide +kernel
 

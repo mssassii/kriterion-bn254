@@ -181,7 +181,7 @@ def toRecord (value : Nat) : Record :=
   ⟨value % 256 ^ recordBytes, Nat.mod_lt _ (Nat.pow_pos (by decide))⟩
 
 /-- A flat conversion vector from the garbler's material. -/
-def convVector (pub : ConvPublic) : Vector Block convCount :=
+def convVector (pub : ConvPublic) : Vector Label convCount :=
   let blocks := (pub.flatten table).toArray
   Vector.ofFn fun k => blocks.getD k.val 0
 
@@ -214,8 +214,10 @@ def assemble (scalar : NonZeroScalar) (coins : Coins) (gx : CoordGarbled table x
 /-- **The garbler program** over the layer's hash. -/
 def garbleCM (scalar : NonZeroScalar) (coins : Coins) : CM (Public × Key) :=
   let outputKeys := outputKeysOf scalar coins
-  coordGarbleM table xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0) >>= fun gx =>
-    coordGarbleM table yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0) >>= fun gy =>
+  coordGarbleM table xCount 0 (clip (coins.inputDelta .x))
+      (fun j => clip (atNat (coins.inputZero .x) 0 j)) >>= fun gx =>
+    coordGarbleM table yCount 1 (clip (coins.inputDelta .y))
+        (fun j => clip (atNat (coins.inputZero .y) 0 j)) >>= fun gy =>
       keyM coins.bridgeKey >>= fun K =>
         maskAnswersM K digitCount >>= fun masks =>
           digestGarbleM coordinateBitCount digitCount (zeroOf coins) (deltaOf coins)
@@ -273,9 +275,9 @@ labels, every query labelled (chunk trees and casts, conversions, body pads). -/
 def replayConv (pub : Public) (input : AffineInput) (labels : GarbledCircuit.LamportSignature) :
     CM ConvOut :=
   coordEvalM table xCount 0 (convOf pub.crtX) (fun e => (pub.recX.get e).val) input.x.val
-      (labelX labels) >>= fun ex =>
+      (fun j => clip (labelX labels j)) >>= fun ex =>
     coordEvalM table yCount 1 (convOf pub.crtY) (fun e => (pub.recY.get e).val) input.y.val
-        (labelY labels) >>= fun ey =>
+        (fun j => clip (labelY labels j)) >>= fun ey =>
       pure { deliveredX := fun e => toField (ex.decoded e)
              deliveredY := fun e => toField (ey.decoded e) }
 
