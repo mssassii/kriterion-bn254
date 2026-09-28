@@ -20,13 +20,14 @@ namespace Machine
 
 /-- **What coordinate `κ`'s replay reads**, as the abstract program reads it (`conv` the published
 conversion material, `records` the records, `v` the coordinate value, `labelsOf` the labels). The
-source layer derives these from the stage-1 RAM. -/
+source layer derives these from the stage-1 RAM. Every chunk-tree join is read at the zero cell
+`Layout.zeroJoin` (`chunkJoins`; the published material's chunk joins are `0`). -/
 structure CoordReads (κ S : Nat) (conv : ConvPublic) (records : Fin S → Nat) (v : Nat)
     (labelsOf : Nat → Block) (memory : Memory) : Prop where
   coordVal : memory.ram (word (coordCellOf κ)) = word v
   labelCells : ∀ j, j < 254 → memory.ram (word (labelBase + 254 * κ + j)) = blockWord (labelsOf j)
   chunkJoins : ∀ c, c < 32 → ∀ n, 1 ≤ n → n < Entry.table.chunkWidth c →
-    memory.ram (word (Layout.sourceJoin κ (Entry.chunkJoinBase c + (n - 1)))) = labelWord (conv.chunkJoin c n)
+    memory.ram (word Layout.zeroJoin) = labelWord (conv.chunkJoin c n)
   chunkPins : ∀ c, c < 32 → ∀ i (ib : i < laneCount),
     memory.ram (word (Layout.sourcePin κ 0 0 + 128 * c + i)) =
       word ((pinOfBlocks 13 fun k => conv.chunkPin c k.val) ⟨i, ib⟩).val
@@ -95,7 +96,7 @@ theorem agree_coordProg (κ : Nat) (κLt : κ < 2) (S : Nat) (sSmall : S ≤ 512
         requestBase]
     · split <;> omega
     · omega
-    · have := IndexFacts.chunkJoinBase_le c; omega
+    · simp only [Layout.zeroJoin]; omega
     · omega
     · omega
     · omega
@@ -282,9 +283,7 @@ theorem CoordReads.transport {κ S : Nat} {conv : ConvPublic} {records : Fin S �
     exact reads.coordVal
   · rw [agree _ (by simp only [labelBase]; omega)]
     exact reads.labelCells j jb
-  · have := IndexFacts.chunkJoinBase_le c
-    have : Entry.table.chunkWidth c ≤ 8 := by rw [TableFacts.chunkWidth]; omega
-    rw [agree _ (by simp only [Layout.sourceJoin]; omega)]
+  · rw [agree _ (by simp only [Layout.zeroJoin]; omega)]
     exact reads.chunkJoins c cb n n1 nb
   · rw [agree _ (by simp only [Layout.sourcePin]; omega)]
     exact reads.chunkPins c cb i ib

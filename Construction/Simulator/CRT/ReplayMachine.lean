@@ -10,7 +10,8 @@ every block placed on the map (`Layout.lean`). Coordinate `κ` keeps its replay 
 * `R + 2 ^ 28`: the decoding's scratch (gathered residues, digits, limbs).
 
 The inputs are read in place: the request, the labels at `labelBase + 254 κ + j`, the joins and
-pins in the source regions (`sourceJoin`, `sourcePin`) at the flat indices, the residue
+pins in the source regions (`sourceJoin`, `sourcePin`) at the flat indices (every chunk-tree join at the
+never-written zero cell `Layout.zeroJoin`: no chunk joins are published), the residue
 digits at `residueCell κ i e`, the hints at `hintCell κ e`. The mask stage's answer scratch is at
 `replayScratch 0 + 2 ^ 30`.
 -/
@@ -34,7 +35,7 @@ def coordCellOf (κ : Nat) : Nat := if κ = 0 then reqX else reqY
 def coordCells (κ : Nat) : CoordCells where
   coordCell := coordCellOf κ
   labelBase := labelBase + 254 * κ
-  chunkJoin c n := Layout.sourceJoin κ (Entry.chunkJoinBase c + (n - 1))
+  chunkJoin _ _ := Layout.zeroJoin
   pinBase := Layout.sourcePin κ 0 0
   alpha := Layout.replayScratch κ
   levelBase := Layout.replayScratch κ + 1

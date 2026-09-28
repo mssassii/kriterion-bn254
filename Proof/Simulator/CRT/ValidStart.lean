@@ -7,7 +7,8 @@ output tags and `Q`) and the label region (label `i` is the key cell `keyBase + 
 retained memory is unchanged (`prefix_keeps`). So the valid arm reads, on the memory the prefix leaves:
 
 * the stage-1 source through `CrtSource.extract` (unchanged cells, `readDraw_keeps`, `cellsValid_keeps`), hence the
-  replay's `CoordReads` (`SourceCells.coordReads*_extract`), the curve and the row constants (`CrtSource.field_cell`);
+  replay's `CoordReads` (`SourceCells.coordReads*_extract`, with the hint cells and the zero join cell, both kept
+  zero), the curve and the row constants (`CrtSource.field_cell`);
 * the request's input and output cells (`parsedRam`);
 * the selected labels as blocks: the key cells hold `Z` and `Z ⊕ Δ` below `2^128` (`KeyCellsHold`, `label_cell`).
 
@@ -34,10 +35,13 @@ noncomputable section
 /-! ### What stage 1 leaves -/
 
 /-- **The stage-1 facts the valid arm's start needs** (`CrtStage1Retained.Retained`, field for
-field): the stage-1 cells in range, the hint cells zero, the key cells `Z` and `Z ⊕ Δ`, and `Z`, `Δ` below `2^128`. -/
+field): the stage-1 cells in range, the hint cells and the zero join cell zero, the key cells `Z` and `Z ⊕ Δ`, and
+`Z`, `Δ` below `2^128`. -/
 structure Retained (memory : Memory) : Prop where
   cells : CrtSource.CellsValid memory.ram
   hints : ∀ κ, κ < 2 → ∀ e, e < CrtStage1.encCount κ → memory.ram (word (Layout.hintCell κ e)) = word 0
+  /-- The zero join cell holds `0` (no chunk joins: every chunk-tree join is read there). -/
+  zeroJoin : memory.ram (word Layout.zeroJoin) = word 0
   keys : ∀ j, j < labelCount → memory.ram (word (keyBase + 2 * j + 1)) =
     memory.ram (word (keyBase + 2 * j)) ^^^ memory.ram (word (Layout.deltaCell (j / 254)))
   zerosSmall : ∀ j, j < labelCount → (memory.ram (word (keyBase + 2 * j))).toNat < 2 ^ 128
@@ -258,6 +262,9 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
       split at he <;> simp only [Kriterion.CRT.Entry.xCount, Kriterion.CRT.Entry.yCount] at he <;> omega
     rw [keeps _ (keptHigh _ (by unfold Layout.hintCell; omega) (by unfold Layout.hintCell; omega))]
     exact retained.hints κ hκ e he
+  have zero : middle.ram (word Layout.zeroJoin) = word 0 := by
+    rw [keeps _ (keptHigh _ (by unfold Layout.zeroJoin; omega) (by unfold Layout.zeroJoin; omega))]
+    exact retained.zeroJoin
   have labelAt : ∀ i (bound : i < 508), middle.ram (word (labelBase + i)) =
       blockWord ((Kriterion.CRT.Entry.labels (CrtSource.extract memory.ram) input)[i]) := fun i bound =>
     (labelCells i bound).trans (label_cell memory retained input i bound)
@@ -270,14 +277,14 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
   refine
     { readsX := ?_, readsY := ?_, reqXCell := xCell, reqYCell := yCell, c0Cell := ?_, c1Cell := ?_, c2Cell := ?_,
       outputCells := outCells, rowCells := fun d => ?_, labelCells := labelAt, empty := empty }
-  · have reads := SourceCells.coordReadsX_extract middle valid (fun e he => hints 0 e (by decide) he)
+  · have reads := SourceCells.coordReadsX_extract middle valid (fun e he => hints 0 e (by decide) he) zero
       input.x.val (Kriterion.CRT.Entry.labelX (Kriterion.CRT.Entry.labels (CrtSource.extract memory.ram) input))
       xCell (fun j low => by
         rw [labelX_get _ j low, Nat.mul_zero, Nat.add_zero]
         exact labelAt j (by omega))
     rw [sourceEq] at reads
     exact reads
-  · have reads := SourceCells.coordReadsY_extract middle valid (fun e he => hints 1 e (by decide) he)
+  · have reads := SourceCells.coordReadsY_extract middle valid (fun e he => hints 1 e (by decide) he) zero
       input.y.val (Kriterion.CRT.Entry.labelY (Kriterion.CRT.Entry.labels (CrtSource.extract memory.ram) input))
       yCell (fun j low => by
         rw [labelY_get _ j low, Nat.mul_one, Nat.add_assoc]

@@ -59,10 +59,8 @@ theorem convPieces_safe (κ : Nat) (small : κ < 2) : ∀ p ∈ convPieces κ, P
   simp only [convPieces, List.mem_append, List.mem_flatMap, List.mem_range] at member
   rcases member with ⟨c, bound, inPart⟩ | ⟨i, _, inPart⟩
   · have c32 : c < 32 := by rw [← chunkCount_eq]; exact bound
-    obtain ⟨joinsIn, pinIn, _⟩ := chunkFacts ⟨c, c32⟩
-    rcases inPart with inJoins | inPin
-    · exact joinPieces_safe κ _ _ small joinsIn p inJoins
-    · exact pinPieces_safe κ c small pinIn p inPin
+    obtain ⟨_, pinIn, _⟩ := chunkFacts ⟨c, c32⟩
+    exact pinPieces_safe κ c small pinIn p inPart
   · revert inPart
     split
     · simp

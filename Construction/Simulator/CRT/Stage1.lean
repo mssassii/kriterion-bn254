@@ -8,7 +8,7 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 |---|---|---|
 | `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row constants `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
 | `bytes` | `exceptionBase + index`, `index < 182` | independent exception nibbles (4 coins each) |
-| `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins |
+| `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins (the chunk-join cells are drawn but neither serialized nor read) |
 | `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 85` | bounded rejection below `m_i` over `digitWidth m_i` coins |
 | `zeros` | `keyBase + 2 j`, `j < 508` (`Z_j`) | 128 coins |
@@ -137,10 +137,10 @@ def joinPieces (κ start count : Nat) : List Piece :=
 def pinPieces (κ k : Nat) : List Piece :=
   (List.range laneCount).map fun lane => .word (Layout.sourcePin κ k lane) (pinWidthAt k)
 
-/-- The conversion blocks of coordinate `κ`, in the order of `ConvPublic.flatten`. -/
+/-- The conversion blocks of coordinate `κ`, in the order of `ConvPublic.flatten`: per chunk its pin only (no
+chunk joins: the chunk-join source cells are drawn but never serialized), then per odd modulus its joins and pins. -/
 def convPieces (κ : Nat) : List Piece :=
-  ((List.range Entry.table.chunkCount).flatMap fun c =>
-    joinPieces κ (Entry.chunkJoinBase c) (Entry.table.chunkWidth c - 1) ++ pinPieces κ c) ++
+  ((List.range Entry.table.chunkCount).flatMap fun c => pinPieces κ c) ++
   ((List.finRange Entry.table.count).flatMap fun i => match Entry.table.kind i with
     | .chunkZero => []
     | .odd row =>

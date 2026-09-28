@@ -11,8 +11,9 @@ mixed-radix digits at `Layout.residueCell κ i e`, each digit below its modulus.
 source indices, the pin lanes, and the digits of the record below `M`. This file puts the two together, cell
 by cell:
 
-* the conversion cells (`chunkJoins`, `chunkPins`, `stageJoins0/1`, `stagePins0/1`, `growJoins`, `foldJoins`)
-  for either coordinate, from `CrtConv.ConvHolds`;
+* the conversion cells (`chunkPins`, `stageJoins0/1`, `stagePins0/1`, `growJoins`, `foldJoins`)
+  for either coordinate, from `CrtConv.ConvHolds`; the chunk joins (`chunkJoins`) from a hypothesis that the zero
+  cell `Layout.zeroJoin` holds `word 0` (no chunk joins: the published ones are `0`, `SourceReads.chunkJoin_publish`);
 * the residue cells (`residuesX/Y`) from the record facts, through the mixed-radix digit read-back
   (`CrtTable.digit_mixedRadix`);
 * the hint cells (`hintsX/Y`) from a hypothesis that the hint cells hold `word 0` (stage 1 does not write
@@ -54,15 +55,14 @@ theorem joinAt_cell (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s �
   rw [holds.joins index inside]
   simp only [Source.joinAt, atNat, dif_pos inside, labelWord_eq_word]
 
-theorem chunkJoins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
+/-- **No chunk joins**: the published chunk joins are `0`, and the zero cell holds `0` (a hypothesis: stage 1
+never writes it and its start RAM is zero, `CrtValidStart.Retained.zeroJoin`). -/
+theorem chunkJoins (κ : Nat) (hκ : κ < 2) (zero : ram (word Layout.zeroJoin) = word 0) :
     ∀ c, c < 32 → ∀ n, 1 ≤ n → n < Entry.table.chunkWidth c →
-      ram (word (Layout.sourceJoin κ (chunkJoinBase c + (n - 1)))) =
-        labelWord ((convPub s ⟨κ, hκ⟩).chunkJoin c n) := by
-  intro c hc n lower upper
-  have bound : chunkJoinBase c + (Entry.table.chunkWidth c - 1) ≤ joinCount := (CrtConv.chunkFacts ⟨c, hc⟩).1
-  have hc' : c < Entry.table.chunkCount := by rw [CrtConv.chunkCount_eq]; exact hc
-  rw [SourceReads.chunkJoin_publish s ⟨κ, hκ⟩ c n hc' lower upper]
-  exact joinAt_cell ram s κ hκ holds _ (by omega)
+      ram (word Layout.zeroJoin) = labelWord ((convPub s ⟨κ, hκ⟩).chunkJoin c n) := by
+  intro c _ n _ _
+  rw [SourceReads.chunkJoin_publish s ⟨κ, hκ⟩ c n, zero, labelWord_eq_word]
+  rfl
 
 theorem chunkPins (κ : Nat) (hκ : κ < 2) (holds : CrtConv.ConvHolds ram s ⟨κ, hκ⟩) :
     ∀ c, c < 32 → ∀ i (ib : i < laneCount),
@@ -277,6 +277,7 @@ theorem hintsY (hints : ∀ e, e < Entry.yCount → ram (word (Layout.hintCell 1
 theorem coordReadsX (memory : Memory) (holds : CrtPieces.SourceHolds memory.ram s)
     (digits : CrtSerial.DigitsSmall memory.ram)
     (hints : ∀ e, e < Entry.xCount → memory.ram (word (Layout.hintCell 0 e)) = word 0)
+    (zero : memory.ram (word Layout.zeroJoin) = word 0)
     (v : Nat) (labelsOf : Nat → Block)
     (coordVal : memory.ram (word (Machine.coordCellOf 0)) = word v)
     (labelCells : ∀ j, j < 254 → memory.ram (word (labelBase + 254 * 0 + j)) = blockWord (labelsOf j)) :
@@ -287,7 +288,7 @@ theorem coordReadsX (memory : Memory) (holds : CrtPieces.SourceHolds memory.ram 
   exact
     { coordVal := coordVal
       labelCells := labelCells
-      chunkJoins := chunkJoins memory.ram s 0 (by decide) conv
+      chunkJoins := chunkJoins memory.ram s 0 (by decide) zero
       chunkPins := chunkPins memory.ram s 0 (by decide) conv
       stageJoins0 := stageJoins0 memory.ram s 0 (by decide) conv
       stageJoins1 := stageJoins1 memory.ram s 0 (by decide) conv
@@ -302,6 +303,7 @@ theorem coordReadsX (memory : Memory) (holds : CrtPieces.SourceHolds memory.ram 
 theorem coordReadsY (memory : Memory) (holds : CrtPieces.SourceHolds memory.ram s)
     (digits : CrtSerial.DigitsSmall memory.ram)
     (hints : ∀ e, e < Entry.yCount → memory.ram (word (Layout.hintCell 1 e)) = word 0)
+    (zero : memory.ram (word Layout.zeroJoin) = word 0)
     (v : Nat) (labelsOf : Nat → Block)
     (coordVal : memory.ram (word (Machine.coordCellOf 1)) = word v)
     (labelCells : ∀ j, j < 254 → memory.ram (word (labelBase + 254 * 1 + j)) = blockWord (labelsOf j)) :
@@ -312,7 +314,7 @@ theorem coordReadsY (memory : Memory) (holds : CrtPieces.SourceHolds memory.ram 
   exact
     { coordVal := coordVal
       labelCells := labelCells
-      chunkJoins := chunkJoins memory.ram s 1 (by decide) conv
+      chunkJoins := chunkJoins memory.ram s 1 (by decide) zero
       chunkPins := chunkPins memory.ram s 1 (by decide) conv
       stageJoins0 := stageJoins0 memory.ram s 1 (by decide) conv
       stageJoins1 := stageJoins1 memory.ram s 1 (by decide) conv
@@ -330,24 +332,26 @@ variable [FieldCertificate]
 /-- `coordReadsX` for the source stage 1 leaves in RAM (`CrtSource.extract`). -/
 theorem coordReadsX_extract (memory : Memory) (valid : CrtSource.CellsValid memory.ram)
     (hints : ∀ e, e < Entry.xCount → memory.ram (word (Layout.hintCell 0 e)) = word 0)
+    (zero : memory.ram (word Layout.zeroJoin) = word 0)
     (v : Nat) (labelsOf : Nat → Block)
     (coordVal : memory.ram (word (Machine.coordCellOf 0)) = word v)
     (labelCells : ∀ j, j < 254 → memory.ram (word (labelBase + 254 * 0 + j)) = blockWord (labelsOf j)) :
     Machine.CoordReads 0 Entry.xCount (convOf (publish (CrtSource.extract memory.ram)).crtX)
       (fun e => ((publish (CrtSource.extract memory.ram)).recX.get e).val) v labelsOf memory :=
-  coordReadsX _ memory (CrtSource.sourceHolds_extract _ valid) (CrtSource.digitsSmall_of_valid _ valid) hints v
-    labelsOf coordVal labelCells
+  coordReadsX _ memory (CrtSource.sourceHolds_extract _ valid) (CrtSource.digitsSmall_of_valid _ valid) hints zero
+    v labelsOf coordVal labelCells
 
 /-- `coordReadsY` for the source stage 1 leaves in RAM (`CrtSource.extract`). -/
 theorem coordReadsY_extract (memory : Memory) (valid : CrtSource.CellsValid memory.ram)
     (hints : ∀ e, e < Entry.yCount → memory.ram (word (Layout.hintCell 1 e)) = word 0)
+    (zero : memory.ram (word Layout.zeroJoin) = word 0)
     (v : Nat) (labelsOf : Nat → Block)
     (coordVal : memory.ram (word (Machine.coordCellOf 1)) = word v)
     (labelCells : ∀ j, j < 254 → memory.ram (word (labelBase + 254 * 1 + j)) = blockWord (labelsOf j)) :
     Machine.CoordReads 1 Entry.yCount (convOf (publish (CrtSource.extract memory.ram)).crtY)
       (fun e => ((publish (CrtSource.extract memory.ram)).recY.get e).val) v labelsOf memory :=
-  coordReadsY _ memory (CrtSource.sourceHolds_extract _ valid) (CrtSource.digitsSmall_of_valid _ valid) hints v
-    labelsOf coordVal labelCells
+  coordReadsY _ memory (CrtSource.sourceHolds_extract _ valid) (CrtSource.digitsSmall_of_valid _ valid) hints zero
+    v labelsOf coordVal labelCells
 
 end SourceCells
 

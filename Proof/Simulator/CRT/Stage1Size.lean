@@ -56,9 +56,9 @@ theorem size_pieceProg (p : Piece) (safe : CrtSerial.PieceSafe p) : (pieceProg p
       omega
   | record κ e => exact size_recordProg κ e
 
--- The concrete material list has 1,100 non-conversion pieces, 2,900 joins, and 41,600 pin lanes.
+-- The concrete material list has 1,100 non-conversion pieces, 2,456 joins (no chunk joins), and 41,600 pin lanes.
 set_option maxRecDepth 200000 in
-theorem pieces_length : pieces.length = 45600 := by decide +kernel
+theorem pieces_length : pieces.length = 45156 := by decide +kernel
 
 theorem size_serializeList (list : List Piece) (safeAll : ∀ p ∈ list, CrtSerial.PieceSafe p) :
     (Prog.rep list.length fun n => pieceProg (list.getD (list.length - 1 - n) default)).size ≤
@@ -122,7 +122,7 @@ theorem bound_arith (total a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 : Nat)
     (eq : total = a0 + (a1 + (a2 + (a3 + (a4 + (a5 + (a6 + (a7 + (a8 + (a9 + (a10 + a11)))))))))))
     (h0 : a0 ≤ fieldCount * 457231) (h1 : a1 ≤ exceptionCellCount * 34) (h2 : a2 ≤ 2 * Entry.joinCount * 734)
     (h3 : a3 ≤ 2 * (Entry.pinCount * laneCount) * 104) (h4 : a4 ≤ recordCount * moduliCount * 20000)
-    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h7 : a7 ≤ 45600 * 6000) (h8 : a8 ≤ labelCount * 7)
+    (h5 : a5 ≤ labelCount * 902) (h6 : a6 ≤ 2 * 902) (h7 : a7 ≤ 45156 * 6000) (h8 : a8 ≤ labelCount * 7)
     (h9 : a9 ≤ recordLimbCount * 3) (h10 : a10 ≤ 16) (h11 : a11 = 0) : total ≤ 2 ^ 55 := by
   rewrite [CrtStored.joinCount_eq] at h2
   rewrite [CrtConv.pinCount_eq] at h3
@@ -154,7 +154,7 @@ theorem size_program : CrtStage1.program.size ≤ 2 ^ 55 := by
       simp only [keyXor, Prog.seqList, Prog.size_seq, size_loadAt, size_storeAt, ar, Prog.size]; omega
   have clearSize : CrtStage1.clearLimbs.size = recordLimbCount * 3 :=
     Prog.size_rep _ _ _ fun _ _ => by simp only [Prog.size_seq, size_cst, size_storeAt]
-  have serialSize : CrtStage1.serialize.size ≤ 45600 * 6000 := by
+  have serialSize : CrtStage1.serialize.size ≤ 45156 * 6000 := by
     have bound := size_serialize
     rewrite [pieces_length] at bound
     exact bound
