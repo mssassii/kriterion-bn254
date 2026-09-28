@@ -16,6 +16,7 @@ sampler cutoff (`CutoffTail.tail_close`, counted in `samplerCutoff`).
 -/
 
 import Proof.Simulator.OpeningBase
+import Construction.Simulator.Opening
 
 namespace Kriterion.ArgoMAC.PlanB.SimMachine
 
