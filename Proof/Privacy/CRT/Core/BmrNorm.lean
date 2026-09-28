@@ -598,21 +598,17 @@ def signJoin (q : NonZeroBase × Bool) : NonZeroBase × Bool :=
 
 theorem signSplit_fst (p : NonZeroBase × Bool) :
     (signSplit p).1.value = Rows.signed p.2 (p.1.value ^ 2) := by
-  unfold signSplit
-  rfl
+  dsimp only [signSplit]
 
 theorem signSplit_snd (p : NonZeroBase × Bool) : (signSplit p).2 = sqBit p.1.value := by
-  unfold signSplit
-  rfl
+  dsimp only [signSplit]
 
 theorem signJoin_fst (q : NonZeroBase × Bool) :
     (signJoin q).1.value = signedRoot q.2 (Rows.signed (negBit q.1.value) q.1.value) := by
-  unfold signJoin
-  rfl
+  dsimp only [signJoin]
 
 theorem signJoin_snd (q : NonZeroBase × Bool) : (signJoin q).2 = negBit q.1.value := by
-  unfold signJoin
-  rfl
+  dsimp only [signJoin]
 
 theorem signJoin_signSplit (p : NonZeroBase × Bool) : signJoin (signSplit p) = p := by
   obtain ⟨⟨tau, ne⟩, sign⟩ := p
