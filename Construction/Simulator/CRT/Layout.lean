@@ -7,7 +7,7 @@ preimage limbs) run unchanged:
 
 * `fieldBase` (`2^40`): the curve constants (cells `0 .. 2`) and the row constants (`3 + 3 d + slot`,
   `xC0, yC4, zC0`, `Opening.rowCell`);
-* `exceptionBase` (`2^41`): the `91 · 12` exception bytes (`12 d + slot`);
+* `exceptionBase` (`2^41`): the `91 · 2` exception nibbles (`2 d + kind`);
 * `requestBase` (`2^43`), `labelBase` (`2^44`, the `508` selected labels), `tmpBase` (`2^48`), `openBase` (`2^49`),
   `keyBase` (`2^50`: `keyBase + 2 i + b` is label `b` of input bit `i`, stored as `Z_i` and `Z_i ⊕ Δ`).
 

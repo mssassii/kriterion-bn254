@@ -4,7 +4,7 @@
 `Wire.encoding`'s field, block, byte, entry, row, curve and record encoders are private to
 `Construction/CRT/Public.lean`; `encoding_eq` restates the encoding with public copies (`rfl`). `wire_bits`: the
 byte bits of `Wire.encoding.encode pub` are the curve (`3 × 256` bits), the rows (`91 × 3 × 256`), the exception
-bytes (`91 × 12 × 8`), the two conversion vectors (`3412 × 104` bits each) and the records (`624` bits each), least
+nibbles (`91 × 2 × 4`), the two conversion vectors (`3412 × 104` bits each) and the records (`624` bits each), least
 significant first.
 -/
 
@@ -39,7 +39,7 @@ def gadgetByte : Kriterion.Encoding (BitVec 8) :=
     (fun value => by simp)
 
 /-- One exception entry. -/
-def entry : Kriterion.Encoding Exception.Entry := gadgetByte.vector 12
+def entry : Kriterion.Encoding Exception.Entry := Exception.entryEncoding
 
 /-- One digit's row constants. -/
 def rowGamma : Kriterion.Encoding RowGamma :=
@@ -85,9 +85,22 @@ theorem record_bits (value : Record) : byteBits (encodeOf record value) = lsbs 6
 
 theorem entry_bits (value : Exception.Entry) :
     byteBits (encodeOf entry value) =
-      (List.ofFn fun index : Fin 12 => lsbs 8 value[index.val].toNat).flatten := by
-  rw [show entry = gadgetByte.vector 12 from rfl, byteBits_vector]
-  simp only [gadgetByte_bits]
+      (List.ofFn fun index : Fin 2 => lsbs 4 value[index.val].toNat).flatten := by
+  rw [show entry = gadgetByte.map Exception.pack Exception.unpack Exception.unpack_pack from rfl,
+    encodeOf_map, gadgetByte_bits]
+  have lo := value[0].isLt
+  have hi := value[1].isLt
+  have packed : (Exception.pack value).toNat = value[0].toNat + 16 * value[1].toNat := by
+    simp only [Exception.pack, BitVec.toNat_ofNat]
+    apply Nat.mod_eq_of_lt
+    omega
+  rw [packed]
+  have bits := digitSum_bits 4 2 (fun index => value[index.val].toNat) (fun index => value[index.val].isLt)
+  have sum : digitSum 4 2 (fun index => value[index.val].toNat) =
+      value[0].toNat + 16 * value[1].toNat := by
+    simp [digitSum, Fin.sum_univ_two, Nat.mul_comm]
+  rw [sum] at bits
+  exact bits
 
 /-- The three row constants of a digit by slot. -/
 def rowField (gamma : RowGamma) : Nat → BaseField
@@ -114,8 +127,8 @@ theorem wire_bits (value : Entry.Public) :
           (List.ofFn fun index : Fin 3 =>
             lsbs 256 (rowField value.rows[digit.val] index.val).val).flatten).flatten ++
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 12 =>
-            lsbs 8 value.exception[digit.val][index.val].toNat).flatten).flatten ++
+          (List.ofFn fun index : Fin 2 =>
+            lsbs 4 value.exception[digit.val][index.val].toNat).flatten).flatten ++
       (List.ofFn fun k : Fin convCount => lsbs labelBits value.crtX[k.val].toNat).flatten ++
       (List.ofFn fun k : Fin convCount => lsbs labelBits value.crtY[k.val].toNat).flatten ++
       (List.ofFn fun e : Fin xCount => lsbs 624 value.recX[e.val].val).flatten ++

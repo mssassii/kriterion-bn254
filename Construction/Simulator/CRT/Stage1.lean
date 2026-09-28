@@ -7,7 +7,7 @@ Sampling, in this order (every cell in `Layout.lean`'s regions):
 | block | cells | sampler |
 |---|---|---|
 | `fields` | `fieldBase + index`, `index < 276`: the curve constants, then the row constants `3 + 3 d + slot` | release-r1's `fieldCell` (bounded rejection below `p`) |
-| `bytes` | `exceptionBase + index`, `index < 1092` | release-r1's `bytes` (8 coins each) |
+| `bytes` | `exceptionBase + index`, `index < 182` | independent exception nibbles (4 coins each) |
 | `joins` | `sourceJoin κ index`, `index < joinCount` | 104 coins |
 | `pins` | `sourcePin κ k lane`, `k < pinCount`, `lane < 104` | `pinWidth k` coins (one lane per word) |
 | `digits` | `residueCell κ i e`, `e < encCount κ`, `i < 85` | bounded rejection below `m_i` over `digitWidth m_i` coins |
@@ -71,7 +71,7 @@ def digitCell (m address : Nat) : Prog :=
 /-- The curve and row constants. -/
 def fields : Prog := Prog.rep fieldCount fun index => Stage1.fieldCell (fieldBase + index)
 
-/-- The exception bytes (release-r1's). -/
+/-- The exception nibbles (two per digit). -/
 def bytes : Prog := Stage1.bytes
 
 /-- The joins of both coordinates, flat: `n = κ · joinCount + index`. -/
@@ -158,7 +158,7 @@ def recordPieces (κ : Nat) : List Piece := (List.range (encCount κ)).map fun e
 /-- **The wire, piece by piece**: curve, rows, exception, `crtX`, `crtY`, `recX`, `recY`. -/
 def pieces : List Piece :=
   (List.range fieldCount).map (fun index => .word (fieldBase + index) 256) ++
-  (List.range exceptionByteCount).map (fun index => .word (exceptionBase + index) 8) ++
+  (List.range exceptionCellCount).map (fun index => .word (exceptionBase + index) 4) ++
   convPieces 0 ++ convPieces 1 ++ recordPieces 0 ++ recordPieces 1
 
 /-- Clear the record limbs. -/

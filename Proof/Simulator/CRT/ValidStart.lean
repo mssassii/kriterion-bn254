@@ -158,8 +158,8 @@ theorem readDraw_keeps (ram ram' : Word → Word) (agree : ∀ n, Kept n → ram
       (Or.inl (by unfold fieldBase requestBase CrtStage1.fieldCount curveCellCount rowCellCount at *; omega)))]
   · funext n
     have := n.isLt
-    rw [agree _ (kept _ (by unfold exceptionBase exceptionByteCount at *; omega)
-      (Or.inl (by unfold exceptionBase requestBase exceptionByteCount at *; omega)))]
+    rw [agree _ (kept _ (by unfold exceptionBase exceptionCellCount at *; omega)
+      (Or.inl (by unfold exceptionBase requestBase exceptionCellCount at *; omega)))]
   · funext n
     have := CrtStored.joinAddr_range n.val n.isLt
     rw [agree _ (kept _ (by omega) (Or.inr (by unfold labelBase labelCount; omega)))]
@@ -189,8 +189,8 @@ theorem cellsValid_keeps (ram ram' : Word → Word) (agree : ∀ n, Kept n → r
   · rw [agree _ (kept _ (by unfold fieldBase CrtStage1.fieldCount curveCellCount rowCellCount at *; omega)
       (Or.inl (by unfold fieldBase requestBase CrtStage1.fieldCount curveCellCount rowCellCount at *; omega)))]
     exact valid.fields index inside
-  · rw [agree _ (kept _ (by unfold exceptionBase exceptionByteCount at *; omega)
-      (Or.inl (by unfold exceptionBase requestBase exceptionByteCount at *; omega)))]
+  · rw [agree _ (kept _ (by unfold exceptionBase exceptionCellCount at *; omega)
+      (Or.inl (by unfold exceptionBase requestBase exceptionCellCount at *; omega)))]
     exact valid.bytes n inside
   · have := CrtStored.joinAddr_range n inside
     rw [agree _ (kept _ (by omega) (Or.inr (by unfold labelBase labelCount; omega)))]

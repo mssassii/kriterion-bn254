@@ -29,7 +29,7 @@ def sourceOf (d : Draw) : Source where
   curve := (total 0 d.fields 0, total 0 d.fields 1, total 0 d.fields 2)
   rows g := ⟨total 0 d.fields (3 + 3 * g.val), total 0 d.fields (3 + 3 * g.val + 1),
     total 0 d.fields (3 + 3 * g.val + 2)⟩
-  exception g := Vector.ofFn fun b : Fin 12 => BitVec.ofNat 8 (total 0 d.bytes (12 * g.val + b.val))
+  exception g := Vector.ofFn fun b : Fin 2 => BitVec.ofNat 4 (total 0 d.bytes (2 * g.val + b.val))
   joins κ i := BitVec.ofNat labelBits (total 0 d.joins (κ.val * joinCount + i.val))
   pins κ k lane := ((total 0 d.pins ((κ.val * pinCount + k.val) * laneCount + lane.val) : Nat) : ZMod (2 ^ pinWidth k))
   recX e := ⟨recordNat d e.val % Entry.table.product, Nat.mod_lt _ Entry.table_product_pos⟩
@@ -43,7 +43,7 @@ def extract (ram : Word → Word) : Source := sourceOf (readDraw ram)
 /-- Every cell of the stage-1 regions is in range. -/
 structure CellsValid (ram : Word → Word) : Prop where
   fields : ∀ index, index < fieldCount → (ram (word (fieldBase + index))).toNat < baseFieldModulus
-  bytes : ∀ n, n < exceptionByteCount → (ram (word (exceptionBase + n))).toNat < 2 ^ 8
+  bytes : ∀ n, n < exceptionCellCount → (ram (word (exceptionBase + n))).toNat < 2 ^ 4
   joins : ∀ n, n < 2 * joinCount → (ram (word (joinAddr n))).toNat < 2 ^ labelBits
   pins : ∀ n, n < 2 * (pinCount * laneCount) → (ram (word (pinAddr n))).toNat < 2 ^ pinWidthAt (pinOf n)
   digits : ∀ n, n < recordCount * moduliCount →
@@ -84,10 +84,10 @@ theorem field_cell (ram : Word → Word) (valid : CellsValid ram) (index : Nat) 
   rw [ZMod.val_natCast, Nat.mod_eq_of_lt (valid.fields index inside)]
   exact (CrtSerial.word_toNat_self _).symm
 
-theorem byte_cell (ram : Word → Word) (valid : CellsValid ram) (d : Fin 91) (b : Fin 12) :
-    ram (word (exceptionBase + (12 * d.val + b.val))) = word ((extract ram).exception d)[b.val].toNat := by
-  have inside : 12 * d.val + b.val < exceptionByteCount := by
-    have := d.isLt; have := b.isLt; unfold exceptionByteCount; omega
+theorem byte_cell (ram : Word → Word) (valid : CellsValid ram) (d : Fin 91) (b : Fin 2) :
+    ram (word (exceptionBase + (2 * d.val + b.val))) = word ((extract ram).exception d)[b.val].toNat := by
+  have inside : 2 * d.val + b.val < exceptionCellCount := by
+    have := d.isLt; have := b.isLt; unfold exceptionCellCount; omega
   simp only [extract, sourceOf, Vector.getElem_ofFn, BitVec.toNat_ofNat]
   rw [total_apply _ _ _ inside]
   simp only [readDraw]

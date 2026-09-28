@@ -123,7 +123,7 @@ theorem stored_ram_upto_joins (memory : Memory) (d : Draw) (target : Nat) (small
     (offPins : target < 2 ^ 52 ∨ 2 ^ 52 + 2 ^ 25 ≤ target) :
     (storedMem memory d).ram (word target) =
       (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount)
-        (foldStore (wordStep exceptionBase) exceptionByteCount
+        (foldStore (wordStep exceptionBase) exceptionCellCount
           (foldStore (cellStep fieldBase) fieldCount memory d.fields) d.bytes) d.joins).ram (word target) := by
   unfold storedMem
   rw [foldStore_ram_off _ (fun n => word (Layout.deltaCell n)) _ (fun n => wordStore_ram _) 2 _ _ _
@@ -190,18 +190,18 @@ theorem stored_joins (memory : Memory) (d : Draw) (n : Fin (2 * joinCount)) :
   exact foldStore_ram_at _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount)
     joinAddr_injective _ _ n
 
-theorem stored_bytes (memory : Memory) (d : Draw) (n : Fin exceptionByteCount) :
+theorem stored_bytes (memory : Memory) (d : Draw) (n : Fin exceptionCellCount) :
     (storedMem memory d).ram (word (exceptionBase + n.val)) = BitVec.ofNat 256 (d.bytes n) := by
-  have small : n.val < 1092 := n.isLt
+  have small : n.val < 182 := n.isLt
   rw [stored_ram_upto_joins memory d _ (by unfold exceptionBase; omega) (by unfold exceptionBase; omega)
       (by unfold exceptionBase keyBase labelCount; omega) (by unfold exceptionBase; omega) (by unfold exceptionBase; omega),
     foldStore_ram_off _ (fun n => word (joinAddr n)) _ (fun n => wordStore_ram _) (2 * joinCount) _ _ _
       (fun k bound => by
         have := joinAddr_range k bound
         exact word_ne (by unfold exceptionBase; omega) (by omega) (by unfold exceptionBase; omega))]
-  exact foldStore_ram_at _ (fun n => word (exceptionBase + n)) _ (fun n => wordStep_ram exceptionBase n) exceptionByteCount
-    (fun first second fb sb ne => word_ne (by unfold exceptionBase exceptionByteCount at *; omega)
-      (by unfold exceptionBase exceptionByteCount at *; omega) (by omega)) _ _ n
+  exact foldStore_ram_at _ (fun n => word (exceptionBase + n)) _ (fun n => wordStep_ram exceptionBase n) exceptionCellCount
+    (fun first second fb sb ne => word_ne (by unfold exceptionBase exceptionCellCount at *; omega)
+      (by unfold exceptionBase exceptionCellCount at *; omega) (by omega)) _ _ n
 
 theorem stored_fields (memory : Memory) (d : Draw) (n : Fin fieldCount) :
     (storedMem memory d).ram (word (fieldBase + n.val)) = BitVec.ofNat 256 (d.fields n).val := by
@@ -213,9 +213,9 @@ theorem stored_fields (memory : Memory) (d : Draw) (n : Fin fieldCount) :
         have := joinAddr_range k bound
         exact word_ne (by unfold fieldBase; omega) (by omega) (by unfold fieldBase; omega)),
     foldStore_ram_off _ (fun n => word (exceptionBase + n)) _ (fun n => wordStep_ram exceptionBase n)
-      exceptionByteCount _ _ _
-      (fun k bound => word_ne (by unfold fieldBase; omega) (by unfold exceptionBase exceptionByteCount at *; omega)
-        (by unfold fieldBase exceptionBase exceptionByteCount at *; omega))]
+      exceptionCellCount _ _ _
+      (fun k bound => word_ne (by unfold fieldBase; omega) (by unfold exceptionBase exceptionCellCount at *; omega)
+        (by unfold fieldBase exceptionBase exceptionCellCount at *; omega))]
   exact foldStore_ram_at _ (fun n => word (fieldBase + n)) _ (fun n => cellStep_ram fieldBase n) fieldCount
     (fun first second fb sb ne => word_ne (by unfold fieldBase fieldCount curveCellCount rowCellCount at *; omega)
       (by unfold fieldBase fieldCount curveCellCount rowCellCount at *; omega) (by omega)) _ _ n

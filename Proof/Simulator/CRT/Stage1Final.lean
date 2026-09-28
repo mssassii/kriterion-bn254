@@ -26,7 +26,7 @@ noncomputable section
 
 /-- **What a drawn value satisfies.** -/
 structure DrawValid (d : Draw) : Prop where
-  bytes : ∀ n, d.bytes n < 2 ^ 8
+  bytes : ∀ n, d.bytes n < 2 ^ 4
   joins : ∀ n, d.joins n < 2 ^ labelBits
   pins : ∀ n, d.pins n < 2 ^ pinWidthAt (pinOf n.val)
   digits : ∀ n, d.digits n < modulusAt (n.val % moduliCount)
@@ -65,7 +65,7 @@ theorem drawValid_of_support (d : Draw) (member : some d ∈ drawLaw.support) : 
   unfold zerosLaw at zm
   unfold deltasLaw at dlm
   exact
-    { bytes := fun n => wordLaw_support 8 _ (optionProduct_support _ _ b bm n)
+    { bytes := fun n => wordLaw_support 4 _ (optionProduct_support _ _ b bm n)
       joins := fun n => wordLaw_support labelBits _ (optionProduct_support _ _ j jm n)
       pins := fun n => wordLaw_support _ _ (optionProduct_support _ _ p pm n)
       digits := fun n => by
@@ -126,7 +126,7 @@ theorem stored_off (memory : Memory) (d : Draw) (target : Nat) (small : target <
     (offDigits : target < 2 ^ 53 ∨ 2 ^ 53 + 2 ^ 25 ≤ target)
     (offPins : target < 2 ^ 52 ∨ 2 ^ 52 + 2 ^ 25 ≤ target)
     (offJoins : target < 2 ^ 51 ∨ 2 ^ 51 + 2 ^ 25 ≤ target)
-    (offBytes : target < exceptionBase ∨ exceptionBase + exceptionByteCount ≤ target)
+    (offBytes : target < exceptionBase ∨ exceptionBase + exceptionCellCount ≤ target)
     (offFields : target < fieldBase ∨ fieldBase + fieldCount ≤ target) :
     (storedMem memory d).ram (word target) = memory.ram (word target) := by
   rw [stored_ram_upto_joins memory d target small offDeltas offZeros offDigits offPins,
@@ -135,9 +135,9 @@ theorem stored_off (memory : Memory) (d : Draw) (target : Nat) (small : target <
         have := joinAddr_range k bound
         exact word_ne small (by omega) (by omega)),
     foldStore_ram_off _ (fun n => word (exceptionBase + n)) _ (fun n => wordStep_ram exceptionBase n)
-      exceptionByteCount _ _ _
-      (fun k bound => word_ne small (by unfold exceptionBase exceptionByteCount at *; omega)
-        (by unfold exceptionBase exceptionByteCount at *; omega)),
+      exceptionCellCount _ _ _
+      (fun k bound => word_ne small (by unfold exceptionBase exceptionCellCount at *; omega)
+        (by unfold exceptionBase exceptionCellCount at *; omega)),
     foldStore_ram_off _ (fun n => word (fieldBase + n)) _ (fun n => cellStep_ram fieldBase n) fieldCount _ _ _
       (fun k bound => word_ne small (by unfold fieldBase fieldCount curveCellCount rowCellCount at *; omega)
         (by unfold fieldBase fieldCount curveCellCount rowCellCount at *; omega))]

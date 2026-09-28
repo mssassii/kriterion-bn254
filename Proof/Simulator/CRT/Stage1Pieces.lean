@@ -1,7 +1,7 @@
 /-
 **The serializer's pieces are the wire** (M2).
 
-`SourceHolds ram source`: RAM holds the source's field cells, exception bytes, joins, pins and records (as their
+`SourceHolds ram source`: RAM holds the source's field cells, exception nibbles, joins, pins and records (as their
 mixed-radix digits). `pieces_bits`: then the bits of `CrtStage1.pieces`, piece by piece, are exactly the byte bits of
 `Wire.encoding.encode (publish source)`.
 -/
@@ -36,8 +36,8 @@ def recordOf (source : Source) (κ e : Nat) : Nat :=
 /-- **RAM holds the source** (the cells the serializer reads). -/
 structure SourceHolds (ram : Word → Word) (source : Source) : Prop where
   fields : ∀ index, index < fieldCount → ram (word (fieldBase + index)) = fieldWord (fieldOf source index)
-  bytes : ∀ (d : Fin 91) (b : Fin 12),
-    ram (word (exceptionBase + (12 * d.val + b.val))) = word (source.exception d)[b.val].toNat
+  bytes : ∀ (d : Fin 91) (b : Fin 2),
+    ram (word (exceptionBase + (2 * d.val + b.val))) = word (source.exception d)[b.val].toNat
   conv : ∀ κ, ConvHolds ram source κ
   records : ∀ κ e, κ < 2 → e < encCount κ → recordValue ram κ e = recordOf source κ e
 
@@ -89,16 +89,16 @@ theorem fields_bits (ram : Word → Word) (source : Source) (holds : SourceHolds
   rw [rows, three]
 
 theorem bytes_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
-    pieceListBits ram ((List.range exceptionByteCount).map fun index => Piece.word (exceptionBase + index) 8) =
+    pieceListBits ram ((List.range exceptionCellCount).map fun index => Piece.word (exceptionBase + index) 4) =
       (List.ofFn fun digit : Fin digitCount =>
-          (List.ofFn fun index : Fin 12 =>
-            lsbs 8 (Entry.publish source).exception[digit.val][index.val].toNat).flatten).flatten := by
+          (List.ofFn fun index : Fin 2 =>
+            lsbs 4 (Entry.publish source).exception[digit.val][index.val].toNat).flatten).flatten := by
   unfold pieceListBits
-  rw [List.map_map, map_range_eq_ofFn, show exceptionByteCount = digitCount * 12 from rfl, flatten_ofFn_mul]
+  rw [List.map_map, map_range_eq_ofFn, show exceptionCellCount = digitCount * 2 from rfl, flatten_ofFn_mul]
   refine congrArg List.flatten (congrArg List.ofFn (funext fun digit => ?_))
   refine congrArg List.flatten (congrArg List.ofFn (funext fun index => ?_))
   simp only [Function.comp_apply, pieceBits, Fin.val_mk]
-  rw [show digit.val * 12 + index.val = 12 * digit.val + index.val by ring, holds.bytes digit index,
+  rw [show digit.val * 2 + index.val = 2 * digit.val + index.val by ring, holds.bytes digit index,
     bitRun_ofNat _ _ (by norm_num)]
   simp only [Entry.publish, Vector.getElem_ofFn]
 

@@ -2,7 +2,7 @@
 **Stage 1's draws** (M2): the sampling blocks of `CrtStage1.program` are independent draws, and the program is the
 draws followed by its deterministic tail (the true labels, the wire, the clears).
 
-* `Draw`, `drawLaw`: the field cells, the exception bytes, the joins, the pin lanes, the records' digits, the zero
+* `Draw`, `drawLaw`: the field cells, the exception nibbles, the joins, the pin lanes, the records' digits, the zero
   labels and the offsets, each block an `optionProduct` of its cell laws (flat indices as `memSem_rep_nest` makes
   them);
 * `storedMem`: the memory after the draws, a fold of stores per block;
@@ -111,7 +111,7 @@ omit [FieldCertificate] in
 /-- **The stage-1 draws.** -/
 structure Draw where
   fields : Fin fieldCount → BaseField
-  bytes : Fin exceptionByteCount → Nat
+  bytes : Fin exceptionCellCount → Nat
   joins : Fin (2 * joinCount) → Nat
   pins : Fin (2 * (pinCount * laneCount)) → Nat
   digits : Fin (recordCount * moduliCount) → Nat
@@ -119,8 +119,8 @@ structure Draw where
   deltas : Fin 2 → Nat
 
 def fieldsLaw : PMF (Option (Fin fieldCount → BaseField)) := optionProduct fieldCount fun _ => fieldCellLaw
-def bytesLaw : PMF (Option (Fin exceptionByteCount → Nat)) :=
-  optionProduct exceptionByteCount fun _ => (wordLaw 8).map some
+def bytesLaw : PMF (Option (Fin exceptionCellCount → Nat)) :=
+  optionProduct exceptionCellCount fun _ => (wordLaw 4).map some
 def joinsLaw : PMF (Option (Fin (2 * joinCount) → Nat)) := optionProduct (2 * joinCount) fun _ => (wordLaw labelBits).map some
 def pinsLaw : PMF (Option (Fin (2 * (pinCount * laneCount)) → Nat)) :=
   optionProduct (2 * (pinCount * laneCount)) fun n => (wordLaw (pinWidthAt (pinOf n.val))).map some
@@ -150,7 +150,7 @@ def storedMem (memory : Memory) (d : Draw) : Memory :=
       (foldStore (fun n => cellStore (digitAddr n)) (recordCount * moduliCount)
         (foldStore (fun n => wordStore (pinAddr n)) (2 * (pinCount * laneCount))
           (foldStore (fun n => wordStore (joinAddr n)) (2 * joinCount)
-            (foldStore (wordStep exceptionBase) exceptionByteCount
+            (foldStore (wordStep exceptionBase) exceptionCellCount
               (foldStore (cellStep fieldBase) fieldCount memory d.fields) d.bytes) d.joins) d.pins) d.digits)
       d.zeros) d.deltas
 
@@ -173,8 +173,8 @@ theorem seq_fields (rest : Prog) (memory : Memory) :
 
 theorem seq_bytes (rest : Prog) (memory : Memory) :
     (Prog.seq bytes rest).memSem memory =
-      optBind bytesLaw fun b => rest.memSem (foldStore (wordStep exceptionBase) exceptionByteCount memory b) :=
-  memSem_seq_law _ _ _ _ _ (memSem_words 8 exceptionBase exceptionByteCount (by norm_num) memory)
+      optBind bytesLaw fun b => rest.memSem (foldStore (wordStep exceptionBase) exceptionCellCount memory b) :=
+  memSem_seq_law _ _ _ _ _ (memSem_words 4 exceptionBase exceptionCellCount (by norm_num) memory)
 
 theorem seq_joins (rest : Prog) (memory : Memory) :
     (Prog.seq joins rest).memSem memory =

@@ -45,9 +45,9 @@ theorem cells_keep {final stored : Memory}
       (Or.inl (by unfold fieldCount curveCellCount rowCellCount fieldBase keyBase at *; omega))]
     exact valid.fields index inside
   bytes n inside := by
-    rw [CrtStage1Law.off_far off (exceptionBase + n) (by unfold exceptionByteCount exceptionBase at *; omega)
-      (Or.inl (by unfold exceptionByteCount exceptionBase tmpBase at *; omega))
-      (Or.inl (by unfold exceptionByteCount exceptionBase keyBase at *; omega))]
+    rw [CrtStage1Law.off_far off (exceptionBase + n) (by unfold exceptionCellCount exceptionBase at *; omega)
+      (Or.inl (by unfold exceptionCellCount exceptionBase tmpBase at *; omega))
+      (Or.inl (by unfold exceptionCellCount exceptionBase keyBase at *; omega))]
     exact valid.bytes n inside
   joins n inside := by
     have := joinAddr_range n inside
@@ -99,7 +99,7 @@ theorem retained_finalOf (start : Memory)
       (Or.inr (by unfold Layout.hintCell; omega))
       (Or.inr (by unfold Layout.hintCell; omega))
       (Or.inr (by unfold Layout.hintCell; omega))
-      (Or.inr (by unfold Layout.hintCell exceptionBase exceptionByteCount; omega))
+      (Or.inr (by unfold Layout.hintCell exceptionBase exceptionCellCount; omega))
       (Or.inr (by unfold Layout.hintCell fieldBase fieldCount curveCellCount rowCellCount; omega))]
     exact hintsZero κ hκ e he
   · intro j hj

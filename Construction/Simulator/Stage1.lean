@@ -4,7 +4,7 @@ The release-r1 stage-1 samplers the CRT machine's stage 1 is built from (`Constr
 * `fieldCell address`: one field cell by constant-time bounded rejection over `254` coins with `attempts = 256` tries,
   aborting on exhaustion;
 * `wordCell width address`: one uniform word of `width` fair coins;
-* `bytes`: the `91 · 12` exception bytes, `8` coins each.
+* `bytes`: the `91 · 2` exception nibbles, `4` coins each.
 
 Stage 1 contains no oracle instruction at all.
 -/
@@ -25,8 +25,8 @@ def fieldCell (address : Nat) : Prog :=
 def wordCell (width address : Nat) : Prog :=
   .seq (sampleWord width) (.seq (storeAt address rAcc) (zeroRegs [rAcc, rBit, rAddr]))
 
-/-- All exception bytes. -/
-def bytes : Prog := Prog.rep exceptionByteCount fun index => wordCell 8 (exceptionBase + index)
+/-- All exception nibbles, one independent four-coin draw per kind. -/
+def bytes : Prog := Prog.rep exceptionCellCount fun index => wordCell 4 (exceptionBase + index)
 
 /-! ### Sizes and costs -/
 
@@ -50,10 +50,10 @@ theorem cost_wordCell (width address : Nat) : (wordCell width address).cost = 6 
     List.length_nil]
   omega
 
-theorem size_bytes : bytes.size = exceptionByteCount * 62 :=
+theorem size_bytes : bytes.size = exceptionCellCount * 34 :=
   Prog.size_rep _ _ _ fun _ _ => size_wordCell _ _
 
-theorem cost_bytes : bytes.cost = exceptionByteCount * 46 :=
+theorem cost_bytes : bytes.cost = exceptionCellCount * 26 :=
   Prog.cost_rep _ _ _ fun _ _ => cost_wordCell _ _
 
 end Stage1

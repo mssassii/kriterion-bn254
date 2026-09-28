@@ -191,9 +191,9 @@ theorem readDraw_final : readDraw final.ram = readDraw stored.ram := by
       (Or.inl (by unfold fieldCount curveCellCount rowCellCount fieldBase tmpBase at *; omega))
       (Or.inl (by unfold fieldCount curveCellCount rowCellCount fieldBase keyBase at *; omega))]
   · have := n.isLt
-    rw [off_far off (exceptionBase + n.val) (by unfold exceptionByteCount exceptionBase at *; omega)
-      (Or.inl (by unfold exceptionByteCount exceptionBase tmpBase at *; omega))
-      (Or.inl (by unfold exceptionByteCount exceptionBase keyBase at *; omega))]
+    rw [off_far off (exceptionBase + n.val) (by unfold exceptionCellCount exceptionBase at *; omega)
+      (Or.inl (by unfold exceptionCellCount exceptionBase tmpBase at *; omega))
+      (Or.inl (by unfold exceptionCellCount exceptionBase keyBase at *; omega))]
   · have := joinAddr_range n.val n.isLt
     rw [off_far off (joinAddr n.val) (by omega) (Or.inr (by unfold tmpBase; omega))
       (Or.inr (by unfold keyBase; omega))]

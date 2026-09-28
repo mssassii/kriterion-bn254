@@ -214,8 +214,8 @@ instance digitsFintype : Fintype Digits := inferInstance
 instance pinsNonempty : Nonempty Pins := inferInstance
 instance digitsNonempty : Nonempty Digits := inferInstance
 
-/-- **The exact draws**: field cells, bytes, joins, pin lanes, record digits, zero labels, offsets. -/
-abbrev Exact : Type := (Fin fieldCount → BaseField) × (Fin exceptionByteCount → Fin (2 ^ 8)) ×
+/-- **The exact draws**: field cells, nibbles, joins, pin lanes, record digits, zero labels, offsets. -/
+abbrev Exact : Type := (Fin fieldCount → BaseField) × (Fin exceptionCellCount → Fin (2 ^ 4)) ×
   (Fin (2 * Entry.joinCount) → Fin (2 ^ labelBits)) × Pins × Digits × (Fin labelCount → Fin (2 ^ 128)) ×
   (Fin 2 → Fin (2 ^ 128))
 
@@ -311,11 +311,11 @@ theorem idealDigits_eq : idealDigits = (PMF.uniformOfFintype Digits).map fun D =
 /-- **The exact draws' law is the uniform law on `Exact`.** -/
 theorem idealDrawLaw_eq : idealDrawLaw = (PMF.uniformOfFintype Exact).map fun D => some (embed D) := by
   unfold idealDrawLaw
-  rw [idealFields_eq, show bytesLaw = _ from wordProduct_eq exceptionByteCount 8,
+  rw [idealFields_eq, show bytesLaw = _ from wordProduct_eq exceptionCellCount 4,
     show joinsLaw = _ from wordProduct_eq (2 * Entry.joinCount) labelBits, pinsLaw_eq, idealDigits_eq,
     show zerosLaw = _ from wordProduct_eq labelCount 128, show deltasLaw = _ from wordProduct_eq 2 128]
   simp only [optBind_map_some, optBind_map_some_id]
-  rw [← uniform_product (A := Fin fieldCount → BaseField), ← uniform_product (A := Fin exceptionByteCount → Fin (2 ^ 8)),
+  rw [← uniform_product (A := Fin fieldCount → BaseField), ← uniform_product (A := Fin exceptionCellCount → Fin (2 ^ 4)),
     ← uniform_product (A := Fin (2 * Entry.joinCount) → Fin (2 ^ labelBits)), ← uniform_product (A := Pins),
     ← uniform_product (A := Digits), ← uniform_product (A := Fin labelCount → Fin (2 ^ 128))]
   simp only [PMF.map_bind, PMF.map_comp]
@@ -345,13 +345,13 @@ def exFields (s : Entry.Source) (n : Fin fieldCount) : BaseField :=
     show (n.val - 3) / 3 < 91
     omega⟩) ((n.val - 3) % 3)
 
-/-- The exception bytes of a source. -/
-def exBytes (s : Entry.Source) (n : Fin exceptionByteCount) : Fin (2 ^ 8) :=
-  ((s.exception ⟨n.val / 12, by
+/-- The exception nibbles of a source. -/
+def exBytes (s : Entry.Source) (n : Fin exceptionCellCount) : Fin (2 ^ 4) :=
+  ((s.exception ⟨n.val / 2, by
     have := n.isLt
-    unfold exceptionByteCount at this
-    show n.val / 12 < 91
-    omega⟩)[n.val % 12]'(Nat.mod_lt _ (by decide))).toFin
+    unfold exceptionCellCount at this
+    show n.val / 2 < 91
+    omega⟩)[n.val % 2]'(Nat.mod_lt _ (by decide))).toFin
 
 theorem joinCoord_lt (n : Fin (2 * Entry.joinCount)) : n.val / Entry.joinCount < 2 :=
   Nat.div_lt_of_lt_mul (lt_of_lt_of_eq n.isLt (Nat.mul_comm 2 Entry.joinCount))
@@ -471,8 +471,8 @@ theorem read_rows (s : Entry.Source) : (readSource (exOf s)).rows = s.rows := by
     exFields_at s g 2 _ (by decide) rfl]
   exact rowGamma_eq _
 
-theorem exception_get (s : Entry.Source) (a c : Nat) (ha : a < digitCount) (hc : c < 12) (g : Fin digitCount)
-    (b : Nat) (hb : b < 12) (h1 : a = g.val) (h2 : c = b) : (s.exception ⟨a, ha⟩)[c]'hc = (s.exception g)[b]'hb := by
+theorem exception_get (s : Entry.Source) (a c : Nat) (ha : a < digitCount) (hc : c < 2) (g : Fin digitCount)
+    (b : Nat) (hb : b < 2) (h1 : a = g.val) (h2 : c = b) : (s.exception ⟨a, ha⟩)[c]'hc = (s.exception g)[b]'hb := by
   subst h1 h2
   rfl
 
@@ -481,16 +481,16 @@ theorem read_exception (s : Entry.Source) : (readSource (exOf s)).exception = s.
   apply Vector.ext
   intro b hb
   have gs : g.val < 91 := g.isLt
-  show (Vector.ofFn fun b : Fin 12 =>
-    BitVec.ofNat 8 (total 0 (fun n => (exBytes s n).val) (12 * g.val + b.val)))[b] = (s.exception g)[b]
+  show (Vector.ofFn fun b : Fin 2 =>
+    BitVec.ofNat 4 (total 0 (fun n => (exBytes s n).val) (2 * g.val + b.val)))[b] = (s.exception g)[b]
   rw [Vector.getElem_ofFn]
   simp only
-  rw [total_apply _ _ _ (show 12 * g.val + b < exceptionByteCount from show _ < 1092 by omega)]
+  rw [total_apply _ _ _ (show 2 * g.val + b < exceptionCellCount from show _ < 182 by omega)]
   unfold exBytes
   simp only [BitVec.val_toFin]
   rw [bitVec_ofNat_toNat]
-  exact exception_get s _ _ _ _ g b hb (show (12 * g.val + b) / 12 = g.val by omega)
-    (show (12 * g.val + b) % 12 = b by omega)
+  exact exception_get s _ _ _ _ g b hb (show (2 * g.val + b) / 2 = g.val by omega)
+    (show (2 * g.val + b) % 2 = b by omega)
 
 theorem read_joins (s : Entry.Source) : (readSource (exOf s)).joins = s.joins := by
   funext κ i
@@ -645,15 +645,15 @@ theorem exFields_read (D : Exact) : exFields (readSource D) = D.1 := by
 theorem exBytes_read (D : Exact) : exBytes (readSource D) = D.2.1 := by
   funext n
   apply Fin.ext
-  have ns : n.val < 1092 := n.isLt
+  have ns : n.val < 182 := n.isLt
   unfold exBytes
   simp only [BitVec.val_toFin]
-  show (Vector.ofFn fun b : Fin 12 =>
-      BitVec.ofNat 8 (total 0 (fun m => (D.2.1 m).val) (12 * (n.val / 12) + b.val)))[n.val % 12].toNat =
+  show (Vector.ofFn fun b : Fin 2 =>
+      BitVec.ofNat 4 (total 0 (fun m => (D.2.1 m).val) (2 * (n.val / 2) + b.val)))[n.val % 2].toNat =
         (D.2.1 n).val
   rw [Vector.getElem_ofFn]
   simp only [BitVec.toNat_ofNat]
-  rw [show 12 * (n.val / 12) + n.val % 12 = n.val by omega, total_apply _ _ _ n.isLt,
+  rw [show 2 * (n.val / 2) + n.val % 2 = n.val by omega, total_apply _ _ _ n.isLt,
     Nat.mod_eq_of_lt (D.2.1 n).isLt]
 
 theorem exJoins_read (D : Exact) : exJoins (readSource D) = D.2.2.1 := by

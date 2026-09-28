@@ -90,7 +90,7 @@ theorem pieces_safe : ∀ p ∈ pieces, PieceSafe p := by
   · simp only [List.mem_map, List.mem_range] at inBytes
     obtain ⟨index, bound, same⟩ := inBytes
     subst same
-    have : index < 1092 := bound
+    have : index < 182 := bound
     exact ⟨by unfold exceptionBase; omega, Or.inl (by unfold exceptionBase tmpBase; omega), by norm_num⟩
   · exact convPieces_safe 0 (by decide) p inConv0
   · exact convPieces_safe 1 (by decide) p inConv1

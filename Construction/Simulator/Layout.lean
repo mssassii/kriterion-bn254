@@ -7,7 +7,7 @@ constants their code embeds (the CRT machine adds its own regions above `2 ^ 51`
 point registers of `pointAdd`, `R12`–`R15` are the fixed oracle operands (index, input, first
 answer, second answer).
 
-**RAM.** Disjoint regions at `2 ^ 40 .. 2 ^ 50`: the published field cells and exception bytes, the
+**RAM.** Disjoint regions at `2 ^ 40 .. 2 ^ 50`: the published field cells and exception nibbles, the
 parsed request, the selected labels, scalar temporaries, the opening's cells and the Lamport key.
 
 **Stacks.** Stack `0` is the protocol request, stack `1` the private coin stack (every coin is
@@ -58,7 +58,7 @@ abbrev rSecond : Register := 15
 
 /-- The public field cells, in `Wire.encoding` order: curve (3), rows (`91 · 3`). -/
 def fieldBase : Nat := 2 ^ 40
-/-- The `1,092` exception bytes. -/
+/-- The `182` exception nibbles. -/
 def exceptionBase : Nat := 2 ^ 41
 /-- The parsed request: `u.x`, `u.y`, the two output tag bits, `Q.x`, `Q.y`. -/
 def requestBase : Nat := 2 ^ 43
@@ -75,8 +75,8 @@ def keyBase : Nat := 2 ^ 50
 /-- Field-cell counts: the curve constants, then the row constants (`91 · 3`: `xC0, yC4, zC0`). -/
 def curveCellCount : Nat := 3
 def rowCellCount : Nat := 91 * 3
-/-- The exception bytes: `12` per digit. -/
-def exceptionByteCount : Nat := 91 * 12
+/-- The exception nibble cells: `2` per digit, packed as one byte on the wire. -/
+def exceptionCellCount : Nat := 91 * 2
 def labelCount : Nat := 508
 def keyBlockCount : Nat := 2 * 508
 
