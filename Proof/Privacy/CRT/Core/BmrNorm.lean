@@ -659,4 +659,210 @@ def signEquiv : NonZeroBase × Bool ≃ NonZeroBase × Bool :=
 
 end Character
 
+/-! ### 6. The ideal side through `nG` -/
+
+/-- The field scales of kernel scales `(ρ, τ)` and signs `ν`: `(ρ, (−1)^ν τ²)`. -/
+def kScales (rt : Fin 91 → NonZeroBase × NonZeroBase) (sign : Fin 91 → Bool) : Scales :=
+  fun d => ((rt d).1.value, Rows.signed (sign d) ((rt d).2.value ^ 2))
+
+/-- The compact cells of a normalized source. -/
+def compactOf (src : NSource T) : CSource T := (src.1, fun d => (src.2.1 d).xC0, src.2.2.2)
+
+/-- P45's row target of scaled sparse rows. -/
+theorem rowTarget_scaled (rho kappa : BaseField) (rows : Coordinates.Rows) (sparse : FieldMacToECMac.SparseRow rows)
+    (u : AffineInput) :
+    rowTarget (Rows.scaled rho kappa rows) u =
+      ⟨rho ^ 2 * Coordinates.evaluate rows.x u, kappa * Coordinates.evaluate rows.y u,
+        rho * Coordinates.evaluate rows.z u⟩ := by
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩ := sparse
+  simp only [rowTarget, Rows.scaled, Rows.multiply, Coordinates.evaluate, h1, h2, h3, h4, h5, h6, h7, h8,
+    FieldMacToECMac.HomogeneousValue.mk.injEq]
+  refine ⟨by ring, by ring, by ring⟩
+
+/-- The normalized solve at a corrected target is P45's solve at the raw target with zero flags. -/
+theorem nCollectorSolve_eq (target raw : FieldMacToECMac.HomogeneousValue) (row : RowGamma) (sign : Bool)
+    (u : AffineInput) (values : Biquadratic.Values) (e : Biquadratic.Element)
+    (hx : raw.x = target.x) (hy : raw.y = Rows.signed sign target.y) (hz : raw.z = target.z) :
+    nCollectorSolve target (srcRow row sign) u values e = collectorSolve raw ⟨row.xC0, 0, 0⟩ u values e := by
+  have flag0 : Rows.flagValue false = 0 := if_neg Bool.false_ne_true
+  rcases e with (_ | _ | _ | _) | (_ | _ | _)
+  · rfl
+  · show target.x - _ = raw.x - _
+    rw [hx]
+    rfl
+  · show (Rows.signed sign target.y - (Rows.flagValue false * u.x ^ 2 + _ + _)) * _ =
+      (raw.y - (0 * u.x ^ 2 + _ + _)) * _
+    rw [hy, flag0]
+  · show target.z - Rows.flagValue false = raw.z - 0
+    rw [hz, flag0]
+  · rfl
+  · rfl
+  · rfl
+
+section Ideal
+
+variable [FieldCertificate] (nctx : NContext) (sparse : nctx.Sparse)
+include sparse
+
+/-- **The ideal outputs at the corrected targets of `(ρ, τ)` are `nG` at the field scales `(ρ, (−1)^ν τ²)`.** -/
+theorem nIdealOut_eq_nG (u : AffineInput) (rt : Fin 91 → NonZeroBase × NonZeroBase) (cells : NSource T × Visible T u) :
+    nIdealOut (nTargets nctx u rt) u cells = nG nctx u (kScales rt cells.1.2.2.1) (compactOf cells.1, cells.2) := by
+  obtain ⟨⟨J, rows, signs, cur⟩, vis⟩ := cells
+  have pub : (fun d => srcRow (rows d) (signs d)) =
+      fun d => convRow (kScales rt signs d).2 (⟨(rows d).xC0, 0, 0⟩ : RowGamma) := by
+    funext d
+    unfold srcRow convRow kScales
+    rw [signBit_signed_sq (signs d) (rt d).2.value (rt d).2.nonzero]
+  have solve : ∀ (d : Fin 91) (values : Biquadratic.Values) (e : Biquadratic.Element),
+      nCollectorSolve (nTargets nctx u rt d) (srcRow (rows d) (signs d)) u values e =
+        collectorSolve (rowTarget ((fsContext nctx (kScales rt signs)).rows d) u) ⟨(rows d).xC0, 0, 0⟩ u values e := by
+    intro d values e
+    refine nCollectorSolve_eq _ _ _ _ u values e ?_ ?_ ?_
+    · show (rowTarget (Rows.scaled _ _ (nctx.rows d)) u).x = _
+      rw [rowTarget_scaled _ _ _ (sparse d)]
+      rfl
+    · show (rowTarget (Rows.scaled _ _ (nctx.rows d)) u).y = _
+      rw [rowTarget_scaled _ _ _ (sparse d)]
+      show Rows.signed (signs d) ((rt d).2.value ^ 2) * Coordinates.evaluate (nctx.rows d).y u =
+        Rows.signed (signs d) ((rt d).2.value ^ 2 * Coordinates.evaluate (nctx.rows d).y u)
+      rw [signed_mul]
+    · show (rowTarget (Rows.scaled _ _ (nctx.rows d)) u).z = _
+      rw [rowTarget_scaled _ _ _ (sparse d)]
+      rfl
+  unfold nIdealOut nG conv idealOut nPublish
+  simp only
+  rw [pub]
+  refine Prod.ext rfl (Prod.ext rfl (Prod.ext ?_ rfl))
+  funext r
+  simp only
+  rw [solve]
+  rfl
+
+end Ideal
+
+/-! ### 7. Uniform sums -/
+
+section Sums
+
+open scoped ENNReal
+
+theorem tsum_uniform_prod {A B : Type*} [Fintype A] [Nonempty A] [Fintype B] [Nonempty B] (f : A × B → ℝ≥0∞) :
+    ∑' x, PMF.uniformOfFintype (A × B) x * f x =
+      ∑' a, PMF.uniformOfFintype A a * ∑' b, PMF.uniformOfFintype B b * f (a, b) := by
+  simp only [PMF.uniformOfFintype_apply, Fintype.card_prod, Nat.cast_mul, ← ENNReal.tsum_mul_left]
+  rw [ENNReal.tsum_prod']
+  refine tsum_congr fun a => tsum_congr fun b => ?_
+  rw [ENNReal.mul_inv (Or.inr (ENNReal.natCast_ne_top _)) (Or.inl (ENNReal.natCast_ne_top _))]
+  ring
+
+theorem tsum_uniform_equiv {A B : Type*} [Fintype A] [Nonempty A] [Fintype B] [Nonempty B] (e : A ≃ B)
+    (f : B → ℝ≥0∞) :
+    ∑' a, PMF.uniformOfFintype A a * f (e a) = ∑' b, PMF.uniformOfFintype B b * f b := by
+  rw [← e.tsum_eq]
+  simp only [PMF.uniformOfFintype_apply, Fintype.card_congr e, Equiv.apply_symm_apply]
+  exact (e.symm.tsum_eq fun b => ((Fintype.card B : ℝ≥0∞))⁻¹ * f b).symm.trans (by
+    refine tsum_congr fun a => ?_
+    rw [Equiv.symm_symm])
+
+theorem tsum_uniform_const {A : Type*} [Fintype A] [Nonempty A] (c : ℝ≥0∞) :
+    ∑' a, PMF.uniformOfFintype A a * c = c := by
+  rw [ENNReal.tsum_mul_right, PMF.tsum_coe, one_mul]
+
+theorem tsum_map_mul' {α β : Type*} (μ : PMF α) (g : α → β) (f : β → ℝ≥0∞) :
+    ∑' o, (μ.map g) o * f o = ∑' a, μ a * f (g a) := by
+  classical
+  simp only [PMF.map_apply]
+  simp_rw [← ENNReal.tsum_mul_right]
+  rw [ENNReal.tsum_comm]
+  refine tsum_congr fun a => ?_
+  rw [tsum_eq_single (g a)]
+  · rw [if_pos rfl]
+  · intro o different
+    rw [if_neg different, zero_mul]
+
+theorem tsum_uniform_map {A B : Type*} [Fintype A] [Nonempty A] [Fintype B] [Nonempty B] (g : A → B)
+    (law : (PMF.uniformOfFintype A).map g = PMF.uniformOfFintype B) (f : B → ℝ≥0∞) :
+    ∑' a, PMF.uniformOfFintype A a * f (g a) = ∑' b, PMF.uniformOfFintype B b * f b := by
+  rw [← tsum_map_mul', law]
+
+/-- **Restricting a uniform sum to a subtype.** -/
+theorem tsum_uniform_restrict {A : Type*} [Fintype A] [Nonempty A] (p : A → Prop) [DecidablePred p]
+    [Nonempty {a // p a}] (f : A → ℝ≥0∞) :
+    ∑' a, PMF.uniformOfFintype A a * (if p a then f a else 0) =
+      (∑' a, PMF.uniformOfFintype A a * (if p a then 1 else 0)) *
+        ∑' a : {a // p a}, PMF.uniformOfFintype {a // p a} a * f a.1 := by
+  classical
+  have split : ∀ g : A → ℝ≥0∞, ∑' a, (if p a then g a else 0) = ∑' a : {a // p a}, g a.1 := by
+    intro g
+    rw [tsum_fintype, tsum_fintype, ← Finset.sum_filter]
+    exact Finset.sum_subtype _ (fun a => by simp) g
+  have cardPos : (Fintype.card {a // p a} : ℝ≥0∞) ≠ 0 := Nat.cast_ne_zero.mpr Fintype.card_ne_zero
+  have cardFin : (Fintype.card {a // p a} : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+  simp only [PMF.uniformOfFintype_apply, mul_ite, mul_one, mul_zero]
+  rw [← ENNReal.tsum_mul_left, split fun a => (Fintype.card A : ℝ≥0∞)⁻¹ * f a,
+    split fun _ => (Fintype.card A : ℝ≥0∞)⁻¹, tsum_fintype (fun _ : {a // p a} => (Fintype.card A : ℝ≥0∞)⁻¹),
+    Finset.sum_const, Finset.card_univ, nsmul_eq_mul, ← ENNReal.tsum_mul_left]
+  refine tsum_congr fun a => ?_
+  rw [← mul_assoc, ← mul_assoc, mul_comm (Fintype.card {a // p a} : ℝ≥0∞), mul_assoc _ _ (_⁻¹),
+    ENNReal.mul_inv_cancel cardPos cardFin, mul_one]
+
+end Sums
+
+/-! ### 8. The kernel scales against the good field scales -/
+
+/-- The good field scales as nonzero pairs. -/
+def goodEquiv : (Fin 91 → NonZeroBase × NonZeroBase) ≃ {s : Scales // GoodScales s} where
+  toFun g := ⟨fun d => ((g d).1.value, (g d).2.value), fun d => ⟨(g d).1.nonzero, (g d).2.nonzero⟩⟩
+  invFun s := fun d => (⟨(s.1 d).1, (s.2 d).1⟩, ⟨(s.1 d).2, (s.2 d).2⟩)
+  left_inv _ := rfl
+  right_inv _ := rfl
+
+instance goodScalesNonempty : Nonempty {s : Scales // GoodScales s} := ⟨goodEquiv fun _ => (⟨1, one_ne_zero_base⟩, ⟨1, one_ne_zero_base⟩)⟩
+
+section Kernel
+
+variable [FieldCertificate]
+
+/-- The digit-wise sign split of kernel scales and signs. -/
+def kSplit (x : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) :
+    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) :=
+  (fun d => ((x.1 d).1, (signSplit ((x.1 d).2, x.2 d)).1), fun d => (signSplit ((x.1 d).2, x.2 d)).2)
+
+/-- Its inverse. -/
+def kJoin (y : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) :
+    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) :=
+  (fun d => ((y.1 d).1, (signJoin ((y.1 d).2, y.2 d)).1), fun d => (signJoin ((y.1 d).2, y.2 d)).2)
+
+/-- **The kernel split is a bijection.** -/
+def kEquiv : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) ≃
+    (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool) where
+  toFun := kSplit
+  invFun := kJoin
+  left_inv x := by
+    have each : ∀ d, signJoin (signSplit ((x.1 d).2, x.2 d)) = ((x.1 d).2, x.2 d) := fun d => signJoin_signSplit _
+    refine Prod.ext (funext fun d => Prod.ext rfl ?_) (funext fun d => ?_)
+    · exact congrArg Prod.fst (each d)
+    · exact congrArg Prod.snd (each d)
+  right_inv y := by
+    have each : ∀ d, signSplit (signJoin ((y.1 d).2, y.2 d)) = ((y.1 d).2, y.2 d) := fun d => signSplit_signJoin _
+    refine Prod.ext (funext fun d => Prod.ext rfl ?_) (funext fun d => ?_)
+    · exact congrArg Prod.fst (each d)
+    · exact congrArg Prod.snd (each d)
+
+/-- **Uniform kernel scales and uniform signs give uniform field scales.** -/
+theorem kScales_law :
+    (PMF.uniformOfFintype ((Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool))).map
+        (fun x => (kSplit x).1) = PMF.uniformOfFintype (Fin 91 → NonZeroBase × NonZeroBase) := by
+  have factor : (fun x => (kSplit x).1) = Prod.fst ∘ kEquiv := rfl
+  rw [factor, ← PMF.map_comp, uniform_map_equiv, uniform_map_fst]
+
+theorem kScales_eq (x : (Fin 91 → NonZeroBase × NonZeroBase) × (Fin 91 → Bool)) :
+    kScales x.1 x.2 = (goodEquiv (kSplit x).1).1 := by
+  funext d
+  show ((x.1 d).1.value, Rows.signed (x.2 d) ((x.1 d).2.value ^ 2)) =
+    ((x.1 d).1.value, (signSplit ((x.1 d).2, x.2 d)).1.value)
+  rw [signSplit_fst]
+
+end Kernel
+
 end Kriterion.CRT.Privacy.BMR
