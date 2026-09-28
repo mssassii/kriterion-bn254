@@ -87,19 +87,26 @@ theorem rowsDoubling_of_doubling_old [FieldCertificate] [GroupCertificate] (scal
       rw [Exception.exceptionalInput_transform phi six,
         sign_double _ key.offset.onCurve (JacobianMixed.noAffineYZero _ key.offset.onCurve), mul_zero]
 
+/-- At a nonzero digit the corrected row of any keys and randomness is the old row. -/
+theorem nTargets_keys_some [FieldCertificate] (keys : FieldMacToECMac.OutputKeys)
+    (randomness : FieldMacToECMac.Randomness) (u : AffineInput) (d : Fin 91) (phi : BaseField)
+    (selected : digitEndomorphismBase (keys.get d).digit = some phi) :
+    BMR.nTargets ⟨fun d => Rows.unscaledOf keys d⟩ u (fun d => ((randomness.get d).rho, (randomness.get d).tau)) d =
+      FieldMacToECMac.evaluateRow ((FieldMacToECMac.rowsForOutputKeys keys randomness).get d) u := by
+  rw [JacobianMixed.rowsForOutputKeys_get]
+  unfold BMR.nTargets
+  simp only [Rows.unscaledOf]
+  rw [selected]
+  exact NormRows.nTargets_some _ _ _ _ _
+
 /-- At a nonzero digit the corrected true row is the old true row. -/
 theorem normTrueRows_some [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
     (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput) (d : Fin 91) (phi : BaseField)
     (selected : digitEndomorphismBase ((Entry.outputKeysOf scalar coins).get d).digit = some phi) :
     NormRows.normTrueRows scalar coins u d = Security.Phase3.trueRows scalar coins u d := by
-  unfold NormRows.normTrueRows BMR.nTargets Security.Phase3.trueRows
-  simp only [NormRows.nctxOf, NormRows.scalesOf, Rows.unscaledOf]
-  rw [FieldMacToECMac.rowsForOutputKeys, Vector.get_ofFn]
-  show _ = FieldMacToECMac.evaluateRow (Coordinates.rows ((Entry.outputKeysOf scalar coins).get d).offset.coordinates
-    (digitEndomorphismBase ((Entry.outputKeysOf scalar coins).get d).digit) _ _) u
-  rw [selected]
-  rw [← NormRows.nTargets_some]
-  rfl
+  unfold NormRows.normTrueRows NormRows.nctxOf NormRows.scalesOf Security.Phase3.trueRows
+  unfold Entry.outputKeysOf at selected ⊢
+  exact nTargets_keys_some _ coins.pointRandomness u d phi selected
 
 /-- **Doubling shows in the corrected true rows** (the exceptional digits are nonzero, where they are the old rows). -/
 theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar)
@@ -126,8 +133,8 @@ theorem rowsDoubling_of_doubling [FieldCertificate] [GroupCertificate] (scalar :
           FieldMacToECMac.evaluateRow (Coordinates.rows ((Entry.outputKeysOf scalar coins).get d).offset.coordinates
             none (coins.pointRandomness.get d).rho.value (coins.pointRandomness.get d).tau.value) u := by
         unfold Security.Phase3.trueRows
-        rw [FieldMacToECMac.rowsForOutputKeys, Vector.get_ofFn, ← sel]
-        rfl
+        unfold Entry.outputKeysOf at sel ⊢
+        rw [JacobianMixed.rowsForOutputKeys_get, sel]
       rw [rowsNone, FieldMacToECMac.evaluateRowsNone] at zero
       have onK := ((Entry.outputKeysOf scalar coins).get d).offset.onCurve
       rcases zero with z | y
@@ -424,11 +431,11 @@ theorem slXOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
     rw [show (⟨(BMR.xFlat (.inl (d, element))).val, low⟩ : Fin pointElementCountX) = xElementIndex d element
       from rfl]
     erw [Pipeline.pointXAssemble_digit]
-    unfold EntryCorrect.pointOf Entry.pointSlopes EntryCorrect.rowsOf
+    unfold EntryCorrect.pointOf Entry.pointSlopes EntryCorrect.rowsOf Entry.normRowsVec
     have values : EntryCorrect.KOf (H8.tagHash table) coins =
         fun d element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) :=
       funext fun d => funext (KOf_eq coins table d)
-    rw [values]
+    rw [values, vector_get_ofFn]
     rfl
   · have high : ¬ (BMR.xFlat (.inr element)).val < pointElementCountX := by
       show ¬ 364 + element.slot.val < pointElementCountX
@@ -454,11 +461,11 @@ theorem slYOf_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coin
     rw [show (⟨(BMR.yFlat (.inl (d, element))).val, low⟩ : Fin pointElementCountY) = yElementIndex d element
       from rfl]
     erw [Pipeline.pointYAssemble_digit]
-    unfold EntryCorrect.pointOf Entry.pointSlopes EntryCorrect.rowsOf
+    unfold EntryCorrect.pointOf Entry.pointSlopes EntryCorrect.rowsOf Entry.normRowsVec
     have values : EntryCorrect.KOf (H8.tagHash table) coins =
         fun d element => BMR.rowOffset (bmrCoinsOf coins table) (d, element) :=
       funext fun d => funext (KOf_eq coins table d)
-    rw [values]
+    rw [values, vector_get_ofFn]
     rfl
   · have high : ¬ (BMR.yFlat (.inr element)).val < pointElementCountY := by
       show ¬ 273 + element.slot.val < pointElementCountY
