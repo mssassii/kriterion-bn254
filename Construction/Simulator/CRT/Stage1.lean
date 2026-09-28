@@ -21,7 +21,7 @@ independent and uniform below `m_i`, so the record is uniform below `M`.
 
 Serialization (`serialize`): `pieces` lists what the wire carries, in wire order, as words of RAM (`Piece.word
 address width`: the low `width` bits of the word, least significant first) and records (`Piece.record κ e`: the
-record's 620 bits, computed by Horner's rule into five 128-bit limbs at `recordLimb`, then emitted). The machine
+record's 618 bits, computed by Horner's rule into five 128-bit limbs at `recordLimb`, then emitted). The machine
 emits the pieces in reverse (the response stack is last in, first out), each piece's bits most significant first,
 so the stack reads the wire from the top.
 -/
@@ -57,8 +57,8 @@ def pinWidthAt (k : Nat) : Nat := Entry.pinWidths.getD k 0
 /-- The moduli. -/
 def moduliCount : Nat := 84
 
-/-- The limbs of a record under construction (five 128-bit limbs, `620` bits emitted; records are below
-`2 M < 2 ^ 620`). -/
+/-- The limbs of a record under construction (five 128-bit limbs, `618` bits emitted; records are below
+`2 M < 2 ^ 618`). -/
 def recordLimb (k : Nat) : Nat := tmpBase + 64 + k
 
 /-- Limbs of a record. -/
@@ -130,7 +130,7 @@ def keyTrue : Prog := Prog.rep labelCount keyXor
 inductive Piece
   /-- The low `width` bits of `RAM[address]`. -/
   | word (address width : Nat)
-  /-- The 620 bits of the record of encoding `e` of coordinate `κ`. -/
+  /-- The 618 bits of the record of encoding `e` of coordinate `κ`. -/
   | record (κ e : Nat)
 deriving Inhabited
 
@@ -180,9 +180,9 @@ def hornerStep (κ e i : Nat) : Prog :=
   Prog.seqList [loadAt rC (Layout.residueCell κ i e), setupConsts (modulusAt i),
     mulSmallAdd (recordLimb 0) recordLimbCount]
 
-/-- Emit the record's 620 bits: limb 4 (108 bits) first, limb 0 last. -/
+/-- Emit the record's 618 bits: limb 4 (106 bits) first, limb 0 last. -/
 def emitRecord : Prog :=
-  Prog.seqList [emitWord (recordLimb 4) 108, emitWord (recordLimb 3) 128, emitWord (recordLimb 2) 128,
+  Prog.seqList [emitWord (recordLimb 4) 106, emitWord (recordLimb 3) 128, emitWord (recordLimb 2) 128,
     emitWord (recordLimb 1) 128, emitWord (recordLimb 0) 128]
 
 /-- The record of encoding `e` of coordinate `κ`: Horner from the top digit, then its bits. -/

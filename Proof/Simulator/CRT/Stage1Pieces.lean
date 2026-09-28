@@ -128,15 +128,15 @@ theorem convVector_bits (pub : ConvPublic) :
 
 theorem records_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) (κ : Nat)
     (small : κ < 2) (values : Fin (encCount κ) → Nat)
-    (same : ∀ e : Fin (encCount κ), lsbs 620 (recordOf source κ e) = lsbs 620 (values e)) :
-    pieceListBits ram (recordPieces κ) = (List.ofFn fun e => lsbs 620 (values e)).flatten := by
+    (same : ∀ e : Fin (encCount κ), lsbs 618 (recordOf source κ e) = lsbs 618 (values e)) :
+    pieceListBits ram (recordPieces κ) = (List.ofFn fun e => lsbs 618 (values e)).flatten := by
   unfold pieceListBits recordPieces
   rw [List.map_map, map_range_eq_ofFn]
   refine congrArg List.flatten (congrArg List.ofFn (funext fun e => ?_))
   simp only [Function.comp_apply, pieceBits]
   rw [holds.records κ e small e.isLt, same e]
 
-theorem record_mod (value : Nat) : lsbs 620 (value % 2 ^ 620) = lsbs 620 value := lsbs_mod 620 value
+theorem record_mod (value : Nat) : lsbs 618 (value % 2 ^ 618) = lsbs 618 value := lsbs_mod 618 value
 
 /-- **The pieces are the wire.** -/
 theorem pieces_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :

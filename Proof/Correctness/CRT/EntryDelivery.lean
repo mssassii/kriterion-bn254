@@ -8,7 +8,7 @@ Ingredients: the evaluator reads only the labels of the coordinate's 254 bits
 conversion vector reads back as the garbler's material with zero chunk joins on every read cell
 (`FlatLayout.convAgree_unflatten` with `convVector_toArray`), and zero joins on the absorbed labels
 are the joins on the coins' labels (`Absorb.coordEvalM_absorb`); the published records are the
-garbler's records (`record_toRecord`, since `2 M < 2 ^ 620`).
+garbler's records (`record_toRecord`, since `2 M < 2 ^ 618`).
 -/
 
 import Proof.Correctness.CRT.Absorb

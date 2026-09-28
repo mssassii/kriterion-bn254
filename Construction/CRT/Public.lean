@@ -1,6 +1,6 @@
 /-
 The complete public value, packed into one little-endian bit stream. Field
-constants use 254 bits, row flags use three bits, and records use 620 bits.
+constants use 254 bits, row flags use three bits, and records use 618 bits.
 Only the final byte is padded. The codec round-trips every public value.
 -/
 
@@ -30,10 +30,10 @@ abbrev yCount : Nat := 275
 
 /-- Published conversion blocks per coordinate (the half-pins and the modulus joins; the 222 chunk joins are
 absorbed into the Lamport labels). -/
-abbrev convCount : Nat := 2885
+abbrev convCount : Nat := 2881
 
-/-- Exact record width. The independently proved honest bound is `2 M < 2^620`. -/
-abbrev recordBits : Nat := 620
+/-- Exact record width. The independently proved honest bound is `2 M < 2^618`. -/
+abbrev recordBits : Nat := 618
 
 /-- A published record; every inhabitant fits its packed field. -/
 abbrev Record := Fin (2 ^ recordBits)

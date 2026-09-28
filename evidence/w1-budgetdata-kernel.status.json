@@ -1,0 +1,15 @@
+{
+  "command": [
+    "lean",
+    "Proof/Privacy/CRT/Glue/BudgetData.lean"
+  ],
+  "head": "857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790",
+  "tracked_changes": [
+    " M Construction/CRT/Interface.lean",
+    " M Proof/Privacy/CRT/Glue/BudgetData.lean",
+    " M Scratch/opus_gen_budget.py"
+  ],
+  "exit": 0,
+  "seconds": 3.2,
+  "log": "evidence/w1-budgetdata-kernel.log"
+}

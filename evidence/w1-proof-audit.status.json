@@ -1,0 +1,34 @@
+{
+  "command": [
+    "lake",
+    "env",
+    "lean",
+    "Scratch/ProofAudit.lean"
+  ],
+  "head": "857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790",
+  "tracked_changes": [
+    " M Construction/CRT/BudgetFacts.lean",
+    " M Construction/CRT/Entry.lean",
+    " M Construction/CRT/Interface.lean",
+    " M Construction/CRT/Public.lean",
+    " M Construction/Simulator/CRT/Stage1.lean",
+    " M Proof/Correctness/CRT/EntryDelivery.lean",
+    " M Proof/Correctness/CRT/Record.lean",
+    " M Proof/Correctness/CRT/SourceReads.lean",
+    " M Proof/Privacy/CRT/Core/BmrIdealOff.lean",
+    " M Proof/Privacy/CRT/Core/ConvFlat.lean",
+    " M Proof/Privacy/CRT/Flags/CurveWindow.lean",
+    " M Proof/Privacy/CRT/Glue/Budget.lean",
+    " M Proof/Privacy/CRT/Glue/BudgetData.lean",
+    " M Proof/Privacy/CRT/Hidden/Reach.lean",
+    " M Proof/Simulator/CRT/Stage1Conv.lean",
+    " M Proof/Simulator/CRT/Stage1Pieces.lean",
+    " M Proof/Simulator/CRT/Stage1Record.lean",
+    " M Proof/Simulator/CRT/Stage1Size.lean",
+    " M Proof/Simulator/CRT/Stage1Stored.lean",
+    " M Scratch/opus_gen_budget.py"
+  ],
+  "exit": 0,
+  "seconds": 27.3,
+  "log": "evidence/w1-proof-audit.log"
+}

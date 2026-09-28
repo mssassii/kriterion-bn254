@@ -1,10 +1,14 @@
-> **Combined P1a + Opus101 research candidate.** This branch combines the independently proved
+> **Opus W1 research candidate on `claude/structural-research`.** Built on the submitted
+> `857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790` (125,711 bytes; hosted results belong to that commit only). W1
+> charges the hidden hop's curve-window term at its proved size and trades modulus 41 for 17, giving
+> **125,450 bytes** / 1,060,976 / 1,054,152 with 618-bit records. This is an incremental optimization, not the
+> under-100 KB goal. See [W1 verification evidence](evidence/w1/verification.md). This candidate has not been
+> published or submitted.
+>
+> The combined P1a + Opus101 candidate (`857e88b`) combines the independently proved
 > whole-public codec at `cc221c36a4f8e991d2c983b4ec748d40805ea064` with the 101-bit label and
-> privacy changes at `2f7b9ca70f7a9c72ac4a24e98ddb97cb606e7ee8`.
-> The full public representation is **125,711 bytes**, with unchanged query budgets.
-> See [combined verification evidence](evidence/packed-101/verification.md) for check results and
-> the exact source manifest. Hosted results for earlier commits remain historical evidence;
-> this combined candidate has not been submitted.
+> privacy changes at `2f7b9ca70f7a9c72ac4a24e98ddb97cb606e7ee8`; see
+> [combined verification evidence](evidence/packed-101/verification.md).
 
 # CRT-residue ArgoMAC with complete public bit packing
 
@@ -14,16 +18,19 @@ challenge. The challenge, Lean toolchain and dependency lock remain pinned to
 
 Starting from dnctse's **130,122-byte** entry, Astra's selected extraction schedule and Opus's removal
 of modulus 17 save 1,846 bytes. P1a's complete bit packing removes another 401 bytes, for a total
-saving of 2,247 bytes. Opus101 removes a further 2,164 bytes, for a total saving of **4,411 bytes**. The first extraction has width 9 on 26 selected odd
+saving of 2,247 bytes. Opus101 removes a further 2,164 bytes, for a total saving of 4,411 bytes; Opus W1 removes
+261 more (**4,672 bytes** in total). The first extraction has width 9 on 26 selected odd
 moduli, and width 8 on the other 57. The remaining modulus 256 reuses the first chunk.
 
-**Combined local verification passed on 2026-09-28:** full build, actual metrics/encoding and the whole-tree audit of **23,803 declarations**, using only the three permitted axioms. Earlier successful builds and hosted results remain historical evidence for their exact source commits.
+**W1 local verification passed on 2026-09-28:** full build, `lake build Benchmark`, actual metrics/encoding
+(`Scratch/W1Audit.lean`) and the whole-tree audit of **23,805 declarations**, using only the three permitted axioms.
+Earlier successful builds and hosted results remain historical evidence for their exact source commits.
 
 | metric | value | rule |
 |---|---|---|
-| `ciphertextBytes` | **125,711** | ranked, lower is better |
-| `garbleQueries` | **1,061,622** `≤ 1,759,967` | acceptance gate |
-| `evaluateQueries` | **1,054,788** `≤ 1,055,879` | acceptance gate; **1,091** headroom |
+| `ciphertextBytes` | **125,450** | ranked, lower is better |
+| `garbleQueries` | **1,060,976** `≤ 1,759,967` | acceptance gate |
+| `evaluateQueries` | **1,054,152** `≤ 1,055,879` | acceptance gate; **1,727** headroom |
 
 ## 1. Provenance and construction changes
 
@@ -45,7 +52,8 @@ are inherited. Upstream history and credits are retained.
 | 8 | Opus H1 plus integration: remove modulus 17 and widen modulus 397 | 128,276 |
 | 9 | P1: hidden/touch charge numerator 4→1, unchanged 104-bit labels | 128,276 |
 | 10 | Astra P1a: whole-public bit packing, field254/flags3/record620 | 127,875 |
-| 11 | Opus101 + Astra integration: 101-bit internal labels and tighter privacy closure | **125,711** |
+| 11 | Opus101 + Astra integration: 101-bit internal labels and tighter privacy closure | 125,711 |
+| 12 | Opus W1: proved curve-window charge, modulus 41 → 17, 618-bit records | **125,450** |
 
 The independently proved checkpoints are:
 
@@ -57,6 +65,14 @@ The combined schedule widens `59, 61, 257, 263, 269, 271, 277, 281, 283, 293, 30
 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397`. Each widening removes one join and one
 half-pin label per coordinate, saving 52 bytes. Dropping modulus 17 removes 494 bytes and frees query
 budget for the 26th widening. The word widths, chunk width, 128-bit external Lamport labels, 120-bit pad slack and 642 records are retained. P1a replaces the full public byte codec; Opus101 narrows internal labels to 101 bits.
+
+**W1 (Opus).** The hidden hop's window term `hiddenWindowError` was charged at `smudgeError`, about 86 times its
+proved size: `Flags/CurveWindow.lean` bounds the event by `15 ((p − 1)^2 + 1)/M` (five curve encodings, `3B/M`
+each). Charging that value lowers the exact constant at the 857e88b table from `1.2719` (proved bound `1.408`) to `0.6435`, enough to restore modulus 17 (`ell = 10`) in place
+of 41 (`ell = 11`). The product falls from 619 to 617 bits (`log2 M = 616.90`), so records fit 618 bits. The table
+has 84 moduli, all 26 width-9 widenings are unchanged, and the only reach-certificate change restores 17's certificate
+(from `de8f397`) and removes 41's. The construction is otherwise unchanged. `Scratch/opus_window_model.py` evaluated
+single swaps: 43, 47 and 49 → 17 give the same bytes; 37 → 17 gives 125,530.
 
 `Scratch/check_combined.py` reproduces baseline, A1 and H1 before computing this combination. It
 selects the cheapest 26 widenings by evaluation cost, replays all 83 remaining reach certificates,
@@ -81,14 +97,15 @@ unchanged. `Glue/Shapes.lean` connects this to the original `steps + 1` target f
 P1 refines the hidden/touch charge to `1/2^104 + 1/(p−1)` with complete generic case proofs.
 Opus101 generalizes that charge to `1/2^labelBits + 1/(p−1)` and sets `labelBits = 101`.
 Its scaled charge is at most `1/2 + 2^-152`. For fewer than `2^100` adversary queries,
-the accumulated excess fits inside the second constant unit: `1.408 + 2^-51 < 2`.
+the accumulated excess fits inside the second constant unit: `1.408 + 2^-51 < 2`. Under W1 the constant is
+`1.5516` (smudge `≤ 77/50`, window `≤ 1/50`, all others `≤ 8/1000`), still `< 2 − 2^-51`.
 The target security definition, 508 selected external 128-bit labels and both query budgets are unchanged.
 
 The product still satisfies the universal wrap bound. P1a proves every honest record is below
-`2 M ≤ 2^620` and changes the public record type to `Fin (2^620)`. The codec round-trips every
+`2 M ≤ 2^620` and changes the public record type to `Fin (2^620)`; W1 tightens both to `2^618`. The codec round-trips every
 inhabitant of that type, independently of the honest-record bound. The simulator draws 84 residue digits per record and proves the complete finite-machine
-implementation. Its current counts are 1,415 joins (including 222 unused chunk joins) and 198 pins
-per coordinate, and 43,391 serialized pieces. The full construction, perfect correctness and adaptive
+implementation. Its current counts are 1,413 joins (including 222 unused chunk joins) and 198 pins
+per coordinate, and 43,387 serialized pieces. The full construction, perfect correctness and adaptive
 privacy remain fields of `Submission.solution` with proof terms.
 
 ## 3. Complete public bytes and queries
@@ -98,11 +115,11 @@ privacy remain fields of `Submission.solution` with proof terms.
 | `curve` | 3 constants × 254 | 762 |
 | `rows` | 91 digits × (254-bit constant + 3 flags) | 23,387 |
 | `exception` | 91 digits × 2 four-bit nibbles | 728 |
-| `crtX`, `crtY` | 2 × 2,885 labels × 101 bits | 582,770 |
-| `recX`, `recY` | 642 records × 620 bits | 398,040 |
-| **public data** | concatenated before byte conversion | **1,005,687** |
-| final padding | canonical zeros | 1 |
-| **total** | **125,711 bytes** | **1,005,688** |
+| `crtX`, `crtY` | 2 × 2,881 labels × 101 bits | 581,962 |
+| `recX`, `recY` | 642 records × 618 bits | 396,756 |
+| **public data** | concatenated before byte conversion | **1,003,595** |
+| final padding | canonical zeros | 5 |
+| **total** | **125,450 bytes** | **1,003,600** |
 
 `BitPacking` composes fixed-width vectors of bits, proves an all-values inverse, and converts to
 bytes once. Its generic width supports the integrated 101-bit labels without per-label or per-vector padding. `CrtWire.wire_bits` proves exact
@@ -111,10 +128,10 @@ same final zero run; its unchanged fuel bounds are proved again. No per-field by
 
 | part | garbling | evaluation |
 |---|---:|---:|
-| coordinate `x`: chunks 55,936 / 55,522; extraction/growth/folds 281,535 / 279,641; body 217,831 / 216,864 | 555,302 | 552,027 |
-| coordinate `y`: same chunks/extraction; body 166,558 / 165,815 | 504,029 | 500,978 |
+| coordinate `x`: chunks 55,936 / 55,522 (unchanged); extraction, growth, folds and body over the W1 table | 554,955 | 551,685 |
+| coordinate `y`: same chunks and extraction; body at `S = 275` | 503,730 | 500,684 |
 | mask key, masks, exception digest | 2,291 | 1,783 |
-| **total** | **1,061,622** | **1,054,788** |
+| **total** | **1,060,976** | **1,054,152** |
 
 The budgets are exact sums over the 84-modulus table, certified by `decide +kernel` in
 `Construction/CRT/BudgetFacts.lean`. `Entry.Wire.encoding_length` states the fixed length for every
@@ -126,11 +143,14 @@ public value, not only honest garbler outputs.
 lake exe cache get
 lake build
 lake build Benchmark
-lake env lean Scratch/Packed101Audit.lean
+lake env lean Scratch/W1Audit.lean
 lake env lean Scratch/ProofAudit.lean
-python3 -B Scratch/check_packed101.py
-python3 -B Scratch/Packed101SourceManifest.py check
+python3 -B Scratch/opus_check_w1.py
+python3 -B Scratch/opus_w1_manifest.py check
 ```
+
+`Scratch/Packed101Audit.lean` and `Scratch/check_packed101.py` keep their 125,711-byte expectations and must be
+run at `857e88b`.
 
 Combined verification and source binding are recorded in
 [combined evidence](evidence/packed-101/verification.md). The audit measures the actual complete
@@ -195,7 +215,9 @@ P1a's generic bit codec, complete public packing, record bounds and finite simul
 Opus developed and independently proved the 101-bit label, generic replay and tighter privacy
 closure at `2f7b9ca70f7a9c72ac4a24e98ddb97cb606e7ee8`. Astra integrated that exact delta
 with P1a, preserved the all-values whole-public codec, and re-proved the finite serialization bridge
-with 43,391 pieces and one final padding bit.
+with 43,391 pieces and one final padding bit. Opus developed W1 on `claude/structural-research`: charging
+the curve window at the size the inherited `CurveWindow` proof (psivesely `de8f397`, Lazar `f79c96a`) already establishes, the 41 → 17 swap, and the
+618-bit record width through Astra's packed codec and serializer proofs (whose structure is unchanged).
 
 AI involvement is explicit: OpenAI GPT-6 Astra and Anthropic Claude Opus 5.5 assisted under Souhail's
 direction. The original entry disclosed Claude and GPT assistance as well. The pinned verifier checks

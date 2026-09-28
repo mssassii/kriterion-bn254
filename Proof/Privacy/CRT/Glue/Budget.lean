@@ -6,8 +6,8 @@
 | `G0 → G0T` | `tCollisionError = 1,759,967 / p` (`t` equal to a labelled garbler input) | `2^-232.85` |
 | `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `637 δ₃` | `2^-113.5` |
 | `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (1/2^101 + 1/(p − 1))` | linear |
-| `G0U → G1U` | `hiddenWindowError = smudgeError` (the curve encodings' wrap window) | `2^-100.65` |
-| `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-100.65` + ... |
+| `G0U → G1U` | `hiddenWindowError = 15 ((p − 1)^2 + 1)/M` (the five curve encodings' wrap window, as proved) | `2^-105.8` |
+| `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-99.4` + ... |
 | `HW → H` | `outputKernelError = 455/(r − 1)` | `2^-244.8` |
 | `H → I` | `padSwapError` (untouched sites only, no per-query term; F4) | `2^-113.51` |
 | `I → M` | `machineCutoffError = 2^-128` | `2^-128` |
@@ -15,7 +15,7 @@
 Every term is a fraction of two naturals (`frac`), so its share of the unit reduces to one closed `Nat.ble` of
 the generated `BudgetData` (decided by `decide +kernel`, no axiom), and the readable forms
 (`crtHiddenCharge_eq`, ...) are separate lemmas. `chainError_budget` closes with every constant below a thousandth
-of its unit except the smudge term and the hidden window (seven tenths each). The per-query charge
+of its unit except the smudge term (`77/50`) and the hidden window (`1/50`). The per-query charge
 `1/2^101 + 1/(p − 1)` (101-bit conversion labels) is at most `1/2 + 2^-152` of the unit, so a stage-1 query (hidden
 + touch) costs at most `1 + 2^-151` and a stage-2 query `1/2 + 2^-152`. The allowance is **two** units plus one per
 query: the challenge's `steps + 1 = size + 2 + firstFuel + secondFuel ≥ q₁ + q₂ + 2`
@@ -96,9 +96,10 @@ because route M's middle game flags the two-sided window `[0, B − 1) ∪ (M �
 def smudgeError : ℝ := frac (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) BudgetData.M
 
 /-- The window term of the hidden hop: the tapes on which a curve encoding's offset lies near
-the wrap window, where its hint could pin the curve mask; charged once, outside the per-query charge. Bounded by the
-smudge term (five encodings against its 642-encoding union bound). -/
-def hiddenWindowError : ℝ := smudgeError
+the wrap window, where its hint could pin the curve mask; charged once, outside the per-query charge. Charged at its
+proved size (W1, Opus): five curve encodings, each near an edge with probability at most `3B/M`, i.e.
+`15 ((p − 1)^2 + 1)/M` (`Flags/CurveWindow.crtCurveWindowMass`); earlier entries charged the whole smudge term. -/
+def hiddenWindowError : ℝ := frac (15 * ((BudgetData.p - 1) ^ 2 + 1)) BudgetData.M
 
 /-- The per-query charge of the hidden hop, `1/2^w + 1/(p − 1)` at the conversion-label width `w = labelBits`
 (101): every case of the hop is at most this (conversion `2^-w`, full-width cases `2^-128`, key
@@ -181,7 +182,10 @@ theorem collision_share : 1759967 * 2 ^ 100 * 1000 ≤ BudgetData.p := by decide
 
 theorem padSwap_share : BudgetData.padSwapNumer * 2 ^ 100 * 1000 ≤ BudgetData.padSwapDenom := by decide +kernel
 
-theorem smudge_share : (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 10 ≤ 7 * BudgetData.M := by
+theorem window_share : 15 * ((BudgetData.p - 1) ^ 2 + 1) * 2 ^ 100 * 50 ≤ 1 * BudgetData.M := by
+  decide +kernel
+
+theorem smudge_share : (1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p) * 2 ^ 100 * 50 ≤ 77 * BudgetData.M := by
   decide +kernel
 
 theorem exceptional_share : 546 * 2 ^ 100 * 1000 ≤ BudgetData.r - 1 := by decide +kernel
@@ -229,11 +233,11 @@ theorem padSwapError_le : padSwapError * 2 ^ 100 ≤ 1 / 1000 := by
   unfold padSwapError
   exact this
 
-theorem smudgeError_le : smudgeError * 2 ^ 100 ≤ 7 / 10 := by
-  have share := frac_share_le (c := 7) (d := 10) smudge_share M_pos (by norm_num)
+theorem smudgeError_le : smudgeError * 2 ^ 100 ≤ 77 / 50 := by
+  have share := frac_share_le (c := 77) (d := 50) smudge_share M_pos (by norm_num)
   unfold smudgeError
-  calc _ ≤ ((7 : ℕ) : ℝ) / ((10 : ℕ) : ℝ) := share
-    _ = 7 / 10 := by norm_num
+  calc _ ≤ ((77 : ℕ) : ℝ) / ((50 : ℕ) : ℝ) := share
+    _ = 77 / 50 := by norm_num
 
 theorem exceptionalError_le : exceptionalError * 2 ^ 100 ≤ 1 / 1000 := by
   have := frac_share (c := 1000) exceptional_share (Nat.sub_pos_of_lt one_lt_r) (by norm_num)
@@ -255,10 +259,14 @@ theorem machineCutoffError_le : machineCutoffError * 2 ^ 100 ≤ 1 / 1000 := by
   unfold machineCutoffError
   exact this
 
-theorem hiddenWindowError_le : hiddenWindowError * 2 ^ 100 ≤ 7 / 10 := smudgeError_le
+theorem hiddenWindowError_le : hiddenWindowError * 2 ^ 100 ≤ 1 / 50 := by
+  have share := frac_share_le (c := 1) (d := 50) window_share M_pos (by norm_num)
+  unfold hiddenWindowError
+  calc _ ≤ ((1 : ℕ) : ℝ) / ((50 : ℕ) : ℝ) := share
+    _ = 1 / 50 := by norm_num
 
 theorem hiddenWindowError_nonneg : 0 ≤ hiddenWindowError := by
-  unfold hiddenWindowError smudgeError
+  unfold hiddenWindowError
   exact frac_nonneg _ _
 
 /-- **The per-query charge**: `crtHiddenCharge · 2^100 ≤ 1/2 + 1/2^152` (at `w = 101`, exactly
@@ -278,7 +286,7 @@ theorem stageOneTouchCharge_le : stageOneTouchCharge * 2 ^ 100 ≤ 1 / 2 + 1 / 2
 
 /-- **The closing inequality.** Below `2^100` queries the whole chain costs at most `(q₁ + q₂ + 2) / 2^100`. The
 constant part (three swaps, the smudge term, the hidden hop's window term, the collision, the doubling, the kernel,
-the coincidences, the cutoff) is below `1408/1000` of one unit. The linear part is `(q₁ + q₂)·c + q₁·c` with
+the coincidences, the cutoff) is below `77/50 + 1/50 + 8/1000 = 1568/1000` of one unit (exactly 1.5516). The linear part is `(q₁ + q₂)·c + q₁·c` with
 `c · 2^100 ≤ 1/2 + 2^-152`, i.e. at most `q₁ + q₂/2 + (2q₁ + q₂)·2^-152`: a stage-1 query costs slightly more than
 one unit, and the excess `(2q₁ + q₂)·2^-152 < 2^101·2^-152` over fewer than `2^100` queries is absorbed by the
 constant's spare room. The second unit is the challenge's: `steps + 1 = size + 2 + firstFuel + secondFuel`

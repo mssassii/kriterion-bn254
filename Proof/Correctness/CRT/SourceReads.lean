@@ -154,9 +154,9 @@ theorem stagePin_lanes (κ : Fin 2) (i : Fin table.count) (row : OddRow) (kind :
 /-! ### (iii) Records -/
 
 theorem product_small : table.product < 2 ^ recordBits := by
-  have fits : 2 * table.product ≤ 2 ^ 620 := bn254Table_record_fits_bits
+  have fits : 2 * table.product ≤ 2 ^ 618 := bn254Table_record_fits_bits
   have pos := table_product_pos
-  show table.product < 2 ^ 620
+  show table.product < 2 ^ 618
   omega
 
 theorem recX_val (e : Fin xCount) : ((publish s).recX.get e).val = (s.recX e).val := by

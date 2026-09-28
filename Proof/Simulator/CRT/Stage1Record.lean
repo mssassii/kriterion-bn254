@@ -1,11 +1,11 @@
 /-
 **One record on the wire** (M2): `recordProg κ e` computes the record of encoding `e` by Horner's rule over its 84
-digits into five 128-bit limbs, then emits its 620 bits.
+digits into five 128-bit limbs, then emits its 618 bits.
 
 * `hornerSuffix`: `H(k) = Σ_{k ≤ i < 84} J_i Π_{k ≤ i' < i} m_{i'}`, with `H(k) = J_k + m_k H(k + 1)` and
-  `H(0) = Σ_i J_i · radix_i`; `H(k) < 2 ^ 620` when every digit is below its modulus;
+  `H(0) = Σ_i J_i · radix_i`; `H(k) < 2 ^ 618` when every digit is below its modulus;
 * `exec_clearLimbs`, `exec_hornerStep`, `exec_horner`: the limbs hold `H(0)` after the 84 steps;
-* `memSem_recordProg`: the record program pushes `lsbs 620 (recordValue ram κ e)` and changes RAM only in the five
+* `memSem_recordProg`: the record program pushes `lsbs 618 (recordValue ram κ e)` and changes RAM only in the five
   limb cells.
 -/
 
@@ -84,13 +84,13 @@ theorem suffixProduct_le (k : Nat) (small : k ≤ moduliCount) : suffixProduct k
   intro j member
   exact modulusAt_pos j (by have := (Finset.mem_Ico.mp member).2; omega)
 
-/-- The product of the moduli is below `2 ^ 620`. -/
-theorem suffixProduct_zero_lt : suffixProduct 0 < 2 ^ 620 := by
+/-- The product of the moduli is below `2 ^ 618`. -/
+theorem suffixProduct_zero_lt : suffixProduct 0 < 2 ^ 618 := by
   unfold suffixProduct
   decide +kernel
 
 theorem hornerSuffix_small (digit : Nat → Nat) (small : ∀ i, i < moduliCount → digit i < modulusAt i)
-    (k : Nat) (inside : k ≤ moduliCount) : hornerSuffix digit k < 2 ^ 620 :=
+    (k : Nat) (inside : k ≤ moduliCount) : hornerSuffix digit k < 2 ^ 618 :=
   lt_of_lt_of_le (hornerSuffix_lt digit small (moduliCount - k) k (by omega))
     (le_trans (suffixProduct_le k inside) (le_of_lt suffixProduct_zero_lt))
 
@@ -210,13 +210,13 @@ theorem lsbs_mod_le (width v x : Nat) (le : width ≤ v) : lsbs width (x % 2 ^ v
   refine congrArg List.ofFn (funext fun index => ?_)
   simp [Nat.testBit_mod_two_pow, lt_of_lt_of_le index.isLt le]
 
-/-- The five limbs' bits are the record's 620 bits. -/
+/-- The five limbs' bits are the record's 618 bits. -/
 theorem record_windows (n : Nat) :
     lsbs 128 (limbOf n 0) ++ (lsbs 128 (limbOf n 1) ++ (lsbs 128 (limbOf n 2) ++ (lsbs 128 (limbOf n 3) ++
-      lsbs 108 (limbOf n 4)))) = lsbs 620 n := by
+      lsbs 106 (limbOf n 4)))) = lsbs 618 n := by
   unfold limbOf
-  rw [lsbs_mod, lsbs_mod, lsbs_mod, lsbs_mod, lsbs_mod_le 108 128 _ (by norm_num)]
-  rw [show 620 = 128 + (128 + (128 + (128 + 108))) from rfl, lsbs_add, lsbs_add, lsbs_add, lsbs_add]
+  rw [lsbs_mod, lsbs_mod, lsbs_mod, lsbs_mod, lsbs_mod_le 106 128 _ (by norm_num)]
+  rw [show 618 = 128 + (128 + (128 + (128 + 106))) from rfl, lsbs_add, lsbs_add, lsbs_add, lsbs_add]
   simp only [Nat.div_div_eq_div_mul, ← pow_add]
   norm_num
 
@@ -234,8 +234,8 @@ theorem memSem_emitRecord (memory : Memory) :
     ∃ after, emitRecord.memSem memory = PMF.pure (some after) ∧
       Emits memory after (bitRun (memory.ram (word (recordLimb 0))) 0 128 ++
         (bitRun (memory.ram (word (recordLimb 1))) 0 128 ++ (bitRun (memory.ram (word (recordLimb 2))) 0 128 ++
-          (bitRun (memory.ram (word (recordLimb 3))) 0 128 ++ bitRun (memory.ram (word (recordLimb 4))) 0 108)))) := by
-  obtain ⟨m1, r1, e1⟩ := memSem_emitWord (recordLimb 4) 108 (by norm_num) memory
+          (bitRun (memory.ram (word (recordLimb 3))) 0 128 ++ bitRun (memory.ram (word (recordLimb 4))) 0 106)))) := by
+  obtain ⟨m1, r1, e1⟩ := memSem_emitWord (recordLimb 4) 106 (by norm_num) memory
   obtain ⟨m2, r2, e2⟩ := memSem_emitWord (recordLimb 3) 128 (by norm_num) m1
   obtain ⟨m3, r3, e3⟩ := memSem_emitWord (recordLimb 2) 128 (by norm_num) m2
   obtain ⟨m4, r4, e4⟩ := memSem_emitWord (recordLimb 1) 128 (by norm_num) m3
@@ -250,14 +250,14 @@ theorem memSem_emitRecord (memory : Memory) :
     rw [e4.1, e3.1, e2.1, e1.1] at chain
     simpa only [List.append_assoc] using chain
 
-/-- **One record**: Horner's rule into the limbs, then the record's 620 bits; RAM changes only in the limbs. -/
+/-- **One record**: Horner's rule into the limbs, then the record's 618 bits; RAM changes only in the limbs. -/
 theorem memSem_recordProg (κ e : Nat) (memory : Memory) (digit : Nat → Nat)
     (small : ∀ i, i < moduliCount → digit i < modulusAt i)
     (cells : ∀ i, i < moduliCount → memory.ram (word (Layout.residueCell κ i e)) = word (digit i))
     (cellsAway : ∀ i, i < moduliCount → ¬ LimbCell (word (Layout.residueCell κ i e))) :
     ∃ after, (recordProg κ e).memSem memory = PMF.pure (some after) ∧
       (∀ address, ¬ LimbCell address → after.ram address = memory.ram address) ∧
-      after.bits 3 = lsbs 620 (hornerSuffix digit 0) ++ memory.bits 3 ∧
+      after.bits 3 = lsbs 618 (hornerSuffix digit 0) ++ memory.bits 3 ∧
       ∀ stack, stack ≠ 3 → after.bits stack = memory.bits stack := by
   obtain ⟨cleared, clearRun, zeroes, clearOff, clearBits⟩ := exec_clearLimbs memory
   obtain ⟨summed, hornerRun, limbs, hornerOff, hornerBits⟩ := exec_horner κ e cleared digit small
@@ -275,7 +275,7 @@ theorem memSem_recordProg (κ e : Nat) (memory : Memory) (digit : Nat → Nat)
     have small' := hornerSuffix_small digit small 0 (by norm_num)
     rw [limbs 0 (by norm_num), limbs 1 (by norm_num), limbs 2 (by norm_num), limbs 3 (by norm_num),
       limbs 4 (by norm_num)]
-    simp only [bitRun_ofNat _ _ (show 128 ≤ 256 by norm_num), bitRun_ofNat _ _ (show 108 ≤ 256 by norm_num)]
+    simp only [bitRun_ofNat _ _ (show 128 ≤ 256 by norm_num), bitRun_ofNat _ _ (show 106 ≤ 256 by norm_num)]
     rw [← record_windows]
   · rw [emits.2.2 stack other, hornerBits, clearBits]
 

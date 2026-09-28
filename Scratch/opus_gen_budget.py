@@ -122,10 +122,11 @@ def generate(moduli, two_unit):
     out.append('/-- One swap: pads `padSwapNum / 2^4352` plus 637 masks at `(2^384 mod p)/2^384`, at most `1/1000` of the unit. -/\n')
     out.append('theorem padSwapError_le : Nat.ble ((padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968) * 2 ^ 100 * 1000) (2 ^ 4352) = true := by decide +kernel\n\n')
     if two_unit:
-        out.append('/-- The smudge term `(1284 (p - 1)^2 + 273 p)/M` (the two-sided window), at most `7/10` of the\nunit. -/\n')
-        out.append('theorem smudgeError_le : Nat.ble ((1284 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 * 10) (7 * M) = true := by decide +kernel\n\n')
-        out.append('/-- The single-sided smudge term `(642 (p - 1)^2 + 273 p)/M`, at most `1/3` of the unit. -/\n')
-        out.append('theorem smudgeErrorSingle_le : Nat.ble ((642 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 * 3) M = true := by decide +kernel\n\n')
+        out.append('/-- The smudge term `(1284 (p - 1)^2 + 273 p)/M` (the two-sided window), at most `77/50` of the\nunit. -/\n')
+        out.append('theorem smudgeError_le : Nat.ble ((1284 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 * 50) (77 * M) = true := by decide +kernel\n\n')
+        out.append('/-- The hidden hop\'s window term at its proved size, `15 ((p - 1)^2 + 1)/M` (five curve encodings, each near an\n'
+                   'edge with probability at most `3B/M`), at most `1/50` of the unit. -/\n')
+        out.append('theorem windowError_le : Nat.ble (15 * ((p - 1) ^ 2 + 1) * 2 ^ 100 * 50) M = true := by decide +kernel\n\n')
     else:
         out.append('/-- The smudge term `(1284 (p - 1)^2 + 273 p)/M` (the two-sided window), at most `1/20` of the\nunit. -/\n')
         out.append('theorem smudgeError_le : Nat.ble ((1284 * (p - 1) ^ 2 + 273 * p) * 2 ^ 100 * 20) M = true := by decide +kernel\n\n')
@@ -160,13 +161,13 @@ theorem stageTwoQuery_le : Nat.ble ((4 * (p - 1) + 2 ^ 104) * 2 ^ 100 * 3) (2 ^ 
     if two_unit:
         out.append("""/-! ### The closing inequality for the constant, exactly
 
-`3 (pads + masks) + 2 smudge + collision + exceptional + kernel + coincidence + cutoff <= 2 * 2^-100` (the smudge
-term counted twice: `smudgeError` and the hidden hop's window term `hiddenWindowError`), every term over
+`3 (pads + masks) + smudge + window + collision + exceptional + kernel + coincidence + cutoff <= 2 * 2^-100`
+(`smudgeError` and the hidden hop's window term `hiddenWindowError = 15 ((p - 1)^2 + 1)/M`), every term over
 `D = 2^4352 * M * p * (r - 1)`. -/
 theorem chainConstant_le_two :
     Nat.ble
       ((3 * (padSwapNum + 637 * (2 ^ 384 % p) * 2 ^ 3968) * (M * p * (r - 1))
-        + 2 * (1284 * (p - 1) ^ 2 + 273 * p) * (2 ^ 4352 * p * (r - 1))
+        + ((1284 * (p - 1) ^ 2 + 273 * p) + 15 * ((p - 1) ^ 2 + 1)) * (2 ^ 4352 * p * (r - 1))
         + 1759967 * (2 ^ 4352 * M * (r - 1))
         + (546 + 455) * (2 ^ 4352 * M * p)
         + (185 + 1) * 2 ^ 4224 * (M * p * (r - 1))) * 2 ^ 100)
@@ -210,13 +211,14 @@ def check_numbers(moduli, two_unit):
     numer = num + 637 * (2 ** 384 % P) * 2 ** 3968
     assert numer * 2 ** 100 * 1000 <= 2 ** 4352
     smudge = 1284 * (P - 1) ** 2 + 273 * P
+    window = 15 * ((P - 1) ** 2 + 1)
     if two_unit:
-        assert smudge * 2 ** 100 * 10 <= 7 * M
-        assert (642 * (P - 1) ** 2 + 273 * P) * 2 ** 100 * 3 <= M
+        assert smudge * 2 ** 100 * 50 <= 77 * M
+        assert window * 2 ** 100 * 50 <= M
     else:
         assert smudge * 2 ** 100 * 20 <= M
     assert 2 * ((P - 1) ** 2 + 1) <= M, 'wrap exactness needs 2B <= M'
-    total = ((3 * numer * (M * P * (R - 1)) + (2 if two_unit else 1) * smudge * (2 ** 4352 * P * (R - 1))
+    total = ((3 * numer * (M * P * (R - 1)) + ((smudge + window) if two_unit else smudge) * (2 ** 4352 * P * (R - 1))
               + 1759967 * (2 ** 4352 * M * (R - 1)) + (546 + 455) * (2 ** 4352 * M * P)
               + (185 + 1) * 2 ** 4224 * (M * P * (R - 1))) * 2 ** 100)
     D = 2 ** 4352 * M * P * (R - 1)

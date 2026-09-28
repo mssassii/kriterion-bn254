@@ -6,8 +6,8 @@ encodings `273, 274`) lies within `B` of an end of `[0, M)`: `O < B` or `M < O +
 table's pads alone: the garbler asks only labelled inputs below `p`, where the scheme's hash of the table oracle is
 `tagHash` (`CurveWindow.gxOf_tableOracle`), and there BmrEntry's `gxOf_offset` gives P45's offset of the pads. Under
 the swapped table the pads are uniform, so each offset is uniform on `[0, M)` (`BMR.WrapMass.offset_uniform`) and is
-near an edge with probability at most `3B / M`. Over the five encodings this is `15 ((p − 1)^2 + 1) / M`, below
-`smudgeError = hiddenWindowError`.
+near an edge with probability at most `3B / M`. Over the five encodings this is `15 ((p − 1)^2 + 1) / M`, exactly
+`hiddenWindowError` (W1, Opus: previously charged at `smudgeError`, about 86 times larger).
 -/
 
 import Proof.Privacy.CRT.Flags.Wrap
@@ -187,14 +187,13 @@ theorem crtCurveWindowMass : StageTwo.CurveWindowMass := by
   rw [Finset.sum_const, Finset.sum_const, Finset.card_univ, Finset.card_univ, Fintype.card_fin, Fintype.card_fin,
     nsmul_eq_mul, nsmul_eq_mul, ← add_mul, ← mul_div_assoc]
   rw [Wrap.wrapBound_eq, Wrap.product_eq]
-  unfold hiddenWindowError smudgeError frac
+  unfold hiddenWindowError frac
   have Mpos : (0 : ℝ) < (BudgetData.M : ℝ) := by
     have : 0 < BudgetData.M := by decide
     exact_mod_cast this
   rw [ENNReal.ofReal_div_of_pos Mpos, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast]
   refine ENNReal.div_le_div_right ?_ _
-  have numer : (3 + 2) * (3 * ((BudgetData.p - 1) ^ 2 + 1)) ≤
-      1284 * (BudgetData.p - 1) ^ 2 + 273 * BudgetData.p := by
+  have numer : (3 + 2) * (3 * ((BudgetData.p - 1) ^ 2 + 1)) ≤ 15 * ((BudgetData.p - 1) ^ 2 + 1) := by
     decide +kernel
   exact_mod_cast numer
 

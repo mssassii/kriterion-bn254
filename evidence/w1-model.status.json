@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "Scratch/opus_check_w1.py"
+  ],
+  "head": "857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 0.0,
+  "log": "evidence/w1-model.log"
+}

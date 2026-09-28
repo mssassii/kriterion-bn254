@@ -173,7 +173,7 @@ theorem publish_recX_val (s : Kriterion.CRT.Entry.Source) (e : Fin Kriterion.CRT
     from rfl, Vector.get_ofFn]
   refine EntryDelivery.toRecord_val _ ?_
   have lt : (s.recX e).val < Tb.product := (s.recX e).isLt
-  have fits : 2 * Tb.product ≤ 2 ^ 620 := Kriterion.CRT.bn254Table_record_fits_bits
+  have fits : 2 * Tb.product ≤ 2 ^ 618 := Kriterion.CRT.bn254Table_record_fits_bits
   exact Nat.lt_of_lt_of_le lt (le_trans (Nat.le_mul_of_pos_left _ two_pos) fits)
 
 theorem publish_recY_val (s : Kriterion.CRT.Entry.Source) (e : Fin Kriterion.CRT.Entry.yCount) :
@@ -182,7 +182,7 @@ theorem publish_recY_val (s : Kriterion.CRT.Entry.Source) (e : Fin Kriterion.CRT
     from rfl, Vector.get_ofFn]
   refine EntryDelivery.toRecord_val _ ?_
   have lt : (s.recY e).val < Tb.product := (s.recY e).isLt
-  have fits : 2 * Tb.product ≤ 2 ^ 620 := Kriterion.CRT.bn254Table_record_fits_bits
+  have fits : 2 * Tb.product ≤ 2 ^ 618 := Kriterion.CRT.bn254Table_record_fits_bits
   exact Nat.lt_of_lt_of_le lt (le_trans (Nat.le_mul_of_pos_left _ two_pos) fits)
 
 /-- **The joins the published records carry are the source's records read as residues.** -/

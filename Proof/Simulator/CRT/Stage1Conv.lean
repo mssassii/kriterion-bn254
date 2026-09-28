@@ -6,7 +6,7 @@ conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatte
 block. A pin's `101` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
-`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2885` for every `ConvPublic` (no chunk
+`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2881` for every `ConvPublic` (no chunk
 joins: a chunk contributes its half-pin only; the source's chunk-join cells are drawn but not serialized).
 -/
 
@@ -98,7 +98,7 @@ def recordValue (ram : Word → Word) (κ e : Nat) : Nat :=
 /-- The bits one piece puts on the wire. -/
 def pieceBits (ram : Word → Word) : Piece → List Bool
   | .word address width => bitRun (ram (word address)) 0 width
-  | .record κ e => lsbs 620 (recordValue ram κ e)
+  | .record κ e => lsbs 618 (recordValue ram κ e)
 
 /-- The bits of a list of pieces. -/
 def pieceListBits (ram : Word → Word) (pieces : List Piece) : List Bool := (pieces.map (pieceBits ram)).flatten

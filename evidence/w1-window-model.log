@@ -1,0 +1,35 @@
+$ python3 Scratch/opus_window_model.py
+# HEAD 857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790
+# tracked changes:
+ M Construction/CRT/BudgetFacts.lean
+ M Construction/CRT/Entry.lean
+ M Construction/CRT/Interface.lean
+ M Construction/CRT/Public.lean
+ M Construction/Simulator/CRT/Stage1.lean
+ M Proof/Correctness/CRT/EntryDelivery.lean
+ M Proof/Correctness/CRT/Record.lean
+ M Proof/Correctness/CRT/SourceReads.lean
+ M Proof/Privacy/CRT/Core/BmrIdealOff.lean
+ M Proof/Privacy/CRT/Core/ConvFlat.lean
+ M Proof/Privacy/CRT/Flags/CurveWindow.lean
+ M Proof/Privacy/CRT/Glue/Budget.lean
+ M Proof/Privacy/CRT/Glue/BudgetData.lean
+ M Proof/Privacy/CRT/Hidden/Reach.lean
+ M Proof/Simulator/CRT/Stage1Conv.lean
+ M Proof/Simulator/CRT/Stage1Pieces.lean
+ M Proof/Simulator/CRT/Stage1Record.lean
+ M Proof/Simulator/CRT/Stage1Size.lean
+ M Proof/Simulator/CRT/Stage1Stored.lean
+ M README.md
+ M Scratch/opus_gen_budget.py
+
+current {'G': 1061622, 'E': 1054788, 'blocks': 2885, 'record_bits': 620, 'bits': 1005687, 'bytes': 125711} C(two copies) = 1.2718635395647524
+swap 41->17: 125450 B (bits 1003595, records 618), G 1060976, E 1054152 (headroom 1727), width-9 rows 26, constant 1.5516
+swap 43->17: 125450 B (bits 1003595, records 618), G 1060932, E 1054108 (headroom 1771), width-9 rows 26, constant 1.6273
+swap 47->17: 125450 B (bits 1003595, records 618), G 1060844, E 1054020 (headroom 1859), width-9 rows 26, constant 1.7786
+swap 49->17: 125450 B (bits 1003595, records 618), G 1060800, E 1053976 (headroom 1903), width-9 rows 26, constant 1.8543
+swap 37->17: 125530 B (bits 1004237, records 619), G 1061101, E 1054276 (headroom 1603), width-9 rows 26, constant 1.4002
+swap 439->289: 125530 B (bits 1004237, records 619), G 1062121, E 1055292 (headroom 587), width-9 rows 28, constant 0.9773
+swap 367->289: 125581 B (bits 1004641, records 619), G 1061992, E 1055160 (headroom 719), width-9 rows 27, constant 0.8171
+swap 373->289: 125581 B (bits 1004641, records 619), G 1061794, E 1054962 (headroom 917), width-9 rows 27, constant 0.8304
+no swap, window proved: constant 0.6434880949850849

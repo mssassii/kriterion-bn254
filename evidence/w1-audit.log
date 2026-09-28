@@ -1,0 +1,37 @@
+$ lake env lean Scratch/W1Audit.lean
+# HEAD 857e88b66f91ce0c61ab0e86ff6d8b9e9bf91790
+# tracked changes:
+ M Construction/CRT/BudgetFacts.lean
+ M Construction/CRT/Entry.lean
+ M Construction/CRT/Interface.lean
+ M Construction/CRT/Public.lean
+ M Construction/Simulator/CRT/Stage1.lean
+ M Proof/Correctness/CRT/EntryDelivery.lean
+ M Proof/Correctness/CRT/Record.lean
+ M Proof/Correctness/CRT/SourceReads.lean
+ M Proof/Privacy/CRT/Core/BmrIdealOff.lean
+ M Proof/Privacy/CRT/Core/ConvFlat.lean
+ M Proof/Privacy/CRT/Flags/CurveWindow.lean
+ M Proof/Privacy/CRT/Glue/Budget.lean
+ M Proof/Privacy/CRT/Glue/BudgetData.lean
+ M Proof/Privacy/CRT/Hidden/Reach.lean
+ M Proof/Simulator/CRT/Stage1Conv.lean
+ M Proof/Simulator/CRT/Stage1Pieces.lean
+ M Proof/Simulator/CRT/Stage1Record.lean
+ M Proof/Simulator/CRT/Stage1Size.lean
+ M Proof/Simulator/CRT/Stage1Stored.lean
+ M Scratch/opus_gen_budget.py
+
+'Submission.solution' depends on axioms: [propext, Classical.choice, Quot.sound]
+axiom check passed: only propext, Classical.choice, Quot.sound
+Privacy.chainError_budget : ∀ (first second : ℕ),
+  first + second < 2 ^ 100 → Privacy.chainError first second * 2 ^ 100 ≤ ↑first + ↑second + 2
+Privacy.hiddenWindowError_le : Privacy.hiddenWindowError * 2 ^ 100 ≤ 1 / 50
+125450
+1060976
+1054152
+Scratch/W1Audit.lean:79:59: warning: exponent 618 exceeds the threshold 256, exponentiation operation was not evaluated, use `set_option exponentiation.threshold <num>` to set a new threshold
+125450
+'Kriterion.CRT.SliceC.bn254_selectiveFacts' depends on axioms: [propext, Quot.sound]
+'Kriterion.CRT.SimMachine.CrtTop.crtSimulator' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Privacy.Final.crtEntry_adaptivePrivacy' depends on axioms: [propext, Classical.choice, Quot.sound]

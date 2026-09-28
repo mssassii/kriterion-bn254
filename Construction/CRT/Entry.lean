@@ -211,7 +211,7 @@ def slopesY (point : Fin digitCount → Biquadratic.Values) (curve : CurveMember
     Fin yCount → BaseField :=
   joinY (Pipeline.pointYAssemble point) (Pipeline.curveYAssemble curve)
 
-/-- A record natural in its 620-bit public type (honest records are below `2 M < 2^620`). -/
+/-- A record natural in its 618-bit public type (honest records are below `2 M < 2^618`). -/
 def toRecord (value : Nat) : Record :=
   ⟨value % 2 ^ recordBits, Nat.mod_lt _ (Nat.pow_pos (by decide))⟩
 
