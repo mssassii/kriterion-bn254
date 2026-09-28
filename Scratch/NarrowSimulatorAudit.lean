@@ -42,5 +42,5 @@ example : Kriterion.CRT.castAnswers 14 = 6 := by decide +kernel
 
 -- Recompute only this small arithmetic expression, never the program.
 example : 276 + 182 + 2 * 1450 + 400 * 104 + 642 = 45600 := by decide +kernel
-example : 2 * (1450 + 1928) * 104 = 702624 := by decide +kernel
+example : 2 * (1450 + 1728) * 104 = 661024 := by decide +kernel
 example : (508 + 2) * 128 = 65280 := by decide +kernel

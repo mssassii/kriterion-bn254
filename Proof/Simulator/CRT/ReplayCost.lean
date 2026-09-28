@@ -67,9 +67,9 @@ theorem size_treeEval_le (cells : TreeCells) (tagOf : Nat → Nat → Nat) (leve
   omega
 
 theorem size_castBlock (cells : CastCells) (l : Nat) (tagOf : Nat → Nat) :
-    (castBlock cells l tagOf).size = 9 * castAnswers l + 8 * laneCount := by
+    (castBlock cells l tagOf).size = 9 * castAnswers l + 2 + 14 * laneCount := by
   simp only [castBlock, castQueries, castLanesProg, Prog.size_seq]
-  rw [Prog.size_rep _ _ 9 (fun j _ => rfl), Prog.size_rep _ _ 8 (fun i _ => rfl)]
+  rw [Prog.size_rep _ _ 9 (fun j _ => rfl), Prog.size_rep _ _ 14 (fun i _ => rfl), size_loadAt]
   rw [show laneCount = 104 from rfl]
   ring
 
@@ -79,14 +79,14 @@ theorem size_chunkCastPhase_le (cc : ChunkCastCells) (width l : Nat) (tagOf : Na
   have lc : laneCount = 104 := rfl
   have pw : 2 ^ width ≤ 2 ^ 8 := Nat.pow_le_pow_right (by norm_num) widthLe
   simp only [chunkCastPhase, castLoop, pinSolve, Prog.size_seq]
-  have casts := size_rep_le (2 ^ width) (castEntry cc width l tagOf) (9 + 2 * (9 * 64 + 1024))
+  have casts := size_rep_le (2 ^ width) (castEntry cc width l tagOf) (9 + 2 * (9 * 64 + 2048))
     fun leaf _ => by
       simp only [castEntry, Prog.size_seq]
       have := size_ite_le rA (castBlock (leafCells cc leaf) l (tagOf leaf)) (.skip 0)
       rw [size_castBlock, show (Prog.skip 0).size = 0 from rfl] at this
       rw [show (entryTest (alphaCells cc) width leaf).size = 6 from rfl]
       omega
-  have lanes := size_rep_le laneCount (solveLane cc width l) (9 + 23 * 2 ^ 8) fun i _ => by
+  have lanes := size_rep_le laneCount (solveLane cc width l) (10 + 23 * 2 ^ 8) fun i _ => by
     simp only [solveLane, Prog.size_seq]
     have terms := size_rep_le (2 ^ width) (solveTerm cc width l i) 23 fun leaf _ => by
       simp only [solveTerm, Prog.size_seq]
@@ -101,7 +101,7 @@ theorem size_chunkCastPhase_le (cc : ChunkCastCells) (width l : Nat) (tagOf : Na
     have : 2 ^ width * 23 ≤ 2 ^ 8 * 23 := Nat.mul_le_mul_right _ pw
     simp only [Prog.size, size_loadAt, cst, ar]
     omega
-  have : 2 ^ width * (9 + 2 * (9 * 64 + 1024)) ≤ 2 ^ 8 * (9 + 2 * (9 * 64 + 1024)) :=
+  have : 2 ^ width * (9 + 2 * (9 * 64 + 2048)) ≤ 2 ^ 8 * (9 + 2 * (9 * 64 + 2048)) :=
     Nat.mul_le_mul_right _ pw
   rw [lc] at lanes ⊢
   omega

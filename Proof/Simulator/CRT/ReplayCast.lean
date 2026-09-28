@@ -379,6 +379,7 @@ theorem exec_laneExtract (cells : CastCells) (l i : Nat) (memory : Memory) (half
     by rw [bits2, bits1], fun register notA notB notAddr notSecond => ?_⟩
   rw [regs2 register notA notB notAddr, regs1 register notB notSecond]
 
+omit [BN254.FieldCertificate] in
 theorem det_castLanesProg (cells : CastCells) (l : Nat) : (castLanesProg cells l).OpsSatisfy Op.Det :=
   det_rep _ _ fun _ _ =>
     ⟨⟨trivial, trivial, trivial, trivial⟩, ⟨trivial, trivial⟩, trivial, trivial, trivial, trivial, trivial,

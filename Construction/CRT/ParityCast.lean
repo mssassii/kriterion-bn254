@@ -1,7 +1,8 @@
 /-
-An isolated executable parity cast and half-pin wire type. This module does not
-replace the entry's active cast: the privacy source and replay integration must
-first be updated to use the label-dependent parity law.
+The parity cast and the half-pin wire type. Every conversion cast (`castM`, `Chunk.lean`) reads the
+original block-aligned lanes and replaces the low bit of lane `i` by bit `i` of its control label, so a
+tree's pin `Σ_α A_α + Δ⃗` is even in every lane (the leaves XOR to `Δ`); the public material stores the
+pin halved (`Parity.pinHalf`, one label less per pin) and the evaluator doubles it back (`pinExpand`).
 -/
 
 import Construction.CRT.Parity

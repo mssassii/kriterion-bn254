@@ -329,7 +329,8 @@ theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C
     (valueLt : value < 2 ^ w) (A : Label) (m : Memory)
     (valueCell : m.ram (word cells.value) = word value)
     (remCells : ∀ i : Fin laneCount, m.ram (word (cells.remBase + i.val)) = word (remainder i).val)
-    (pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word (pin i).val)
+    (pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word ((pin i).val / 2))
+    (pinEven : Parity.EvenLanes pin)
     (classCells : ∀ i : Fin laneCount,
       m.ram (word (cells.classBase + 128 * w + i.val)) = word (C i).val)
     (castCells : ∀ i : Fin laneCount,
@@ -370,7 +371,7 @@ theorem exec_stageFinal (cells : StageCells) (w rb value : Nat) (remainder pin C
         fun k hk kb => frame _ fun i' ib => word_ne kb (by omega) (by omega)
       obtain ⟨m2, run2, ram2, bits2, c2, regs2⟩ := exec_roundRes cells rb w i current value
         (pin ⟨i, bound⟩).val (T ⟨i, bound⟩).val (C ⟨i, bound⟩).val fReg
-        (by rw [off _ (by omega) (by omega)]; exact pinCells ⟨i, bound⟩)
+        (by rw [off _ (by omega) (by omega)]; exact pinCells ⟨i, bound⟩) (pinEven ⟨i, bound⟩)
         (by rw [off _ (by omega) (by omega)]; exact castCells ⟨i, bound⟩)
         (by rw [off _ (by omega) (by omega)]; exact classCells ⟨i, bound⟩)
         rbLe (by omega) (ZMod.val_lt _) (ZMod.val_lt _) (ZMod.val_lt _)
@@ -590,7 +591,7 @@ theorem agree_stageReplay (cells : StageCells) (w rb value : Nat) (remainder : L
   have in3 := inputs.at layout rel3.frame
   obtain ⟨m4, run4, next4, node4, frame4, bits4, regs4⟩ := exec_stageFinal cells w rb value remainder pin
     (final.classSum w) (final.castSum w) layout rbLe wSmall wLe valueLt final.active m3 in3.valueCell
-    in3.remCells in3.pinCells (fun i => (rel3.sums w le_rfl i).1) (fun i => (rel3.sums w le_rfl i).2)
+    in3.remCells in3.pinCells in3.pinEven (fun i => (rel3.sums w le_rfl i).1) (fun i => (rel3.sums w le_rfl i).2)
     rel3.active
   rw [tree_eq_exec _ (det_stageFinal cells w rb), run4]
   refine .leaf ⟨fun α αb => ?_, fun n nLt => ?_, fun i => ?_, ⟨fun address outside => ?_, ?_,

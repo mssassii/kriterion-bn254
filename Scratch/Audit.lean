@@ -50,10 +50,10 @@ run_cmd do
 #eval Entry.garbleBudget
 #eval Entry.evaluateBudget
 
-/-- The expected numbers of this entry (85 moduli, width-8 extraction on every odd row, pad slack 120, 104-bit internal conversion labels, block-aligned cast
+/-- The expected numbers of this entry (85 moduli, width-8 extraction on every odd row, parity casts with half-pins, pad slack 120, 104-bit internal conversion labels, block-aligned cast
 lanes, per-encoding 78-byte records with the wrap hint, sign rows with three published constants
 per digit, the hash digest with two packed exceptional nibbles). -/
-def expectedBytes : Nat := 146827
+def expectedBytes : Nat := 141627
 def expectedGarble : Nat := 988438
 def expectedEvaluate : Nat := 981506
 

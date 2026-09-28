@@ -1,10 +1,11 @@
 /-
-The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, sign rows, 146,827 bytes).
-Every field has a proof term; every odd CRT row uses first extraction width 8.
+The CRT entry at the challenge's `Solution` record (CRT-residue projectivization, sign rows, 141,627 bytes).
+Every field has a proof term; every odd CRT row uses first extraction width 8, and the
+conversion casts carry their control label in the low plane so every pin is even and is published halved.
 
 * `FixedIndex` and `EncIndex` are `Empty` (the entry is hash-only);
 * `Randomness` is the switch-system entry's `Scheme.Coins` (the CRT layer draws no coins of its own);
-* `Public` is `Kriterion.CRT.Entry.Public`, 146,827 bytes (`Wire.encoding_length`);
+* `Public` is `Kriterion.CRT.Entry.Public`, 141,627 bytes (`Wire.encoding_length`);
 * `garbleProgram` / `evaluateProgram` are `Entry.garbleProgram` / `Entry.evaluateProgram` at the
   term-by-term budgets `garbleBudget` (988,438) and `evaluateBudget` (981,506);
 * `perfectCorrectness` is `Kriterion.CRT.EntryCorrect.perfectCorrectness`
@@ -51,7 +52,7 @@ theorem evaluateProgramCorrect (field : FieldCertificate) (group : @GroupCertifi
   rw [Entry.evaluateProgram, FreeQuery.eval_toProgram, Entry.evaluateM, eval_liftHash]
   simp only [Entry.scheme]
 
-/-- `Solution.ciphertextSize`: every public value is 146,827 bytes. -/
+/-- `Solution.ciphertextSize`: every public value is 141,627 bytes. -/
 theorem ciphertextSize (field : FieldCertificate) (group : @GroupCertificate field) (parameter : Nat)
     (scalar : NonZeroScalar) (tape : Entry.Coins × Entry.Oracle) :
     (Wire.encoding.encode ((@Entry.scheme field group).garble parameter scalar tape).1).length =
@@ -66,7 +67,7 @@ theorem perfectCorrectness (field : FieldCertificate) (group : @GroupCertificate
     GarbledCircuit.PerfectCorrectness (@Entry.scheme field group) Prod.snd :=
   Kriterion.CRT.EntryCorrect.perfectCorrectness field group
 
-/-- The configuration-E submission with sign rows, at 146,827 bytes. -/
+/-- The configuration-E submission with sign rows, at 141,627 bytes. -/
 def solution : Kriterion.Solution := {
   FixedIndex := Empty
   EncIndex := Empty

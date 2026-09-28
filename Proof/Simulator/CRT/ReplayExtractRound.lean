@@ -66,7 +66,7 @@ theorem eval_shl_word (value : Word) (shift : Nat) (small : shift < 2 ^ 256) :
 
 theorem exec_resHead (cells : StageCells) (rb n i : Nat) (memory : Memory) (q P T : Nat)
     (fReg : memory.registers rF = word q)
-    (pinCell : memory.ram (word (cells.pinBase + i)) = word P)
+    (pinCell : memory.ram (word (cells.pinBase + i)) = word (P / 2)) (PEven : P % 2 = 0)
     (castCell : memory.ram (word (cells.castSumBase + 128 * n + i)) = word T)
     (rbLe : rb ≤ 128) (qSmall : q < 2 ^ 64) (PSmall : P < 2 ^ rb) (TSmall : T < 2 ^ rb) :
     ∃ after, (resHead cells rb n i).exec memory = some after ∧ after.ram = memory.ram ∧
@@ -83,7 +83,8 @@ theorem exec_resHead (cells : StageCells) (rb n i : Nat) (memory : Memory) (q P 
   refine ⟨_, rfl, rfl, rfl, ?_, fun register notB notC notE notAddr => ?_⟩
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, fReg, pinCell,
       castCell]
-    rw [eval_add_word P (2 ^ rb) (by omega), eval_sub_word _ T (by omega) (by omega),
+    rw [eval_add_word (P / 2) (P / 2) (by omega), show P / 2 + P / 2 = P by omega,
+      eval_add_word P (2 ^ rb) (by omega), eval_sub_word _ T (by omega) (by omega),
       eval_mul_word _ q (by omega)]
   · simp only [reg_setReg, if_neg notB, if_neg notC, if_neg notE, if_neg notAddr]
 
@@ -103,7 +104,7 @@ theorem exec_resTail (cells : StageCells) (rb n i : Nat) (memory : Memory) (X R 
 
 theorem exec_roundRes (cells : StageCells) (rb n i : Nat) (memory : Memory) (q P T R : Nat)
     (fReg : memory.registers rF = word q)
-    (pinCell : memory.ram (word (cells.pinBase + i)) = word P)
+    (pinCell : memory.ram (word (cells.pinBase + i)) = word (P / 2)) (PEven : P % 2 = 0)
     (castCell : memory.ram (word (cells.castSumBase + 128 * n + i)) = word T)
     (classCell : memory.ram (word (cells.classBase + 128 * n + i)) = word R)
     (rbLe : rb ≤ 128) (qSmall : q < 2 ^ 64) (PSmall : P < 2 ^ rb) (TSmall : T < 2 ^ rb)
@@ -121,7 +122,7 @@ theorem exec_roundRes (cells : StageCells) (rb n i : Nat) (memory : Memory) (q P
     calc (P + 2 ^ rb - T) * q < 2 ^ 129 * 2 ^ 64 := Nat.mul_lt_mul'' diffSmall qSmall
       _ = 2 ^ 193 := by norm_num
   obtain ⟨m1, run1, ram1, bits1, c1, regs1⟩ :=
-    exec_resHead cells rb n i memory q P T fReg pinCell castCell rbLe qSmall PSmall TSmall
+    exec_resHead cells rb n i memory q P T fReg pinCell PEven castCell rbLe qSmall PSmall TSmall
   obtain ⟨m2, run2, ram2, bits2, c2, regs2⟩ := exec_resTail cells rb n i m1 _ R c1
     (by rw [ram1]; exact classCell) rbLe (by omega) RSmall
   refine ⟨m2, by rw [roundRes, Prog.exec_seq_some _ _ memory m1 run1, run2], by rw [ram2, ram1],
@@ -234,7 +235,8 @@ theorem lane_value {w rb : Nat} (sub : Lanes w) (R P T : Lanes rb) (q : Nat) (i 
 theorem exec_roundLanes (cells : StageCells) (w rb : Nat) (rbLe : rb ≤ 128) (wSmall : w ≤ 64)
     (n : Nat) (nLt : n < w) (q : Nat) (qSmall : q < 2 ^ 64) (sub : Lanes w) (pin R T : Lanes rb)
     (m0 : Memory) (fReg : m0.registers rF = word q) (dReg : m0.registers rD = word 0)
-    (pinCells : ∀ i : Fin laneCount, m0.ram (word (cells.pinBase + i.val)) = word (pin i).val)
+    (pinCells : ∀ i : Fin laneCount, m0.ram (word (cells.pinBase + i.val)) = word ((pin i).val / 2))
+    (pinEven : Parity.EvenLanes pin)
     (castCells : ∀ i : Fin laneCount,
       m0.ram (word (cells.castSumBase + 128 * n + i.val)) = word (T i).val)
     (classCells : ∀ i : Fin laneCount,
@@ -263,7 +265,7 @@ theorem exec_roundLanes (cells : StageCells) (w rb : Nat) (rbLe : rb ≤ 128) (w
         rw [regs rF (by decide) (by decide) (by decide) (by decide) (by decide)]; exact fReg
       obtain ⟨m2, run2, ram2, bits2, c2, regs2⟩ := exec_roundRes cells rb n i current q
         (pin ⟨i, bound⟩).val (T ⟨i, bound⟩).val (R ⟨i, bound⟩).val fNow
-        (by rw [ram]; exact pinCells ⟨i, bound⟩) (by rw [ram]; exact castCells ⟨i, bound⟩)
+        (by rw [ram]; exact pinCells ⟨i, bound⟩) (pinEven ⟨i, bound⟩) (by rw [ram]; exact castCells ⟨i, bound⟩)
         (by rw [ram]; exact classCells ⟨i, bound⟩) rbLe qSmall (ZMod.val_lt _) (ZMod.val_lt _)
         (ZMod.val_lt _)
       set C := (((pin ⟨i, bound⟩).val + 2 ^ rb - (T ⟨i, bound⟩).val) * q + (R ⟨i, bound⟩).val) % 2 ^ rb
@@ -440,7 +442,8 @@ theorem exec_roundBit (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
     (rbLe : rb ≤ 128) (wSmall : w ≤ 64) (n : Nat) (nLt : n < w) (value : Nat) (valueLt : value < 2 ^ w)
     (sub : Lanes w) (pin R T : Lanes rb) (m : Memory)
     (valueCell : m.ram (word cells.value) = word value)
-    (pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word (pin i).val)
+    (pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word ((pin i).val / 2))
+    (pinEven : Parity.EvenLanes pin)
     (castCells : ∀ i : Fin laneCount,
       m.ram (word (cells.castSumBase + 128 * n + i.val)) = word (T i).val)
     (classCells : ∀ i : Fin laneCount,
@@ -465,7 +468,7 @@ theorem exec_roundBit (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
     (value % 2 ^ n) qSmall sub pin R T m0
     (by rw [m0Def, reg_setReg, if_neg (by decide), reg_setReg, if_pos rfl])
     (by rw [m0Def, reg_setReg, if_pos rfl])
-    (fun i => by rw [ram0]; exact pinCells i) (fun i => by rw [ram0]; exact castCells i)
+    (fun i => by rw [ram0]; exact pinCells i) pinEven (fun i => by rw [ram0]; exact castCells i)
     (fun i => by rw [ram0]; exact classCells i) (fun i => by rw [ram0]; exact subCells i)
   refine ⟨storeRam (setReg m1 rAddr (word (cells.bitBase + n))) (word (cells.bitBase + n))
     (m1.registers rD), ?_, ?_, ?_, ?_, ?_, fun register nB nC nD nE nF nAddr => ?_⟩
@@ -494,7 +497,8 @@ structure StageInputs (cells : StageCells) (w rb value : Nat) (remainder : Lanes
   valueCell : m.ram (word cells.value) = word value
   remCells : ∀ i : Fin laneCount, m.ram (word (cells.remBase + i.val)) = word (remainder i).val
   joinCells : ∀ n, 1 ≤ n → n < w → m.ram (word (cells.joinBase + n)) = labelWord (joins n)
-  pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word (pin i).val
+  pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word ((pin i).val / 2)
+  pinEven : Parity.EvenLanes pin
 
 theorem not_sw_below (cells : StageCells) (w rb : Nat) (layout : StageLayout cells w rb) {k : Nat}
     (hk : k < cells.subBase) : ¬ stageWrites cells w rb (word k) := by
@@ -516,7 +520,7 @@ theorem StageInputs.at {cells : StageCells} {w rb value : Nat} {remainder : Lane
     StageInputs cells w rb value remainder joins pin m := by
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
   have lc : laneCount = 104 := rfl
-  refine ⟨?_, fun i => ?_, fun n h1 h2 => ?_, fun i => ?_⟩
+  refine ⟨?_, fun i => ?_, fun n h1 h2 => ?_, fun i => ?_, inputs.pinEven⟩
   · rw [frame.ram _ (not_sw_below cells w rb layout c1)]; exact inputs.valueCell
   · rw [frame.ram _ (not_sw_below cells w rb layout (by have := i.isLt; omega))]
     exact inputs.remCells i
@@ -570,7 +574,7 @@ theorem exec_roundPrefix (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
   have slotLt := roundSlot_lt value n
   have inM := inputs.at layout rel.frame
   obtain ⟨m1, run1, ram1, bits1, d1, f1, regs1⟩ := exec_roundBit cells w rb layout rbLe wSmall n nLt
-    value valueLt sub pin (state.classSum n) (state.castSum n) m inM.valueCell inM.pinCells
+    value valueLt sub pin (state.classSum n) (state.castSum n) m inM.valueCell inM.pinCells inM.pinEven
     (fun i => (rel.sums n nLt.le i).2) (fun i => (rel.sums n nLt.le i).1) rel.subCells
   have off1 : ∀ k, k ≠ cells.bitBase + n → k < 2 ^ 256 → m1.ram (word k) = m.ram (word k) :=
     fun k hk kb => by rw [ram1, Function.update_of_ne (word_ne kb (by omega) hk)]

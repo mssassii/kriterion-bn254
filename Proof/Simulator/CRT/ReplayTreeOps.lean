@@ -67,7 +67,7 @@ theorem treeOps_castQueries (cells : CastCells) (tagOf : Nat → Nat) (count : N
 
 theorem treeOps_castBlock (cells : CastCells) (l : Nat) (tagOf : Nat → Nat) :
     (castBlock cells l tagOf).OpsSatisfy TreeOp :=
-  ⟨treeOps_castQueries cells tagOf _, treeOps_of_det (det_castLanesProg cells l)⟩
+  ⟨treeOps_castQueries cells tagOf _, ⟨trivial, trivial⟩, treeOps_of_det (det_castLanesProg cells l)⟩
 
 theorem treeOps_chunkCastPhase (cc : ChunkCastCells) (width l : Nat) (tagOf : Nat → Nat → Nat) :
     (chunkCastPhase cc width l tagOf).OpsSatisfy TreeOp :=
