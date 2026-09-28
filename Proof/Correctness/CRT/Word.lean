@@ -93,7 +93,7 @@ theorem chunkValue_testBit (T : CrtTable) (v c n : Nat) (hn : n < T.chunkWidth c
 
 /-! ### L4: the word label -/
 
-theorem reduceTo_add_smul {L ell : Nat} (hell : ell ≤ L) (X : Lanes L) (k : Nat) (Δ : Block) :
+theorem reduceTo_add_smul {L ell : Nat} (hell : ell ≤ L) (X : Lanes L) (k : Nat) (Δ : Label) :
     reduceTo ell (X + (k : ZMod (2 ^ L)) • deltaLanes L Δ) =
       reduceTo ell X + (k : ZMod (2 ^ ell)) • deltaLanes ell Δ := by
   funext lane
@@ -104,7 +104,7 @@ theorem reduceTo_add_smul {L ell : Nat} (hell : ell ≤ L) (X : Lanes L) (k : Na
 /-- **L4** `truthWord_label`: if every evaluator chunk cast is the garbler's plus `Δ⃗` exactly at
 the chunk value, the evaluator's word of modulus `m` is the garbler's plus `wordValue m v • Δ⃗`. -/
 theorem truthWord_label (T : CrtTable) (m ell : Nat) (hell : ell ≤ T.castWidth)
-    (casts castsE : Nat → Nat → Lanes T.castWidth) (Δ : Block) (v : Nat)
+    (casts castsE : Nat → Nat → Lanes T.castWidth) (Δ : Label) (v : Nat)
     (hE : ∀ c < T.chunkCount, ∀ α < 2 ^ T.chunkWidth c,
       castsE c α = casts c α + (if α = T.chunkValue v c then deltaLanes T.castWidth Δ else 0)) :
     truthWord T m ell castsE =

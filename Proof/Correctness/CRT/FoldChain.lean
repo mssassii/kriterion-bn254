@@ -19,7 +19,7 @@ open Cryptography Kriterion.CRT Kriterion.CRT.ExtractSpec Kriterion.ArgoMAC
 
 /-! ### Folds over `Fin` as `xsum` -/
 
-theorem foldl_ite_eq_xorFold {c : Nat} (P : Fin c → Prop) [DecidablePred P] (f : Fin c → Block) :
+theorem foldl_ite_eq_xorFold {c : Nat} (P : Fin c → Prop) [DecidablePred P] (f : Fin c → Label) :
     Fin.foldl c (fun acc x => if P x then acc ^^^ f x else acc) 0 =
       xorFold (fun x => if P x then f x else 0) := by
   unfold xorFold
@@ -29,17 +29,17 @@ theorem foldl_ite_eq_xorFold {c : Nat} (P : Fin c → Prop) [DecidablePred P] (f
   · simp only [h, if_true]
   · simp only [h, if_false, xor_zero_block]
 
-theorem xsum_indicator (N h : Nat) (hh : h < N) (v : Block) :
+theorem xsum_indicator (N h : Nat) (hh : h < N) (v : Label) :
     xsum (Finset.range N) (fun x => if x = h then v else 0) = v := by
   rw [xsum_erase (Finset.mem_range.mpr hh), if_pos rfl]
-  rw [xsum_congr (g := fun _ => (0 : Block)) (fun x hx => if_neg (Finset.ne_of_mem_erase hx)),
+  rw [xsum_congr (g := fun _ => (0 : Label)) (fun x hx => if_neg (Finset.ne_of_mem_erase hx)),
     xsum_zero_fun, xor_zero_block]
 
 /-! ### L12: reindex -/
 
 /-- **L12** `reindex_invariant`: if the evaluator's one-hot of `2^n` labels is the garbler's XOR
 `Δ` at `h < 2^n`, its reindex modulo `m` is the garbler's XOR `Δ` at `h mod m`. -/
-theorem reindex_invariant (n m : Nat) (G E : Fin (2 ^ n) → Block) (Δ : Block) (h : Nat)
+theorem reindex_invariant (n m : Nat) (G E : Fin (2 ^ n) → Label) (Δ : Label) (h : Nat)
     (hh : h < 2 ^ n) (hE : ∀ x, E x = G x ^^^ (if x.val = h then Δ else 0)) (ρ : Fin m) :
     reindex n E m ρ = reindex n G m ρ ^^^ (if ρ.val = h % m then Δ else 0) := by
   unfold reindex
@@ -98,7 +98,7 @@ theorem foldSource_eq_iff {m : Nat} (ρ : Fin m) (shift hot : Nat) (hhot : hot <
     rw [ZMod.natCast_eq_natCast_iff', Nat.mod_eq_of_lt hhot] at hz'
     exact hz'
 
-theorem foldl_skip_eq_xorFoldExcept {m : Nat} (hot : Nat) (hhot : hot < m) (f : Fin m → Block) :
+theorem foldl_skip_eq_xorFoldExcept {m : Nat} (hot : Nat) (hhot : hot < m) (f : Fin m → Label) :
     Fin.foldl m (fun acc other => if other.val = hot then acc else acc ^^^ f other) 0 =
       xorFoldExcept ⟨hot, hhot⟩ f := by
   unfold xorFoldExcept
@@ -108,45 +108,45 @@ theorem foldl_skip_eq_xorFoldExcept {m : Nat} (hot : Nat) (hhot : hot < m) (f : 
   · rw [if_pos h, if_pos (Fin.ext h)]
   · rw [if_neg h, if_neg (fun e => h (congrArg Fin.val e))]
 
-theorem eval_foldGarbleM (H : HashN) (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (bitMask : Block)
-    (labels : Fin m → Block) :
+theorem eval_foldGarbleM (H : HashN) (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (bitMask : Label)
+    (labels : Fin m → Label) :
     (foldGarbleM m tagOf shift bitMask labels).eval H =
-      (fun ρ => labels ρ ^^^ h128 H (labels ρ) (tagOf ρ.val) ^^^
-          h128 H (labels (foldSource ρ shift)) (tagOf (foldSource ρ shift).val),
-        xorFold (fun ρ => h128 H (labels ρ) (tagOf ρ.val)) ^^^ bitMask) := by
+      (fun ρ => labels ρ ^^^ hLabel H (labels ρ) (tagOf ρ.val) ^^^
+          hLabel H (labels (foldSource ρ shift)) (tagOf (foldSource ρ shift).val),
+        xorFold (fun ρ => hLabel H (labels ρ) (tagOf ρ.val)) ^^^ bitMask) := by
   simp [foldGarbleM]
 
 /-- The evaluator's cold fold materials (the program's table). -/
-def foldColdE (H : HashN) (m : Nat) (tagOf : Nat → Nat) (hot : Nat) (labels : Fin m → Block)
-    (ρ : Fin m) : Block :=
-  if ρ.val = hot then 0 else h128 H (labels ρ) (tagOf ρ.val)
+def foldColdE (H : HashN) (m : Nat) (tagOf : Nat → Nat) (hot : Nat) (labels : Fin m → Label)
+    (ρ : Fin m) : Label :=
+  if ρ.val = hot then 0 else hLabel H (labels ρ) (tagOf ρ.val)
 
 /-- The evaluator's fold materials, the hot one solved from the join. -/
-def foldMatE (H : HashN) (m : Nat) (tagOf : Nat → Nat) (hot : Nat) (bitLabel join : Block)
-    (labels : Fin m → Block) (ρ : Fin m) : Block :=
+def foldMatE (H : HashN) (m : Nat) (tagOf : Nat → Nat) (hot : Nat) (bitLabel join : Label)
+    (labels : Fin m → Label) (ρ : Fin m) : Label :=
   if ρ.val = hot then
     bitLabel ^^^ join ^^^
       Fin.foldl m (fun acc other => if other.val = hot then acc else
         acc ^^^ foldColdE H m tagOf hot labels other) 0
   else foldColdE H m tagOf hot labels ρ
 
-theorem eval_ite_pure (H : HashN) (c : Prop) [Decidable c] (a : Block) (p : CM Block) :
-    (if c then (pure a : CM Block) else p).eval H = if c then a else p.eval H := by
+theorem eval_ite_pure (H : HashN) (c : Prop) [Decidable c] (a : Label) (p : CM Label) :
+    (if c then (pure a : CM Label) else p).eval H = if c then a else p.eval H := by
   split <;> rfl
 
 theorem eval_foldEvalM (H : HashN) (m : Nat) (tagOf : Nat → Nat) (shift hot : Nat)
-    (bitLabel join : Block) (labels : Fin m → Block) (ρ : Fin m) :
+    (bitLabel join : Label) (labels : Fin m → Label) (ρ : Fin m) :
     (foldEvalM m tagOf shift hot bitLabel join labels).eval H ρ =
       labels ρ ^^^ foldMatE H m tagOf hot bitLabel join labels ρ ^^^
         foldMatE H m tagOf hot bitLabel join labels (foldSource ρ shift) := by
   unfold foldMatE foldColdE
   simp only [foldEvalM, FreeQuery.eval_bind, eval_tableM, FreeQuery.eval_pure, stored_eq,
-    eval_ite_pure, eval_h128M]
+    eval_ite_pure, eval_hLabelM]
 
 /-- **L13** for one fold: the evaluator's fold (hot at `hot`, bit label the mask XOR `β·Δ`, the
 garbler's join) is the garbler's fold XOR `Δ` at `(hot + β·shift) mod m`. -/
-theorem foldEvalM_correct (H : HashN) (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (G E : Fin m → Block)
-    (Δ : Block) (hot : Nat) (hhot : hot < m) (β : Bool) (bitMask : Block)
+theorem foldEvalM_correct (H : HashN) (m : Nat) (tagOf : Nat → Nat) (shift : Nat) (G E : Fin m → Label)
+    (Δ : Label) (hot : Nat) (hhot : hot < m) (β : Bool) (bitMask : Label)
     (hE : ∀ ρ, E ρ = G ρ ^^^ (if ρ.val = hot then Δ else 0)) (ρ : Fin m) :
     (foldEvalM m tagOf shift hot (bitMask ^^^ (if β then Δ else 0))
         ((foldGarbleM m tagOf shift bitMask G).eval H).2 E).eval H ρ =
@@ -154,7 +154,7 @@ theorem foldEvalM_correct (H : HashN) (m : Nat) (tagOf : Nat → Nat) (shift : N
         (if ρ.val = (hot + (if β then shift else 0)) % m then Δ else 0) := by
   rw [eval_foldEvalM, eval_foldGarbleM]
   simp only
-  set u : Fin m → Block := fun ρ => h128 H (G ρ) (tagOf ρ.val) with hu
+  set u : Fin m → Label := fun ρ => hLabel H (G ρ) (tagOf ρ.val) with hu
   have hcold : ∀ ρ : Fin m, ρ.val ≠ hot → E ρ = G ρ := by
     intro ρ h; rw [hE, if_neg h, xor_zero_block]
   -- the evaluator's materials are the garbler's XOR `β·Δ` at `hot`
@@ -205,8 +205,8 @@ def foldHot (m value : Nat) : Nat → Nat → Nat → Nat
       foldHot m value count (position + 1)
         ((hot + (if value.testBit position then foldShift m position else 0)) % m)
 
-theorem eval_foldsGarbleM_succ (H : HashN) (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Block)
-    (count position : Nat) (labels : Fin m → Block) :
+theorem eval_foldsGarbleM_succ (H : HashN) (m : Nat) (tagOf : Nat → Nat → Nat) (bitMask : Nat → Label)
+    (count position : Nat) (labels : Fin m → Label) :
     (foldsGarbleM m tagOf bitMask (count + 1) position labels).eval H =
       let step := (foldGarbleM m (tagOf position) (foldShift m position) (bitMask position) labels).eval H
       let rest := (foldsGarbleM m tagOf bitMask count (position + 1) step.1).eval H
@@ -214,9 +214,9 @@ theorem eval_foldsGarbleM_succ (H : HashN) (m : Nat) (tagOf : Nat → Nat → Na
   simp only [foldsGarbleM, FreeQuery.eval_bind, FreeQuery.eval_pure]
 
 /-- **L13 iterated** `foldsEvalM_correct`. -/
-theorem foldsEvalM_correct (H : HashN) (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (Δ : Block)
-    (bitMask bitLabel join : Nat → Block) :
-    ∀ count position hot (G E : Fin m → Block), hot < m →
+theorem foldsEvalM_correct (H : HashN) (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (Δ : Label)
+    (bitMask bitLabel join : Nat → Label) :
+    ∀ count position hot (G E : Fin m → Label), hot < m →
       (∀ ρ, E ρ = G ρ ^^^ (if ρ.val = hot then Δ else 0)) →
       (∀ j, position ≤ j → j < position + count →
         bitLabel j = bitMask j ^^^ (if value.testBit j then Δ else 0)) →
@@ -331,27 +331,8 @@ theorem blocks_reassemble (N : Nat) :
     ring
 
 /-- The dense pin codec round-trips: `pinOfBlocks width (pinBlocks P) = P`. -/
-theorem pinOfBlocks_pinBlocks {width : Nat} (hw : 0 < width) (P : Lanes width) :
-    pinOfBlocks width (pinBlocks P) = P := by
-  have hB : 0 < 2 ^ width := Nat.two_pow_pos width
-  have hpow : ∀ i : Nat, 2 ^ (width * i) = (2 ^ width) ^ i := fun i => by rw [pow_mul]
-  have hdig : ∀ i : Fin laneCount, (P i).val < 2 ^ width := fun i => ZMod.val_lt (P i)
-  have hN : pinNat P < 2 ^ (128 * width) := by
-    have h := digits_lt hB laneCount (fun i => (P i).val) hdig
-    unfold pinNat
-    simp only [hpow]
-    calc _ < (2 ^ width) ^ laneCount := h
-      _ = 2 ^ (128 * width) := by rw [← pow_mul, Nat.mul_comm]
-  funext lane
-  unfold pinOfBlocks pinBlocks
-  have hval : ∑ index : Fin width, (BitVec.ofNat 128 (pinNat P >>> (128 * index.val))).toNat *
-      2 ^ (128 * index.val) = pinNat P := by
-    simp only [BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
-    rw [blocks_reassemble, Nat.mod_eq_of_lt hN]
-  rw [hval, Nat.shiftRight_eq_div_pow]
-  have hget := digits_get hB laneCount (fun i => (P i).val) hdig lane
-  unfold pinNat
-  simp only [hpow]
-  rw [← ZMod.natCast_mod _ (2 ^ width), hget, ZMod.natCast_zmod_val]
+theorem pinOfBlocks_pinBlocks {width : Nat} (_hw : 0 < width) (P : Lanes width) :
+    pinOfBlocks width (pinBlocks P) = P :=
+  Narrow.pinOfBlocks_pinBlocks P
 
 end Kriterion.CRT.SliceC

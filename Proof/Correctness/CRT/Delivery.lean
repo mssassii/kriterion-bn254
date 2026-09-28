@@ -31,8 +31,8 @@ structure CorrectTable (T : CrtTable) : Prop where
 
 /-! ### The garbler's coordinate, field by field -/
 
-theorem coordGarbleM_fields (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Block)
-    (Z : Nat → Block) :
+theorem coordGarbleM_fields (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Label)
+    (Z : Nat → Label) :
     let chunkTableG : Fin T.chunkCount → ChunkGarbled T.castWidth :=
       fun c => (chunkGarbleM T coord Δ Z c.val).eval H
     let chunksG := atNat chunkTableG (ChunkGarbled.empty _)
@@ -68,7 +68,7 @@ theorem chunkValue_zero (T : CrtTable) (v : Nat) : T.chunkValue v 0 = v % 2 ^ T.
 
 /-- One modulus: the evaluator's residue of every encoding is the garbler's plus `slope·v` modulo
 `m_i`, given the chunk step's invariants, the garbler's published material and residue joins. -/
-theorem mod_residue (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Block) (slopes : Fin S → Nat)
+theorem mod_residue (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Label) (slopes : Fin S → Nat)
     (v : Nat) (hT : CorrectTable T) (hv : v < 2 ^ T.inputBits) (pub : ConvPublic)
     (joinsE : Fin T.count → Fin S → Nat) (chunksG : Nat → ChunkGarbled T.castWidth)
     (chunksE : Nat → ChunkEval T.castWidth)
@@ -123,7 +123,7 @@ theorem mod_residue (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Block) (slo
     refine hbody.trans (Nat.ModEq.add_left _ (Nat.ModEq.mul_left _ ?_))
     exact (Nat.mod_modEq _ _).trans hσ
 
-theorem coord_delivery (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Block) (Z : Nat → Block)
+theorem coord_delivery (H : HashN) (T : CrtTable) (S coord : Nat) (Δ : Label) (Z : Nat → Label)
     (slopes : Fin S → Nat) (v : Nat) (hT : CorrectTable T) (hv : v < 2 ^ T.inputBits)
     (hav : ∀ e, slopes e * v < T.wrapBound) :
     let g := (coordGarbleM T S coord Δ Z).eval H

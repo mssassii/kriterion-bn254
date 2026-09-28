@@ -33,31 +33,31 @@ open Cryptography Kriterion.CRT Kriterion.CRT.ExtractSpec
 
 /-! ### XOR sums and XOR algebra -/
 
-theorem xsum_congr {ι : Type} {s : Finset ι} {f g : ι → Block} (h : ∀ x ∈ s, f x = g x) :
+theorem xsum_congr {ι : Type} {s : Finset ι} {f g : ι → Label} (h : ∀ x ∈ s, f x = g x) :
     xsum s f = xsum s g :=
   Finset.fold_congr h
 
-theorem xsum_erase {ι : Type} [DecidableEq ι] {s : Finset ι} {a : ι} (ha : a ∈ s) (f : ι → Block) :
+theorem xsum_erase {ι : Type} [DecidableEq ι] {s : Finset ι} {a : ι} (ha : a ∈ s) (f : ι → Label) :
     xsum s f = f a ^^^ xsum (s.erase a) f := by
   unfold xsum
   conv_lhs => rw [← Finset.insert_erase ha]
   rw [Finset.fold_insert (Finset.notMem_erase a s)]
 
-theorem xor_zero_block (a : Block) : a ^^^ (0 : Block) = a := by
+theorem xor_zero_block {width : Nat} (a : BitVec width) : a ^^^ (0 : BitVec width) = a := by
   apply BitVec.eq_of_getLsbD_eq; intro i _
   simp
 
-theorem xor_cancel_mid (a b c : Block) : (a ^^^ c) ^^^ (b ^^^ c) = a ^^^ b := by
+theorem xor_cancel_mid {width : Nat} (a b c : BitVec width) : (a ^^^ c) ^^^ (b ^^^ c) = a ^^^ b := by
   apply BitVec.eq_of_getLsbD_eq; intro i _
   simp only [BitVec.getLsbD_xor]
   cases a.getLsbD i <;> cases b.getLsbD i <;> cases c.getLsbD i <;> rfl
 
-theorem xor_hot_solve (b d t e : Block) : (b ^^^ d) ^^^ ((t ^^^ e) ^^^ b) ^^^ e = t ^^^ d := by
+theorem xor_hot_solve {width : Nat} (b d t e : BitVec width) : (b ^^^ d) ^^^ ((t ^^^ e) ^^^ b) ^^^ e = t ^^^ d := by
   apply BitVec.eq_of_getLsbD_eq; intro i _
   simp only [BitVec.getLsbD_xor]
   cases b.getLsbD i <;> cases d.getLsbD i <;> cases t.getLsbD i <;> cases e.getLsbD i <;> rfl
 
-theorem xor_swap_right (a b c : Block) : (a ^^^ b) ^^^ c = (a ^^^ c) ^^^ b := by
+theorem xor_swap_right {width : Nat} (a b c : BitVec width) : (a ^^^ b) ^^^ c = (a ^^^ c) ^^^ b := by
   apply BitVec.eq_of_getLsbD_eq; intro i _
   simp only [BitVec.getLsbD_xor]
   cases a.getLsbD i <;> cases b.getLsbD i <;> cases c.getLsbD i <;> rfl
@@ -110,21 +110,21 @@ variable {rb : Nat} (sp : StageParams rb)
 /-! ### L9: off-path nodes agree with the garbler's -/
 
 /-- The closed labels up to round `N` are the garbler's siblings of the active path. -/
-def ClosedOK (b0 Δ : Block) (s : Nat) (cl : Nat → Block) (N : Nat) : Prop :=
+def ClosedOK (b0 Δ : Label) (s : Nat) (cl : Nat → Label) (N : Nat) : Prop :=
   ∀ j < N, ∀ x, x % 2 ^ j = s % 2 ^ j → x.testBit j ≠ s.testBit j → cl j = gNode sp b0 Δ (j + 1) x
 
-theorem stepMat_succ (b0 : Block) (n x : Nat) (lab : Block) :
+theorem stepMat_succ (b0 : Label) (n x : Nat) (lab : Label) :
     stepMat sp b0 (n + 1) x lab = sp.mat (n + 1) x lab :=
   rfl
 
-theorem offPath_succ (s : Nat) (cl : Nat → Block) (n x : Nat) :
+theorem offPath_succ (s : Nat) (cl : Nat → Label) (n x : Nat) :
     offPath sp s cl (n + 1) x =
       if x % 2 ^ n = s % 2 ^ n then cl n
       else if x.testBit n then sp.mat n (x % 2 ^ n) (offPath sp s cl n (x % 2 ^ n))
       else offPath sp s cl n (x % 2 ^ n) ^^^ sp.mat n (x % 2 ^ n) (offPath sp s cl n (x % 2 ^ n)) :=
   rfl
 
-theorem gNode_succ (b0 Δ : Block) (n x : Nat) :
+theorem gNode_succ (b0 Δ : Label) (n x : Nat) :
     gNode sp b0 Δ (n + 1) x =
       if x.testBit n then stepMat sp b0 n (x % 2 ^ n) (gNode sp b0 Δ n (x % 2 ^ n))
       else gNode sp b0 Δ n (x % 2 ^ n) ^^^ stepMat sp b0 n (x % 2 ^ n) (gNode sp b0 Δ n (x % 2 ^ n)) :=
@@ -132,7 +132,7 @@ theorem gNode_succ (b0 Δ : Block) (n x : Nat) :
 
 /-- **L9** `offPath_eq`: every node that branches off the active path before level `N` has the
 garbler's label, once the closed labels up to round `N` do. -/
-theorem offPath_eq (b0 Δ : Block) (s : Nat) (cl : Nat → Block) (N : Nat)
+theorem offPath_eq (b0 Δ : Label) (s : Nat) (cl : Nat → Label) (N : Nat)
     (hcl : ClosedOK sp b0 Δ s cl N) :
     ∀ n x, x % 2 ^ (min n N) ≠ s % 2 ^ (min n N) → offPath sp s cl n x = gNode sp b0 Δ n x := by
   intro n
@@ -172,7 +172,7 @@ theorem offPath_eq (b0 Δ : Block) (s : Nat) (cl : Nat → Block) (N : Nat)
 
 /-- **L8** `classSum_eval`: with the closed labels correct up to round `n` (`n ≤ w`) and the
 garbler's pin, `R_n + q_n • (P - T_n) = res_n + q_n • Δ⃗`. -/
-theorem eRes_eq (R : Lanes rb) (Δ : Block) (s : Nat) (cl : Nat → Block) (n : Nat) (hn : n ≤ sp.w)
+theorem eRes_eq (R : Lanes rb) (Δ : Label) (s : Nat) (cl : Nat → Label) (n : Nat) (hn : n ≤ sp.w)
     (hcl : ClosedOK sp (gBit0 sp R) Δ s cl n) :
     eRes sp s cl (gPin sp R Δ) n =
       gRes sp R Δ n + ((s % 2 ^ n : Nat) : ZMod (2 ^ rb)) • deltaLanes rb Δ := by
@@ -213,13 +213,13 @@ theorem eRes_eq (R : Lanes rb) (Δ : Block) (s : Nat) (cl : Nat → Block) (n : 
 
 /-! ### The bit labels (L7 applied through L8) -/
 
-theorem gBit_succ (R : Lanes rb) (Δ : Block) (n : Nat) (hn : n < sp.w) (hn0 : n ≠ 0) :
+theorem gBit_succ (R : Lanes rb) (Δ : Label) (n : Nat) (hn : n < sp.w) (hn0 : n ≠ 0) :
     gBit sp R Δ n = laneBit (R - gRes sp R Δ n) n := by
   unfold gBit
   rw [if_neg hn0, ← reduceTo_sub sp.hw, laneBit_reduceTo hn]
 
 /-- The evaluator's bit label of round `n < w` is the garbler's mask XOR `s_n · Δ`. -/
-theorem eBit_eq (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^ sp.w) (cl : Nat → Block)
+theorem eBit_eq (R : Lanes rb) (Δ : Label) (σ s : Nat) (hs : s = σ % 2 ^ sp.w) (cl : Nat → Label)
     (n : Nat) (hn : n < sp.w) (hcl : ClosedOK sp (gBit0 sp R) Δ s cl n) :
     eBit sp (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ) s cl (gPin sp R Δ) n =
       gBit sp R Δ n ^^^ (if s.testBit n then Δ else 0) := by
@@ -253,7 +253,7 @@ theorem eBit_eq (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^ sp.w
 
 /-! ### Level sums -/
 
-theorem gLevelSum_eq (R : Lanes rb) (Δ : Block) (s : Nat) (cl : Nat → Block) (n : Nat)
+theorem gLevelSum_eq (R : Lanes rb) (Δ : Label) (s : Nat) (cl : Nat → Label) (n : Nat)
     (hcl : ClosedOK sp (gBit0 sp R) Δ s cl n) :
     gLevelSum sp R Δ n =
       sp.mat n (s % 2 ^ n) (gNode sp (gBit0 sp R) Δ n (s % 2 ^ n)) ^^^ eLevelSum sp s cl n := by
@@ -271,7 +271,7 @@ theorem gLevelSum_eq (R : Lanes rb) (Δ : Block) (s : Nat) (cl : Nat → Block) 
 
 /-- The solved hot material of round `n < w` is the garbler's step material at the active slot,
 XOR `s_n · Δ`. -/
-theorem eHot_eq (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^ sp.w) (cl : Nat → Block)
+theorem eHot_eq (R : Lanes rb) (Δ : Label) (σ s : Nat) (hs : s = σ % 2 ^ sp.w) (cl : Nat → Label)
     (n : Nat) (hn : n < sp.w) (hcl : ClosedOK sp (gBit0 sp R) Δ s cl n) :
     eHot sp (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ) s (gJoin sp R Δ) (gPin sp R Δ) cl n =
       stepMat sp (gBit0 sp R) n (s % 2 ^ n) (gNode sp (gBit0 sp R) Δ n (s % 2 ^ n)) ^^^
@@ -292,7 +292,7 @@ theorem eHot_eq (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^ sp.w
 
 /-- **L10**, the round invariant: after `n ≤ w` rounds the active label is the garbler's active
 node XOR `Δ`, and the closed labels are the garbler's siblings. -/
-theorem eRounds_spec (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^ sp.w) :
+theorem eRounds_spec (R : Lanes rb) (Δ : Label) (σ s : Nat) (hs : s = σ % 2 ^ sp.w) :
     ∀ n ≤ sp.w,
       (eRounds sp (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ) s (gJoin sp R Δ) (gPin sp R Δ) n).1 =
           gNode sp (gBit0 sp R) Δ n (s % 2 ^ n) ^^^ Δ ∧
@@ -303,7 +303,7 @@ theorem eRounds_spec (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^
   | zero =>
     intro _
     refine ⟨?_, fun j hj => absurd hj (Nat.not_lt_zero j)⟩
-    show (0 : Block) = Δ ^^^ Δ
+    show (0 : Label) = Δ ^^^ Δ
     rw [BitVec.xor_self]
     rfl
   | succ n ih =>
@@ -352,7 +352,7 @@ theorem eRounds_spec (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^
 and the stage value `s = σ mod 2^w` holds: the leaf labels `G_α ⊕ [α = s]·Δ`; the bit labels
 `b_n ⊕ s_n·Δ` for `n < w`; the upcast `res_w + s•Δ⃗`; and the peeled remainder
 `R' + ⌊σ / 2^w⌋•Δ⃗`, an arithmetic label of the next remainder value. -/
-theorem stage_invariant (hw1 : 1 ≤ sp.w) (R : Lanes rb) (Δ : Block) (σ s : Nat)
+theorem stage_invariant (hw1 : 1 ≤ sp.w) (R : Lanes rb) (Δ : Label) (σ s : Nat)
     (hs : s = σ % 2 ^ sp.w) :
     let RE := R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ
     (∀ α < 2 ^ sp.w, eLeaf sp RE s (gJoin sp R Δ) (gPin sp R Δ) α =
@@ -392,22 +392,22 @@ end Stage
 
 /-! ### The per-wire form over the layer's hash -/
 
-/-- One fused stage over the hash of the layer: tree material `h128 H label (treeTag level slot)`
-and leaf casts `castLanes rb (hlong H label (castTag leaf) (castAnswers rb))` (D11). At the frozen
+/-- One fused stage over the hash of the layer: tree material `hLabel H label (treeTag level slot)`
+and leaf casts `castLanes rb (hlong H (embed label) (castTag leaf) (castAnswers rb))` (D11). At the frozen
 tags, `treeTag = fun n x => tagCode Family.extTree κ i st n x 0` and
 `castTag = fun α j => tagCode Family.extCast κ i st 0 α j`. -/
 def hashStage (H : HashN) {rb : Nat} (w : Nat) (hw : w ≤ rb) (treeTag castTag : Nat → Nat → Nat) :
     StageParams rb where
   w := w
   hw := hw
-  mat := fun n x lab => h128 H lab (treeTag n x)
-  castF := fun α lab => castLanes rb (hlong H lab (castTag α) (castAnswers rb))
+  mat := fun n x lab => hLabel H lab (treeTag n x)
+  castF := fun α lab => castLanes rb (hlong H (embed lab) (castTag α) (castAnswers rb))
 
 /-- **C3, per-wire form**: `stage_invariant` for every hash `H : HashN` and every tag assignment;
 with `H = tableHash T` it is the statement on an answer table `T`, with hot positions overridden
 by `Function.update`s of `T`. -/
 theorem stage_invariant_hash (H : HashN) {rb : Nat} (w : Nat) (hw : w ≤ rb) (hw1 : 1 ≤ w)
-    (treeTag castTag : Nat → Nat → Nat) (R : Lanes rb) (Δ : Block) (σ s : Nat) (hs : s = σ % 2 ^ w) :
+    (treeTag castTag : Nat → Nat → Nat) (R : Lanes rb) (Δ : Label) (σ s : Nat) (hs : s = σ % 2 ^ w) :
     let sp := hashStage H w hw treeTag castTag
     let RE := R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ
     (∀ α < 2 ^ sp.w, eLeaf sp RE s (gJoin sp R Δ) (gPin sp R Δ) α =

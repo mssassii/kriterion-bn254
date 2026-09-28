@@ -23,7 +23,7 @@ open Cryptography Kriterion.CRT Kriterion.CRT.ExtractSpec Kriterion.ArgoMAC
 
 /-! ### Finite sums over slots -/
 
-theorem xsum_filter_ind {s : Finset Nat} (p : Nat → Prop) [DecidablePred p] (f : Nat → Block) :
+theorem xsum_filter_ind {s : Finset Nat} (p : Nat → Prop) [DecidablePred p] (f : Nat → Label) :
     xsum (s.filter p) f = xsum s (fun x => if p x then f x else 0) := by
   induction s using Finset.induction_on with
   | empty => rfl
@@ -34,10 +34,10 @@ theorem xsum_filter_ind {s : Finset Nat} (p : Nat → Prop) [DecidablePred p] (f
         if_pos hp]
     · rw [if_neg hp, xsum_insert_nat ha, ih, if_neg hp, zero_xor_block]
 
-theorem xsum_xor {s : Finset Nat} (f g : Nat → Block) :
+theorem xsum_xor {s : Finset Nat} (f g : Nat → Label) :
     xsum s (fun x => f x ^^^ g x) = xsum s f ^^^ xsum s g := by
   induction s using Finset.induction_on with
-  | empty => show (0 : Block) = 0 ^^^ 0; rw [xor_zero_block]
+  | empty => show (0 : Label) = 0 ^^^ 0; rw [xor_zero_block]
   | insert a s ha ih =>
     rw [xsum_insert_nat ha, xsum_insert_nat ha, xsum_insert_nat ha, ih]
     xor_norm
@@ -67,7 +67,7 @@ theorem injOn_slot (start slot : Nat) (s : Set Nat) :
   exact Nat.eq_of_mul_eq_mul_left (Nat.two_pow_pos start) h'
 
 /-- XOR over the relative slots of a subtree is the XOR over its absolute slots. -/
-theorem xsum_slot (start d slot : Nat) (hslot : slot < 2 ^ start) (F : Nat → Block) :
+theorem xsum_slot (start d slot : Nat) (hslot : slot < 2 ^ start) (F : Nat → Label) :
     xsum (Finset.range (2 ^ d)) (fun t => F (slot + 2 ^ start * t)) =
       xsum (Finset.range (2 ^ (start + d))) (fun x => if x % 2 ^ start = slot then F x else 0) := by
   rw [← xsum_filter_ind, ← image_slot start d slot hslot]
@@ -131,7 +131,7 @@ theorem branch_disjoint {x s c n : Nat} (hcs : c % 2 ^ n = s % 2 ^ n) :
   rw [← mod_two_pow_mod_of_le (x := x) (Nat.le_succ n), h2, hcs]
 
 theorem ite_xor_union {A B C : Prop} [Decidable A] [Decidable B] [Decidable C] (hC : C ↔ (A ∨ B))
-    (hd : ¬ (A ∧ B)) (v : Block) :
+    (hd : ¬ (A ∧ B)) (v : Label) :
     (if A then v else 0) ^^^ (if B then v else 0) = if C then v else 0 := by
   by_cases hA : A <;> by_cases hB : B
   · exact absurd ⟨hA, hB⟩ hd
@@ -150,13 +150,13 @@ theorem ite_add_union {M : Type} [AddCommMonoid M] {A B C : Prop} [Decidable A] 
 
 /-! ### Helpers on the programs -/
 
-theorem stepMat_pos {rb : Nat} (sp : StageParams rb) (b0 : Block) {n : Nat} (hn : 1 ≤ n) (x : Nat)
-    (lab : Block) : stepMat sp b0 n x lab = sp.mat n x lab := by
+theorem stepMat_pos {rb : Nat} (sp : StageParams rb) (b0 : Label) {n : Nat} (hn : 1 ≤ n) (x : Nat)
+    (lab : Label) : stepMat sp b0 n x lab = sp.mat n x lab := by
   obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
   rfl
 
-theorem eval_castM (H : HashN) (l : Nat) (label : Block) (tagOf : Nat → Nat) :
-    (castM l label tagOf).eval H = castLanes l (hlong H label tagOf (castAnswers l)) := by
+theorem eval_castM (H : HashN) (l : Nat) (label : Label) (tagOf : Nat → Nat) :
+    (castM l label tagOf).eval H = castLanes l (hlong H (embed label) tagOf (castAnswers l)) := by
   simp [castM, materialize_eq]
 
 theorem scaleLanes_eq {l : Nat} (k : Nat) (A : Lanes l) : scaleLanes k A = (k : ZMod (2 ^ l)) • A := by
@@ -175,8 +175,8 @@ section Garbler
 
 variable (H : HashN) {rb : Nat}
 
-theorem eval_treeGarbleM (tagOf : Nat → Nat → Nat) (Δ b0 : Block) (sp : StageParams rb)
-    (hmat : ∀ n x lab, sp.mat n x lab = h128 H lab (tagOf n x)) :
+theorem eval_treeGarbleM (tagOf : Nat → Nat → Nat) (Δ b0 : Label) (sp : StageParams rb)
+    (hmat : ∀ n x lab, sp.mat n x lab = hLabel H lab (tagOf n x)) :
     ∀ levels,
       (∀ x : Fin (2 ^ levels), ((treeGarbleM tagOf Δ b0 levels).eval H).1 x =
         gNode sp b0 Δ levels x.val) ∧
@@ -216,7 +216,7 @@ theorem eval_treeGarbleM (tagOf : Nat → Nat → Nat) (Δ b0 : Block) (sp : Sta
 variable (w : Nat) (hw : w ≤ rb) (treeTag castTag : Nat → Nat → Nat)
 
 /-- The garbler program computes the pure stage of `ExtractSpec` over the layer's hash. -/
-theorem extStageGarbleM_eval (Δ : Block) (R : Lanes rb) :
+theorem extStageGarbleM_eval (Δ : Label) (R : Lanes rb) :
     let sp := hashStage H w hw treeTag castTag
     let g := (extStageGarbleM w treeTag castTag Δ R).eval H
     (∀ α < 2 ^ w, g.leaves α = gLeaf sp R Δ α) ∧
@@ -231,7 +231,7 @@ theorem extStageGarbleM_eval (Δ : Block) (R : Lanes rb) :
     intro α hα
     rw [ht1]; rfl
   have hres : ∀ n, (∑ leaf : Fin (2 ^ w), scaleLanes (leaf.val % 2 ^ n)
-      (castLanes rb (hlong H (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf)
+      (castLanes rb (hlong H (embed (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf))
         (castTag leaf.val) (castAnswers rb)))) = gRes sp R Δ n := by
     intro n
     unfold gRes
@@ -241,7 +241,7 @@ theorem extStageGarbleM_eval (Δ : Block) (R : Lanes rb) :
     rw [scaleLanes_eq, ← hcast leaf.val leaf.isLt]
     rfl
   have hpinsum : (∑ leaf : Fin (2 ^ w),
-      castLanes rb (hlong H (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf)
+      castLanes rb (hlong H (embed (((treeGarbleM treeTag Δ (laneBit (reduceTo w R) 0) w).eval H).1 leaf))
         (castTag leaf.val) (castAnswers rb))) = ∑ α ∈ Finset.range (2 ^ w), gCast sp R Δ α := by
     rw [← Fin.sum_univ_eq_sum_range (fun α => gCast sp R Δ α)]
     apply Finset.sum_congr rfl
@@ -273,13 +273,13 @@ end Garbler
 
 /-! ### Algebra of one round -/
 
-theorem xsum_zero_fun {s : Finset Nat} : xsum s (fun _ => (0 : Block)) = 0 := by
+theorem xsum_zero_fun {s : Finset Nat} : xsum s (fun _ => (0 : Label)) = 0 := by
   induction s using Finset.induction_on with
   | empty => rfl
   | insert a s ha ih => rw [xsum_insert_nat ha, ih, xor_zero_block]
 
 /-- The XOR over a level is the active slot's material XOR the XOR over the other slots. -/
-theorem xsum_single_out (n q : Nat) (hq : q < 2 ^ n) (F : Nat → Block) :
+theorem xsum_single_out (n q : Nat) (hq : q < 2 ^ n) (F : Nat → Label) :
     xsum (Finset.range (2 ^ n)) F =
       F q ^^^ xsum (Finset.range (2 ^ n)) (fun x => if x % 2 ^ n ≠ q then F x else 0) := by
   rw [xsum_erase (Finset.mem_range.mpr hq), ← Finset.filter_ne', xsum_filter_ind]
@@ -290,7 +290,7 @@ theorem xsum_single_out (n q : Nat) (hq : q < 2 ^ n) (F : Nat → Block) :
 
 /-- **L8**, generic: with the closed leaves' class and cast sums and the pin,
 `R_n + q • (P - T_n) = res_n + q • Δ⃗`. -/
-theorem classSum_identity {rb : Nat} (N : Nat) (A : Nat → Lanes rb) (Δ : Block) (n q : Nat) :
+theorem classSum_identity {rb : Nat} (N : Nat) (A : Nat → Lanes rb) (Δ : Label) (n q : Nat) :
     (∑ α ∈ Finset.range N,
         if α % 2 ^ n ≠ q then ((α % 2 ^ n : Nat) : ZMod (2 ^ rb)) • A α else 0) +
       ((q : Nat) : ZMod (2 ^ rb)) • ((∑ α ∈ Finset.range N, A α + deltaLanes rb Δ) -
@@ -321,7 +321,7 @@ theorem classSum_identity {rb : Nat} (N : Nat) (A : Nat → Lanes rb) (Δ : Bloc
   ring
 
 /-- The bit of round `n ≥ 1` (L7 through L8). -/
-theorem bit_of_classSum {rb : Nat} (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (σ n : Nat)
+theorem bit_of_classSum {rb : Nat} (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (σ n : Nat)
     (hn : n < sp.w) (hn0 : n ≠ 0) :
     laneBit (reduceTo sp.w (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ) -
       reduceTo sp.w (gRes sp R Δ n + ((σ % 2 ^ n : Nat) : ZMod (2 ^ rb)) • deltaLanes rb Δ)) n =
@@ -341,7 +341,7 @@ theorem bit_of_classSum {rb : Nat} (sp : StageParams rb) (R : Lanes rb) (Δ : Bl
   rw [hsplit, laneBit_add_shift hrb, Nat.testBit_div_two_pow, Nat.zero_add]
 
 /-- The bit-0 label (L7 at `n = 0`). -/
-theorem bit0_label {rb : Nat} (sp : StageParams rb) (hw1 : 1 ≤ sp.w) (R : Lanes rb) (Δ : Block)
+theorem bit0_label {rb : Nat} (sp : StageParams rb) (hw1 : 1 ≤ sp.w) (R : Lanes rb) (Δ : Label)
     (σ : Nat) :
     laneBit (reduceTo sp.w (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ)) 0 =
       gBit0 sp R ^^^ (if σ.testBit 0 then Δ else 0) := by
@@ -359,8 +359,8 @@ variable (H : HashN) {rb : Nat} (w : Nat) (hw : w ≤ rb) (treeTag castTag : Nat
 @[simp] theorem hashStage_w (H : HashN) {rb : Nat} (w : Nat) (hw : w ≤ rb)
     (treeTag castTag : Nat → Nat → Nat) : (hashStage H w hw treeTag castTag).w = w := rfl
 
-theorem eval_subtreeM (sp : StageParams rb) (hmat : ∀ n x lab, sp.mat n x lab = h128 H lab (treeTag n x))
-    (b0 Δ : Block) (start slot : Nat) (hstart : 1 ≤ start) (hslot : slot < 2 ^ start) :
+theorem eval_subtreeM (sp : StageParams rb) (hmat : ∀ n x lab, sp.mat n x lab = hLabel H lab (treeTag n x))
+    (b0 Δ : Label) (start slot : Nat) (hstart : 1 ≤ start) (hslot : slot < 2 ^ start) :
     ∀ d, (∀ t : Fin (2 ^ d),
         ((subtreeM treeTag start slot (gNode sp b0 Δ start slot) d).eval H).1 t =
           gNode sp b0 Δ (start + d) (slot + 2 ^ start * t.val)) ∧
@@ -400,7 +400,7 @@ theorem eval_subtreeM (sp : StageParams rb) (hmat : ∀ n x lab, sp.mat n x lab 
 /-- The evaluator's sums after the closed nodes of rounds `0 .. n - 1` are expanded: the garbler's
 materials, class sums and casts over exactly the nodes and leaves that branch off the active path of
 `s` before level `n`, and the garbler's labels on those leaves. -/
-def Sums (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s n : Nat) (st : StageState rb) : Prop :=
+def Sums (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s n : Nat) (st : StageState rb) : Prop :=
   (∀ j, 1 ≤ j → j < sp.w → st.levelSum j = xsum (Finset.range (2 ^ j)) (fun x =>
       if x % 2 ^ (min j n) ≠ s % 2 ^ (min j n) then sp.mat j x (gNode sp (gBit0 sp R) Δ j x) else 0)) ∧
   (∀ j ≤ sp.w, st.classSum j = ∑ α ∈ Finset.range (2 ^ sp.w),
@@ -412,7 +412,7 @@ def Sums (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s n : Nat) (st : Sta
 
 /-- Expanding the closed node `c` of round `n` (label: the garbler's) moves the sums from `n` to
 `n + 1` and leaves the active label and the bits alone. -/
-theorem expandM_sums (R : Lanes rb) (Δ : Block) (s n : Nat) (hn : n < w) (c : Nat)
+theorem expandM_sums (R : Lanes rb) (Δ : Label) (s n : Nat) (hn : n < w) (c : Nat)
     (hc : c < 2 ^ (n + 1)) (hcs : c % 2 ^ n = s % 2 ^ n) (hcb : c.testBit n ≠ s.testBit n)
     (st : StageState rb) (hst : Sums (hashStage H w hw treeTag castTag) R Δ s n st) :
     let st' := (expandM w treeTag castTag (n + 1) c (gNode (hashStage H w hw treeTag castTag)
@@ -438,8 +438,8 @@ theorem expandM_sums (R : Lanes rb) (Δ : Block) (s n : Nat) (hn : n < w) (c : N
     rfl
   have hcastsum : ∀ (V : Nat → ZMod (2 ^ rb)),
       (∑ t : Fin (2 ^ (w - (n + 1))), V (c + 2 ^ (n + 1) * t.val) •
-        castLanes rb (hlong H (((subtreeM treeTag (n + 1) c (gNode sp (gBit0 sp R) Δ (n + 1) c)
-          (w - (n + 1))).eval H).1 t) (castTag (c + 2 ^ (n + 1) * t.val)) (castAnswers rb))) =
+        castLanes rb (hlong H (embed (((subtreeM treeTag (n + 1) c (gNode sp (gBit0 sp R) Δ (n + 1) c)
+          (w - (n + 1))).eval H).1 t)) (castTag (c + 2 ^ (n + 1) * t.val)) (castAnswers rb))) =
       ∑ α ∈ Finset.range (2 ^ w), (if α % 2 ^ (n + 1) = c then V α • gCast sp R Δ α else 0) := by
     intro V
     rw [← sum_slot' (n + 1) (w - (n + 1)) c w hwn hc (fun α => V α • gCast sp R Δ α),
@@ -507,11 +507,11 @@ theorem expandM_sums (R : Lanes rb) (Δ : Block) (s n : Nat) (hn : n < w) (c : N
       exact hE α hα (this.resolve_right hαc)
 
 /-- The round invariant of the evaluator program. -/
-def Inv (sp : StageParams rb) (R : Lanes rb) (Δ : Block) (s n : Nat) (st : StageState rb) : Prop :=
+def Inv (sp : StageParams rb) (R : Lanes rb) (Δ : Label) (s n : Nat) (st : StageState rb) : Prop :=
   st.active = gNode sp (gBit0 sp R) Δ n (s % 2 ^ n) ^^^ Δ ∧ Sums sp R Δ s n st ∧
     ∀ k < n, st.bits k = gBit sp R Δ k ^^^ (if s.testBit k then Δ else 0)
 
-theorem gNode_succ_active {rb : Nat} (sp : StageParams rb) (b0 Δ : Block) (s n : Nat) :
+theorem gNode_succ_active {rb : Nat} (sp : StageParams rb) (b0 Δ : Label) (s n : Nat) :
     gNode sp b0 Δ (n + 1) (s % 2 ^ (n + 1)) =
       if s.testBit n then stepMat sp b0 n (s % 2 ^ n) (gNode sp b0 Δ n (s % 2 ^ n))
       else gNode sp b0 Δ n (s % 2 ^ n) ^^^ stepMat sp b0 n (s % 2 ^ n) (gNode sp b0 Δ n (s % 2 ^ n)) := by
@@ -522,9 +522,9 @@ theorem gNode_succ_active {rb : Nat} (sp : StageParams rb) (b0 Δ : Block) (s n 
 
 /-- After expanding the closed node of round `n` from a state with the sums of round `n`, the round
 invariant of `n + 1` holds as soon as the active label and the bits are right. -/
-theorem inv_after_expand (R : Lanes rb) (Δ : Block) (s n : Nat) (hn : n < w) (c : Nat)
+theorem inv_after_expand (R : Lanes rb) (Δ : Label) (s n : Nat) (hn : n < w) (c : Nat)
     (hc : c < 2 ^ (n + 1)) (hcs : c % 2 ^ n = s % 2 ^ n) (hcb : c.testBit n ≠ s.testBit n)
-    (label : Block) (st : StageState rb)
+    (label : Label) (st : StageState rb)
     (hst : Sums (hashStage H w hw treeTag castTag) R Δ s n st)
     (hlabel : label = gNode (hashStage H w hw treeTag castTag)
       (gBit0 (hashStage H w hw treeTag castTag) R) Δ (n + 1) c)
@@ -539,7 +539,7 @@ theorem inv_after_expand (R : Lanes rb) (Δ : Block) (s n : Nat) (hn : n < w) (c
   exact ⟨ha'.trans hact, hs', fun k hk => (congrFun hb' k).trans (hbits k hk)⟩
 
 /-- **L10 on the program**, one round `1 ≤ n < w`. -/
-theorem stageRoundM_inv (R : Lanes rb) (Δ : Block) (σ : Nat) (joins : Nat → Block) (pin : Lanes rb)
+theorem stageRoundM_inv (R : Lanes rb) (Δ : Label) (σ : Nat) (joins : Nat → Label) (pin : Lanes rb)
     (hJ : ∀ n, 1 ≤ n → n < w → joins n = gJoin (hashStage H w hw treeTag castTag) R Δ n)
     (hP : pin = gPin (hashStage H w hw treeTag castTag) R Δ)
     (n : Nat) (hn1 : 1 ≤ n) (hn : n < w) (st : StageState rb)
@@ -630,7 +630,7 @@ theorem stageRoundM_inv (R : Lanes rb) (Δ : Block) (σ : Nat) (joins : Nat → 
       · rw [if_neg hkn]; exact hbits k (by omega)
 
 /-- The rounds `n, ..., n + r - 1` keep the invariant. -/
-theorem stageRoundsM_inv (R : Lanes rb) (Δ : Block) (σ : Nat) (joins : Nat → Block) (pin : Lanes rb)
+theorem stageRoundsM_inv (R : Lanes rb) (Δ : Label) (σ : Nat) (joins : Nat → Label) (pin : Lanes rb)
     (hJ : ∀ n, 1 ≤ n → n < w → joins n = gJoin (hashStage H w hw treeTag castTag) R Δ n)
     (hP : pin = gPin (hashStage H w hw treeTag castTag) R Δ) :
     ∀ r n, 1 ≤ n → n + r ≤ w → ∀ st : StageState rb,
@@ -650,7 +650,7 @@ theorem stageRoundsM_inv (R : Lanes rb) (Δ : Block) (σ : Nat) (joins : Nat →
     exact h2
 
 /-- Round 0: expanding the closed level-1 slot from the empty state gives the invariant at 1. -/
-theorem initial_inv (hw1 : 1 ≤ w) (R : Lanes rb) (Δ : Block) (σ : Nat) :
+theorem initial_inv (hw1 : 1 ≤ w) (R : Lanes rb) (Δ : Label) (σ : Nat) :
     Inv (hashStage H w hw treeTag castTag) R Δ (σ % 2 ^ w) 1
       ((expandM w treeTag castTag 1 ((σ % 2 ^ w % 2) ^^^ 1)
         (laneBit (materialize (reduceTo w (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ))) 0)
@@ -680,7 +680,7 @@ theorem initial_inv (hw1 : 1 ≤ w) (R : Lanes rb) (Δ : Block) (σ : Nat) :
     rw [hsb0]; rcases hmod2 with h | h <;> rw [h] <;> decide
   refine inv_after_expand H w hw treeTag castTag R Δ s 0 (by omega) _ hc hcs hcb _ _ ?_ ?_ ?_ ?_
   · refine ⟨fun j hj1 _ => ?_, fun j _ => ?_, fun j _ => ?_, fun α _ hne => ?_⟩
-    · show (0 : Block) = _
+    · show (0 : Label) = _
       simp only [Nat.min_zero, pow_zero, Nat.mod_one, ne_eq, not_true_eq_false, if_false]
       exact xsum_zero_fun.symm
     · show (0 : Lanes rb) = _
@@ -723,7 +723,7 @@ theorem initial_inv (hw1 : 1 ≤ w) (R : Lanes rb) (Δ : Block) (σ : Nat) :
     have hk0 : k = 0 := by omega
     subst hk0
     show (if (0 : Nat) = 0 then laneBit (reduceTo w (R + (σ : ZMod (2 ^ rb)) •
-      deltaLanes rb Δ)) 0 else (0 : Block)) = _
+      deltaLanes rb Δ)) 0 else (0 : Label)) = _
     rw [if_pos rfl, hb0]
     unfold gBit
     rw [if_pos rfl]
@@ -734,7 +734,7 @@ functions, offset `Δ`, remainder mask `R` and value `σ`, the evaluator program
 `R + σ•Δ⃗`, the stage value `s = σ mod 2^w` and the garbler program's joins and pin returns the
 garbler's leaves XOR `[α = s]·Δ`, the garbler's bit masks XOR `σ_n·Δ`, and the garbler's next
 remainder plus `⌊σ / 2^w⌋•Δ⃗`. -/
-theorem extStage_correct (hw1 : 1 ≤ w) (Δ : Block) (R : Lanes rb) (σ : Nat) :
+theorem extStage_correct (hw1 : 1 ≤ w) (Δ : Label) (R : Lanes rb) (σ : Nat) :
     let g := (extStageGarbleM w treeTag castTag Δ R).eval H
     let e := (extStageEvalM w treeTag castTag (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ)
       (σ % 2 ^ w) g.joins g.pin).eval H

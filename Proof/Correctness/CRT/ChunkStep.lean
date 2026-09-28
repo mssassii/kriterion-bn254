@@ -17,25 +17,25 @@ open Cryptography Kriterion.CRT Kriterion.CRT.ExtractSpec Kriterion.ArgoMAC
 
 /-! ### Trees from the constant wire -/
 
-theorem eval_treeGarbleM_one (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : Block) :
+theorem eval_treeGarbleM_one (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : Label) :
     (treeGarbleM tagOf Δ b0 1).eval H =
       (extendLevel 0 (fun _ => Δ) (fun _ => b0), fun _ => 0) := by
   simp [treeGarbleM]
 
-theorem eval_treeGarbleM_succ (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : Block) (n : Nat)
+theorem eval_treeGarbleM_succ (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : Label) (n : Nat)
     (hn : n ≠ 0) :
     (treeGarbleM tagOf Δ b0 (n + 1)).eval H =
       let prev := (treeGarbleM tagOf Δ b0 n).eval H
-      (extendLevel n prev.1 (fun slot => h128 H (prev.1 slot) (tagOf n slot.val)),
+      (extendLevel n prev.1 (fun slot => hLabel H (prev.1 slot) (tagOf n slot.val)),
         fun level => if level = n then
-          xorFold (fun slot => h128 H (prev.1 slot) (tagOf n slot.val)) else prev.2 level) := by
+          xorFold (fun slot => hLabel H (prev.1 slot) (tagOf n slot.val)) else prev.2 level) := by
   simp only [treeGarbleM, FreeQuery.eval_bind, if_neg hn, eval_garbleStepM, FreeQuery.eval_pure]
 
 /-- The garbler's level XOR of level `n` (`1 ≤ n < total`), read from the whole tree. -/
-theorem treeGarbleM_levelSum (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : Block) :
+theorem treeGarbleM_levelSum (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : Label) :
     ∀ total n, 1 ≤ n → n < total →
       ((treeGarbleM tagOf Δ b0 total).eval H).2 n =
-        xorFold (fun slot => h128 H (((treeGarbleM tagOf Δ b0 n).eval H).1 slot) (tagOf n slot.val)) := by
+        xorFold (fun slot => hLabel H (((treeGarbleM tagOf Δ b0 n).eval H).1 slot) (tagOf n slot.val)) := by
   intro total
   induction total with
   | zero => intro n _ h; exact absurd h (Nat.not_lt_zero n)
@@ -50,14 +50,14 @@ theorem treeGarbleM_levelSum (H : HashN) (tagOf : Nat → Nat → Nat) (Δ b0 : 
       · rw [if_neg hnk]; exact ih n h1 (by omega)
 
 theorem eval_treeEvalM_one (H : HashN) (tagOf : Nat → Nat → Nat) (value : Nat)
-    (bitLabel join : Nat → Block) :
+    (bitLabel join : Nat → Label) :
     (treeEvalM tagOf value bitLabel join 1).eval H = extendLevel 0 (fun _ => 0) (fun _ => bitLabel 0) := by
   simp [treeEvalM]
 
 /-- **L2** `treeEvalM_correct`: the evaluator's tree with known bits (bit labels the masks XOR
 `value_j·Δ`, the garbler's joins) is the garbler's tree XOR `Δ` at `value mod 2^n`. -/
-theorem treeEvalM_correct (H : HashN) (tagOf : Nat → Nat → Nat) (Δ : Block) (value : Nat)
-    (bitMask bitLabel join : Nat → Block) (total : Nat)
+theorem treeEvalM_correct (H : HashN) (tagOf : Nat → Nat → Nat) (Δ : Label) (value : Nat)
+    (bitMask bitLabel join : Nat → Label) (total : Nat)
     (hbit : ∀ j < total, bitLabel j = bitMask j ^^^ (if value.testBit j then Δ else 0))
     (hjoin : ∀ j, 1 ≤ j → j < total →
       join j = ((treeGarbleM tagOf Δ (bitMask 0) total).eval H).2 j ^^^ bitMask j) :
@@ -69,14 +69,14 @@ theorem treeEvalM_correct (H : HashN) (tagOf : Nat → Nat → Nat) (Δ : Block)
   | zero =>
     intro _ x
     have hx : x.val = 0 := by have := x.isLt; simp at this; omega
-    show (0 : Block) = Δ ^^^ _
+    show (0 : Label) = Δ ^^^ _
     rw [if_pos (by rw [hx, pow_zero, Nat.mod_one]), xor_self_block]
   | succ n ih =>
     intro hn x
     by_cases hn0 : n = 0
     · subst hn0
       rw [eval_treeEvalM_one, eval_treeGarbleM_one]
-      have hE : ∀ y : Fin (2 ^ 0), (fun _ => (0 : Block)) y =
+      have hE : ∀ y : Fin (2 ^ 0), (fun _ => (0 : Label)) y =
           (fun _ => Δ) y ^^^ (if y.val = 0 then Δ else 0) := by
         intro y
         have hy : y.val = 0 := by have := y.isLt; simp at this; omega
@@ -114,7 +114,7 @@ theorem eval_ite_pure' (H : HashN) {α : Type} (c : Prop) [Decidable c] (a : α)
 /-- **L3** `chunk_correct`: the evaluator's chunk `c` (labels `Z_j ⊕ v_j·Δ`, the garbler's joins and
 pin) has the garbler's leaves XOR `Δ` at the chunk value and the garbler's casts plus `Δ⃗` exactly
 there. -/
-theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Block) (Z : Nat → Block)
+theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Label) (Z : Nat → Label)
     (v c : Nat) :
     let g := (chunkGarbleM T coord Δ Z c).eval H
     let e := (chunkEvalM T coord (fun j => Z j ^^^ (if v.testBit j then Δ else 0)) v g.joins g.pin c).eval H
@@ -138,10 +138,10 @@ theorem chunk_correct (H : HashN) (T : CrtTable) (coord : Nat) (Δ : Block) (Z :
   set G1 := ((treeGarbleM (chunkTreeTag coord c) Δ (Z (T.chunkOffset c + 0)) (T.chunkWidth c)).eval H).1
     with hG1
   set A : Fin (2 ^ T.chunkWidth c) → Lanes T.castWidth := fun x =>
-    castLanes T.castWidth (hlong H (G1 x) (chunkCastTag coord c x.val) (castAnswers T.castWidth)) with hA
+    castLanes T.castWidth (hlong H (embed (G1 x)) (chunkCastTag coord c x.val) (castAnswers T.castWidth)) with hA
   have key : ∀ x : Fin (2 ^ T.chunkWidth c),
       (if x.val = s then (0 : Lanes T.castWidth) else if x.val = s then 0 else
-        castLanes T.castWidth (hlong H (G1 x ^^^ if x.val = s then Δ else 0) (chunkCastTag coord c x.val)
+        castLanes T.castWidth (hlong H (embed (G1 x ^^^ if x.val = s then Δ else 0)) (chunkCastTag coord c x.val)
           (castAnswers T.castWidth))) = if x.val = s then 0 else A x := by
     intro x
     by_cases hx : x.val = s

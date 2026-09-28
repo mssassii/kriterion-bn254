@@ -30,10 +30,12 @@ section Garbled
 variable (H : HashN) (scalar : NonZeroScalar) (coins : Coins)
 
 def gxOf : CoordGarbled table xCount :=
-  (coordGarbleM table xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)).eval H
+  (coordGarbleM table xCount 0 (clip (coins.inputDelta .x))
+    (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval H
 
 def gyOf : CoordGarbled table yCount :=
-  (coordGarbleM table yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)).eval H
+  (coordGarbleM table yCount 1 (clip (coins.inputDelta .y))
+    (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval H
 
 def masksOf : MaskValues digitCount := maskValues H (maskKey H coins.bridgeKey) digitCount
 
@@ -120,10 +122,11 @@ theorem deliveredX_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (inpu
     (e : Fin xCount) :
     ((replayConv (pubOf H scalar coins) input (labelsFor coins input)).eval H).deliveredX e =
       slXOf H scalar coins e * input.x + toField ((gxOf H coins).offset e) := by
-  have delivery := published_delivery H xCount 0 (coins.inputDelta .x) (atNat (coins.inputZero .x) 0)
+  have delivery := published_delivery H xCount 0 (clip (coins.inputDelta .x))
+    (fun j => clip (atNat (coins.inputZero .x) 0 j))
     (fun e => (slXOf H scalar coins e).val) input.x.val (val_lt_two_pow _)
-    (fun e => val_mul_val_lt _ _) (labelX (labelsFor coins input))
-    (fun j low => labelX_honest _ _ _ (coins_key_x coins) input j low)
+    (fun e => val_mul_val_lt _ _) (fun j => clip (labelX (labelsFor coins input) j))
+    (fun j low => clip_labelX_honest _ _ _ (coins_key_x coins) input j low)
     (fun e => ((pubOf H scalar coins).recX.get e).val) (pubOf_recX H scalar coins) e
   rw [← toField_delivery, gxOf, ← delivery]
   simp only [replayConv, FreeQuery.eval_bind, FreeQuery.eval_pure]
@@ -133,10 +136,11 @@ theorem deliveredY_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (inpu
     (e : Fin yCount) :
     ((replayConv (pubOf H scalar coins) input (labelsFor coins input)).eval H).deliveredY e =
       slYOf H scalar coins e * input.y + toField ((gyOf H coins).offset e) := by
-  have delivery := published_delivery H yCount 1 (coins.inputDelta .y) (atNat (coins.inputZero .y) 0)
+  have delivery := published_delivery H yCount 1 (clip (coins.inputDelta .y))
+    (fun j => clip (atNat (coins.inputZero .y) 0 j))
     (fun e => (slYOf H scalar coins e).val) input.y.val (val_lt_two_pow _)
-    (fun e => val_mul_val_lt _ _) (labelY (labelsFor coins input))
-    (fun j low => labelY_honest _ _ _ (coins_key_y coins) input j low)
+    (fun e => val_mul_val_lt _ _) (fun j => clip (labelY (labelsFor coins input) j))
+    (fun j low => clip_labelY_honest _ _ _ (coins_key_y coins) input j low)
     (fun e => ((pubOf H scalar coins).recY.get e).val) (pubOf_recY H scalar coins) e
   rw [← toField_delivery, gyOf, ← delivery]
   simp only [replayConv, FreeQuery.eval_bind, FreeQuery.eval_pure]

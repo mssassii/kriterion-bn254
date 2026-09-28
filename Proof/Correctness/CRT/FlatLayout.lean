@@ -37,7 +37,7 @@ def ConvAgree (T : CrtTable) (p q : ConvPublic) : Prop :=
 
 /-! ### Congruence of the evaluator's blocks -/
 
-theorem treeEvalM_congr (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J₁ J₂ : Nat → Block)
+theorem treeEvalM_congr (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J₁ J₂ : Nat → Label)
     (levels : Nat) (agree : ∀ n, 1 ≤ n → n < levels → J₁ n = J₂ n) :
     treeEvalM tagOf value bitLabel J₁ levels = treeEvalM tagOf value bitLabel J₂ levels := by
   induction levels with
@@ -50,8 +50,8 @@ theorem treeEvalM_congr (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J�
       · simp only [zero, if_true]
       · rw [if_neg zero, if_neg zero, agree n (by omega) (by omega)]
 
-theorem growEvalM_congr (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J₁ J₂ : Nat → Block)
-    (start : Nat) (labels : Fin (2 ^ start) → Block) (count : Nat)
+theorem growEvalM_congr (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J₁ J₂ : Nat → Label)
+    (start : Nat) (labels : Fin (2 ^ start) → Label) (count : Nat)
     (agree : ∀ k < count, J₁ (start + k) = J₂ (start + k)) :
     growEvalM tagOf value bitLabel J₁ start labels count =
       growEvalM tagOf value bitLabel J₂ start labels count := by
@@ -61,7 +61,7 @@ theorem growEvalM_congr (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J�
       rw [growEvalM, growEvalM, ih fun j lower => agree j (by omega), agree k (by omega)]
 
 theorem stageRoundsM_congr {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat) (sub : Lanes w)
-    (value : Nat) (J₁ J₂ : Nat → Block) (pin : Lanes rb) (remaining : Nat) :
+    (value : Nat) (J₁ J₂ : Nat → Label) (pin : Lanes rb) (remaining : Nat) :
     ∀ (n : Nat), (∀ k < remaining, J₁ (n + k) = J₂ (n + k)) → ∀ (state : StageState rb),
       stageRoundsM w treeTag castTag sub value J₁ pin remaining n state =
         stageRoundsM w treeTag castTag sub value J₂ pin remaining n state := by
@@ -81,7 +81,7 @@ theorem stageRoundsM_congr {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat �
       exact ih (n + 1) (fun k lower => by rw [show n + 1 + k = n + (k + 1) by omega]; exact agree _ (by omega)) next
 
 theorem extStageEvalM_congr {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat → Nat)
-    (remainder : Lanes rb) (value : Nat) (J₁ J₂ : Nat → Block) (pin : Lanes rb)
+    (remainder : Lanes rb) (value : Nat) (J₁ J₂ : Nat → Label) (pin : Lanes rb)
     (agree : ∀ n, 1 ≤ n → n < w → J₁ n = J₂ n) :
     extStageEvalM w treeTag castTag remainder value J₁ pin =
       extStageEvalM w treeTag castTag remainder value J₂ pin := by
@@ -90,8 +90,8 @@ theorem extStageEvalM_congr {rb : Nat} (w : Nat) (treeTag castTag : Nat → Nat 
   unfold extStageEvalM
   simp only [rounds]
 
-theorem foldsEvalM_congr (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J₁ J₂ : Nat → Block)
-    (count : Nat) : ∀ (start hot : Nat) (labels : Fin m → Block),
+theorem foldsEvalM_congr (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (bitLabel J₁ J₂ : Nat → Label)
+    (count : Nat) : ∀ (start hot : Nat) (labels : Fin m → Label),
       (∀ k < count, J₁ (start + k) = J₂ (start + k)) →
       foldsEvalM m tagOf value bitLabel J₁ count start hot labels =
         foldsEvalM m tagOf value bitLabel J₂ count start hot labels := by
@@ -107,7 +107,7 @@ theorem foldsEvalM_congr (m : Nat) (tagOf : Nat → Nat → Nat) (value : Nat) (
       exact ih (start + 1) _ next fun k lower => by
         rw [show start + 1 + k = start + (k + 1) by omega]; exact agree _ (by omega)
 
-theorem pinOfBlocks_congr (width : Nat) (f g : Fin width → Block) (agree : ∀ k : Fin width, f k = g k) :
+theorem pinOfBlocks_congr (width : Nat) (f g : Fin width → Label) (agree : ∀ k : Fin width, f k = g k) :
     pinOfBlocks width f = pinOfBlocks width g := by
   rw [funext agree]
 
@@ -152,7 +152,7 @@ theorem modEvalM_congr (T : CrtTable) (S coord : Nat) (p q : ConvPublic) (joins 
 
 /-- **The evaluator reads only the agreeing cells.** -/
 theorem coordEvalM_congr (T : CrtTable) (S coord : Nat) (p q : ConvPublic) (records : Fin S → Nat)
-    (v : Nat) (labels : Nat → Block) (agree : ConvAgree T p q) :
+    (v : Nat) (labels : Nat → Label) (agree : ConvAgree T p q) :
     coordEvalM T S coord p records v labels = coordEvalM T S coord q records v labels := by
   obtain ⟨cJ, cP, mA⟩ := agree
   have chunks : ∀ c : Fin T.chunkCount,
@@ -222,12 +222,12 @@ theorem flatMap_finRange_eq {α : Type} (n : Nat) (g : Fin n → List α) :
 /-! ### The sections of the flat layout -/
 
 /-- Chunk `c`'s section: its joins, then its pin blocks. -/
-def chunkSection (T : CrtTable) (pub : ConvPublic) (c : Nat) : List Block :=
+def chunkSection (T : CrtTable) (pub : ConvPublic) (c : Nat) : List Label :=
   (List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1)) ++
     (List.range T.castWidth).map (pub.chunkPin c)
 
 /-- Modulus `i`'s section. -/
-def modSection (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) : List Block :=
+def modSection (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) : List Label :=
   match T.kind i with
   | .chunkZero => []
   | .odd row =>
@@ -239,7 +239,7 @@ def modSection (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) : List Block 
     (List.range (row.ell - row.keep)).map (fun n => pub.foldJoin i (row.keep + n))
 
 /-- The modulus sections indexed by naturals (empty off range). -/
-def modSectionNat (T : CrtTable) (pub : ConvPublic) (i : Nat) : List Block :=
+def modSectionNat (T : CrtTable) (pub : ConvPublic) (i : Nat) : List Label :=
   if h : i < T.count then modSection T pub ⟨i, h⟩ else []
 
 /-- The block count of the modulus at a natural index. -/

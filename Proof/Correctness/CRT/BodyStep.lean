@@ -34,16 +34,16 @@ theorem sum_split_hot {M : Type} [AddCommMonoid M] {m : Nat} (hot : Nat) (hhot :
 
 /-! ### L15: the body -/
 
-theorem eval_padVectorM (H : HashN) (m S q : Nat) (label : Block) (tagOf : Nat → Nat) :
+theorem eval_padVectorM (H : HashN) (m S q : Nat) (label : Label) (tagOf : Nat → Nat) :
     (padVectorM m S q label tagOf).eval H =
-      fun e => digit m (fractionValue m S q (hlong H label tagOf q)) e.val := by
+      fun e => digit m (fractionValue m S q (hlong H (embed label) tagOf q)) e.val := by
   simp [padVectorM]
 
 /-- **L15** `body_correct`: if the evaluator's final one-hot is the garbler's XOR `Δ` at `hot` and the
 residue joins are the garbler's pad sums plus the slopes modulo `m`, the evaluator's residue of
 every encoding is congruent to the garbler's residue plus `slope·hot` modulo `m`. -/
-theorem body_correct (H : HashN) (m S q coord i : Nat) (hm : 0 < m) (final finalE : Fin m → Block)
-    (Δ : Block) (hot : Nat) (hhot : hot < m)
+theorem body_correct (H : HashN) (m S q coord i : Nat) (hm : 0 < m) (final finalE : Fin m → Label)
+    (Δ : Label) (hot : Nat) (hhot : hot < m)
     (hE : ∀ ρ, finalE ρ = final ρ ^^^ (if ρ.val = hot then Δ else 0))
     (slopes joins : Fin S → Nat)
     (hJ : ∀ e, joins e = (((bodyGarbleM m S q coord i final).eval H).padSum e + slopes e) % m)
@@ -52,13 +52,13 @@ theorem body_correct (H : HashN) (m S q coord i : Nat) (hm : 0 < m) (final final
       ((bodyGarbleM m S q coord i final).eval H).residue e + slopes e * hot [MOD m] := by
   haveI : NeZero m := ⟨hm.ne'⟩
   set V : Fin m → Fin S → Nat := fun ρ e =>
-    digit m (fractionValue m S q (hlong H (final ρ) (bodyTag coord i ρ.val) q)) e.val with hV
+    digit m (fractionValue m S q (hlong H (embed (final ρ)) (bodyTag coord i ρ.val) q)) e.val with hV
   have hg : (bodyGarbleM m S q coord i final).eval H =
       { residue := fun e => (∑ ρ : Fin m, (ρ.val : ZMod m) * (V ρ e : ZMod m)).val
         padSum := fun e => (∑ ρ : Fin m, (V ρ e : ZMod m)).val } := by
     simp [bodyGarbleM, eval_padVectorM, V]
   have hcold : ∀ ρ : Fin m, ρ.val ≠ hot →
-      digit m (fractionValue m S q (hlong H (finalE ρ) (bodyTag coord i ρ.val) q)) e.val = V ρ e := by
+      digit m (fractionValue m S q (hlong H (embed (finalE ρ)) (bodyTag coord i ρ.val) q)) e.val = V ρ e := by
     intro ρ hρ
     rw [hE, if_neg hρ, xor_zero_block]
   obtain rfl : joins = fun e => (((bodyGarbleM m S q coord i final).eval H).padSum e + slopes e) % m :=
@@ -71,7 +71,7 @@ theorem body_correct (H : HashN) (m S q coord i : Nat) (hm : 0 < m) (final final
   rw [ZMod.natCast_mod, ZMod.natCast_zmod_val]
   have hknown : ∑ ρ : Fin m, (if ρ.val = hot then (0 : ZMod m) else
       (((if ρ.val = hot then (fun _ => 0 : Fin S → Nat) else
-        fun e => digit m (fractionValue m S q (hlong H (finalE ρ) (bodyTag coord i ρ.val) q)) e.val) e : Nat) : ZMod m)) =
+        fun e => digit m (fractionValue m S q (hlong H (embed (finalE ρ)) (bodyTag coord i ρ.val) q)) e.val) e : Nat) : ZMod m)) =
       ∑ ρ : Fin m, (if ρ.val = hot then (0 : ZMod m) else (V ρ e : ZMod m)) := by
     apply Finset.sum_congr rfl
     intro ρ _
@@ -80,7 +80,7 @@ theorem body_correct (H : HashN) (m S q coord i : Nat) (hm : 0 < m) (final final
     · rw [if_neg hρ, if_neg hρ, if_neg hρ, hcold ρ hρ]
   have hweighted : ∑ ρ : Fin m, (if ρ.val = hot then (0 : ZMod m) else (ρ.val : ZMod m) *
       (((if ρ.val = hot then (fun _ => 0 : Fin S → Nat) else
-        fun e => digit m (fractionValue m S q (hlong H (finalE ρ) (bodyTag coord i ρ.val) q)) e.val) e : Nat) : ZMod m)) =
+        fun e => digit m (fractionValue m S q (hlong H (embed (finalE ρ)) (bodyTag coord i ρ.val) q)) e.val) e : Nat) : ZMod m)) =
       ∑ ρ : Fin m, (if ρ.val = hot then (0 : ZMod m) else (ρ.val : ZMod m) * (V ρ e : ZMod m)) := by
     apply Finset.sum_congr rfl
     intro ρ _

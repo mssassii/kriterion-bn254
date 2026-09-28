@@ -21,7 +21,7 @@ open Kriterion.CRT Kriterion.CRT.Entry Kriterion.CRT.FlatLayout
 
 /-! ### The evaluator reads only the labels of the coordinate's bits -/
 
-theorem treeEvalM_bits_congr (tagOf : Nat → Nat → Nat) (value : Nat) (B₁ B₂ J : Nat → Block)
+theorem treeEvalM_bits_congr (tagOf : Nat → Nat → Nat) (value : Nat) (B₁ B₂ J : Nat → Label)
     (levels : Nat) (agree : ∀ n < levels, B₁ n = B₂ n) :
     treeEvalM tagOf value B₁ J levels = treeEvalM tagOf value B₂ J levels := by
   induction levels with
@@ -43,7 +43,7 @@ theorem chunkWidth_add_offset_le (T : CrtTable) (c n : Nat) (inRange : n < T.chu
   omega
 
 theorem coordEvalM_labels_congr (T : CrtTable) (S coord : Nat) (pub : ConvPublic) (records : Fin S → Nat)
-    (v : Nat) (l₁ l₂ : Nat → Block) (agree : ∀ j < T.inputBits, l₁ j = l₂ j) :
+    (v : Nat) (l₁ l₂ : Nat → Label) (agree : ∀ j < T.inputBits, l₁ j = l₂ j) :
     coordEvalM T S coord pub records v l₁ = coordEvalM T S coord pub records v l₂ := by
   have chunks : ∀ c : Fin T.chunkCount,
       chunkEvalM T coord l₁ v (pub.chunkJoin c.val) (pinOfBlocks T.castWidth fun k => pub.chunkPin c.val k.val)
@@ -109,9 +109,9 @@ theorem records_small {S : Nat} (g : CoordGarbled table S) (slopes : Fin S → N
 
 /-- **One coordinate delivers through the published material**: the flat conversion vector and the
 records as published, and any labels that agree with the honest labels on the coordinate's bits. -/
-theorem published_delivery (H : HashN) (S coord : Nat) (Δ : Block) (Z : Nat → Block)
+theorem published_delivery (H : HashN) (S coord : Nat) (Δ : Label) (Z : Nat → Label)
     (slopes : Fin S → Nat) (v : Nat) (hv : v < 2 ^ 254) (hav : ∀ e, slopes e * v < table.wrapBound)
-    (labels : Nat → Block) (hlabels : ∀ j < 254, labels j = Z j ^^^ (if v.testBit j then Δ else 0))
+    (labels : Nat → Label) (hlabels : ∀ j < 254, labels j = Z j ^^^ (if v.testBit j then Δ else 0))
     (records : Fin S → Nat)
     (hrecords : ∀ e, records e = ((coordGarbleM table S coord Δ Z).eval H).records slopes e) (e : Fin S) :
     ((coordEvalM table S coord (convOf (convVector ((coordGarbleM table S coord Δ Z).eval H).pub))
@@ -153,6 +153,24 @@ theorem labelY_honest (key : InputMacKey) (Z : Fin coordinateBitCount → Block)
     coordinateBits_getLsb, BitAdaptor.encode]
   rw [hkey ⟨j, low⟩]
   simp only [atNat, dif_pos (show j < coordinateBitCount from low)]
+  split <;> simp
+
+/-- Conversion sees only the low label bits; digest consumers retain `labelX_honest`. -/
+theorem clip_labelX_honest (key : InputMacKey) (Z : Fin coordinateBitCount → Block) (Δ : Block)
+    (hkey : ∀ j : Fin coordinateBitCount, key.x[j.val] = ⟨Z j, Z j ^^^ Δ⟩)
+    (input : AffineInput) (j : Nat) (low : j < 254) :
+    clip (labelX (Lamport.selectedLabels (key.encode (BitInput.ofAffine input))) j) =
+      clip (atNat Z 0 j) ^^^ (if input.x.val.testBit j then clip Δ else 0) := by
+  rw [labelX_honest key Z Δ hkey input j low, Narrow.clip_xor]
+  split <;> simp
+
+/-- Conversion sees only the low label bits; digest consumers retain `labelY_honest`. -/
+theorem clip_labelY_honest (key : InputMacKey) (Z : Fin coordinateBitCount → Block) (Δ : Block)
+    (hkey : ∀ j : Fin coordinateBitCount, key.y[j.val] = ⟨Z j, Z j ^^^ Δ⟩)
+    (input : AffineInput) (j : Nat) (low : j < 254) :
+    clip (labelY (Lamport.selectedLabels (key.encode (BitInput.ofAffine input))) j) =
+      clip (atNat Z 0 j) ^^^ (if input.y.val.testBit j then clip Δ else 0) := by
+  rw [labelY_honest key Z Δ hkey input j low, Narrow.clip_xor]
   split <;> simp
 
 theorem coins_key_x (coins : Coins) (j : Fin coordinateBitCount) :

@@ -22,7 +22,7 @@ theorem pinOfBlocks_atNat {width : Nat} (hw : 0 < width) (P : Lanes width) :
 
 /-- The conversion after the two fused stages: the free stage-2 bit, growth, reindex and folds,
 from any stage results that satisfy the stage invariant (L10) against the garbler's. -/
-theorem after_stages_correct (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Block)
+theorem after_stages_correct (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Label)
     (σ : Nat) (h0 : 1 ≤ row.width0) (h1 : 1 ≤ row.width1)
     (hell : row.width0 + row.width1 + 1 = row.ell) (hk0 : row.width0 ≤ row.keep)
     (hk1 : row.keep ≤ row.ell) (hm : 0 < m) (hσ : σ < 2 ^ row.ell)
@@ -95,7 +95,7 @@ conversion of the word label `W + σ•Δ⃗` (`σ < 2^ell` the word value) retu
 `σ mod m` and the garbler's final one-hot XOR `Δ` exactly there. With `σ ≡ v (mod m)` (L5) that is
 `v mod m`. The side conditions are those of every row of T9: `1 ≤ width0`, `1 ≤ width1`,
 `width0 + width1 + 1 = ell`, `width0 ≤ keep ≤ ell`, and `0 < m`. -/
-theorem conversion_final (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Block)
+theorem conversion_final (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Label)
     (W : Lanes row.ell) (σ : Nat) (pub : ConvPublic)
     (h0 : 1 ≤ row.width0) (h1 : 1 ≤ row.width1) (hell : row.width0 + row.width1 + 1 = row.ell)
     (hk0 : row.width0 ≤ row.keep) (hk1 : row.keep ≤ row.ell) (hm : 0 < m) (hσ : σ < 2 ^ row.ell)
@@ -168,7 +168,7 @@ theorem fallbackRow_conditions (m : Nat) (hm : 17 ≤ m) :
 
 /-- **L14 with L5**: when the word value is congruent to the coordinate value `v` modulo `m` (L5),
 the evaluator's final one-hot is the garbler's XOR `Δ` exactly at `v mod m`. -/
-theorem conversion_final_value (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Block)
+theorem conversion_final_value (H : HashN) (coord i : Nat) (row : OddRow) (m : Nat) (Δ : Label)
     (W : Lanes row.ell) (σ v : Nat) (pub : ConvPublic)
     (h0 : 1 ≤ row.width0) (h1 : 1 ≤ row.width1) (hell : row.width0 + row.width1 + 1 = row.ell)
     (hk0 : row.width0 ≤ row.keep) (hk1 : row.keep ≤ row.ell) (hm : 0 < m) (hσ : σ < 2 ^ row.ell)

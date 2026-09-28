@@ -29,7 +29,7 @@ namespace Kriterion.CRT.SliceC
 open scoped BigOperators Function
 open Cryptography Kriterion.CRT
 
-/-! `Block`, `Lanes`, `laneCount`, `wrapHint`, `wrapDecode` are the frozen ones of
+/-! `Label`, `Lanes`, `laneCount`, `wrapHint`, `wrapDecode` are the frozen ones of
 `Construction/CRT/Interface.lean`; `deltaLanes`, `laneBit`, `peelDiv` are those of
 `Construction/CRT/Lanes.lean`. -/
 
@@ -52,7 +52,7 @@ theorem val_testBit_add_shift {w n : Nat} (hn : n < w) (a : ZMod (2 ^ w)) (t : N
   exact testBit_add_two_pow_mul _ _ _
 
 /-- L7 on labels: adding `(2^n t)•Δ⃗` flips lane bit `n` on the lanes where `Δ` is set, when `t` is odd. -/
-theorem laneBit_add_shift {l n : Nat} (hn : n < l) (A : Lanes l) (Δ : Block) (t : Nat) :
+theorem laneBit_add_shift {l n : Nat} (hn : n < l) (A : Lanes l) (Δ : Label) (t : Nat) :
     laneBit (A + ((2 ^ n * t : Nat) : ZMod (2 ^ l)) • deltaLanes l Δ) n =
       laneBit A n ^^^ (if t.testBit 0 then Δ else 0) := by
   apply BitVec.eq_of_getLsbD_eq
@@ -67,7 +67,7 @@ theorem laneBit_add_shift {l n : Nat} (hn : n < l) (A : Lanes l) (Δ : Block) (t
     by_cases ht : t.testBit 0 <;> simp [ht, hΔ]
 
 /-- L7 at `n = 0`: `laneBit (A + σ•Δ⃗) 0 = laneBit A 0 ⊕ (σ mod 2)·Δ`. -/
-theorem laneBit_add_smul_delta_zero {l : Nat} (hl : 0 < l) (A : Lanes l) (Δ : Block) (σ : Nat) :
+theorem laneBit_add_smul_delta_zero {l : Nat} (hl : 0 < l) (A : Lanes l) (Δ : Label) (σ : Nat) :
     laneBit (A + (σ : ZMod (2 ^ l)) • deltaLanes l Δ) 0 =
       laneBit A 0 ^^^ (if σ % 2 = 1 then Δ else 0) := by
   have h := laneBit_add_shift hl A Δ σ
@@ -94,7 +94,7 @@ theorem peel_lane_add {rb w : Nat} (hw : w ≤ rb) (d : ZMod (2 ^ rb)) (k : Nat)
   ring
 
 /-- L11 in difference form: shifting `R` by `(2^w k)•Δ⃗` shifts the peel by `k•Δ⃗`. -/
-theorem peelDiv_add_shift {rb w : Nat} (hw : w ≤ rb) (R U : Lanes rb) (Δ : Block) (k : Nat) :
+theorem peelDiv_add_shift {rb w : Nat} (hw : w ≤ rb) (R U : Lanes rb) (Δ : Label) (k : Nat) :
     peelDiv (R + ((2 ^ w * k : Nat) : ZMod (2 ^ rb)) • deltaLanes rb Δ) U w =
       peelDiv R U w + (k : ZMod (2 ^ (rb - w))) • deltaLanes (rb - w) Δ := by
   funext i
@@ -109,7 +109,7 @@ theorem peelDiv_add_shift {rb w : Nat} (hw : w ≤ rb) (R U : Lanes rb) (Δ : Bl
 
 /-- **L11** `peelDiv_label`: if the evaluator holds `R + σ•Δ⃗` and `U + s•Δ⃗` with `s = σ mod 2^w`,
 its peel is the garbler's peel plus `⌊σ / 2^w⌋•Δ⃗`. No hypothesis on `R - U` is needed. -/
-theorem peelDiv_label {rb w : Nat} (hw : w ≤ rb) (R U : Lanes rb) (Δ : Block) (σ : Nat) :
+theorem peelDiv_label {rb w : Nat} (hw : w ≤ rb) (R U : Lanes rb) (Δ : Label) (σ : Nat) :
     peelDiv (R + (σ : ZMod (2 ^ rb)) • deltaLanes rb Δ) (U + ((σ % 2 ^ w : Nat) : ZMod (2 ^ rb)) •
         deltaLanes rb Δ) w =
       peelDiv R U w + ((σ / 2 ^ w : Nat) : ZMod (2 ^ (rb - w))) • deltaLanes (rb - w) Δ := by
