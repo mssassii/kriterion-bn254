@@ -4,7 +4,7 @@ the growth of the kept one-hot).
 
 At level `n ≥ 1` the evaluator holds the `2 ^ n` labels `E_s` of the level, the tree's value `α`
 (the active slot is `α mod 2 ^ n`), its bit-`n` label `L` and the published join `J`. It hashes
-every slot but the active one in ascending order, `y_s = (H(E_s + 2 ^ 128 · tag_s)).1`, recovers
+every slot but the active one in ascending order, `y_s = clip (H(embed E_s + 2 ^ 128 · tag_s)).1`, recovers
 the active material `y_h = J ⊕ L ⊕ (the other y_s)`, and extends the level in place: entry `s`
 becomes `E_s ⊕ y_s` and entry `s + 2 ^ n` becomes `y_s` (`Construction/CRT/Tree.lean`,
 `evalStepM` and `extendLevel`).
@@ -15,7 +15,7 @@ The machine block `treeStep cells tagOf n` follows `wideStep`
 * `rD := 0`;
 * `treeEntry` for every slot `s < 2 ^ n`: `entryTest` puts `(α mod 2 ^ n) xor s` in `rA`; if it is
   nonzero, `entryInput` builds the hash input `E_s + 2 ^ 128 · tag_s` in `rInput`, one kind-4
-  query leaves the material in `rFirst`, and `entryStore` stores it at `matBase + s` and adds it
+  query leaves its raw first answer in `rFirst`, `clipReg` projects it, and `entryStore` stores it at `matBase + s` and adds it
   into `rD`; otherwise a padded skip;
 * `treeRecover`: `rD ⊕ J ⊕ L` stored at `matBase + (α mod 2 ^ n)`;
 * `treeLevel`: the extension in place.
@@ -66,7 +66,7 @@ def entryInput (cells : TreeCells) (tag s : Nat) : Prog :=
 def entryStore (cells : TreeCells) (s : Nat) : Prog :=
   .seq (storeAt (cells.matBase + s) rFirst) (ar .xor rD rD rFirst)
 
-/-- The paid arm of an entry: build the input, ask the hash, store the material. -/
+/-- The paid arm of an entry: build the input, ask the hash, project and store its material. -/
 def entryHash (cells : TreeCells) (tag s : Nat) : Prog :=
   .seq (entryInput cells tag s)
     (.seq (.op (.query 4 rIndex rInput rFirst rSecond))
@@ -76,7 +76,7 @@ def entryHash (cells : TreeCells) (tag s : Nat) : Prog :=
 def treeEntry (cells : TreeCells) (tagOf : Nat → Nat) (n s : Nat) : Prog :=
   .seq (entryTest cells n s) (.ite rA (entryHash cells (tagOf s) s) (.skip 0))
 
-/-- The active material `rD ⊕ J ⊕ L` to `matBase + (α mod 2 ^ n)`. -/
+/-- The active material `rD ⊕ J ⊕ clip L` to `matBase + (α mod 2 ^ n)`. -/
 def treeRecover (cells : TreeCells) (n : Nat) : Prog :=
   .seq (loadAt rE (cells.join n))
     (.seq (ar .xor rD rD rE)
@@ -107,7 +107,7 @@ def treeStep (cells : TreeCells) (tagOf : Nat → Nat) (n : Nat) : Prog :=
 
 /-! ### The whole tree -/
 
-/-- Level 1: both slots hold the bit-0 label (step 0 is free). -/
+/-- Level 1: both slots hold the projected bit-0 label (step 0 is free). -/
 def treePrefix (cells : TreeCells) : Prog :=
   .seq (loadAt rInput (cells.bit 0))
     (.seq (clipReg rInput)
