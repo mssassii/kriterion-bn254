@@ -100,21 +100,23 @@ theorem crtConvNever : ∀ (field : FieldCertificate) (group : @GroupCertificate
   -- the reach's inputs
   have hgarble : (@Entry.scheme field group).garble parameter scalar (coins, tableOracle table) =
       (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) scalar coins,
-        coins.inputMacKey) := by
+        EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins) := by
     refine (Paths.entry_garble_eval field group parameter scalar coins (tableOracle table)).trans ?_
     unfold Entry.garbleProgram
     rw [FreeQuery.eval_toProgram]
     unfold Entry.garbleM
     rw [eval_liftHash]
     exact EntryCorrect.garbleCM_eval _ scalar coins
-  have hencode : (@Entry.scheme field group).encode coins.inputMacKey u = EntryCorrect.labelsFor coins u := by
+  have hencode : (@Entry.scheme field group).encode
+      (EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins) u =
+      EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u := by
     unfold Entry.scheme EntryCorrect.labelsFor
     rfl
   have transcriptR := transcript_toProgram (publicAnswer (tableOracle (FI := Empty) (EI := Empty) table))
     (EntryReading.reachDecodedM (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table))
-      scalar coins) u (EntryCorrect.labelsFor coins u)) Entry.evaluateBudget
+      scalar coins) u (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u)) Entry.evaluateBudget
     (EntryReading.bounded_reachDecodedM (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty)
-      table)) scalar coins) u (EntryCorrect.labelsFor coins u))
+      table)) scalar coins) u (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u))
   unfold reachedEntries tapeOracle at inReach
   dsimp only [Instance.crtEntry] at inReach
   rw [hgarble] at inReach
@@ -125,7 +127,7 @@ theorem crtConvNever : ∀ (field : FieldCertificate) (group : @GroupCertificate
   rw [ftranscript_bind_pure] at inReach
   set H := schemeHash (tableOracle (FI := Empty) (EI := Empty) table) with hH
   set pub := EntryCorrect.pubOf H scalar coins with hpub
-  set labels := EntryCorrect.labelsFor coins u with hlabels
+  set labels := EntryCorrect.labelsFor H coins u with hlabels
   have asks : ∃ y, (y ∈ asked H (Entry.reachCM pub u labels) ∨ y ∈ asked H (EntryReading.reachOffCM pub u labels)) ∧
       ((y : BaseField)) = ((x : BaseField)) := by
     split at inReach

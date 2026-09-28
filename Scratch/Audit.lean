@@ -52,8 +52,8 @@ run_cmd do
 
 /-- The expected numbers of this entry (85 moduli, width-8 extraction on every odd row, parity casts with half-pins, pad slack 120, 104-bit internal conversion labels, block-aligned cast
 lanes, per-encoding 78-byte records with the wrap hint, normalized rows publishing one constant and one flags byte
-per digit, the hash digest with two packed exceptional nibbles). -/
-def expectedBytes : Nat := 135894
+per digit, the hash digest with two packed exceptional nibbles, chunk-tree joins absorbed into the Lamport labels). -/
+def expectedBytes : Nat := 130122
 def expectedGarble : Nat := 988438
 def expectedEvaluate : Nat := 981506
 

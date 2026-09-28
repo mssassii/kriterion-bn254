@@ -3,11 +3,18 @@ The stage-1 source of configuration E: every published cell in source form, for 
 stage 1 and the abstract simulator.
 
 Per coordinate the conversion material is a list of **joins** (single blocks, in the flat order of
-`ConvPublic.flatten`) and a list of **pins** held as lanes, one lane per value (`Lanes w`, with
+the pre-no-joins layout: chunk joins, then modulus joins) and a list of **pins** held as lanes, one lane per value (`Lanes w`, with
 `w = L` for the chunk pins and `ell`, `ell - width0` for the two extraction stages of an odd
 modulus); the dense packing into blocks happens only in `publish`. Records are held as naturals
 below `M` (the ideal stage 1 publishes every record uniform below `M` with the hint 0) and embedded into `Record` by `publish`. The Lamport key is the zero labels and
 the two offsets.
+
+**No chunk joins.** The chunk-join cells (indices `chunkJoinBase c + (n - 1)`) are retained in
+`joins` so that the modulus join indices and the stage-1 sampler keep their layout, but they are
+never read: `Source.conv` has zero chunk joins (the evaluator's chunk trees run on zero joins) and
+`publish` omits them (`ConvPublic.flatten`). The Lamport key stays the zero labels and the two
+offsets: in the ideal world the labels are uniform, as the actual real labels are (the privacy
+argument's XOR bijection).
 
 `Finite` instances only (computable): a `Fintype` for uniform sampling is
 `Fintype.ofFinite`, which is noncomputable and so belongs in `Proof/`.
@@ -101,7 +108,7 @@ def Source.pinBlockAt (source : Source) (coord : Fin 2) (k b : Nat) : Label :=
 
 /-- The conversion material of one coordinate, as the evaluator reads it. -/
 def Source.conv (source : Source) (coord : Fin 2) : ConvPublic where
-  chunkJoin c n := source.joinAt coord (chunkJoinBase c + (n - 1))
+  chunkJoin _ _ := 0
   chunkPin c k := source.pinBlockAt coord c k
   stageJoin i stage n :=
     if stage = 0 then source.joinAt coord (modJoinBase i + (n - 1))

@@ -6,14 +6,15 @@ the support of the draw law (`CrtStage1Law.mem_support_stage1_final`). On that m
 
 * the source cells are in range: the stores leave them in range (`cellsValid_stored`) and the tail, which writes only
   the record limbs and the true labels, leaves them alone (`cells_keep`);
-* the hint cells are zero: the start memory's RAM is zero, the stores and the tail never write a hint cell
-  (`stored_off`, `final_off`);
+* the hint cells and the zero join cell (`Layout.zeroJoin`, read as every chunk-tree join) are zero: the start
+  memory's RAM is zero, the stores and the tail never write them (`stored_off`, `final_off`);
 * the odd key cell `j` is the even key cell `j` XOR `Δ` of its coordinate: the tail writes it so (`finalOf_spec`) from
   the stored even cell and the stored `Δ`, which it leaves alone;
 * the even key cells and the two `Δ` cells are below `2^128`: they hold the drawn zeros and deltas (`stored_zeros`,
   `stored_deltas`), which are below `2^128` on the support (`DrawValid`).
 
-`retained_finalOf` is stated for any start memory whose hint cells are zero (the machine stays generic in its blocks).
+`retained_finalOf` is stated for any start memory whose hint cells and zero join cell are zero (the machine stays
+generic in its blocks).
 -/
 
 import Proof.Simulator.CRT.Stage1LawFinal
@@ -76,9 +77,11 @@ theorem encCount_le (κ : Nat) : CrtStage1.encCount κ ≤ 367 := by
   unfold CrtStage1.encCount Entry.xCount Entry.yCount
   split <;> omega
 
-/-- **What stage 1 retains**, from a start memory whose hint cells are zero, for a draw in the support. -/
+/-- **What stage 1 retains**, from a start memory whose hint cells and zero join cell are zero, for a draw in the
+support. -/
 theorem retained_finalOf (start : Memory)
     (hintsZero : ∀ κ, κ < 2 → ∀ e, e < CrtStage1.encCount κ → start.ram (word (Layout.hintCell κ e)) = word 0)
+    (zeroStart : start.ram (word Layout.zeroJoin) = word 0)
     (d : Draw) (member : some d ∈ drawLaw.support) : CrtValidStart.Retained (finalOf start d) := by
   have valid := drawValid_of_support d member
   have spec := finalOf_spec start d (cellsValid_stored start d valid)
@@ -92,7 +95,7 @@ theorem retained_finalOf (start : Memory)
     fun κ hκ => final_off _ _ off _ (by unfold Layout.deltaCell; omega)
       (Or.inr (by unfold Layout.deltaCell tmpBase; omega))
       (Or.inr (Or.inl (by unfold Layout.deltaCell keyBase labelCount; omega)))
-  refine ⟨cells_keep off (cellsValid_stored start d valid), ?_, ?_, ?_, ?_⟩
+  refine ⟨cells_keep off (cellsValid_stored start d valid), ?_, ?_, ?_, ?_, ?_⟩
   · intro κ hκ e he
     have eb := lt_of_lt_of_le he (encCount_le κ)
     rw [final_off _ _ off (Layout.hintCell κ e) (by unfold Layout.hintCell; omega)
@@ -108,6 +111,18 @@ theorem retained_finalOf (start : Memory)
       (Or.inr (by unfold Layout.hintCell fieldBase fieldCount curveCellCount rowCellCount; omega))
       (Or.inr (by unfold Layout.hintCell fieldBase; omega))]
     exact hintsZero κ hκ e he
+  · rw [final_off _ _ off Layout.zeroJoin (by unfold Layout.zeroJoin; omega)
+      (Or.inr (by unfold Layout.zeroJoin tmpBase; omega))
+      (Or.inr (Or.inl (by unfold Layout.zeroJoin keyBase labelCount; omega)))]
+    rw [stored_off start d Layout.zeroJoin (by unfold Layout.zeroJoin; omega)
+      (Or.inl (by unfold Layout.zeroJoin; omega))
+      (Or.inr (by unfold Layout.zeroJoin keyBase labelCount; omega))
+      (Or.inr (by unfold Layout.zeroJoin; omega))
+      (Or.inr (by unfold Layout.zeroJoin; omega))
+      (Or.inr (by unfold Layout.zeroJoin; omega))
+      (Or.inr (by unfold Layout.zeroJoin exceptionBase exceptionCellCount; omega))
+      (Or.inr (by unfold Layout.zeroJoin fieldBase fieldCount curveCellCount rowCellCount; omega))]
+    exact zeroStart
   · intro j hj
     rw [evenKeep j hj, deltaKeep (j / 254) (by unfold labelCount at hj; omega)]
     exact trueCells j hj
@@ -138,7 +153,7 @@ theorem CrtStage1Retained.retained :
     (Fintype.ofFinite Empty) (Classical.decEq Empty) (Classical.decEq Empty) _ _ _ CrtTop.crt_within
     (CrtTop.ofProg_size _) (CrtTop.ofProg_cost _) parameter _ result member
   exact CrtStage1Retained.retained_finalOf (CrtStage1Law.stage1Start parameter)
-    (fun _ _ _ _ => CrtStage1Retained.stage1Start_ram parameter _) d dm
+    (fun _ _ _ _ => CrtStage1Retained.stage1Start_ram parameter _) (CrtStage1Retained.stage1Start_ram parameter _) d dm
 
 end
 

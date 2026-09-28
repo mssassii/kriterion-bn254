@@ -387,9 +387,11 @@ theorem public_guess (κ : Fin 2) (scalar : NonZeroScalar) {s : ℕ} (hs : s < 3
         {tape | pubT scalar tape.1 tape.2 = v} := by
   have joint := DeltaView.conv_split 0 scalar zeroInput κ
     (fun tape => (restPub κ (pubT scalar tape.1 tape.2), clip (tape.2 (treePos κ.val s)).1))
-    (restPub_label_reads κ scalar hs hne) (crtOf κ v) (restPub κ v, g)
+    (H8.ReadsOff.mono (fun _ h => H8.hotPayloadTag_hotConvTag h) (restPub_label_reads κ scalar hs hne))
+    (crtOf κ v) (restPub κ v, g)
   have marginal := DeltaView.conv_split 0 scalar zeroInput κ
-    (fun tape => restPub κ (pubT scalar tape.1 tape.2)) (restPub_reads κ scalar)
+    (fun tape => restPub κ (pubT scalar tape.1 tape.2))
+    (H8.ReadsOff.mono (fun _ h => H8.hotPayloadTag_hotConvTag h) (restPub_reads κ scalar))
     (crtOf κ v) (restPub κ v)
   simp only [crtPart_pubT, map_mass] at joint marginal
   have jointSet : {tape : TableTape Instance.crtEntry |

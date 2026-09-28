@@ -1,5 +1,5 @@
 /-
-Phase-A audit: construction, perfect correctness, source readback and exact
+Phase-A audit (historical; superseded on branch nojoins by Scratch/NoJoinsAudit.lean): construction, perfect correctness, source readback and exact
 metrics.  This deliberately imports no Submission, privacy or simulator proof.
 Run with `lake env lean Scratch/NarrowPhaseA.lean` after building its imports.
 -/

@@ -15,6 +15,12 @@ modulus index `i` ascending: extraction stage 0, stage 1 (round order), stage 2 
 reindex (free), folds, body pads (cold slots ascending), residues. Reconstruction:
 `w_e = crt(L_{e,·})`, hint `h_e = [M ≤ record_e]`, decoded integer `wrapDecode M B h_e w_e`, which
 equals `a_e * v + O_e` (L16, L17, L18).
+
+**No chunk joins.** The chunk-tree joins `J_{c,n}` (`1 ≤ n < w_c`) are not published: the entry
+absorbs each into the zero label of coordinate bit `chunkBits * c + n` (`CrtTable.chunkShift`), and
+the evaluator runs the chunk trees with zero joins. The garbler still returns them in
+`CoordGarbled.pub.chunkJoin` (garbler-private from here on); `ConvPublic.flatten` omits them and
+`ConvPublic.unflatten` restores them as `0`.
 -/
 
 import Construction.CRT.Body
@@ -60,7 +66,8 @@ theorem crt_eq_crtWith (T : CrtTable) (residues : Fin T.count → Nat) :
 /-- The published conversion material of one coordinate, as total functions of natural indices
 (`0` off range). -/
 structure ConvPublic where
-  /-- Chunk `c`, tree level `n` (`1 ≤ n < w_c`). -/
+  /-- Chunk `c`, tree level `n` (`1 ≤ n < w_c`). Not published: the garbler's joins are absorbed into
+  the Lamport labels (`CrtTable.chunkShift`), and the published material reads back as `0`. -/
   chunkJoin : Nat → Nat → Label
   /-- Chunk `c`, pin block `k` (`k < L`). -/
   chunkPin : Nat → Nat → Label
@@ -72,6 +79,18 @@ structure ConvPublic where
   growJoin : Nat → Nat → Label
   /-- Modulus `i`, fold join at bit position `j` (`keep ≤ j < ell`). -/
   foldJoin : Nat → Nat → Label
+
+/-- The published material with the chunk joins replaced by `0` (what the evaluator reads back from
+the flat layout, which omits them). -/
+def ConvPublic.dropChunkJoins (pub : ConvPublic) : ConvPublic :=
+  { pub with chunkJoin := fun _ _ => 0 }
+
+/-- **The chunk join absorbed into coordinate bit `j`**: bit `n ≥ 1` of chunk `c`
+(`j = chunkBits * c + n`) carries `chunkJoin c n`; the first bit of every chunk carries `0`.
+The entry's actual zero label of bit `j` is the coins' zero label XOR this (lifted to a raw
+block). -/
+def CrtTable.chunkShift (T : CrtTable) (chunkJoin : Nat → Nat → Label) (j : Nat) : Label :=
+  if j % T.chunkBits = 0 then 0 else chunkJoin (j / T.chunkBits) (j % T.chunkBits)
 
 /-! ### One odd modulus: the conversion -/
 
@@ -179,7 +198,8 @@ def modEvalM (T : CrtTable) (S coord : Nat) (pub : ConvPublic) (joins : Fin T.co
 
 /-- What the garbler keeps of one coordinate (slope-free). -/
 structure CoordGarbled (T : CrtTable) (S : Nat) where
-  /-- The published conversion material. -/
+  /-- The conversion material: published except `chunkJoin`, which the entry absorbs into the
+  Lamport labels (`CrtTable.chunkShift`). -/
   pub : ConvPublic
   /-- `R_{e,i}`. -/
   residue : Fin T.count → Fin S → Nat
@@ -282,19 +302,17 @@ def modBlocks : Kind → Nat
   | .odd row => (row.width0 - 1) + (row.ell - 1) + (row.width1 - 1) + (row.ell - row.width0 - 1)
       + (row.keep - row.width0) + (row.ell - row.keep)
 
-/-- Published blocks of chunk `c`: its joins and its pin. -/
-def CrtTable.chunkBlocks (T : CrtTable) (c : Nat) : Nat := (T.chunkWidth c - 1) + (T.castWidth - 1)
+/-- Published blocks of chunk `c`: its half-pin only (its joins are absorbed into the labels). -/
+def CrtTable.chunkBlocks (T : CrtTable) (_c : Nat) : Nat := T.castWidth - 1
 
-/-- Published conversion blocks of one coordinate (3,178 for the real table). -/
+/-- Published conversion blocks of one coordinate (2,956 for the real table). -/
 def CrtTable.convBlocks (T : CrtTable) : Nat :=
   (∑ c : Fin T.chunkCount, T.chunkBlocks c.val) + ∑ i : Fin T.count, modBlocks (T.kind i)
 
-/-- The flat layout: for each chunk its joins then its pin; then for each odd modulus stage 0's
+/-- The flat layout: for each chunk its pin (no joins); then for each odd modulus stage 0's
 joins and pin, stage 1's joins and pin, the growth joins and the fold joins. -/
 def ConvPublic.flatten (T : CrtTable) (pub : ConvPublic) : List Label :=
-  ((List.range T.chunkCount).flatMap fun c =>
-    (List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1)) ++
-      (List.range (T.castWidth - 1)).map (pub.chunkPin c)) ++
+  ((List.range T.chunkCount).flatMap fun c => (List.range (T.castWidth - 1)).map (pub.chunkPin c)) ++
   ((List.finRange T.count).flatMap fun i => match T.kind i with
     | .chunkZero => []
     | .odd row =>
@@ -315,14 +333,14 @@ def CrtTable.modBase (T : CrtTable) (i : Nat) : Nat :=
     | some kind => modBlocks kind
     | none => 0)
 
-/-- Read the published conversion material back from the flat blocks. -/
+/-- Read the published conversion material back from the flat blocks (chunk joins read as `0`). -/
 def ConvPublic.unflatten (T : CrtTable) (blocks : Array Label) : ConvPublic :=
   let at_ (index : Nat) : Label := blocks.getD index 0
   let row (i : Nat) : OddRow := match T.kindAt i with
     | some (.odd row) => row
     | _ => ⟨0, 0, 0, 0⟩
-  { chunkJoin := fun c n => at_ (T.chunkBase c + (n - 1))
-    chunkPin := fun c k => at_ (T.chunkBase c + (T.chunkWidth c - 1) + k)
+  { chunkJoin := fun _ _ => 0
+    chunkPin := fun c k => at_ (T.chunkBase c + k)
     stageJoin := fun i stage n =>
       if stage = 0 then at_ (T.modBase i + (n - 1))
       else at_ (T.modBase i + ((row i).width0 - 1) + ((row i).ell - 1) + (n - 1))

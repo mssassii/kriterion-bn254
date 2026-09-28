@@ -132,26 +132,31 @@ theorem realBmr_congr (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInpu
 
 /-! ### 3. The real rest part, the exception entries, the conversion material of `y` -/
 
-/-- The real rest part at a pair tape. -/
+/-- The real rest part at a pair tape (no chunk joins: the labels are the actual labels, which read the coins' label
+keys and the table's chunk-tree answers). -/
 theorem realRest_pair (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) (c : crtEntry.Coins)
     (t : TagTable) :
     Laws.realRest Tb parameter scalar u (c, t) =
-      ((crtEntry.scheme inferInstance inferInstance).encode c.inputMacKey u,
+      (NoJoins.sourceLabels (NoJoins.actualZeros (NoJoins.tableAnswers t) (LabelsSplitProof.zeroOfC c))
+          (LabelsSplitProof.deltaOfC c) u,
         fun tag : RestTags Tb u => t tag.1.1) := by
-  unfold Laws.realRest
-  rw [show realGarbled crtEntry parameter scalar (c, t) = _ from BmrReal.realGarbled_pair parameter scalar c t]
+  show (Laws.tapeLabels parameter scalar u (c, t), fun tag : RestTags Tb u => t tag.1.1) = _
+  rw [LabelsSplitProof.tapeLabels_eq]
 
-theorem inputMacKey_congr {c c' : crtEntry.Coins} (zero : c.inputZero = c'.inputZero)
-    (delta : c.inputDelta = c'.inputDelta) : c.inputMacKey = c'.inputMacKey := by
-  unfold Kriterion.ArgoMAC.Scheme.Coins.inputMacKey
-  rw [zero, delta]
-
-/-- **The real rest part reads the input labels and the table at the visible rest tags.** -/
+/-- **The real rest part reads the input labels, the table at the chunk-tree tags (family `0`) and the table at the
+visible rest tags.** -/
 theorem realRest_congr (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput) {c c' : crtEntry.Coins}
     {t t' : TagTable} (zero : c.inputZero = c'.inputZero) (delta : c.inputDelta = c'.inputDelta)
+    (agree0 : ∀ p : Fin (2 ^ 40), tagFamily p.val = 0 → t p = t' p)
     (agree : ∀ tag : RestTags Tb u, t tag.1.1 = t' tag.1.1) :
     Laws.realRest Tb parameter scalar u (c, t) = Laws.realRest Tb parameter scalar u (c', t') := by
-  rw [realRest_pair, realRest_pair, inputMacKey_congr zero delta]
+  have hz : LabelsSplitProof.zeroOfC c = LabelsSplitProof.zeroOfC c' := by
+    unfold LabelsSplitProof.zeroOfC Entry.zeroOf
+    rw [zero]
+  have hd : LabelsSplitProof.deltaOfC c = LabelsSplitProof.deltaOfC c' := by
+    unfold LabelsSplitProof.deltaOfC Entry.deltaOf
+    rw [delta]
+  rw [realRest_pair, realRest_pair, hz, hd, NoJoins.actualZeros_family0 agree0]
   exact congrArg _ (funext agree)
 
 theorem finalPos_family (s : ℕ) (small : s < 65536) : tagFamily (DigestSplit.finalPos s).val = 9 := by
@@ -232,40 +237,46 @@ theorem realReads : RealReads Entry.table := by
     dsimp only at same agree ⊢
     subst same
     have fam : FamAgree t t' := fun p families => agree p fun hot => by
-      obtain ⟨low, -, -⟩ := hot
+      obtain ⟨-, low, -, -⟩ := hot
       omega
     have rest : ∀ tag : RestTags Tb u, t tag.1.1 = t' tag.1.1 := fun tag => agree _ fun hot => by
-      obtain ⟨low, -, isHot⟩ := hot
+      obtain ⟨-, low, -, isHot⟩ := hot
       rw [hot_false_of_visible u tag.1.2 (by omega)] at isHot
       exact absurd isHot (by decide)
+    have agree0 : ∀ p : Fin (2 ^ 40), tagFamily p.val = 0 → t p = t' p := fun p zero => agree p fun hot => by
+      obtain ⟨one, -, -, -⟩ := hot
+      omega
     by_cases D : Doubling crtEntry scalar (c, t) u
     · rw [if_pos D, if_pos ((doubling_congr scalar u c t t').mp D)]
     · rw [if_neg D, if_neg fun D' => D ((doubling_congr scalar u c t t').mpr D'),
         crtY_congr parameter scalar c (t' := t') fun p coord => agree p fun hot => by
-          obtain ⟨-, coordZero, -⟩ := hot
+          obtain ⟨-, -, coordZero, -⟩ := hot
           omega,
         exception_congr parameter scalar c (t' := t') fun p nine => agree p fun hot => by
-          obtain ⟨low, -, -⟩ := hot
+          obtain ⟨-, low, -, -⟩ := hot
           omega,
-        realRest_congr parameter scalar u rfl rfl rest,
+        realRest_congr parameter scalar u rfl rfl agree0 rest,
         realBmr_congr parameter scalar u rfl rfl rfl rfl rfl rfl fam]
   · rintro ⟨c, t⟩ ⟨c', t'⟩ same agree
     dsimp only at same agree ⊢
     subst same
     have fam : FamAgree t t' := fun p families => agree p fun hot => by
-      obtain ⟨low, -, -⟩ := hot
+      obtain ⟨-, low, -, -⟩ := hot
       omega
     have rest : ∀ tag : RestTags Tb u, t tag.1.1 = t' tag.1.1 := fun tag => agree _ fun hot => by
-      obtain ⟨low, -, isHot⟩ := hot
+      obtain ⟨-, low, -, isHot⟩ := hot
       rw [hot_false_of_visible u tag.1.2 (by omega)] at isHot
       exact absurd isHot (by decide)
+    have agree0 : ∀ p : Fin (2 ^ 40), tagFamily p.val = 0 → t p = t' p := fun p zero => agree p fun hot => by
+      obtain ⟨one, -, -, -⟩ := hot
+      omega
     by_cases D : Doubling crtEntry scalar (c, t) u
     · rw [if_pos D, if_pos ((doubling_congr scalar u c t t').mp D)]
     · rw [if_neg D, if_neg fun D' => D ((doubling_congr scalar u c t t').mpr D'),
         exception_congr parameter scalar c (t' := t') fun p nine => agree p fun hot => by
-          obtain ⟨low, -, -⟩ := hot
+          obtain ⟨-, low, -, -⟩ := hot
           omega,
-        realRest_congr parameter scalar u rfl rfl rest,
+        realRest_congr parameter scalar u rfl rfl agree0 rest,
         realBmr_congr parameter scalar u rfl rfl rfl rfl rfl rfl fam]
   · rintro ⟨c, t⟩ ⟨c', t'⟩ same agree
     dsimp only at same agree ⊢
@@ -276,15 +287,16 @@ theorem realReads : RealReads Entry.table := by
       rcases hidden with nine | ⟨eight, other⟩
       · rcases tag.2 with low | eight' <;> omega
       · exact other (part_of_visible u tag.1.2 eight)
-    exact Prod.ext (realRest_congr parameter scalar u zero delta rest)
+    have agree0 : ∀ p : Fin (2 ^ 40), tagFamily p.val = 0 → t p = t' p := fun p zero => agree p fun hidden => by
+      rcases hidden with nine | ⟨eight, -⟩ <;> omega
+    exact Prod.ext (realRest_congr parameter scalar u zero delta agree0 rest)
       (realBmr_congr parameter scalar u offsets points bridge mask r1 r2 fam)
   · rintro ⟨c, t⟩ ⟨c', t'⟩ same agree
     dsimp only at same agree ⊢
     obtain ⟨offsets, points, -, bridge, mask, r1, r2⟩ := same
     exact realBmr_congr parameter scalar u offsets points bridge mask r1 r2 fun p families =>
       agree p fun hidden => by
-        obtain ⟨-, restFam⟩ := hidden
-        omega
+        rcases hidden with ⟨-, restFam⟩ | ⟨zero, -⟩ <;> omega
 
 end
 

@@ -3,8 +3,10 @@ The evaluator's reads of a published source (for the machine's M5b chain):
 for a stage-1 source `s` and `pub := publish s`, what the replay reads from `pub` is `s`, field by field.
 
 (i) joins: the conversion material the evaluator reads, `convOf pub.crtX` (and `crtY`), agrees with
-    `s.conv κ` on every read cell (`convAgree_publishX/Y`); at the read indices this is the source's joins at
-    the flat source indices (`chunkJoin_publish`, `stageJoin_publish`, `growJoin_publish`, `foldJoin_publish`);
+    `s.conv κ` on every read cell (`convAgree_publishX/Y`); at the read indices this is `0` for the chunk
+    joins (no chunk joins: `chunkJoin_publish`; the source's chunk-join cells are never read) and the
+    source's joins at the flat source indices otherwise (`stageJoin_publish`, `growJoin_publish`,
+    `foldJoin_publish`);
 (ii) pins: the lanes `pinOfBlocks` decodes from the published blocks are the source's pin lanes
      (`chunkPin_lanes`, `stagePin_lanes`);
 (iii) records: the published record is the source's natural below `M` (`recX_val`, `recY_val`), its hint is 0
@@ -26,11 +28,14 @@ variable (s : Source)
 
 /-! ### (i) Joins -/
 
+/-- The source's conversion material has no chunk joins. -/
+theorem conv_chunkJoin (κ : Fin 2) (c n : Nat) : (s.conv κ).chunkJoin c n = 0 := rfl
+
 theorem convAgree_publishX : ConvAgree table (convOf (publish s).crtX) (s.conv 0) :=
-  convAgree_convOf (s.conv 0)
+  (convAgree_convOf (s.conv 0)).of_dropChunkJoins (conv_chunkJoin s 0)
 
 theorem convAgree_publishY : ConvAgree table (convOf (publish s).crtY) (s.conv 1) :=
-  convAgree_convOf (s.conv 1)
+  (convAgree_convOf (s.conv 1)).of_dropChunkJoins (conv_chunkJoin s 1)
 
 /-- The published conversion material of coordinate `κ`. -/
 def convPub (κ : Fin 2) : ConvPublic :=
@@ -47,10 +52,11 @@ theorem convAgree_publish (κ : Fin 2) : ConvAgree table (convPub s κ) (s.conv 
     subst one
     exact convAgree_publishY s
 
-theorem chunkJoin_publish (κ : Fin 2) (c n : Nat) (hc : c < table.chunkCount) (lower : 1 ≤ n)
-    (upper : n < table.chunkWidth c) :
-    (convPub s κ).chunkJoin c n = s.joinAt κ (chunkJoinBase c + (n - 1)) :=
-  (convAgree_publish s κ).1 c hc n lower upper
+/-- No chunk joins: the evaluator reads every chunk join as `0`. -/
+theorem chunkJoin_publish (κ : Fin 2) (c n : Nat) :
+    (convPub s κ).chunkJoin c n = 0 := by
+  unfold convPub
+  split <;> rfl
 
 theorem stageJoin0_publish (κ : Fin 2) (i : Fin table.count) (row : OddRow) (kind : table.kind i = .odd row)
     (n : Nat) (lower : 1 ≤ n) (upper : n < row.width0) :

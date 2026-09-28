@@ -359,13 +359,30 @@ def PartSplit {β : Type} (sameCoins : crtEntry.Coins → crtEntry.Coins → Pro
 def hotConvTag (T : CrtTable) (u : AffineInput) (κ : ℕ) (tag : Fin (2 ^ 40)) : Prop :=
   tagFamily tag.val ≤ 5 ∧ tagCoord tag.val = κ ∧ hotTag T u tag.val = true
 
+/-- The hot conversion **payload** tags of coordinate `κ` at `u` (families `1` to `5`): no chunk joins are
+published, so the published conversion material reads no chunk-tree answer (family `0`); the hot chunk-tree answers
+are absorbed into the Lamport labels and belong to the rest split. -/
+def hotPayloadTag (T : CrtTable) (u : AffineInput) (κ : ℕ) (tag : Fin (2 ^ 40)) : Prop :=
+  1 ≤ tagFamily tag.val ∧ tagFamily tag.val ≤ 5 ∧ tagCoord tag.val = κ ∧ hotTag T u tag.val = true
+
+theorem hotPayloadTag_hotConvTag {T : CrtTable} {u : AffineInput} {κ : ℕ} {tag : Fin (2 ^ 40)}
+    (h : hotPayloadTag T u κ tag) : hotConvTag T u κ tag :=
+  ⟨h.2.1, h.2.2.1, h.2.2.2⟩
+
+/-- Reading off a larger hidden set is reading off a smaller one. -/
+theorem ReadsOff.mono {α : Type} {sameCoins : crtEntry.Coins → crtEntry.Coins → Prop}
+    {small large : Fin (2 ^ 40) → Prop} {g : TableTape crtEntry → α} (sub : ∀ tag, small tag → large tag)
+    (reads : ReadsOff sameCoins large g) : ReadsOff sameCoins small g :=
+  fun tape tape' same agree => reads tape tape' same fun tag off => agree tag fun h => off (sub tag h)
+
 /-- **P3**: the conversion material of coordinate `κ` is uniform (as the source publishes it) and
-independent of everything off the hot conversion tags of `κ` at `u`, the coins included. -/
+independent of everything off the hot conversion payload tags of `κ` at `u` (families `1` to `5`), the coins
+included. -/
 def CrtConvSplit (T : CrtTable) (κ : Fin 2) : Prop :=
   ∀ [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput),
     letI := (view).sourceFintype
     haveI := (view).sourceNonempty
-    PartSplit Eq (hotConvTag T u κ.val) (fun _ => False)
+    PartSplit Eq (hotPayloadTag T u κ.val) (fun _ => False)
       (fun tape => if κ = 0 then (realGarbled crtEntry parameter scalar tape).1.crtX
         else (realGarbled crtEntry parameter scalar tape).1.crtY)
       ((PMF.uniformOfFintype (view).Source).map fun source =>
@@ -431,15 +448,21 @@ def SameOffLabels (first second : crtEntry.Coins) : Prop :=
 abbrev RestTags (T : CrtTable) (u : AffineInput) :=
   {tag : VisTags T u // tagFamily tag.1.val ≤ 5 ∨ tagFamily tag.1.val = 8}
 
+/-- The tags the rest split owns at `u`: the visible tags of families `0` to `5` and `8`, and (no chunk joins) the
+hot chunk-tree tags (family `0`), whose answers the actual Lamport labels absorb. -/
+def restHidden (T : CrtTable) (u : AffineInput) (tag : Fin (2 ^ 40)) : Prop :=
+  (visTag T u tag.val = true ∧ (tagFamily tag.val ≤ 5 ∨ tagFamily tag.val = 8)) ∨
+    (tagFamily tag.val = 0 ∧ hotTag T u tag.val = true)
+
 /-- **P2b and P6**: under the swapped tape, off doubling, the labels of `u` and the table at
 the visible tags of families `0` to `5` and `8` are uniform and independent of everything that reads the coins off
-the input labels and the table off those tags (in the composition: the P45 part, after P3 and P5a have split the
-conversion material and the exception entries off). -/
+the input labels and the table off those tags and the hot chunk-tree tags (in the composition: the P45 part, after
+P3 and P5a have split the conversion material and the exception entries off). -/
 def CrtRestSplit (T : CrtTable) : Prop :=
   ∀ [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput),
     letI := (view).sourceFintype
     haveI := (view).sourceNonempty
-    PartSplit SameOffLabels (fun tag => visTag T u tag.val = true ∧ (tagFamily tag.val ≤ 5 ∨ tagFamily tag.val = 8))
+    PartSplit SameOffLabels (restHidden T u)
       (fun tape => Doubling crtEntry scalar tape u)
       (fun tape => ((crtEntry.scheme inferInstance inferInstance).encode (realGarbled crtEntry parameter scalar tape).2 u,
         fun tag : RestTags T u => tape.2 tag.1.1))

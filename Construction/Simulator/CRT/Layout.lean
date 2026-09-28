@@ -22,6 +22,7 @@ field by field:
 | source pins | `2^52` | `sourcePin κ k lane` | lane `lane` of `Source.pins κ k` (`word lane.val`) |
 | residue digits | `2^53` | `residueCell κ i e` | the mixed-radix digit `J_{κ,e,i}` of record `e` (`word`) |
 | hints | `2^54` | `hintCell κ e` | the published hint (`word 0`; the source's records carry hint 0) |
+| zero join | `2^54 + 2^11` | `zeroJoin` | `word 0`: the join every chunk-tree level reads (no chunk joins are published) |
 | deltas | `2^55` | `deltaCell κ` | `Source.deltas κ` (`blockWord`) |
 | decoded values | `2^56` | `decodedCell κ e` | the replay's delivered value `v_e` (`fieldWord`) |
 | masks | `2^57` | `maskCell κ e` | `π_e` (`fieldWord`): non-collectors by the replay, collectors by the opening |
@@ -31,6 +32,12 @@ field by field:
 
 Every cell is below `2^62`, far below the word size; the regions are pairwise disjoint because each lies in
 `[2^n, 2^n + 2^40)` for a distinct `n ≥ 51`.
+
+**No chunk joins.** The chunk trees' joins are absorbed into the Lamport labels and not published; the evaluator
+runs the chunk trees on the join `0`. The machine reads it from `zeroJoin`, a cell in the hint region past both
+coordinates' hint cells. Like the hint cells, it is never written: the stage-1 start memory's RAM is zero, and no
+block of stage 1, the stage-2 prefix or the replay writes it (`CrtStage1Retained.retained_finalOf`,
+`CrtValidStart.Retained.zeroJoin`). The retained source-join cells of the chunk joins are not read.
 -/
 
 import Construction.Simulator.Layout
@@ -56,6 +63,9 @@ def residueCell (κ i e : Nat) : Nat := 2 ^ 53 + 2 ^ 24 * κ + 2 ^ 10 * i + e
 
 /-- The published hint of record `e` of coordinate `κ`. -/
 def hintCell (κ e : Nat) : Nat := 2 ^ 54 + 2 ^ 10 * κ + e
+
+/-- **The zero join**: a cell that holds `word 0` throughout (never written), read as every chunk-tree join. -/
+def zeroJoin : Nat := 2 ^ 54 + 2 ^ 11
 
 /-- The Lamport `Δ` of coordinate `κ`. -/
 def deltaCell (κ : Nat) : Nat := 2 ^ 55 + κ

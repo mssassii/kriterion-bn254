@@ -2,11 +2,14 @@
 **H7's `Δ` residual, part 2: the stage-2 view is a function of the fine view**.
 
 Two tapes with the same fine view (`DeltaView.fine`: coordinate `κ`'s published conversion material, the coins through
-`u`'s labels, the table off the hot conversion tags of `κ`) have
+`u`'s labels, the table off the hot conversion tags of `κ`, the actual selected labels of `u`) have
 
 * related garbler question lists (`gAsked_rel`): position by position the same tag, the same input off the `Shifted`
   tags, labels shifted by the tag-dependent `queryShift (Δ_κ ⊕ Δ'_κ)` on them (coordinate `κ` from `coord_relational`, the other
-  coordinate by congruence, the tail from `TailRel`);
+  coordinate by congruence, the tail from `TailRel`). No chunk joins: the flat vector omits `κ`'s chunk joins, but
+  at a non-first bit the chunk join is the XOR of the low parts of the actual selected label and of `u`'s coin label
+  (`chunkJoin_labels`), both in the fine view, so the full published material agrees (`convAgree_of_joins`); the
+  garbler's tail runs on the actual zero labels (`zeroAt`), whose selected labels are the fine view's;
 * the same stage-2 view (`view_fd`): the same published value, the same labels, the same designed entries (a designed
   tag is never `Shifted`, so its input is the same, and it is not a hot conversion tag, so its answer is the same).
 
@@ -72,17 +75,34 @@ abbrev cxM (coins : Entry.Coins) : CM (CoordGarbled Entry.table Entry.xCount) :=
 abbrev cyM (coins : Entry.Coins) : CM (CoordGarbled Entry.table Entry.yCount) :=
   coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))
 
+/-- **The garbler's actual zero labels** (no chunk joins): the coins' zero labels with both coordinates' chunk joins
+absorbed (`EntryCorrect.keyZero`). -/
+abbrev zeroAt (H : HashN) (coins : Entry.Coins) : Fin 2 → Fin coordinateBitCount → Block :=
+  Entry.keyZeroOf coins (Entry.absorbedOf ((cxM coins).eval H) ((cyM coins).eval H))
+
 theorem garbleCM_asked (H : HashN) (scalar : NonZeroScalar) (coins : Entry.Coins) :
-    asked H (Entry.garbleCM scalar coins) = asked H (cxM coins) ++ (asked H (cyM coins) ++ asked H (tailM scalar coins)) := by
+    asked H (Entry.garbleCM scalar coins) =
+      asked H (cxM coins) ++ (asked H (cyM coins) ++ asked H (tailM scalar coins (zeroAt H coins))) := by
   unfold Entry.garbleCM tailM
   simp only [asked_bind, asked_pure]
 
 theorem garbleCM_eval (H : HashN) (scalar : NonZeroScalar) (coins : Entry.Coins) :
     (Entry.garbleCM scalar coins).eval H =
-      (Entry.assemble scalar coins ((cxM coins).eval H) ((cyM coins).eval H) ((tailM scalar coins).eval H).1
-        ((tailM scalar coins).eval H).2, coins.inputMacKey) := by
+      (Entry.assemble scalar coins ((cxM coins).eval H) ((cyM coins).eval H)
+        ((tailM scalar coins (zeroAt H coins)).eval H).1 ((tailM scalar coins (zeroAt H coins)).eval H).2,
+        Entry.keyOfZeros (zeroAt H coins) (Entry.deltaOf coins)) := by
   unfold Entry.garbleCM tailM
   simp only [FreeQuery.eval_bind, FreeQuery.eval_pure]
+
+/-- On a tag table the actual zero labels are `NoJoins.actualZeros` of the table's answers. -/
+theorem keyZero_eq (H : HashN) (c : Entry.Coins) : EntryCorrect.keyZero H c = zeroAt H c := by
+  unfold EntryCorrect.keyZero zeroAt
+  rw [show EntryCorrect.gxOf H c = (cxM c).eval H from rfl, show EntryCorrect.gyOf H c = (cyM c).eval H from rfl]
+
+theorem zeroAt_table (c : Entry.Coins) (t : TagTable) :
+    zeroAt (hashOf t) c = NoJoins.actualZeros (NoJoins.tableAnswers t) (Entry.zeroOf c) := by
+  rw [← keyZero_eq]
+  exact NoJoins.keyZero_tagOnly (NoJoins.tagOnly_schemeHash t) c
 
 /-! ### 3. The two coordinates -/
 
@@ -143,16 +163,18 @@ theorem uBit_eq (u : AffineInput) (κ : Fin 2) (p : ℕ) : uBit u κ p = (coordV
   · rw [if_pos h, if_pos h]
   · rw [if_neg h, if_neg h]
 
-/-- Two materials with the same flat vector agree on every index the evaluator reads. -/
-theorem convAgree_of_convVector_eq {p q : ConvPublic} (same : Entry.convVector p = Entry.convVector q) :
+/-- **Two materials with the same flat vector and the same chunk joins agree on every index the evaluator reads**
+(the flat vector omits the chunk joins). -/
+theorem convAgree_of_joins {p q : ConvPublic} (same : Entry.convVector p = Entry.convVector q)
+    (joins : ∀ c < Entry.table.chunkCount, ∀ n, 1 ≤ n → n < Entry.table.chunkWidth c →
+      p.chunkJoin c n = q.chunkJoin c n) :
     FlatLayout.ConvAgree Entry.table p q := by
   have hp := EntryDelivery.convAgree_convOf p
   have hq := EntryDelivery.convAgree_convOf q
   rw [same] at hp
-  obtain ⟨p1, p2, p3⟩ := hp
-  obtain ⟨q1, q2, q3⟩ := hq
-  refine ⟨fun c hc n h1 h2 => (p1 c hc n h1 h2).symm.trans (q1 c hc n h1 h2),
-    fun c hc k hk => (p2 c hc k hk).symm.trans (q2 c hc k hk), fun i row kind => ?_⟩
+  obtain ⟨-, p2, p3⟩ := hp
+  obtain ⟨-, q2, q3⟩ := hq
+  refine ⟨joins, fun c hc k hk => (p2 c hc k hk).symm.trans (q2 c hc k hk), fun i row kind => ?_⟩
   obtain ⟨a1, a2, a3, a4, a5, a6⟩ := p3 i row kind
   obtain ⟨b1, b2, b3, b4, b5, b6⟩ := q3 i row kind
   exact ⟨fun n h1 h2 => (a1 n h1 h2).symm.trans (b1 n h1 h2), fun n h1 h2 => (a2 n h1 h2).symm.trans (b2 n h1 h2),
@@ -167,13 +189,72 @@ theorem cxM_eq (coins : Entry.Coins) : cxM coins = progM Entry.xCount 0 coins :=
 
 theorem cyM_eq (coins : Entry.Coins) : cyM coins = progM Entry.yCount 1 coins := rfl
 
+theorem coinKeys_fst (c : Entry.Coins) : (coinKeys c).1 = Entry.zeroOf c := by
+  funext κ
+  exact (zeroOf_eq_coinKeys c κ).symm
+
+theorem coinKeys_snd (c : Entry.Coins) : (coinKeys c).2 = Entry.deltaOf c := by
+  funext κ
+  exact (deltaOf_eq_coinKeys c κ).symm
+
+/-- **Coordinate `κ`'s chunk joins through the labels** (no chunk joins). At a non-first bit the chunk join, the level
+sum XOR the low part of the zero label, is the XOR of the low parts of the actual selected label and of `u`'s coin
+label: two tapes with the same coin labels and the same actual labels of `u` have the same chunk joins. (Stated
+without the garbler, so that no unification unfolds it.) -/
+theorem joins_of_labels {u : AffineInput} {κ : Fin 2} {c c' : Entry.Coins} {t t' : TagTable}
+    (sameC : eCoins u κ c = eCoins u κ c') (sameL : labelsAt u (c, t) = labelsAt u (c', t')) (cc n : ℕ)
+    (hc : cc < Entry.table.chunkCount) (lower : 1 ≤ n) (upper : n < Entry.table.chunkWidth cc) :
+    NoJoins.levelSum (NoJoins.tableAnswers t) κ.val cc n ^^^
+        clip (atNat (c.inputZero (coordOf κ)) 0 (Entry.table.chunkOffset cc + n)) =
+      NoJoins.levelSum (NoJoins.tableAnswers t') κ.val cc n ^^^
+        clip (atNat (c'.inputZero (coordOf κ)) 0 (Entry.table.chunkOffset cc + n)) := by
+  rw [NoJoins.table_chunkCount] at hc
+  rw [NoJoins.table_chunkWidth] at upper
+  have hj : 8 * cc + n < 254 := by omega
+  have off : Entry.table.chunkOffset cc + n = 8 * cc + n := rfl
+  have hdiv : (8 * cc + n) / 8 = cc := by omega
+  have hmod : (8 * cc + n) % 8 = n := by omega
+  let j : NoJoins.Bits := ⟨8 * cc + n, hj⟩
+  have first : ¬ j.val % 8 = 0 := by
+    show ¬ (8 * cc + n) % 8 = 0
+    omega
+  have side : ∀ (d : Entry.Coins) (s : TagTable),
+      NoJoins.levelSum (NoJoins.tableAnswers s) κ.val cc n ^^^ clip (atNat (d.inputZero (coordOf κ)) 0 (8 * cc + n)) =
+        clip (NoJoins.selZ (NoJoins.actualZeros (NoJoins.tableAnswers s) (Entry.zeroOf d)) (Entry.deltaOf d) u κ j) ^^^
+          clip (eLabel u κ (coinKeys d) j) := by
+    intro d s
+    rw [← selZ_eq_eLabel, coinKeys_fst, coinKeys_snd]
+    show _ = clip (NoJoins.actualZero (NoJoins.tableAnswers s) κ.val (Entry.zeroOf d κ j) j.val ^^^
+        NoJoins.deltaMask (Entry.deltaOf d) u κ j) ^^^
+          clip (Entry.zeroOf d κ j ^^^ NoJoins.deltaMask (Entry.deltaOf d) u κ j)
+    unfold NoJoins.actualZero NoJoins.deltaMask
+    rw [if_neg first, NoJoins.clip_selZ_actual]
+    have hz : atNat (d.inputZero (coordOf κ)) 0 (8 * cc + n) = Entry.zeroOf d κ j := by
+      rw [SliceC.atNat_of_lt _ _ hj]
+      fin_cases κ <;> rfl
+    show _ = NoJoins.levelSum (NoJoins.tableAnswers s) κ.val ((8 * cc + n) / 8) ((8 * cc + n) % 8) ^^^ _
+    rw [hdiv, hmod, hz]
+  rw [off, side c t, side c' t', eLabel_eq sameC]
+  have sel := NoJoins.selZ_of_labels sameL
+  exact congrArg (· ^^^ _) (congrArg clip (congrFun (congrFun sel κ) j))
+
+/-- The real table's chunk-tree tags of a chunk bit are below `2 ^ 40`. -/
+theorem chunkTreeTag_lt' (coord : ℕ) (hcoord : coord < 2) (cc n : ℕ) (hc : cc < Entry.table.chunkCount)
+    (upper : n < Entry.table.chunkWidth cc) (s : ℕ) (hs : s < 2 ^ n) : chunkTreeTag coord cc n s < 2 ^ 40 := by
+  rw [NoJoins.table_chunkCount] at hc
+  rw [NoJoins.table_chunkWidth] at upper
+  have small := NoJoins.chunkTreeTag_small coord hcoord (8 * cc + n) (by omega) s
+    (by rwa [show (8 * cc + n) % 8 = n by omega])
+  rwa [show (8 * cc + n) / 8 = cc by omega, show (8 * cc + n) % 8 = n by omega] at small
+
 /-- Two coordinate garblings that the rest of the garbler cannot tell apart. -/
 def GAgree {S : ℕ} (g g' : CoordGarbled Entry.table S) : Prop :=
   Entry.convVector g.pub = Entry.convVector g'.pub ∧ g.offset = g'.offset ∧ g.padSum = g'.padSum ∧ g.hint = g'.hint
 
 /-- **One coordinate of two tapes with the same fine view.** -/
 theorem coord_part (rel : CoordRelational) (u : AffineInput) (κ : Fin 2) {c c' : Entry.Coins} {t t' : TagTable}
-    (sameC : eCoins u κ c = eCoins u κ c') (sameT : maskTable u κ t = maskTable u κ t') (S : ℕ) (hS : S ≤ 1000)
+    (sameC : eCoins u κ c = eCoins u κ c') (sameT : maskTable u κ t = maskTable u κ t')
+    (sameL : labelsAt u (c, t) = labelsAt u (c', t')) (S : ℕ) (hS : S ≤ 1000)
     (i : Fin 2)
     (hvec : i = κ → Entry.convVector ((progM S i c).eval (hashOf t)).pub =
       Entry.convVector ((progM S i c').eval (hashOf t')).pub) :
@@ -205,8 +286,22 @@ theorem coord_part (rel : CoordRelational) (u : AffineInput) (κ : Fin 2) {c c' 
       intro j hj
       have h := congrArg clip (hE j hj)
       simpa only [Narrow.clip_xor, apply_ite clip, show clip (0 : Block) = 0 from Narrow.clip_zero] using h
+    have joins : ∀ cc < Entry.table.chunkCount, ∀ n, 1 ≤ n → n < Entry.table.chunkWidth cc →
+        ((coordGarbleM Entry.table S i.val (clip (c.inputDelta (coordOf i)))
+          (fun j => clip (atNat (c.inputZero (coordOf i)) 0 j))).eval (hashOf t)).pub.chunkJoin cc n =
+        ((coordGarbleM Entry.table S i.val (clip (c'.inputDelta (coordOf i)))
+          (fun j => clip (atNat (c'.inputZero (coordOf i)) 0 j))).eval (hashOf t')).pub.chunkJoin cc n := by
+      intro cc hc n lower upper
+      -- explicit hashes and no `rw`: a failed match against the other side's garbling unfolds the garbler
+      have h1 := @NoJoins.chunkJoin_tagOnly (hashOf t) (NoJoins.tableAnswers t) (NoJoins.tagOnly_schemeHash t)
+        Entry.table S i.val (clip (c.inputDelta (coordOf i))) (fun j => clip (atNat (c.inputZero (coordOf i)) 0 j))
+        cc n hc lower upper (chunkTreeTag_lt' i.val i.isLt cc n hc upper)
+      have h3 := @NoJoins.chunkJoin_tagOnly (hashOf t') (NoJoins.tableAnswers t') (NoJoins.tagOnly_schemeHash t')
+        Entry.table S i.val (clip (c'.inputDelta (coordOf i))) (fun j => clip (atNat (c'.inputZero (coordOf i)) 0 j))
+        cc n hc lower upper (chunkTreeTag_lt' i.val i.isLt cc n hc upper)
+      exact h1.trans ((joins_of_labels sameC sameL cc n hc lower upper).trans h3.symm)
     obtain ⟨relHot, _, hpad, hoff, hhint⟩ := rel (hashOf t) (hashOf t') S i.val hS i.isLt u _ _ _ _ hEclip
-      (convAgree_of_convVector_eq vec) hagree
+      (convAgree_of_joins vec joins) hagree
     have mixed : RelAsked (fun τ => hotTag Entry.table u τ = true)
         (deltaAt i c ^^^ deltaAt i c') (asked (hashOf t) (progM S i c))
         (asked (hashOf t') (progM S i c')) := by
@@ -386,7 +481,12 @@ theorem same_crt : crtPart parameter scalar κ ω = crtPart parameter scalar κ 
 
 theorem same_coins : eCoins u κ ω.1 = eCoins u κ ω'.1 := congrArg (fun w : WType => w.2.1) same
 
-theorem same_table : maskTable u κ ω.2 = maskTable u κ ω'.2 := congrArg (fun w : WType => w.2.2) same
+theorem same_table : maskTable u κ ω.2 = maskTable u κ ω'.2 := congrArg (fun w : WType => w.2.2.1) same
+
+theorem same_labels : labelsAt u ω = labelsAt u ω' := by
+  have h := congrArg (fun w : WType => w.2.2.2) same
+  simp only [fine, restOf] at h
+  exact h
 
 include rel tail
 
@@ -397,17 +497,25 @@ theorem garbler_rel :
         (asked (hashOf ω'.2) (Entry.garbleCM scalar ω'.1)) ∧
       GAgree ((cxM ω.1).eval (hashOf ω.2)) ((cxM ω'.1).eval (hashOf ω'.2)) ∧
       GAgree ((cyM ω.1).eval (hashOf ω.2)) ((cyM ω'.1).eval (hashOf ω'.2)) ∧
-      (tailM scalar ω.1).eval (hashOf ω.2) = (tailM scalar ω'.1).eval (hashOf ω'.2) := by
+      (tailM scalar ω.1 (zeroAt (hashOf ω.2) ω.1)).eval (hashOf ω.2) =
+        (tailM scalar ω'.1 (zeroAt (hashOf ω'.2) ω'.1)).eval (hashOf ω'.2) := by
   have sameC := same_coins parameter scalar u κ same
   have sameT := same_table parameter scalar u κ same
+  have sameL := same_labels parameter scalar u κ same
   have crt := same_crt parameter scalar u κ same
-  obtain ⟨relX, agreeX⟩ := coord_part rel u κ sameC sameT Entry.xCount (by decide) 0 fun h => by
+  obtain ⟨relX, agreeX⟩ := coord_part rel u κ sameC sameT sameL Entry.xCount (by decide) 0 fun h => by
     subst h
     exact (crtPart_x parameter scalar ω).symm.trans (crt.trans (crtPart_x parameter scalar ω'))
-  obtain ⟨relY, agreeY⟩ := coord_part rel u κ sameC sameT Entry.yCount (by decide) 1 fun h => by
+  obtain ⟨relY, agreeY⟩ := coord_part rel u κ sameC sameT sameL Entry.yCount (by decide) 1 fun h => by
     subst h
     exact (crtPart_y parameter scalar ω).symm.trans (crt.trans (crtPart_y parameter scalar ω'))
-  obtain ⟨relTail, evalTail⟩ := tail scalar u κ ω.1 ω'.1 ω.2 ω'.2 sameC sameT
+  have zeros : NoJoins.sourceLabels (zeroAt (hashOf ω.2) ω.1) (Entry.deltaOf ω.1) u =
+      NoJoins.sourceLabels (zeroAt (hashOf ω'.2) ω'.1) (Entry.deltaOf ω'.1) u := by
+    have z := zeroAt_table ω.1 ω.2
+    have z' := zeroAt_table ω'.1 ω'.2
+    rw [z, z']
+    exact sameL
+  obtain ⟨relTail, evalTail⟩ := tail scalar u κ ω.1 ω'.1 _ _ ω.2 ω'.2 sameC sameT zeros
   refine ⟨?_, agreeX, agreeY, evalTail⟩
   rw [garbleCM_asked (hashOf ω.2) scalar ω.1, garbleCM_asked (hashOf ω'.2) scalar ω'.1]
   exact relX.append (relY.append relTail)
@@ -426,11 +534,11 @@ omit rel tail in
 /-- **The labels agree.** -/
 theorem labels_eq :
     Laws.tapeLabels parameter scalar u ω = Laws.tapeLabels parameter scalar u ω' := by
-  have sameC := same_coins parameter scalar u κ same
+  have sameL := same_labels parameter scalar u κ same
   obtain ⟨c, t⟩ := ω
   obtain ⟨c', t'⟩ := ω'
   rw [Laws.LabelsSplitProof.tapeLabels_eq, Laws.LabelsSplitProof.tapeLabels_eq]
-  exact labelsFrom_congr (eLabel_eq sameC) fun i hi => keys_other sameC i hi
+  exact sameL
 
 /-- The designed inputs agree. -/
 theorem designed_filter_eq :

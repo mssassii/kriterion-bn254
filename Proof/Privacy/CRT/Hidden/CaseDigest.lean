@@ -3,7 +3,8 @@
 the bit `u` does not hold.
 
 The garbler asks the digest label of coordinate `κ`, position `p` at both bits: at bit `b` its label is
-`Z_{κ,p} ⊕ b · Δ_κ`. The evaluator's label is `E_{κ,p} = Z_{κ,p} ⊕ u_{κ,p} · Δ_κ`, which the stage-2 view holds.
+`Z_{κ,p} ⊕ b · Δ_κ`, with `Z` the actual zero labels (no chunk joins: the coins' zero labels XOR the absorbed chunk
+joins, `EntryCorrect.keyZero`). The evaluator's label is `E_{κ,p} = Z_{κ,p} ⊕ u_{κ,p} · Δ_κ`, which the stage-2 view holds.
 At the other bit the garbler's label is `E_{κ,p} ⊕ Δ_κ`, so a query that meets it fixes
 `Δ_κ = E_{κ,p} ⊕ label` (`digestOther_delta`). Given the view, `Δ_κ` is uniform (`Hidden/DeltaView.lean`), so this has conditional mass at most `2^-128`.
 -/
@@ -23,13 +24,24 @@ theorem ofNat_label (label : Block) (tag : ℕ) : BitVec.ofNat 128 (hashInput la
   rw [Paths.hashInput_label]
   exact BitVec.eq_of_toNat_eq (by rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt label.isLt])
 
+/-- `d = (a ⊕ d) ⊕ b` when `a = b` (the two sides name the actual zero label in two defeq forms). -/
+theorem xor_cancel_left' (a b d : Block) (h : a = b) : d = (a ^^^ d) ^^^ b := by
+  subst h
+  rw [BitVec.xor_comm a d, BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
+
+/-- `d = (a ⊕ 0) ⊕ (b ⊕ d)` when `a = b` (the honest label at bit `0` is `Z ⊕ 0`). -/
+theorem xor_cancel_right' (a b d : Block) (h : a = b) : d = (a ^^^ 0) ^^^ (b ^^^ d) := by
+  subst h
+  rw [show a ^^^ (0 : Block) = a from BitVec.xor_zero, ← BitVec.xor_assoc, BitVec.xor_self, BitVec.zero_xor]
+
 /-- **A garbler input at a digest label at the other bit fixes the coordinate's `Δ`**: it is `E ⊕ label`, with `E`
 the evaluator's label at that position. The coordinate and the position are read from the input's tag. -/
 theorem digestOther_delta (scalar : NonZeroScalar) (u : AffineInput) (tape : TableTape Instance.crtEntry) (N : ℕ)
     (inG : N ∈ gAsked scalar tape) (other : digestOther u (N / 2 ^ 128)) :
     ∃ (c : Fin 2) (p : Fin coordinateBitCount), c.val = tagCoord (N / 2 ^ 128) ∧ p.val = tagSlot (N / 2 ^ 128) ∧
       Entry.deltaOf tape.1 c =
-        Entry.labelsOf (EntryCorrect.labelsFor tape.1 u) c p ^^^ BitVec.ofNat 128 (N % 2 ^ 128) := by
+        Entry.labelsOf (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2)) tape.1 u)
+          c p ^^^ BitVec.ofNat 128 (N % 2 ^ 128) := by
   obtain ⟨coins, tab⟩ := tape
   obtain ⟨fam8, otherBit⟩ := other
   unfold gAsked at inG
@@ -62,19 +74,19 @@ theorem digestOther_delta (scalar : NonZeroScalar) (u : AffineInput) (tape : Tab
         (lt_of_lt_of_le p.isLt (by decide)) (by norm_num)
       rw [hashInput_div, hcoord, hslot, hpart, inputBit_eq_coordBit] at otherBit
       refine ⟨c, p, by rw [hashInput_div, hcoord], by rw [hashInput_div, hslot], ?_⟩
-      rw [ofNat_label, EntryCorrect.labelsOf_honest coins u c p]
+      rw [ofNat_label, EntryCorrect.labelsOf_honest (schemeHash (tableOracle (FI := Empty) (EI := Empty) tab)) coins u c p]
       have one : coordBit u c p.val = 1 := by have := Paths.coordBit_lt u c p.val; omega
-      rw [if_pos one, BitVec.xor_comm (Entry.zeroOf coins c p), BitVec.xor_assoc, BitVec.xor_self,
-        BitVec.xor_zero]
+      rw [if_pos one]
+      exact xor_cancel_left' _ _ _ rfl
     · subst same
       obtain ⟨_, hcoord, hslot, hpart⟩ := digestLabelTag_fields (b := 1) c.isLt
         (lt_of_lt_of_le p.isLt (by decide)) (by norm_num)
       rw [hashInput_div, hcoord, hslot, hpart, inputBit_eq_coordBit] at otherBit
       refine ⟨c, p, by rw [hashInput_div, hcoord], by rw [hashInput_div, hslot], ?_⟩
-      rw [ofNat_label, EntryCorrect.labelsOf_honest coins u c p]
+      rw [ofNat_label, EntryCorrect.labelsOf_honest (schemeHash (tableOracle (FI := Empty) (EI := Empty) tab)) coins u c p]
       have zero : ¬ coordBit u c p.val = 1 := fun one => otherBit one.symm
-      rw [if_neg zero, ← BitVec.xor_assoc]
-      simp
+      rw [if_neg zero]
+      exact xor_cancel_right' _ _ _ rfl
   · rw [asked_tableM] at inFinals
     simp only [List.mem_flatMap, List.mem_finRange, true_and] at inFinals
     obtain ⟨o, inEntry⟩ := inFinals
@@ -93,11 +105,12 @@ theorem digestOther_delta (scalar : NonZeroScalar) (u : AffineInput) (tape : Tab
 /-- The evaluator's labels in the stage-2 view are the honest labels of the tape's coins at `u`. -/
 theorem stageTwoView_labels [field : FieldCertificate] [group : GroupCertificate] (parameter : ℕ)
     (scalar : NonZeroScalar) (u : AffineInput) (tape : TableTape Instance.crtEntry) :
-    (stageTwoView Instance.crtEntry Entry.table parameter scalar u tape).2.1 = EntryCorrect.labelsFor tape.1 u := by
+    (stageTwoView Instance.crtEntry Entry.table parameter scalar u tape).2.1 =
+      EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) tape.2)) tape.1 u := by
   obtain ⟨coins, tab⟩ := tape
   have hgarble : (@Entry.scheme field group).garble parameter scalar (coins, tableOracle tab) =
       (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) tab)) scalar coins,
-        coins.inputMacKey) := by
+        EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) tab)) coins) := by
     refine (Paths.entry_garble_eval field group parameter scalar coins (tableOracle tab)).trans ?_
     unfold Entry.garbleProgram
     rw [FreeQuery.eval_toProgram]

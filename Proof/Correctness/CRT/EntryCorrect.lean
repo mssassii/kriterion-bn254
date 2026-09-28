@@ -4,8 +4,12 @@ hash, coins and input.
 
 * Off the curve the evaluator refuses before any query (`some none`), which is
   `checkedScalarMultiplication` there.
+* The garbler's returned key is the **actual** key `keyOf`: the coins' zero labels XOR the absorbed
+  chunk joins (no chunk joins, ROUND2 §5), pairs `(Z'_j, Z'_j ⊕ Δ)` with the coins' full `Δ`; the
+  digest is built on the same actual labels (`entriesOf`).
 * On the curve: the replay delivers `slope_e · v + O_e` for every encoding
-  (`EntryDelivery.published_delivery`, from `coord_delivery` on the real table);
+  (`EntryDelivery.published_delivery`, from `Absorb.coordEvalM_absorb` and `coord_delivery` on the
+  real table);
   the curve encodings give `t' = t` (release-r1's `CurveMembership.evaluateEncodedOnCurve`), so the
   key and the masks are the garbler's; the row values are then release-r1's delivered element values
   (part B), the rows evaluate to `evaluateRows` (`FieldMacToECMac.evaluateHomogeneousEncoded`), the
@@ -40,8 +44,15 @@ def gyOf : CoordGarbled table yCount :=
 
 def masksOf : MaskValues digitCount := maskValues H (maskKey H coins.bridgeKey) digitCount
 
+/-- The actual zero labels of the garbling: the coins' zero labels XOR the absorbed chunk joins. -/
+def keyZero : Fin 2 → Fin coordinateBitCount → Block :=
+  keyZeroOf coins (absorbedOf (gxOf H coins) (gyOf H coins))
+
+/-- The garbler's returned key (the actual Lamport pairs). -/
+def keyOf : Key := keyOfZeros (keyZero H coins) (deltaOf coins)
+
 def entriesOf : Fin digitCount → Exception.Entry :=
-  digestEntries H coordinateBitCount digitCount (zeroOf coins) (deltaOf coins)
+  digestEntries H coordinateBitCount digitCount (keyZero H coins) (deltaOf coins)
     (fun o => ((outputKeysOf scalar coins).get o).digit)
     (fun o => ((outputKeysOf scalar coins).get o).offset.coordinates)
     (fun o => coins.exceptionPad.get o)
@@ -62,7 +73,7 @@ def slYOf : Fin yCount → BaseField := slopesY (pointOf H scalar coins) (curveS
 def pubOf : Entry.Public :=
   assemble scalar coins (gxOf H coins) (gyOf H coins) (masksOf H coins) (entriesOf H scalar coins)
 
-theorem garbleCM_eval : (garbleCM scalar coins).eval H = (pubOf H scalar coins, coins.inputMacKey) := by
+theorem garbleCM_eval : (garbleCM scalar coins).eval H = (pubOf H scalar coins, keyOf H coins) := by
   simp only [garbleCM, FreeQuery.eval_bind, FreeQuery.eval_pure, eval_keyM, eval_maskAnswersM,
     eval_digestGarbleM]
   rfl
@@ -96,9 +107,23 @@ theorem pubOf_recY (e : Fin yCount) :
 
 end Garbled
 
-/-- The evaluator's Lamport blocks for an input. -/
-def labelsFor (coins : Coins) (input : AffineInput) : GarbledCircuit.LamportSignature :=
-  Lamport.selectedLabels (coins.inputMacKey.encode (BitInput.ofAffine input))
+/-- The evaluator's Lamport blocks for an input (selected from the actual key). -/
+def labelsFor (H : HashN) (coins : Coins) (input : AffineInput) : GarbledCircuit.LamportSignature :=
+  Lamport.selectedLabels ((keyOf H coins).encode (BitInput.ofAffine input))
+
+theorem keyOf_x (H : HashN) (coins : Coins) (j : Fin coordinateBitCount) :
+    (keyOf H coins).x[j.val] =
+      ⟨coins.inputZero .x j ^^^ embed (table.chunkShift (gxOf H coins).pub.chunkJoin j.val),
+        coins.inputZero .x j ^^^ embed (table.chunkShift (gxOf H coins).pub.chunkJoin j.val) ^^^
+          coins.inputDelta .x⟩ :=
+  actualKey_x coins (gxOf H coins) (gyOf H coins) j
+
+theorem keyOf_y (H : HashN) (coins : Coins) (j : Fin coordinateBitCount) :
+    (keyOf H coins).y[j.val] =
+      ⟨coins.inputZero .y j ^^^ embed (table.chunkShift (gyOf H coins).pub.chunkJoin j.val),
+        coins.inputZero .y j ^^^ embed (table.chunkShift (gyOf H coins).pub.chunkJoin j.val) ^^^
+          coins.inputDelta .y⟩ :=
+  actualKey_y coins (gxOf H coins) (gyOf H coins) j
 
 /-! ### Part A: the replay delivers -/
 
@@ -120,31 +145,33 @@ theorem toField_delivery (a x : BaseField) (offset : Nat) :
 
 theorem deliveredX_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (input : AffineInput)
     (e : Fin xCount) :
-    ((replayConv (pubOf H scalar coins) input (labelsFor coins input)).eval H).deliveredX e =
+    ((replayConv (pubOf H scalar coins) input (labelsFor H coins input)).eval H).deliveredX e =
       slXOf H scalar coins e * input.x + toField ((gxOf H coins).offset e) := by
   have delivery := published_delivery H xCount 0 (clip (coins.inputDelta .x))
-    (fun j => clip (atNat (coins.inputZero .x) 0 j))
+    (fun j => clip (atNat (coins.inputZero .x) 0 j)) (gxOf H coins) rfl
     (fun e => (slXOf H scalar coins e).val) input.x.val (val_lt_two_pow _)
-    (fun e => val_mul_val_lt _ _) (fun j => clip (labelX (labelsFor coins input) j))
-    (fun j low => clip_labelX_honest _ _ _ (coins_key_x coins) input j low)
+    (fun e => val_mul_val_lt _ _) (fun j => clip (labelX (labelsFor H coins input) j))
+    (fun j low => clip_labelX_absorbed _ (coins.inputZero .x)
+      (table.chunkShift (gxOf H coins).pub.chunkJoin) (coins.inputDelta .x) (keyOf_x H coins) input j low)
     (fun e => ((pubOf H scalar coins).recX.get e).val) (pubOf_recX H scalar coins) e
-  rw [← toField_delivery, gxOf, ← delivery]
+  rw [← toField_delivery, ← delivery]
   simp only [replayConv, FreeQuery.eval_bind, FreeQuery.eval_pure]
-  rw [pubOf_crtX, gxOf]
+  rw [pubOf_crtX]
 
 theorem deliveredY_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (input : AffineInput)
     (e : Fin yCount) :
-    ((replayConv (pubOf H scalar coins) input (labelsFor coins input)).eval H).deliveredY e =
+    ((replayConv (pubOf H scalar coins) input (labelsFor H coins input)).eval H).deliveredY e =
       slYOf H scalar coins e * input.y + toField ((gyOf H coins).offset e) := by
   have delivery := published_delivery H yCount 1 (clip (coins.inputDelta .y))
-    (fun j => clip (atNat (coins.inputZero .y) 0 j))
+    (fun j => clip (atNat (coins.inputZero .y) 0 j)) (gyOf H coins) rfl
     (fun e => (slYOf H scalar coins e).val) input.y.val (val_lt_two_pow _)
-    (fun e => val_mul_val_lt _ _) (fun j => clip (labelY (labelsFor coins input) j))
-    (fun j low => clip_labelY_honest _ _ _ (coins_key_y coins) input j low)
+    (fun e => val_mul_val_lt _ _) (fun j => clip (labelY (labelsFor H coins input) j))
+    (fun j low => clip_labelY_absorbed _ (coins.inputZero .y)
+      (table.chunkShift (gyOf H coins).pub.chunkJoin) (coins.inputDelta .y) (keyOf_y H coins) input j low)
     (fun e => ((pubOf H scalar coins).recY.get e).val) (pubOf_recY H scalar coins) e
-  rw [← toField_delivery, gyOf, ← delivery]
+  rw [← toField_delivery, ← delivery]
   simp only [replayConv, FreeQuery.eval_bind, FreeQuery.eval_pure]
-  rw [pubOf_crtY, gyOf]
+  rw [pubOf_crtY]
 
 /-! ### Index facts -/
 
@@ -294,7 +321,7 @@ theorem replay_eval_masks (H : HashN) (pub : Entry.Public) (input : AffineInput)
 theorem curveOutput_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (input : AffineInput)
     (onCurve : OnCurve input) :
     curveOutput (pubOf H scalar coins) input
-        ((replayConv (pubOf H scalar coins) input (labelsFor coins input)).eval H) = coins.bridgeKey := by
+        ((replayConv (pubOf H scalar coins) input (labelsFor H coins input)).eval H) = coins.bridgeKey := by
   unfold curveOutput
   rw [curveValues_delivered H scalar coins input _ _ (deliveredX_eq H scalar coins input)
     (deliveredY_eq H scalar coins input), pubOf_curve]
@@ -302,19 +329,19 @@ theorem curveOutput_eq (H : HashN) (scalar : NonZeroScalar) (coins : Coins) (inp
 
 /-! ### The digest's labels are honest -/
 
-theorem labelsOf_honest (coins : Coins) (input : AffineInput) :
-    DigestUnlock.Honest (zeroOf coins) (deltaOf coins) (labelsOf (labelsFor coins input)) input := by
+theorem labelsOf_honest (H : HashN) (coins : Coins) (input : AffineInput) :
+    DigestUnlock.Honest (keyZero H coins) (deltaOf coins) (labelsOf (labelsFor H coins input)) input := by
   intro coord position
   have low : position.val < 254 := position.isLt
   fin_cases coord
-  · simp only [labelsOf, zeroOf, deltaOf, coordBit, coordNat, labelsFor, Fin.zero_eta, Fin.isValue,
-      ↓reduceIte]
-    rw [labelX_honest _ _ _ (coins_key_x coins) input position.val low]
+  · simp only [labelsOf, coordBit, coordNat, labelsFor, Fin.zero_eta, Fin.isValue, ↓reduceIte]
+    rw [labelX_honest (keyOf H coins) (keyZero H coins 0) (deltaOf coins 0) (fun j => keyOfZeros_x _ _ j)
+      input position.val low]
     simp only [atNat, dif_pos (show position.val < coordinateBitCount from low)]
     split <;> simp_all
-  · simp only [labelsOf, zeroOf, deltaOf, coordBit, coordNat, labelsFor, Fin.mk_one, Fin.isValue,
-      one_ne_zero, ↓reduceIte]
-    rw [labelY_honest _ _ _ (coins_key_y coins) input position.val low]
+  · simp only [labelsOf, coordBit, coordNat, labelsFor, Fin.mk_one, Fin.isValue, one_ne_zero, ↓reduceIte]
+    rw [labelY_honest (keyOf H coins) (keyZero H coins 1) (deltaOf coins 1) (fun j => keyOfZeros_y _ _ j)
+      input position.val low]
     simp only [atNat, dif_pos (show position.val < coordinateBitCount from low)]
     split <;> simp_all
 
@@ -460,13 +487,13 @@ theorem decodeSame [FieldCertificate] [GroupCertificate] (H : HashN) (scalar : N
 /-- **On the curve the evaluator returns the scalar multiple.** -/
 theorem evaluate_onCurve [FieldCertificate] [GroupCertificate] (H : HashN) (scalar : NonZeroScalar)
     (coins : Coins) (input : AffineInput) (point : Point) (decoded : decodePoint input = some point) :
-    (evaluateCM (pubOf H scalar coins) input (labelsFor coins input)).eval H =
+    (evaluateCM (pubOf H scalar coins) input (labelsFor H coins input)).eval H =
       some (some (scalarMultiplication scalar.value point)) := by
   have onCurve : OnCurve input := (decodePoint_defined input).mp (by simp [decoded])
   rw [eval_evaluateCM_of_decode H _ input _ point decoded]
   refine congrArg some ?_
   simp only [reachCM, FreeQuery.eval_bind, FreeQuery.eval_pure, eval_digestEvalM, resultOf]
-  set out := (replay (pubOf H scalar coins) input (labelsFor coins input)).eval H with hout
+  set out := (replay (pubOf H scalar coins) input (labelsFor H coins input)).eval H with hout
   have hX : ∀ e, out.deliveredX e =
       slXOf H scalar coins e * input.x + toField ((gxOf H coins).offset e) := by
     intro e
@@ -490,26 +517,26 @@ theorem evaluate_onCurve [FieldCertificate] [GroupCertificate] (H : HashN) (scal
       zZero xZero
     rw [pubOf_exception]
     simp only [vector_get_ofFn]
-    exact DigestUnlock.digestUnlock_exceptional H coordinateBitCount digitCount (zeroOf coins)
+    exact DigestUnlock.digestUnlock_exceptional H coordinateBitCount digitCount (keyZero H coins)
       (deltaOf coins) (fun o => ((outputKeysOf scalar coins).get o).digit)
       (fun o => ((outputKeysOf scalar coins).get o).offset.coordinates)
-      (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest coins input) index phi selected
+      (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest H coins input) index phi selected
       exceptional
   · obtain ⟨phi, selected, triple⟩ := EntryDecode.signZero_triple (outputKeysOf scalar coins)
       _ input index onCurve ((outputKeysOf scalar coins).get index).offset.onCurve
       zNe sZero
     rw [pubOf_exception]
     simp only [vector_get_ofFn]
-    exact DigestUnlock.digestUnlock_triple H coordinateBitCount digitCount (zeroOf coins)
+    exact DigestUnlock.digestUnlock_triple H coordinateBitCount digitCount (keyZero H coins)
       (deltaOf coins) (fun o => ((outputKeysOf scalar coins).get o).digit)
       (fun o => ((outputKeysOf scalar coins).get o).offset.coordinates)
-      (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest coins input) index phi selected
+      (fun o => coins.exceptionPad.get o) _ input (labelsOf_honest H coins input) index phi selected
       triple
 
 /-- **Perfect correctness at every hash, coins and input.** -/
 theorem entry_correct [FieldCertificate] [GroupCertificate] (H : HashN) (scalar : NonZeroScalar)
     (coins : Coins) (input : AffineInput) :
-    (evaluateCM (pubOf H scalar coins) input (labelsFor coins input)).eval H =
+    (evaluateCM (pubOf H scalar coins) input (labelsFor H coins input)).eval H =
       some (checkedScalarMultiplication scalar.value input) := by
   cases decoded : decodePoint input with
   | none =>

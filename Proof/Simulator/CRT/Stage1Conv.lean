@@ -6,7 +6,8 @@ conversion pieces of coordinate `κ` emit exactly the bits of `ConvPublic.flatte
 block. A pin's `104` lanes of `w` bits are its `w` blocks (`pinNat`, least significant lane first).
 
 The table facts (every join and pin index in range, every pin's width) are checked on the concrete table by
-`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `3178` for every `ConvPublic`.
+`decide +kernel` (`chunkFacts`, `modFacts_all`); `flatten_length` is `2956` for every `ConvPublic` (no chunk
+joins: a chunk contributes its half-pin only; the source's chunk-join cells are drawn but not serialized).
 -/
 
 import Proof.Simulator.CRT.Stage1Wire
@@ -202,21 +203,14 @@ theorem conv_bits (ram : Word → Word) (source : Source) (κ : Fin 2) (holds : 
   unfold ConvPublic.flatten convPieces
   rw [blockBits_append, pieceListBits_append, blockBits_flatMap, blockBits_flatMap, pieceListBits_flatMap,
     pieceListBits_flatMap]
-  congr 1
-  · congr 1
-    apply List.map_congr_left
-    intro c member
-    have small : c < 32 := by rw [← chunkCount_eq]; exact List.mem_range.mp member
-    obtain ⟨joinsIn, pinIn, pinWidthIs⟩ := chunkFacts ⟨c, small⟩
-    rw [blockBits_append, pieceListBits_append]
-    congr 1
-    · exact joins_bits ram source κ holds _ _ joinsIn _ (fun n _ => by simp [Source.conv])
-    · rw [show Entry.table.castWidth - 1 = pinWidthAt c from pinWidthIs.symm]
-      exact pin_bits ram source κ holds c pinIn _ (fun b _ => by simp [Source.conv])
-  · congr 1
-    apply List.map_congr_left
-    intro i _
-    split
+  -- `congr 1` here would try `rfl` on the chunk halves and unfold the table (maximum recursion)
+  refine congrArg₂ HAppend.hAppend (congrArg List.flatten (List.map_congr_left fun c member => ?_))
+    (congrArg List.flatten (List.map_congr_left fun i _ => ?_))
+  · have small : c < 32 := by rw [← chunkCount_eq]; exact List.mem_range.mp member
+    obtain ⟨_, pinIn, pinWidthIs⟩ := chunkFacts ⟨c, small⟩
+    rw [show Entry.table.castWidth - 1 = pinWidthAt c from pinWidthIs.symm]
+    exact pin_bits ram source κ holds c pinIn _ (fun b _ => by simp [Source.conv])
+  · split
     · rename_i zero
       simp only [zero]
       rfl

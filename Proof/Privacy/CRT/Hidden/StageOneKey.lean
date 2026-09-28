@@ -509,8 +509,10 @@ theorem moveCoins_inputDelta (c : Entry.Coins) (m : NZ) : (moveCoins c m).inputD
 
 theorem entries_move (H : HashN) (scalar : NonZeroScalar) (c : Entry.Coins) (m : NZ) :
     EntryCorrect.entriesOf H scalar (moveCoins c m) = EntryCorrect.entriesOf H scalar c := by
-  unfold EntryCorrect.entriesOf Entry.zeroOf Entry.deltaOf Entry.outputKeysOf
-  rw [moveCoins_offsets, moveCoins_exceptionPad, moveCoins_inputZero, moveCoins_inputDelta]
+  -- the actual zero labels read the coins' zero labels and the coordinate garblings only
+  have hz : EntryCorrect.keyZero H (moveCoins c m) = EntryCorrect.keyZero H c := rfl
+  unfold EntryCorrect.entriesOf Entry.deltaOf Entry.outputKeysOf
+  rw [hz, moveCoins_offsets, moveCoins_exceptionPad, moveCoins_inputDelta]
 
 theorem gx_move (H : HashN) (c : Entry.Coins) (m : NZ) :
     EntryCorrect.gxOf H (moveCoins c m) = EntryCorrect.gxOf H c := rfl

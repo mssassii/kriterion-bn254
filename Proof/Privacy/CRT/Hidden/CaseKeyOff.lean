@@ -10,7 +10,8 @@
   the coins, the same P45 cells and hints and tables that agree off the hidden positions (`KeyOffEntry.HidPos`: hot
   body positions and every mask position) have the same stage-2 view. The curve, rows and records are P45's
   (`BmrEntry.curve_eq`, `rows_eq`, `recX_eq`, `recY_eq`); the conversion material reads only families 0 to 5
-  (`Asks.readPub_congr`); the digest reads families 8 and 9; the labels read only the input keys; the designed entries
+  (`Asks.readPub_congr`); the digest reads families 8 and 9; the labels read only the input keys and, through the
+  absorbed chunk joins, the in-range conversion reading, families 0 to 5 (`keyOf_low`); the designed entries
   are the designed garbler inputs (`StageTwo.designedEntries_eq`), where the coordinate garblers ask the same inputs
   on both tables (their family-6 answers feed only the residues, `asked_coordGarbleM`), the key and mask inputs are
   not designed off the curve, and a designed input is never at a hidden position.
@@ -18,6 +19,7 @@
 
 import Proof.Privacy.CRT.Core.BmrKeyOffEntry
 import Proof.Privacy.CRT.Hidden.StageTwoTable
+import Proof.Privacy.CRT.Core.KeyZeroCongr
 
 set_option autoImplicit false
 
@@ -54,7 +56,7 @@ theorem key_of_fam10 (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagTabl
     exact inKey
   · rw [mask_fam _ _ N inMask] at fam
     exact absurd fam (by decide)
-  · obtain ⟨k, member, range, label, rfl⟩ := asked_of_tagged (digest_tagged scalar coins) _ _ inDigest
+  · obtain ⟨k, member, range, label, rfl⟩ := asked_of_tagged (digest_tagged scalar coins _) _ _ inDigest
     rw [hashInput_div, tagFamily_key range] at fam
     simp only [Paths.digestLabelKeys, Paths.digestFinalKeys, Set.mem_union, Set.mem_ofPred_eq] at member
     omega
@@ -179,13 +181,14 @@ theorem asked_coordGarbleM (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (�
   simp only [coordGarbleM, asked_bind, asked_tableM, asked_pure, List.append_nil, eval_tableM, chunkAsk, chunkEval,
     modAsk]
 
-/-- **A coordinate's published conversion material** is the same on two hashes that agree at families 0 to 5. -/
-theorem convVector_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
+/-- **A coordinate's in-range conversion reading** (with its chunk joins) is the same on two hashes that agree at
+families 0 to 5. -/
+theorem readPub_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
     {H H' : HashN} (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
-    Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H).pub =
-      Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
+    Conv.readPub Entry.table ((coordGarbleM Entry.table S coord Δ Z).eval H).pub =
+      Conv.readPub Entry.table ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
   have ranges := Paths.bn254_ranges S hS
-  rw [Flat.convVector_eq_flatOf, Flat.convVector_eq_flatOf, Asks.readPub_congr Entry.table S coord Δ Z H H' ?_ ?_]
+  refine Asks.readPub_congr Entry.table S coord Δ Z H H' ?_ ?_
   · intro c hcc
     exact (tagged_congr (Paths.chunkGarbleM_tagged Entry.table coord Δ Z c hc (lt_of_lt_of_le hcc ranges.chunkCount)
       (ranges.chunkWidth c hcc) ranges.castAnswers) (chunk_keys coord c) agree).2
@@ -193,6 +196,46 @@ theorem convVector_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ 
     exact (tagged_congr (Paths.conversionGarbleM_tagged coord i.val row (Entry.table.modulus i) hc
       (lt_of_lt_of_le i.isLt ranges.count) (ranges.rows i row hk) (ranges.modulus i) Δ W) (conv_keys coord i.val)
       agree).2
+
+/-- **A coordinate's published conversion material** is the same on two hashes that agree at families 0 to 5. -/
+theorem convVector_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
+    {H H' : HashN} (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
+    Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H).pub =
+      Entry.convVector ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
+  rw [Flat.convVector_eq_flatOf, Flat.convVector_eq_flatOf, readPub_coord S coord hS hc Δ Z agree]
+
+/-- **A coordinate's in-range chunk joins** are the same on two hashes that agree at families 0 to 5. -/
+theorem joins_coord (S coord : ℕ) (hS : S ≤ 1000) (hc : coord < 2) (Δ : Label) (Z : ℕ → Label)
+    {H H' : HashN} (agree : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
+    KeyZero.JoinsAgree ((coordGarbleM Entry.table S coord Δ Z).eval H).pub
+      ((coordGarbleM Entry.table S coord Δ Z).eval H').pub := by
+  intro c hcc n _ _
+  have ranges := Paths.bn254_ranges S hS
+  have chunk := (tagged_congr (Paths.chunkGarbleM_tagged Entry.table coord Δ Z c hc
+    (lt_of_lt_of_le hcc ranges.chunkCount) (ranges.chunkWidth c hcc) ranges.castAnswers) (chunk_keys coord c) agree).2
+  obtain ⟨fJ, -⟩ := SliceC.coordGarbleM_fields H Entry.table S coord Δ Z
+  obtain ⟨fJ', -⟩ := SliceC.coordGarbleM_fields H' Entry.table S coord Δ Z
+  rw [fJ c, fJ' c, SliceC.atNat_of_lt _ _ hcc, SliceC.atNat_of_lt _ _ hcc]
+  exact congrArg (fun g : ChunkGarbled Entry.table.castWidth => g.joins n) chunk
+
+/-- **No chunk joins: the actual key** is the same for coins that agree on the label keys, on two hashes that agree
+at families 0 to 5 (its absorbed chunk joins are in-range chunk joins, `KeyZero.keyOf_congr`). -/
+theorem keyZero_low {c1 c2 : Entry.Coins} (hZero : c1.inputZero = c2.inputZero)
+    (hDelta : c1.inputDelta = c2.inputDelta) {H H' : HashN} (low : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
+    EntryCorrect.keyZero H c1 = EntryCorrect.keyZero H' c2 := by
+  refine KeyZero.keyZero_congr hZero ?_ ?_
+  · unfold EntryCorrect.gxOf
+    rw [hDelta, hZero]
+    exact joins_coord _ _ (by decide) (by norm_num) _ _ low
+  · unfold EntryCorrect.gyOf
+    rw [hDelta, hZero]
+    exact joins_coord _ _ (by decide) (by norm_num) _ _ low
+
+theorem keyOf_low {c1 c2 : Entry.Coins} (hZero : c1.inputZero = c2.inputZero)
+    (hDelta : c1.inputDelta = c2.inputDelta) {H H' : HashN} (low : AgreeOn (fun τ => tagFamily τ ≤ 5) H H') :
+    EntryCorrect.keyOf H c1 = EntryCorrect.keyOf H' c2 := by
+  unfold EntryCorrect.keyOf Entry.deltaOf
+  rw [keyZero_low hZero hDelta low, hDelta]
 
 /-! ### 4. The coins -/
 
@@ -274,9 +317,9 @@ theorem pubOf_fd (scalar : NonZeroScalar) (u : AffineInput) (c1 c2 : Entry.Coins
   · rw [EntryCorrect.pubOf_exception, EntryCorrect.pubOf_exception]
     refine congrArg Vector.ofFn ?_
     unfold EntryCorrect.entriesOf
-    rw [← eval_digestGarbleM, ← eval_digestGarbleM, zeroOf_congr hZero, deltaOf_congr hDelta,
+    rw [← eval_digestGarbleM, ← eval_digestGarbleM, keyZero_low hZero hDelta low, deltaOf_congr hDelta,
       outputKeysOf_congr scalar hOff, hPad]
-    exact (tagged_congr (digest_tagged scalar c2) (digest_keys u) tables).2
+    exact (tagged_congr (digest_tagged scalar c2 _) (digest_keys u) tables).2
   · rw [EntryCorrect.pubOf_crtX, EntryCorrect.pubOf_crtX, EntryCorrect.gxOf, EntryCorrect.gxOf, hDelta, hZero]
     exact convVector_coord _ _ (by decide) (by norm_num) _ _ low
   · rw [EntryCorrect.pubOf_crtY, EntryCorrect.pubOf_crtY, EntryCorrect.gyOf, EntryCorrect.gyOf, hDelta, hZero]
@@ -299,7 +342,8 @@ theorem view_fd_core (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput
     stageTwoView Instance.crtEntry Entry.table parameter scalar u (c1, T) =
       stageTwoView Instance.crtEntry Entry.table parameter scalar u (c2, T') := by
   have hpub := pubOf_fd scalar u c1 c2 T T' hOff hPad hZero hDelta ctx hctx1 hctx2 p45 agree
-  have hmac := inputMacKey_congr hZero hDelta
+  have hmac : EntryCorrect.keyOf (H8.tagHash T) c1 = EntryCorrect.keyOf (H8.tagHash T') c2 :=
+    keyOf_low hZero hDelta ((agreeOn_tagHash u T T' agree).mono fun τ h => not_hid_of_low h)
   have hexc := exceptional_congr scalar hOff
   have hg : (Instance.crtEntry.scheme inferInstance inferInstance).garble parameter scalar
         (c1, tapeOracle Instance.crtEntry (c1, T)) =
@@ -308,7 +352,7 @@ theorem view_fd_core (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput
     unfold tapeOracle
     dsimp only [Instance.crtEntry]
     rw [scheme_garble, scheme_garble, EntryCorrect.garbleCM_eval, EntryCorrect.garbleCM_eval,
-      BmrReal.pubOf_table, BmrReal.pubOf_table, hpub, hmac]
+      BmrReal.pubOf_table, BmrReal.pubOf_table, BmrReal.keyOf_table scalar, BmrReal.keyOf_table scalar, hpub, hmac]
   unfold stageTwoView
   dsimp only
   rw [hg, designedEntries_eq, designedEntries_eq]
@@ -324,11 +368,14 @@ theorem view_fd_core (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput
         (n : BaseField)⟩ : Entry Empty Empty))
         (List.filter (fun n => designTag Entry.table (Entry.exceptional scalar c2) u (n / 2 ^ 128))
           (gAsked scalar (c2, T'))) := by
-    rw [hexc, gAsked_eq, gAsked_eq, hDelta, hZero, zeroOf_congr hZero, deltaOf_congr hDelta,
+    have hzero : zeroOn c1 T = zeroOn c2 T' := by
+      rw [zeroOn_eq, zeroOn_eq]
+      exact keyZero_low hZero hDelta low
+    rw [hexc, gAsked_eq, gAsked_eq, hzero, hDelta, hZero, deltaOf_congr hDelta,
       outputKeysOf_congr scalar hOff, hPad,
       asked_coordGarbleM _ _ (by decide) (by norm_num) _ _ low,
       asked_coordGarbleM _ _ (by decide) (by norm_num) _ _ low,
-      (tagged_congr (digest_tagged scalar c2) (digest_keys u) tables).1]
+      (tagged_congr (digest_tagged scalar c2 _) (digest_keys u) tables).1]
     have maskGone : ∀ H K, (asked H (maskAnswersM K digitCount)).filter
         (fun n => designTag Entry.table (Entry.exceptional scalar c2) u (n / 2 ^ 128)) = [] := by
       intro H K
@@ -376,7 +423,7 @@ theorem view_fd_core (parameter : ℕ) (scalar : NonZeroScalar) (u : AffineInput
       rcases inside with ⟨a, d⟩ | ⟨a, d⟩ | ⟨a, d⟩
       · exact answer (coordX_tagged c2) (coordKeys 0) a d
       · exact answer (coordY_tagged c2) (coordKeys 1) a d
-      · exact answer (digest_tagged scalar c2) (fun k member range _ => digest_keys u k member range) a d
+      · exact answer (digest_tagged scalar c2 _) (fun k member range _ => digest_keys u k member range) a d
     rw [same]
   dsimp only
   rw [hl]

@@ -1,6 +1,6 @@
 # Intuition: the sign row on psivesely's CRT-residue delivery of ArgoMAC
 
-This entry garbles BN254 scalar multiplication with **147,711 bytes** of public ciphertext.
+This entry garbles BN254 scalar multiplication with **135,855 bytes** of public ciphertext.
 Garbling makes at most **964,502** oracle queries (gate 1,759,967) and evaluation at most
 **957,536** (gate 1,055,879). Both figures are the exact bounds in the types of
 `garbleProgram` and `evaluateProgram`.
@@ -11,7 +11,10 @@ instead of four and, with the coefficient cut, publishes one constant instead of
 reads 7 encodings and publishes 3 constants (section 1.1). It also vanishes at a second exceptional
 input, which the exception gadget covers with a one-byte entry per digit (sections 1.2 and 6).
 Sections 1.1, 1.2, 6 and 11.6 describe the sign-row change. This branch additionally retunes the
-first extraction width to 8 for 67 odd moduli, retaining width 7 for the other 17 (section 3.6).
+first extraction width to 8 for 67 odd moduli, retaining width 7 for the other 17 (section 3.6), and
+absorbs the chunk-tree joins into the (unscored) Lamport labels: the actual zero label of coordinate bit
+`8c + n`, `n ≥ 1`, is `Z ⊕ embed(J_{c,n})`, the 222 chunk joins per coordinate are not published, and the
+evaluator runs its chunk trees on the join `0` (`Construction/CRT/Entry.lean`, `Proof/Correctness/CRT/Absorb.lean`).
 
 psivesely's entry keeps the ArgoMAC structure of xinshu's entry (`xinshudong/bn254-entry`, commit
 `bf53ea4`, 3,363,376 bytes): 91 digit MACs whose rows read affine encodings of the input
@@ -21,7 +24,7 @@ chunks. psivesely's entry delivers them through the CRT-residue projectivization
 (Khambhati, Bhattacharya and Heath), as ePrint 2026/2100 (Khambhati, Feickert, Lewe and Tiwari) does
 for the field encodings of Argo MAC: each input coordinate is turned once into one-hot labels of its
 residues modulo 85 small moduli, and each encoding then costs one 78-byte record. The conversion of
-a coordinate is 44,356 bytes whatever the number of encodings. The rows are gated by masks keyed by
+a coordinate is 38,428 bytes whatever the number of encodings. The rows are gated by masks keyed by
 the curve check, the exception gadget is a hash digest, and the oracle is the field hash alone. The
 proof architecture (the obligation, the lazy oracle, the chain of games, the public-first hop, the
 opening and the closed simulator machine) is xinshu's, adapted to the CRT layer.
@@ -123,7 +126,7 @@ The construction obtains those residues in two layers.
    modulus, one residue join. The evaluator can hash every slot except the hot one, and the join
    supplies what it misses. Section 4.
 
-The conversion of a coordinate publishes 3,412 blocks (44,356 bytes). The body publishes, per
+The conversion of a coordinate publishes 2,956 blocks (38,428 bytes; no chunk joins, half-pins). The body publishes, per
 encoding, the 85 residue joins and one hint bit, packed into a 78-byte record.
 
 ---
@@ -157,6 +160,12 @@ of `2^n` labels grows by one bit as in xinshu's `bin-to-hot`: every slot `s` has
 `(⊕_s y_s) ⊕ z` with `z` the mask of the new bit. The evaluator hashes every slot except the active
 one and solves the active material from the join. A tree over `k` bits starts from the free pair
 `(z_0 ⊕ Δ, z_0)` and publishes `k − 1` joins.
+
+**No chunk joins.** For the chunk trees the join of level `n` is `J_{c,n} = (⊕_s y_s) ⊕ z_{8c+n}`, and the
+evaluator uses it only through `J ⊕ (bit label)`. The entry therefore publishes none of the 222 chunk joins per
+coordinate: it returns the Lamport labels `Z'_j = Z_j ⊕ embed(J_{c,n})` for `j = 8c + n`, `n ≥ 1` (and `Z_j` at each
+chunk's first bit), builds the digest on them, and the evaluator runs its chunk trees on the join `0`, whose active
+material `0 ⊕ clip(Z'_j ⊕ bΔ) ⊕ cold` is the joined one (`Absorb.coordEvalM_absorb`). Query counts are unchanged.
 
 Every leaf of a chunk is then cast to an arithmetic label over `Z_{2^14}` (8 answers per leaf), and
 the chunk publishes a 14-block pin. The evaluator ends with the arithmetic labels
@@ -212,11 +221,10 @@ The moduli are every prime from 17 to 439 (79 primes), the prime powers 49, 81, 
 256: 85 pairwise coprime moduli whose product `M` has 623 bits (`log2 M = 622.26`). Every odd modulus
 uses `ℓ = bitlen(32·(m − 1))`, stage widths `(w0, ℓ − w0 − 1, 1)`, and
 `k0 = max(w0, ℓ − 5)`, with `k0 − w0` growth bits and `ℓ − k0` folds. The real table chooses
-`w0 = 8` for 67 odd moduli and `w0 = 7` for 17; the generic T9 definition remains unchanged.
-A modulus publishes `4ℓ − 2w0 − 3` blocks (21 to 37 in the selected table). The odd rows
-publish 2,742 blocks and the chunks 670, giving 3,412 blocks per coordinate. Compared with all
-width-7 rows, this saves `2 × 67 = 134` blocks per coordinate while retaining 1,309 queries of
-evaluator headroom. Using width 8 for all odd rows would exceed the evaluator gate at 128 bits.
+`w0 = 8` for every odd modulus (at 104-bit labels this fits the evaluator gate); the generic T9 definition remains
+unchanged. With parity casts every pin is even and is published halved (one label less per pin), so a modulus
+publishes `4ℓ − 2w0 − 5` blocks. The odd rows publish 2,540 blocks and the chunks 416 (their 13-block half-pins;
+the 222 chunk joins are absorbed into the Lamport labels), giving 2,956 blocks per coordinate.
 
 ---
 
@@ -303,21 +311,21 @@ Correctness does not use this; privacy does (section 11).
 
 ---
 
-## 8. Why the ciphertext is 147,711 bytes
+## 8. Why the ciphertext is 135,855 bytes
 
 | Field | Contents | Bytes |
 |---|---|---:|
 | `curve` | 3 curve-check constants × 32 | 96 |
 | `rows` | 91 digits × 3 constants × 32 | 8,736 |
 | `exception` | 91 digits × one-byte entry | 91 |
-| `crtX` | conversion of `x`: 3,412 labels × 13 | 44,356 |
-| `crtY` | conversion of `y`: 3,412 labels × 13 | 44,356 |
+| `crtX` | conversion of `x`: 2,956 labels × 13 | 38,428 |
+| `crtY` | conversion of `y`: 2,956 labels × 13 | 38,428 |
 | `recX` | 367 records × 78 | 28,626 |
 | `recY` | 275 records × 78 | 21,450 |
-| **total** | | **147,711** |
+| **total** | | **135,855** |
 
 Every field has a fixed width and there is no tag, so every public value encodes to the same
-length (`Wire.encoding_length`). The conversion blocks are 60 percent of the total and do not depend
+length (`Wire.encoding_length`). The conversion blocks are 58 percent of the total and do not depend
 on the number of encodings; each further encoding would cost 78 bytes. Against psivesely's entry,
 the sign row saves 91 records (7,098 bytes) and one row constant per digit (2,912 bytes), and the
 second exceptional case adds 6 bytes per digit (546 bytes). The fallback schedule then saves
@@ -416,6 +424,10 @@ everything else the evaluator sees. The fused extraction, whose evaluator uses a
 of the same level, needs no special treatment: the argument uses only that the procedure is a function
 of the published values that recovers every hidden answer.
 
+With no chunk joins the hot chunk-tree materials are not published: they are absorbed into the returned Lamport
+labels, so the privacy argument pairs them with the labels instead (an XOR bijection between the hot tree materials
+and the noninitial selected labels, in the labels' factor of the core split).
+
 In the random-oracle model this replaces the circular correlation robustness that Duty-Free Bits
 assumes: the hidden answers are never installed, the view does not involve `Δ`, and a query at a
 hidden label succeeds with probability `2^-128`.
@@ -506,7 +518,8 @@ table with a compiler-correctness theorem, one cost on every non-aborting path) 
 layout.
 
 - **Stage 1** draws the public value: the curve and row constants (276 field cells) as field
-  elements by bounded rejection, the 182 exception nibbles (91 bytes), the joins and pins as coin words, the 85
+  elements by bounded rejection, the 182 exception nibbles (91 bytes), the joins and pins as coin words (the chunk-join
+  cells are drawn but not serialized; the replay's chunk trees read the never-written zero cell `Layout.zeroJoin`), the 85
   residue digits of each of the 642 records by bounded rejection below `m_i` (so the record is
   uniform below `M`, with hint 0), and the Lamport key; it serializes them with `Wire.encoding`,
   computing each 624-bit record by Horner's rule over 128-bit limbs.

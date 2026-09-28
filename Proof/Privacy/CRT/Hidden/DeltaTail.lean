@@ -9,9 +9,11 @@ garbler's tail (the key, the masks, the digest) on related question lists with t
   hashes agree at every input these blocks ask, and each block asks the same inputs with the same values
   (`Paths.SameVisible.asked_congr`); the key's and the finals' inputs are fixed by the bridge key and by the digest
   table's value, which is label-free on a tag table;
-* the digest table (family 8) asks, per coordinate and position, bit 0 at `Z` and bit 1 at `Z ⊕ Δ`. Off coordinate
-  `κ` the two coins agree. On `κ`, at `u`'s bit the label is `u`'s label `E`, the same on both sides, and at the other
-  bit it is `E ⊕ Δ`, so the two labels differ by `Δ ⊕ Δ'` exactly at the `Shifted` tags (`digestTable_rel`).
+* the digest table (family 8) asks, per coordinate and position, bit 0 at `Z` and bit 1 at `Z ⊕ Δ`, `Z` the actual
+  zero labels (no chunk joins: the coins' zero labels with the chunk joins absorbed). The two sides have the same
+  selected actual labels of `u` (the fine view carries them). Off coordinate `κ` the offsets agree, so the actual zero
+  labels agree. On `κ`, at `u`'s bit the label is `u`'s selected label, the same on both sides, and at the other bit
+  it is that label `⊕ Δ`, so the two labels differ by `Δ ⊕ Δ'` exactly at the `Shifted` tags (`digestTable_rel`).
 -/
 
 import Proof.Privacy.CRT.Hidden.DeltaView
@@ -84,16 +86,18 @@ theorem RelAsked.flatMap {ι : Type} {hot : ℕ → Prop} {δ : Block} (l : List
 
 section Table
 
-variable {u : AffineInput} {κ : Fin 2} {c c' : Entry.Coins}
+variable {u : AffineInput} {κ : Fin 2} {c c' : Entry.Coins} {z z' : Fin 2 → Fin coordinateBitCount → Block}
 
-/-- **The digest labels of the two coins**, per coordinate, position and bit. -/
-theorem label_rel (same : eCoins u κ c = eCoins u κ c') (cc : Fin 2) (p : Fin coordinateBitCount) (b : ℕ)
-    (hb : b < 2) :
-    let l₁ := if b = 0 then Entry.zeroOf c cc p else Entry.zeroOf c cc p ^^^ Entry.deltaOf c cc
-    let l₂ := if b = 0 then Entry.zeroOf c' cc p else Entry.zeroOf c' cc p ^^^ Entry.deltaOf c' cc
+/-- **The digest labels of the two tails**, per coordinate, position and bit (at the actual zero labels). -/
+theorem label_rel (same : eCoins u κ c = eCoins u κ c')
+    (sameL : NoJoins.sourceLabels z (Entry.deltaOf c) u = NoJoins.sourceLabels z' (Entry.deltaOf c') u)
+    (cc : Fin 2) (p : Fin coordinateBitCount) (b : ℕ) (hb : b < 2) :
+    let l₁ := if b = 0 then z cc p else z cc p ^^^ Entry.deltaOf c cc
+    let l₂ := if b = 0 then z' cc p else z' cc p ^^^ Entry.deltaOf c' cc
     (¬ Shifted u κ (digestLabelTag cc.val p.val b) → l₁ = l₂) ∧
       (Shifted u κ (digestLabelTag cc.val p.val b) → l₁ = l₂ ^^^ (deltaAt κ c ^^^ deltaAt κ c')) := by
   intro l₁ l₂
+  have sel := NoJoins.selZ_of_labels sameL
   obtain ⟨fam, hcoord, hslot, hpart⟩ := digestLabelTag_fields (b := b) cc.isLt
     (lt_of_lt_of_le p.isLt (by decide)) (by omega)
   have shifted : Shifted u κ (digestLabelTag cc.val p.val b) ↔ cc = κ ∧ b ≠ inputBit u κ.val p.val := by
@@ -108,9 +112,11 @@ theorem label_rel (same : eCoins u κ c = eCoins u κ c') (cc : Fin 2) (p : Fin 
   rw [shifted, deltaAt_eq_deltaOf, deltaAt_eq_deltaOf]
   by_cases coordSame : cc = κ
   · subst coordSame
-    have labels := congrFun (eLabel_eq same) p
-    unfold eLabel at labels
-    rw [← zeroOf_eq_coinKeys, ← zeroOf_eq_coinKeys, ← deltaOf_eq_coinKeys, ← deltaOf_eq_coinKeys] at labels
+    have labels : (if uBit u cc p.val then z cc p ^^^ Entry.deltaOf c cc else z cc p) =
+        (if uBit u cc p.val then z' cc p ^^^ Entry.deltaOf c' cc else z' cc p) := by
+      have e := congrFun (congrFun sel cc) p
+      rw [NoJoins.selZ_apply, NoJoins.selZ_apply, bitOf_eq_uBit] at e
+      exact e
     rw [inputBit_uBit]
     by_cases bit : uBit u cc p.val = true
     · simp only [if_pos bit] at labels ⊢
@@ -131,20 +137,24 @@ theorem label_rel (same : eCoins u κ c = eCoins u κ c') (cc : Fin 2) (p : Fin 
         refine ⟨fun h => by simp at h, fun _ => ?_⟩
         rw [labels]
         exact xor_shift _ _ _
-  · have other := keys_other same cc coordSame
-    rw [← zeroOf_eq_coinKeys, ← zeroOf_eq_coinKeys, ← deltaOf_eq_coinKeys, ← deltaOf_eq_coinKeys] at other
+  · have hΔ : Entry.deltaOf c cc = Entry.deltaOf c' cc := by
+      rw [deltaOf_eq_coinKeys, deltaOf_eq_coinKeys]
+      exact (keys_other same cc coordSame).2
+    have hz : z cc p = z' cc p := NoJoins.zero_of_selZ (congrFun (congrFun sel cc) p) hΔ
     refine ⟨fun _ => ?_, fun h => absurd h.1 coordSame⟩
-    simp only [l₁, l₂, other.1, other.2]
+    simp only [l₁, l₂, hz, hΔ]
 
 /-- **The digest table's question lists are related.** -/
-theorem digestTable_rel (same : eCoins u κ c = eCoins u κ c') (H H' : HashN) :
+theorem digestTable_rel (same : eCoins u κ c = eCoins u κ c')
+    (sameL : NoJoins.sourceLabels z (Entry.deltaOf c) u = NoJoins.sourceLabels z' (Entry.deltaOf c') u)
+    (H H' : HashN) :
     RelAsked (Shifted u κ) (deltaAt κ c ^^^ deltaAt κ c')
-      (asked H (digestTableM coordinateBitCount (Entry.zeroOf c) (Entry.deltaOf c)))
-      (asked H' (digestTableM coordinateBitCount (Entry.zeroOf c') (Entry.deltaOf c'))) := by
+      (asked H (digestTableM coordinateBitCount z (Entry.deltaOf c)))
+      (asked H' (digestTableM coordinateBitCount z' (Entry.deltaOf c'))) := by
   rw [asked_digestTableM, asked_digestTableM]
   refine RelAsked.flatMap _ _ _ fun cc _ => RelAsked.flatMap _ _ _ fun p _ => ?_
-  obtain ⟨off0, on0⟩ := label_rel same cc p 0 (by norm_num)
-  obtain ⟨off1, on1⟩ := label_rel same cc p 1 (by norm_num)
+  obtain ⟨off0, on0⟩ := label_rel same sameL cc p 0 (by norm_num)
+  obtain ⟨off1, on1⟩ := label_rel same sameL cc p 1 (by norm_num)
   simp only [if_true, one_ne_zero, if_false] at off0 on0 off1 on1
   have wide : ∀ b, b < 2 → 6 < tagFamily (digestLabelTag cc.val p.val b) := by
     intro b hb
@@ -155,8 +165,8 @@ theorem digestTable_rel (same : eCoins u κ c = eCoins u κ c') (H H' : HashN) :
 
 /-- **The digest table's value is the same** on two tables with the same masks. -/
 theorem digestTable_eval {t t' : TagTable} (tsame : maskTable u κ t = maskTable u κ t') :
-    (digestTableM coordinateBitCount (Entry.zeroOf c) (Entry.deltaOf c)).eval (hashOf t) =
-      (digestTableM coordinateBitCount (Entry.zeroOf c') (Entry.deltaOf c')).eval (hashOf t') := by
+    (digestTableM coordinateBitCount z (Entry.deltaOf c)).eval (hashOf t) =
+      (digestTableM coordinateBitCount z' (Entry.deltaOf c')).eval (hashOf t') := by
   rw [eval_digestTableM, eval_digestTableM]
   funext cc p
   have small : ∀ b, b < 2 → digestLabelTag cc.val p.val b < 2 ^ 40 := fun b hb => by
@@ -279,7 +289,7 @@ end DeltaTail
 open DeltaTail in
 /-- **The garbler's tail through the fine view** (`TailRel`). -/
 theorem tailRel : TailRel := by
-  intro scalar u κ c c' t t' same tsame
+  intro scalar u κ c c' z z' t t' same tsame sameL
   have bridge : c.bridgeKey = c'.bridgeKey := bridgeKey_eq same
   have pads : c.exceptionPad = c'.exceptionPad := exceptionPad_eq same
   have outputs : Entry.outputKeysOf scalar c = Entry.outputKeysOf scalar c' := by
@@ -293,8 +303,8 @@ theorem tailRel : TailRel := by
     simp only [keyM, asked_bind, asked_askN, asked_pure]
   have maskSame := Paths.SameVisible.asked_congr (hashOf t) (hashOf t')
     (maskAnswersM ((keyM c.bridgeKey).eval (hashOf t)) digitCount) (mask_agree tsame _)
-  have tableEval := digestTable_eval (c := c) (c' := c') tsame
-  set T := (digestTableM coordinateBitCount (Entry.zeroOf c) (Entry.deltaOf c)).eval (hashOf t) with hT
+  have tableEval := digestTable_eval (c := c) (c' := c') (z := z) (z' := z') tsame
+  set T := (digestTableM coordinateBitCount z (Entry.deltaOf c)).eval (hashOf t) with hT
   have fa := finals_agree tsame T (fun o => ((Entry.outputKeysOf scalar c).get o).digit)
     (fun o => ((Entry.outputKeysOf scalar c).get o).offset.coordinates) (fun o => c.exceptionPad.get o)
   have finalsSame := Paths.SameVisible.asked_congr (hashOf t) (hashOf t') _ fa
@@ -305,6 +315,6 @@ theorem tailRel : TailRel := by
   refine ⟨?_, rfl⟩
   exact RelAsked.append (RelAsked.refl (key_notShifted _ _))
     (RelAsked.append (RelAsked.refl (mask_notShifted _ _))
-      (RelAsked.append (digestTable_rel same _ _) (RelAsked.refl (finals_notShifted _ _ _ _ _))))
+      (RelAsked.append (digestTable_rel same sameL _ _) (RelAsked.refl (finals_notShifted _ _ _ _ _))))
 
 end Kriterion.CRT.Privacy.DeltaView

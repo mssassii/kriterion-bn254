@@ -1,9 +1,10 @@
 /-
 C7, the flat layout: the evaluator reads only the published cells of `ConvPublic` that `flatten`
 writes, and `unflatten ∘ flatten` returns every one of them. Together: the evaluator run on the
-material read back from the published blocks is the evaluator run on the garbler's material
-(`coordEvalM_unflatten`), which lets `coord_delivery` apply to the published
-value.
+material read back from the published blocks is the evaluator run on the garbler's material with
+its chunk joins zeroed (`convAgree_unflatten`: the layout omits the chunk joins, which the entry
+absorbs into the labels; `Absorb.coordEvalM_absorb` then lets `coord_delivery` apply to the
+published value).
 
 `ConvAgree T p q` says that `p` and `q` agree on every index the evaluator reads; the congruence
 lemmas are program equalities (`coordEvalM T S coord p = coordEvalM T S coord q`), proved block by
@@ -221,10 +222,9 @@ theorem flatMap_finRange_eq {α : Type} (n : Nat) (g : Fin n → List α) :
 
 /-! ### The sections of the flat layout -/
 
-/-- Chunk `c`'s section: its joins, then its pin blocks. -/
+/-- Chunk `c`'s section: its pin blocks (no joins). -/
 def chunkSection (T : CrtTable) (pub : ConvPublic) (c : Nat) : List Label :=
-  (List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1)) ++
-    (List.range (T.castWidth - 1)).map (pub.chunkPin c)
+  (List.range (T.castWidth - 1)).map (pub.chunkPin c)
 
 /-- Modulus `i`'s section. -/
 def modSection (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) : List Label :=
@@ -360,20 +360,10 @@ theorem modSection_odd (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) (row 
   rw [kind]
   simp only [List.append_assoc]
 
-/-- **`unflatten ∘ flatten` agrees with the material on every cell the evaluator reads.** -/
-theorem convAgree_unflatten (T : CrtTable) (pub : ConvPublic) :
-    ConvAgree T (ConvPublic.unflatten T (pub.flatten T).toArray) pub := by
-  refine ⟨fun c hc n lower upper => ?_, fun c hc k hk => ?_, fun i row kind => ?_⟩
-  · show (pub.flatten T).toArray.getD (T.chunkBase c + (n - 1)) 0 = pub.chunkJoin c n
-    rw [array_getD_toArray, flatten_chunk T pub c (n - 1) hc (by unfold CrtTable.chunkBlocks; omega),
-      chunkSection, getD_left _ _ _ _ (by simp; omega), getD_map_range _ _ _ _ (by omega),
-      Nat.sub_add_cancel lower]
-  · show (pub.flatten T).toArray.getD (T.chunkBase c + (T.chunkWidth c - 1) + k) 0 = pub.chunkPin c k
-    rw [array_getD_toArray, Nat.add_assoc, flatten_chunk T pub c _ hc (by unfold CrtTable.chunkBlocks; omega),
-      chunkSection]
-    have len : ((List.range (T.chunkWidth c - 1)).map (fun n => pub.chunkJoin c (n + 1))).length =
-        T.chunkWidth c - 1 := by simp
-    rw [getD_right' _ _ _ _ _ len, getD_map_range _ _ _ _ hk]
+/-- `unflatten ∘ flatten` agrees with the material on every modulus cell the evaluator reads. -/
+theorem modAgree_unflatten (T : CrtTable) (pub : ConvPublic) (i : Fin T.count) (row : OddRow)
+    (kind : T.kind i = .odd row) :
+    ModAgree row i.val (ConvPublic.unflatten T (pub.flatten T).toArray) pub := by
   · have hi := i.isLt
     have kindAt : T.kindAt i.val = some (.odd row) := by simp [CrtTable.kindAt, hi, kind]
     have blocks : modBlocksNat T i.val = modBlocks (.odd row) := by simp [modBlocksNat, kindAt]
@@ -426,5 +416,27 @@ theorem convAgree_unflatten (T : CrtTable) (pub : ConvPublic) :
         at_ _ (by rw [total]; omega), getD_right' _ _ _ _ _ lJ0, getD_right' _ _ _ _ _ lP0,
         getD_right' _ _ _ _ _ lJ1, getD_right' _ _ _ _ _ lP1, getD_right' _ _ _ _ _ lG,
         getD_map_range _ _ _ _ (by omega), Nat.add_sub_cancel' lower]
+
+/-- **`unflatten ∘ flatten` agrees with the material, chunk joins zeroed, on every cell the
+evaluator reads**: the layout omits the chunk joins and reads them back as `0`. -/
+theorem convAgree_unflatten (T : CrtTable) (pub : ConvPublic) :
+    ConvAgree T (ConvPublic.unflatten T (pub.flatten T).toArray) pub.dropChunkJoins := by
+  refine ⟨fun c hc n lower upper => rfl, fun c hc k hk => ?_, fun i row kind => ?_⟩
+  · show (pub.flatten T).toArray.getD (T.chunkBase c + k) 0 = pub.chunkPin c k
+    rw [array_getD_toArray, flatten_chunk T pub c k hc (by unfold CrtTable.chunkBlocks; omega),
+      chunkSection, getD_map_range _ _ _ _ hk]
+  · exact modAgree_unflatten T pub i row kind
+
+/-- Agreement with the material with its chunk joins zeroed is agreement with the material itself
+when its chunk joins are `0`. -/
+theorem ConvAgree.of_dropChunkJoins {T : CrtTable} {p q : ConvPublic} (agree : ConvAgree T p q.dropChunkJoins)
+    (zero : ∀ c n, q.chunkJoin c n = 0) : ConvAgree T p q :=
+  ⟨fun c hc n lower upper => (agree.1 c hc n lower upper).trans (zero c n).symm, agree.2.1, agree.2.2⟩
+
+/-- Zeroing the chunk joins changes no modulus cell. -/
+theorem modAgree_dropChunkJoins (row : OddRow) (i : Nat) (pub : ConvPublic) :
+    ModAgree row i pub.dropChunkJoins pub :=
+  ⟨fun _ _ _ => rfl, fun _ _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ => rfl,
+    fun _ _ _ => rfl⟩
 
 end Kriterion.CRT.FlatLayout

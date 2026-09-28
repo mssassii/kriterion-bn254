@@ -1284,9 +1284,9 @@ theorem convAgree_trans {T : CrtTable} {p q r : ConvPublic} (h : FlatLayout.Conv
     fun c hc k hk => (h.2.1 c hc k hk).trans (h'.2.1 c hc k hk),
     fun i row hk => modAgree_trans (h.2.2 i row hk) (h'.2.2 i row hk)⟩
 
-/-- Equal flat vectors give agreeing published material. -/
+/-- Equal flat vectors give agreeing published material off the chunk joins (the flat layout omits them). -/
 theorem convAgree_of_convVector_eq {p q : ConvPublic} (same : Entry.convVector p = Entry.convVector q) :
-    FlatLayout.ConvAgree Entry.table p q := by
+    FlatLayout.ConvAgree Entry.table p.dropChunkJoins q.dropChunkJoins := by
   have hp := EntryDelivery.convAgree_convOf p
   have hq := EntryDelivery.convAgree_convOf q
   rw [same] at hp

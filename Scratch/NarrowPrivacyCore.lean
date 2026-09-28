@@ -45,7 +45,7 @@ example (label : Label) :
     (Finset.univ.filter (fun delta : Cryptography.Block => clip delta = label)).card = 2 ^ 24 := by
   simpa only [Narrow.labelBits] using Narrow.clip_fiber_filter_card label
 
-/- Recheck the unchanged Phase-A metric certificates. -/
-example : ciphertextBytes = 141627 ∧ garbleBudget = 988438 ∧ evaluateBudget = 981506 := by
+/- Recheck the metric certificates (no chunk joins: 135,855 bytes). -/
+example : ciphertextBytes = 135855 ∧ garbleBudget = 988438 ∧ evaluateBudget = 981506 := by
   rw [garbleBudget_eq, evaluateBudget_eq]
   decide +kernel

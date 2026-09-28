@@ -83,12 +83,13 @@ abbrev StageVals (row : OddRow) : Type :=
   UpperHidden row.width0 row.ell × UpperHidden row.width1 (row.ell - row.width0) ×
     (Fin (row.keep - row.width0) → Label) × (Fin (row.ell - row.keep) → Label)
 
-/-- The values of the chunks: the joins of the hashed tree levels `1 .. w_c − 1` and the pins. -/
-abbrev ChunkVals (tbl : CrtTable) : Type :=
-  ((c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) × (Fin tbl.chunkCount → Lanes (tbl.castWidth - 1))
+/-- The values of the chunks: the (upper-plane) pins. No chunk joins: the tree joins are absorbed into the Lamport
+labels and are not published, so the tree materials are not part of the conversion payload (the chunk trees are read
+from the table). -/
+abbrev ChunkVals (tbl : CrtTable) : Type := Fin tbl.chunkCount → Lanes (tbl.castWidth - 1)
 
 /-- **The conversion values of one coordinate**: the hidden values at the hot slots, and equally the published
-conversion material (one join per hashed level, one pin per cast family). -/
+conversion material (one pin per chunk; per odd modulus one join per hashed level and one pin per cast family). -/
 abbrev ConvVals (tbl : CrtTable) : Type :=
   ChunkVals tbl × ((i : Fin tbl.count) → StageVals (rowOf (tbl.kind i) (tbl.modulus i)))
 
@@ -104,7 +105,7 @@ instance convValsFintype (tbl : CrtTable) : Fintype (ConvVals tbl) := by
   infer_instance
 
 instance convValsNonempty (tbl : CrtTable) : Nonempty (ConvVals tbl) :=
-  ⟨((fun _ _ => 0, fun _ _ => 0), fun _ => Classical.arbitrary _)⟩
+  ⟨(fun _ _ => 0, fun _ => Classical.arbitrary _)⟩
 
 /-- Everything of one coordinate's conversion that is not hidden: the answer table (read at the cold slots), the zero
 labels and `Δ`. -/
@@ -119,30 +120,19 @@ section Publish
 
 variable (tbl : CrtTable) (coord v : ℕ) (r : ConvRest)
 
-/-- The material at a tree slot, with its hot entry replaced by the hidden label. -/
-def chunkMatH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label)
-    (c : Fin tbl.chunkCount) (n slot : ℕ) : Label :=
-  if slot = tbl.chunkValue v c.val % 2 ^ n then ExtractStage.hot (joins c) (n - 1)
-  else clip (r.table (chunkTreeTag coord c.val n slot)).1
+/-- The material at a tree slot, read from the table (no chunk joins: the tree materials are not hidden values of
+the conversion payload). -/
+def chunkMatH (c : Fin tbl.chunkCount) (n slot : ℕ) : Label := clip (r.table (chunkTreeTag coord c.val n slot)).1
 
-/-- Leaf labels reconstructed from hidden hot tree materials and cold table data. -/
-def chunkTreeH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label)
-    (c : Fin tbl.chunkCount) : Fin (2 ^ tbl.chunkWidth c.val) → Label :=
-  materialTree (chunkMatH tbl coord v r joins c) r.delta (r.zero (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val)
+/-- Leaf labels of the chunk tree, from the table. -/
+def chunkTreeH (c : Fin tbl.chunkCount) : Fin (2 ^ tbl.chunkWidth c.val) → Label :=
+  materialTree (chunkMatH tbl coord r c) r.delta (r.zero (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val)
 
-/-- Each cast retains the reconstructed leaf label in its low plane. -/
+/-- Each cast retains the tree's leaf label in its low plane. -/
 def chunkCastH (h : ChunkVals tbl) (c : Fin tbl.chunkCount) (leaf : ℕ) : Lanes tbl.castWidth :=
-  let label := atNat (chunkTreeH tbl coord v r h.1 c) 0 leaf
-  if leaf = tbl.chunkValue v c.val then Parity.liftUpper tbl.castWidth (h.2 c) label
+  let label := atNat (chunkTreeH tbl coord r c) 0 leaf
+  if leaf = tbl.chunkValue v c.val then Parity.liftUpper tbl.castWidth (h c) label
   else parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf) label
-
-/-- The join of hashed level `k + 1` of chunk `c`. -/
-def chunkJoinH (joins : (c : Fin tbl.chunkCount) → Fin (tbl.chunkWidth c.val - 1) → Label) (c : Fin tbl.chunkCount)
-    (k : Fin (tbl.chunkWidth c.val - 1)) : Label :=
-  xorFold (fun slot : Fin (2 ^ (k.val + 1)) =>
-      if slot.val = tbl.chunkValue v c.val % 2 ^ (k.val + 1) then joins c k
-      else (clip (r.table (chunkTreeTag coord c.val (k.val + 1) slot.val)).1)) ^^^
-    r.zero (tbl.chunkOffset c.val + (k.val + 1))
 
 /-- The full even pin, before its zero low plane is omitted. -/
 def chunkFullPinH (h : ChunkVals tbl) (c : Fin tbl.chunkCount) : Lanes tbl.castWidth :=
@@ -184,7 +174,7 @@ def modPublish (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ
 
 /-- **The published conversion material of one coordinate** from the rest and the hidden values. -/
 def convPublish (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) (h : ConvVals tbl) : ConvVals tbl :=
-  ((fun c k => chunkJoinH tbl coord v r h.1.1 c k, fun c => chunkPinH tbl coord v r h.1 c),
+  (fun c => chunkPinH tbl coord v r h.1 c,
     fun i => modPublish r.table coord i.val (rowOf (tbl.kind i) (tbl.modulus i)) (tbl.modulus i)
       (tbl.wordValue (tbl.modulus i) v) r.delta (rowOf_hw0 _ _) (rowOf_hw1 _ _)
       (wordH tbl coord v r h.1 (tbl.modulus i) (rowOf (tbl.kind i) (tbl.modulus i)).ell) (h.2 i))
@@ -247,7 +237,7 @@ theorem stageVals_empty_eq (a b : StageVals emptyRow) : a = b := by
 theorem chunkFullPinH_even (tbl : CrtTable) (coord v : ℕ) (r : ConvRest)
     (h : ChunkVals tbl) (c : Fin tbl.chunkCount) :
     Parity.EvenLanes (chunkFullPinH tbl coord v r h c) := by
-  apply SliceC.pin_even_of_leaf_xor_total _ (chunkTreeH tbl coord v r h.1 c) r.delta
+  apply SliceC.pin_even_of_leaf_xor_total _ (chunkTreeH tbl coord r c) r.delta
   · intro positive leaf
     unfold chunkCastH
     rw [SliceC.atNat_of_lt _ _ leaf.isLt]
@@ -300,32 +290,26 @@ theorem modPublish_injective (T : ℕ → Block × Block) (coord i : ℕ) (row :
 bijection of `ConvVals tbl`), for every table, coordinate, value and rest. -/
 theorem convPublish_injective (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) :
     Function.Injective (convPublish tbl coord v r) := by
-  rintro ⟨⟨hJ, hP⟩, hM⟩ ⟨⟨hJ', hP'⟩, hM'⟩ same
-  have joins : hJ = hJ' := funext fun c => funext fun k => by
-    have e := congrArg (fun x => x.1.1 c k) same
-    simp only [convPublish, chunkJoinH] at e
-    rw [xorFold_hot _ (Nat.mod_lt _ (Nat.two_pow_pos _)), xorFold_hot _ (Nat.mod_lt _ (Nat.two_pow_pos _))] at e
-    exact xor_cancel_mid _ _ _ _ e
-  subst joins
+  rintro ⟨hP, hM⟩ ⟨hP', hM'⟩ same
   have pins : hP = hP' := funext fun c => by
-    have halves := congrArg (fun x => x.1.2 c) same
-    change Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r (hJ, hP) c) =
-      Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r (hJ, hP') c) at halves
+    have halves := congrArg (fun x => x.1 c) same
+    change Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r hP c) =
+      Parity.pinHalf tbl.castWidth (chunkFullPinH tbl coord v r hP' c) at halves
     have full := Parity.pinHalf_injective_on_even tbl.castWidth
-      (chunkFullPinH_even tbl coord v r (hJ, hP) c)
-      (chunkFullPinH_even tbl coord v r (hJ, hP') c) halves
+      (chunkFullPinH_even tbl coord v r hP c)
+      (chunkFullPinH_even tbl coord v r hP' c) halves
     have sums := add_right_cancel full
-    change ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r (hJ, hP) c leaf.val =
-      ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r (hJ, hP') c leaf.val at sums
+    change ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r hP c leaf.val =
+      ∑ leaf : Fin (2 ^ tbl.chunkWidth c.val), chunkCastH tbl coord v r hP' c leaf.val at sums
     have hot : tbl.chunkValue v c.val < 2 ^ tbl.chunkWidth c.val := Nat.mod_lt _ (Nat.two_pow_pos _)
     have fixed : ∀ (pins : Fin tbl.chunkCount → Lanes (tbl.castWidth - 1))
         (leaf : Fin (2 ^ tbl.chunkWidth c.val)),
-        chunkCastH tbl coord v r (hJ, pins) c leaf.val =
+        chunkCastH tbl coord v r pins c leaf.val =
           if leaf.val = tbl.chunkValue v c.val then
             Parity.liftUpper tbl.castWidth (pins c)
-              (atNat (chunkTreeH tbl coord v r hJ c) 0 (tbl.chunkValue v c.val))
+              (atNat (chunkTreeH tbl coord r c) 0 (tbl.chunkValue v c.val))
           else parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf.val)
-            (atNat (chunkTreeH tbl coord v r hJ c) 0 leaf.val) := by
+            (atNat (chunkTreeH tbl coord r c) 0 leaf.val) := by
       intro pins leaf
       unfold chunkCastH
       split_ifs with hit
@@ -333,10 +317,10 @@ theorem convPublish_injective (tbl : CrtTable) (coord v : ℕ) (r : ConvRest) :
       · rfl
     simp only [fixed] at sums
     apply Parity.liftUpper_injective tbl.castWidth
-      (atNat (chunkTreeH tbl coord v r hJ c) 0 (tbl.chunkValue v c.val))
+      (atNat (chunkTreeH tbl coord r c) 0 (tbl.chunkValue v c.val))
     exact sum_hot_cancel _ hot _ _
       (fun leaf => parityRd r.table tbl.castWidth (chunkCastTag coord c.val leaf)
-        (atNat (chunkTreeH tbl coord v r hJ c) 0 leaf)) sums
+        (atNat (chunkTreeH tbl coord r c) 0 leaf)) sums
   subst pins
   have mods : hM = hM' := funext fun i =>
     modPublish_injective _ _ _ _ _ _ _ _ _ _ (rowOf_cases _ _) (congrArg (fun x => x.2 i) same)
@@ -400,9 +384,9 @@ def readMod (pub : ConvPublic) (i : ℕ) (row : OddRow) : StageVals row :=
     (fun k => pub.stageJoin i 1 (k.val + 1), pinOfBlocks (row.ell - row.width0 - 1) fun j => pub.stagePin i 1 j.val),
     fun k => pub.growJoin i (row.width0 + k.val), fun k => pub.foldJoin i (row.keep + k.val))
 
-/-- **The published conversion material read in range** (pins through the dense codec). -/
+/-- **The published conversion material read in range** (pins through the dense codec; no chunk joins). -/
 def readPub (tbl : CrtTable) (pub : ConvPublic) : ConvVals tbl :=
-  ((fun c k => pub.chunkJoin c.val (k.val + 1), fun c => pinOfBlocks (tbl.castWidth - 1) fun j => pub.chunkPin c.val j.val),
+  (fun c => pinOfBlocks (tbl.castWidth - 1) fun j => pub.chunkPin c.val j.val,
     fun i => readMod pub i.val (rowOf (tbl.kind i) (tbl.modulus i)))
 
 /-- A table's readings at the hot slots of one modulus of row `row` and word value `σ`. -/
@@ -417,25 +401,16 @@ def readHotMod (T : ℕ → Block × Block) (coord i : ℕ) (row : OddRow) (m σ
 /-- **A table's readings at the hot slots of the coordinate value `v`**: the hidden values the garbler's own table
 gives. -/
 def readHot (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block) : ConvVals tbl :=
-  ((fun c k => (clip (T (chunkTreeTag coord c.val (k.val + 1) (tbl.chunkValue v c.val % 2 ^ (k.val + 1)))).1),
-      fun c => upperRd T tbl.castWidth (chunkCastTag coord c.val (tbl.chunkValue v c.val))),
+  (fun c => upperRd T tbl.castWidth (chunkCastTag coord c.val (tbl.chunkValue v c.val)),
     fun i => readHotMod T coord i.val (rowOf (tbl.kind i) (tbl.modulus i)) (tbl.modulus i)
       (tbl.wordValue (tbl.modulus i) v))
 
-/-- Replacing hot tree materials by their actual readings preserves the complete tree. -/
-theorem chunkTreeH_self (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block)
+/-- The chunk tree is the table's complete tree. -/
+theorem chunkTreeH_self (tbl : CrtTable) (coord : ℕ) (T : ℕ → Block × Block)
     (Z : ℕ → Label) (Δ : Label) (c : Fin tbl.chunkCount) :
-    chunkTreeH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.1 c =
+    chunkTreeH tbl coord ⟨T, Z, Δ⟩ c =
       materialTree (fun n slot => clip (T (chunkTreeTag coord c.val n slot)).1)
-        Δ (Z (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val) := by
-  apply materialTree_congr
-  intro n hn1 hn2 slot hslot
-  unfold chunkMatH
-  split_ifs with hit
-  · rw [hit]
-    simp only [ExtractStage.hot, dif_pos (show n - 1 < tbl.chunkWidth c.val - 1 by omega),
-      readHot, Nat.sub_add_cancel hn1]
-  · rfl
+        Δ (Z (tbl.chunkOffset c.val)) (tbl.chunkWidth c.val) := rfl
 
 /-- At its own hot data every chunk cast is its actual label-dependent table reading. -/
 theorem chunkCastH_self (tbl : CrtTable) (coord v : ℕ) (T : ℕ → Block × Block)
@@ -629,19 +604,8 @@ theorem garbler_conv_eq (tbl : CrtTable) (wf : ConvTableWF tbl) (S coord v : ℕ
     (Z : ℕ → Label) (Δ : Label) :
     readPub tbl ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub =
       convPublish tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T) := by
-  obtain ⟨cp, jp, -, -, -, -⟩ := coord_pub (tableHash T) tbl S coord Δ Z
-  refine Prod.ext (Prod.ext (funext fun c => funext fun k => ?_) (funext fun c => ?_)) (funext fun i => ?_)
-  · obtain ⟨cj, -, -⟩ := chunk_table T tbl coord Δ Z c.val
-    refine (cp c.val c.isLt (k.val + 1)).trans ((cj (k.val + 1) (by omega) (by omega)).trans ?_)
-    show _ = chunkJoinH tbl coord v ⟨T, Z, Δ⟩ (readHot tbl coord v T).1.1 c k
-    unfold chunkJoinH
-    congr 1
-    congr 1
-    funext slot
-    split_ifs with hs
-    · rw [hs]
-      rfl
-    · rfl
+  obtain ⟨-, jp, -, -, -, -⟩ := coord_pub (tableHash T) tbl S coord Δ Z
+  refine Prod.ext (funext fun c => ?_) (funext fun i => ?_)
   · obtain ⟨-, -, cpin⟩ := chunk_table T tbl coord Δ Z c.val
     have e : (fun j : Fin (tbl.castWidth - 1) => ((coordGarbleM tbl S coord Δ Z).eval (tableHash T)).pub.chunkPin c.val
         j.val) = fun j => atNat (stored (pinBlocks (Parity.pinHalf tbl.castWidth ((chunkGarbleM tbl coord Δ Z c.val).eval (tableHash T)).pin)))

@@ -8,15 +8,18 @@ from its joins and pins (`Construction/CRT/Layout.lean`). This file connects the
 
 * **B1** (`convVector_eq_flatOf`): the flat vector reads only in-range cells, and the dense codec is a bijection
   (`pinOfBlocks_injective`), so `convVector pub = flatOf (readPub table pub)` for a fixed map `flatOf`.
-* **B2** (`phi_bijective`, `phi_uniform`): the source's joins and pins of one coordinate are read back by `readPub` as
-  a bijection `phi` onto `ConvVals table`. The join and pin positions of `ConvVals` are enumerated by sums and sigmas
-  whose `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_chunk`, `jIdx_mod`, `pIdx_mod`), so `phi` is
-  injective; the two sides have `2 ^ (labelBits · 3178)` elements.
+* **B2** (`phiR_bijective`, `phi_uniform`): no chunk joins are published, but the source keeps its 222 chunk-join
+  cells (never read). The source's joins and pins of one coordinate split as (chunk-join cells, read part) (`jpEquiv`);
+  `phi` (the `readPub` reading of the source's material) reads only the read part (`phi_eq_phiR`), on which it is a
+  bijection `phiR` onto `ConvVals table`: the modulus join and pin positions are enumerated by sums and sigmas whose
+  `finSigmaFinEquiv` offsets are the layout's bases (`jIdx_mod`, `pIdx_mod`), so `phiR` is injective; the two sides
+  have `2 ^ (labelBits · 2956)` elements. So `phi` pushes the uniform law to the uniform law.
 * `source_joins_pins_uniform`, `source_crt_law`: under a uniform source the joins and pins of coordinate `κ` are
   uniform, so the source's flat vector is `flatOf` of uniform conversion values.
 -/
 
 import Proof.Privacy.CRT.Core.Conversion
+import Proof.Privacy.CRT.NoJoins.Law
 import Proof.Correctness.CRT.FoldChain
 import Proof.Privacy.CRT.Core.TableSplit
 import Construction.CRT.Layout
@@ -143,19 +146,14 @@ same flat list. -/
 theorem flatten_congr (p q : ConvPublic) (h : readPub table p = readPub table q) :
     p.flatten table = q.flatten table := by
   simp only [readPub, Prod.mk.injEq] at h
-  obtain ⟨⟨hj, hp⟩, hm⟩ := h
+  obtain ⟨hp, hm⟩ := h
   unfold ConvPublic.flatten
   congr 1
   · apply flatMap_congr'
     intro c hc
     rw [List.mem_range] at hc
     have pins := pinOfBlocks_injective _ (congrFun hp ⟨c, hc⟩)
-    have e1 : (List.range (table.chunkWidth c - 1)).map (fun n => p.chunkJoin c (n + 1)) =
-        (List.range (table.chunkWidth c - 1)).map (fun n => q.chunkJoin c (n + 1)) :=
-      List.map_congr_left fun n hn => congrFun (congrFun hj ⟨c, hc⟩) ⟨n, List.mem_range.mp hn⟩
-    have e2 : (List.range (table.castWidth - 1)).map (p.chunkPin c) = (List.range (table.castWidth - 1)).map (q.chunkPin c) :=
-      List.map_congr_left fun k hk => congrFun pins ⟨k, List.mem_range.mp hk⟩
-    rw [e1, e2]
+    exact List.map_congr_left fun k hk => congrFun pins ⟨k, List.mem_range.mp hk⟩
   · apply flatMap_congr'
     intro i _
     have hi := readMod_parts (congrFun hm i)
@@ -213,12 +211,12 @@ abbrev JP : Type := (Fin joinCount → Label) × ((k : Fin pinCount) → Lanes (
 def srcOf (x : JP) : Source :=
   { (Classical.arbitrary Source) with joins := fun _ => x.1, pins := fun _ => x.2 }
 
-/-- The conversion material that joins and pins publish (`Source.conv`). -/
+/-- The conversion material that joins and pins publish (`Source.conv`: zero chunk joins). -/
 def srcConv (x : JP) : ConvPublic := (srcOf x).conv 0
 
 theorem source_conv_eq (s : Source) (κ : Fin 2) : s.conv κ = srcConv (s.joins κ, s.pins κ) := rfl
 
-/-- **The in-range reading of the source's conversion material.** -/
+/-- **The in-range reading of the source's conversion material** (no chunk joins: `readPub` reads none). -/
 def phi (x : JP) : ConvVals table := readPub table (srcConv x)
 
 /-! #### Join positions -/
@@ -301,19 +299,18 @@ def modRead {row : OddRow} (x : StageVals row) : ModJoinPos row → Label
   | .inl (.inr c) => x.2.2.1 c
   | .inr d => x.2.2.2 d
 
-/-- The conversion values read at a join position. -/
-def jRead (v : ConvVals table) : JoinPos → Label
-  | .inl ⟨c, k⟩ => v.1.1 c k
-  | .inr ⟨i, r⟩ => modRead (v.2 i) r
+/-- The modulus join positions of a coordinate. -/
+abbrev ModPos : Type := Σ i : Fin table.count, ModJoinPos (rowI i)
+
+/-- The conversion values read at a modulus join position (no chunk joins are published). -/
+def jRead (v : ConvVals table) : ModPos → Label
+  | ⟨i, r⟩ => modRead (v.2 i) r
 
 theorem joinAt_eq (x : JP) (n : ℕ) : (srcOf x).joinAt 0 n = atNat x.1 0 n := rfl
 
-/-- **Every join position reads its join.** -/
-theorem jRead_phi (x : JP) (p : JoinPos) : jRead (phi x) p = atNat x.1 0 (jIdx p) := by
-  rcases p with ⟨c, k⟩ | ⟨i, r⟩
-  · rw [jIdx_chunk]
-    show atNat x.1 0 (chunkJoinBase c.val + (k.val + 1 - 1)) = _
-    rw [Nat.add_sub_cancel]
+/-- **Every modulus join position reads its join.** -/
+theorem jRead_phi (x : JP) (p : ModPos) : jRead (phi x) p = atNat x.1 0 (jIdx (.inr p)) := by
+  obtain ⟨i, r⟩ := p
   · rw [jIdx_mod]
     have hrow := rowAt_eq i
     rcases r with ((a | b) | c) | d
@@ -336,14 +333,10 @@ theorem jRead_phi (x : JP) (p : JoinPos) : jRead (phi x) p = atNat x.1 0 (jIdx p
       congr 1
       omega
 
-theorem joins_eq_of_phi {x y : JP} (h : phi x = phi y) : x.1 = y.1 := by
-  funext j
-  let p := joinEquiv.symm (Fin.cast joinCount_eq j)
-  have hp : jIdx p = j.val := by
-    simp only [jIdx, p, Equiv.apply_symm_apply, Fin.val_cast]
-  have e := jRead_phi x p
-  rw [h, jRead_phi y p, hp, atNat_lt _ _ j.isLt, atNat_lt _ _ j.isLt] at e
-  exact e.symm
+/-- `phi` determines the modulus join cells. -/
+theorem modJoins_eq_of_phi {x y : JP} (h : phi x = phi y) (p : ModPos) :
+    atNat x.1 0 (jIdx (.inr p)) = atNat y.1 0 (jIdx (.inr p)) := by
+  rw [← jRead_phi x p, h, jRead_phi y p]
 
 /-! #### Pin positions -/
 
@@ -432,7 +425,7 @@ theorem stagePin_eq (x : JP) (i s k : ℕ) :
 theorem pins_eq_of_phi {x y : JP} (h : phi x = phi y) : x.2 = y.2 := by
   funext k
   obtain ⟨kv, kh⟩ := k
-  have hpins := congrArg (fun v : ConvVals table => v.1.2) h
+  have hpins := congrArg (fun v : ConvVals table => v.1) h
   have hmods := congrArg Prod.snd h
   simp only [phi, readPub, readMod, chunkPin_eq, stagePin_eq] at hpins hmods
   obtain ⟨p, hp⟩ : ∃ p, (pinEquiv p).val = kv :=
@@ -459,9 +452,95 @@ theorem pins_eq_of_phi {x y : JP} (h : phi x = phi y) : x.2 = y.2 := by
     · rw [if_neg (show ¬ ((⟨1, hsv⟩ : Fin (modPins i)).val = 0) from Nat.one_ne_zero)] at hw
       exact pin_eq_of_read (modPinBase i.val + 1) kh _ hw pos1 e1
 
-/-- **`phi` is injective.** -/
-theorem phi_injective : Function.Injective phi := fun _ _ h =>
-  Prod.ext (joins_eq_of_phi h) (pins_eq_of_phi h)
+/-! #### `phi` reads only the modulus join cells and the pins -/
+
+/-- A modulus's values are determined by their join reads and their two pins. -/
+theorem stageVals_ext {row : OddRow} {a b : StageVals row} (joins : ∀ r, modRead a r = modRead b r)
+    (pin0 : a.1.2 = b.1.2) (pin1 : a.2.1.2 = b.2.1.2) : a = b := by
+  obtain ⟨⟨a0, a0'⟩, ⟨a1, a1'⟩, a2, a3⟩ := a
+  obtain ⟨⟨b0, b0'⟩, ⟨b1, b1'⟩, b2, b3⟩ := b
+  simp only at pin0 pin1
+  subst pin0 pin1
+  have e0 : a0 = b0 := funext fun k => joins (.inl (.inl (.inl k)))
+  have e1 : a1 = b1 := funext fun k => joins (.inl (.inl (.inr k)))
+  have e2 : a2 = b2 := funext fun k => joins (.inl (.inr k))
+  have e3 : a3 = b3 := funext fun k => joins (.inr k)
+  rw [e0, e1, e2, e3]
+
+theorem pinBlockAt_congr {x y : JP} (pins : x.2 = y.2) (k b : ℕ) :
+    (srcOf x).pinBlockAt 0 k b = (srcOf y).pinBlockAt 0 k b := by
+  simp only [Source.pinBlockAt, srcOf, pins]
+
+/-- **`phi` reads only the modulus join cells and the pins** (the chunk-join cells are never read). -/
+theorem phi_eq_of_agree {x y : JP}
+    (joins : ∀ p : ModPos, atNat x.1 0 (jIdx (.inr p)) = atNat y.1 0 (jIdx (.inr p))) (pins : x.2 = y.2) :
+    phi x = phi y := by
+  refine Prod.ext (funext fun c => ?_) (funext fun i => stageVals_ext (fun r => ?_) ?_ ?_)
+  · show pinOfBlocks (table.castWidth - 1) (fun j => (srcConv x).chunkPin c.val j.val) =
+      pinOfBlocks (table.castWidth - 1) (fun j => (srcConv y).chunkPin c.val j.val)
+    simp only [chunkPin_eq, pinBlockAt_congr pins]
+  · exact (jRead_phi x ⟨i, r⟩).trans ((joins ⟨i, r⟩).trans (jRead_phi y ⟨i, r⟩).symm)
+  · show pinOfBlocks ((rowI i).ell - 1) (fun j => (srcConv x).stagePin i.val 0 j.val) =
+      pinOfBlocks ((rowI i).ell - 1) (fun j => (srcConv y).stagePin i.val 0 j.val)
+    simp only [stagePin_eq, pinBlockAt_congr pins]
+  · show pinOfBlocks ((rowI i).ell - (rowI i).width0 - 1) (fun j => (srcConv x).stagePin i.val 1 j.val) =
+      pinOfBlocks ((rowI i).ell - (rowI i).width0 - 1) (fun j => (srcConv y).stagePin i.val 1 j.val)
+    simp only [stagePin_eq, pinBlockAt_congr pins]
+
+/-! #### The read part of the joins and pins -/
+
+/-- The chunk-join positions of a coordinate (source cells retained from the pre-no-joins layout). -/
+abbrev ChunkPos : Type := Σ c : Fin table.chunkCount, Fin (table.chunkWidth c.val - 1)
+
+/-- The part of a coordinate's joins and pins that the published material reads. -/
+abbrev JPr : Type := (ModPos → Label) × ((k : Fin pinCount) → Lanes (pinWidth k))
+
+/-- The join cells indexed by positions. -/
+def joinPosEquiv : Fin joinCount ≃ JoinPos := (finCongr joinCount_eq).trans joinEquiv.symm
+
+theorem joinPosEquiv_symm_val (p : JoinPos) : (joinPosEquiv.symm p).val = jIdx p := rfl
+
+/-- **The source's joins and pins of a coordinate: (chunk-join cells, read part).** -/
+def jpEquiv : JP ≃ (ChunkPos → Label) × JPr :=
+  (Equiv.prodCongr ((Equiv.arrowCongr joinPosEquiv (Equiv.refl Label)).trans
+      (Equiv.sumArrowEquivProdArrow ChunkPos ModPos Label)) (Equiv.refl _)).trans (Equiv.prodAssoc _ _ _)
+
+theorem jpEquiv_snd (x : JP) : (jpEquiv x).2 = (fun p => x.1 (joinPosEquiv.symm (.inr p)), x.2) := rfl
+
+theorem jpEquiv_symm_mod (z : (ChunkPos → Label) × JPr) (p : ModPos) :
+    atNat (jpEquiv.symm z).1 0 (jIdx (.inr p)) = z.2.1 p := by
+  rw [atNat_lt _ _ (jIdx_lt (.inr p))]
+  show (Equiv.sumArrowEquivProdArrow ChunkPos ModPos Label).symm (z.1, z.2.1)
+      (joinPosEquiv ⟨jIdx (.inr p), jIdx_lt (.inr p)⟩) = z.2.1 p
+  have hp : joinPosEquiv ⟨jIdx (.inr p), jIdx_lt (.inr p)⟩ = .inr p := by
+    rw [Equiv.apply_eq_iff_eq_symm_apply]
+    exact Fin.ext (joinPosEquiv_symm_val (.inr p)).symm
+  rw [hp]
+  rfl
+
+theorem jpEquiv_symm_pins (z : (ChunkPos → Label) × JPr) : (jpEquiv.symm z).2 = z.2.2 := rfl
+
+theorem atNat_mod (x : JP) (p : ModPos) : atNat x.1 0 (jIdx (.inr p)) = x.1 (joinPosEquiv.symm (.inr p)) :=
+  atNat_lt _ _ (jIdx_lt (.inr p))
+
+/-- `phi` on the read part (the chunk-join cells set to `0`). -/
+def phiR (z : JPr) : ConvVals table := phi (jpEquiv.symm (fun _ => 0, z))
+
+theorem phi_eq_phiR (x : JP) : phi x = phiR (jpEquiv x).2 := by
+  unfold phiR
+  refine phi_eq_of_agree (fun p => ?_) (by rw [jpEquiv_symm_pins, jpEquiv_snd])
+  rw [jpEquiv_symm_mod, jpEquiv_snd, atNat_mod]
+
+/-- **`phiR` is injective.** -/
+theorem phiR_injective : Function.Injective phiR := by
+  intro z z' h
+  have joins : z.1 = z'.1 := funext fun p => by
+    have e := modJoins_eq_of_phi h p
+    rwa [jpEquiv_symm_mod, jpEquiv_symm_mod] at e
+  have pins : z.2 = z'.2 := by
+    have e := pins_eq_of_phi h
+    rwa [jpEquiv_symm_pins, jpEquiv_symm_pins] at e
+  exact Prod.ext joins pins
 
 /-! #### Cardinalities -/
 
@@ -476,28 +555,35 @@ theorem natCard_stageVals (row : OddRow) : Nat.card (StageVals row) = 2 ^ (label
       (natCard_prod (natCard_blocks _) (natCard_blocks _)))
 
 theorem natCard_convVals : Nat.card (ConvVals table) =
-    2 ^ (labelBits * (((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +
-      ∑ _c : Fin table.chunkCount, (table.castWidth - 1)) + ∑ i : Fin table.count, stageBlocks (rowI i))) :=
-  natCard_prod (natCard_prod (natCard_pi _ fun _ => natCard_blocks _) (natCard_pi _ fun _ => natCard_lanes _))
-    (natCard_pi _ fun _ => natCard_stageVals _)
+    2 ^ (labelBits * ((∑ _c : Fin table.chunkCount, (table.castWidth - 1)) +
+      ∑ i : Fin table.count, stageBlocks (rowI i))) :=
+  natCard_prod (natCard_pi _ fun _ => natCard_lanes _) (natCard_pi _ fun _ => natCard_stageVals _)
 
-theorem natCard_JP : Nat.card JP = 2 ^ (labelBits * (joinCount + ∑ k : Fin pinCount, pinWidth k)) :=
-  natCard_prod (natCard_blocks _) (natCard_pi _ fun _ => natCard_lanes _)
+theorem natCard_modPos : Nat.card (ModPos → Label) = 2 ^ (labelBits * ∑ i : Fin table.count, modJoinsOf (rowI i)) := by
+  rw [Nat.card_congr (Equiv.arrowCongr ((Equiv.sigmaCongrRight fun i => modJoinEquiv (rowI i)).trans
+    finSigmaFinEquiv) (Equiv.refl Label)), natCard_blocks]
 
-theorem blocks_eq : ((∑ c : Fin table.chunkCount, (table.chunkWidth c.val - 1)) +
-      ∑ _c : Fin table.chunkCount, (table.castWidth - 1)) + ∑ i : Fin table.count, stageBlocks (rowI i) =
-    joinCount + ∑ k : Fin pinCount, pinWidth k := by
+theorem natCard_JPr : Nat.card JPr =
+    2 ^ (labelBits * ((∑ i : Fin table.count, modJoinsOf (rowI i)) + ∑ k : Fin pinCount, pinWidth k)) :=
+  natCard_prod natCard_modPos (natCard_pi _ fun _ => natCard_lanes _)
+
+theorem blocks_eq : (∑ _c : Fin table.chunkCount, (table.castWidth - 1)) + ∑ i : Fin table.count, stageBlocks (rowI i) =
+    (∑ i : Fin table.count, modJoinsOf (rowI i)) + ∑ k : Fin pinCount, pinWidth k := by
   decide +kernel
 
-theorem card_JP : Fintype.card JP = Fintype.card (ConvVals table) := by
-  rw [← Nat.card_eq_fintype_card, ← Nat.card_eq_fintype_card, natCard_JP, natCard_convVals, blocks_eq]
+theorem card_JPr : Fintype.card JPr = Fintype.card (ConvVals table) := by
+  rw [← Nat.card_eq_fintype_card, ← Nat.card_eq_fintype_card, natCard_JPr, natCard_convVals, blocks_eq]
 
-/-- **B2: the source's joins and pins of a coordinate are its conversion values, bijectively.** -/
-theorem phi_bijective : Function.Bijective phi :=
-  bijective_of_injective_card phi_injective card_JP
+/-- **B2: the read part of the source's joins and pins of a coordinate is its conversion values, bijectively.** -/
+theorem phiR_bijective : Function.Bijective phiR :=
+  bijective_of_injective_card phiR_injective card_JPr
 
-theorem phi_uniform : (PMF.uniformOfFintype JP).map phi = PMF.uniformOfFintype (ConvVals table) :=
-  map_uniform_of_bijective phi_bijective
+theorem phi_uniform : (PMF.uniformOfFintype JP).map phi = PMF.uniformOfFintype (ConvVals table) := by
+  have factor : phi = phiR ∘ Prod.fst ∘ (Equiv.prodComm (ChunkPos → Label) JPr) ∘ jpEquiv :=
+    funext fun x => phi_eq_phiR x
+  rw [factor, ← PMF.map_comp, ← PMF.map_comp, ← PMF.map_comp, NoJoins.map_uniform_equiv,
+    NoJoins.map_uniform_equiv, NoJoins.map_uniform_fst]
+  exact map_uniform_of_bijective phiR_bijective
 
 end B2
 

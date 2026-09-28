@@ -58,6 +58,17 @@ theorem pubOf_table (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.C
   rw [EntryCorrect.garbleCM_eval, EntryCorrect.garbleCM_eval] at same
   exact (Prod.mk.inj same).1
 
+/-- **The returned key on the table oracle is `keyOf` on `tagHash`** (no chunk joins: the key absorbs the chunk
+joins, so it depends on the hash, through inputs below `p` only). -/
+theorem keyOf_table (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (table : TagTable) :
+    EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins =
+      EntryCorrect.keyOf (H8.tagHash table) coins := by
+  have same := eval_congr_asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) (H8.tagHash table)
+    (Kriterion.CRT.Entry.garbleCM scalar coins) fun n asked =>
+      schemeHash_eq_tagHash table n (Align.garbler_input_lt _ scalar coins n asked)
+  rw [EntryCorrect.garbleCM_eval, EntryCorrect.garbleCM_eval] at same
+  exact (Prod.mk.inj same).2
+
 variable [FieldCertificate] [GroupCertificate]
 
 /-- The garbling on a pair tape, as a pair (rewrite with this before any projection is reduced: a projection of an
@@ -65,10 +76,10 @@ unevaluated garbling compared against anything else unfolds the garbler). -/
 theorem realGarbled_pair (parameter : ℕ) (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins)
     (table : TagTable) :
     H8.realGarbled crtEntry parameter scalar (coins, table) =
-      (EntryCorrect.pubOf (H8.tagHash table) scalar coins, coins.inputMacKey) := by
+      (EntryCorrect.pubOf (H8.tagHash table) scalar coins, EntryCorrect.keyOf (H8.tagHash table) coins) := by
   rw [ConvSplit.realGarbled_eq]
   dsimp only
-  rw [EntryCorrect.garbleCM_eval, pubOf_table]
+  rw [EntryCorrect.garbleCM_eval, pubOf_table, keyOf_table scalar]
 
 theorem realGarbled_pub (parameter : ℕ) (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins)
     (table : TagTable) :

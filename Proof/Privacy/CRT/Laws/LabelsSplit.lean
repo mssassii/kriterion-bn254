@@ -1,19 +1,21 @@
 /-
-**`LabelsSplit`** (the named input of `Laws/Rest.lean`'s `crtRestSplit_of`).
+**`LabelsSplit`** (the named input of `Laws/Rest.lean`'s `crtRestSplit_of`), no chunk joins.
 
-The labels of `u` read only the coins' input label keys (`inputZero`, `inputDelta`). The key of a real garbling is
-`coins.inputMacKey` on every hash (`EntryCorrect.garbleCM_eval`), so the table never enters, and the selected labels are
-`Entry.labels` read on the coins' zeros and deltas (`EntryDelivery.labelX_honest`, `labelY_honest`).
+The garbler's returned key absorbs the chunk joins: on a tag table the selected labels of `u` are the source-form
+labels of the *actual* zero labels (the coins' zero labels with the chunk-tree level sums installed in their low
+parts, `NoJoins.Key`) and the coins' offsets (`tapeLabels_eq`). The actual zero labels are the first component of a
+bijection of (coins' zero labels, hot chunk-tree answers) that reads the cold table only (`NoJoins.actualZeros_fillAt`).
 
-The coin law of the swapped tape is uniform. The label keys are a coordinate of the coins with a setter, and neither
-`SameOffLabels` nor the exceptional inputs (which read the offsets only) see it. Under a uniform law such a coordinate
-is uniform and independent of every weight that ignores it (`split_sum`, through the equivalence of the space with a
-fibre times the coordinate). The source's labels read the same coordinate of a uniform source, so they have the same
-law (`map_comp_get`).
+The swapped tape resamples both: the coins are uniform with a zero-label setter (`NoJoins.uniform_resample`), and the
+hot chunk-tree positions are non-site positions, refilled uniformly (`HiddenGuess.swappedTableLaw_fill`). A weight
+that reads the coins up to `SameOffLabels` and the table off the hot chunk-tree tags does not see the resampling, and
+for every offset and cold table the labels of the resampled tape have the source's law (`NoJoins.keysLabels_law`,
+`NoJoins.source_labels_law`): **`labelsSplit`**.
 -/
 
 import Proof.Privacy.CRT.Laws.Rest
 import Proof.Correctness.CRT.EntryCorrect
+import Proof.Privacy.CRT.NoJoins.Fill
 
 namespace Kriterion.CRT.Privacy.Laws.LabelsSplitProof
 
@@ -159,49 +161,37 @@ theorem withKeys_coinKeys (coins : Entry.Coins) : withKeys coins (coinKeys coins
 theorem withKeys_withKeys (coins : Entry.Coins) (keys keys' : LabelKeys) :
     withKeys (withKeys coins keys) keys' = withKeys coins keys' := rfl
 
-/-! ### 3. The labels read the coins' label keys only -/
+/-! ### 3. The labels read the coins' label keys and the table's chunk-tree answers -/
 
 theorem getElem_eq_getD (labels : LamportSignature) (i : ℕ) (hi : i < 508) :
     labels[i] = labels.toArray.getD i 0 := by
   simp [Array.getD, hi]
 
-theorem selectedLabels_eq (coins : Entry.Coins) (u : AffineInput) :
-    Lamport.selectedLabels (coins.inputMacKey.encode (BitInput.ofAffine u)) = labelsFrom (coinKeys coins) u := by
-  apply Vector.ext
-  intro i hi
-  rw [getElem_eq_getD _ i hi]
-  simp only [labelsFrom, Vector.getElem_ofFn]
-  by_cases low : i < coordinateBitCount
-  · rw [dif_pos low]
-    have hx := EntryDelivery.labelX_honest coins.inputMacKey (coins.inputZero .x) (coins.inputDelta .x)
-      (EntryDelivery.coins_key_x coins) u i low
-    unfold Entry.labelX at hx
-    rw [hx]
-    simp only [atNat, dif_pos low, coinKeys]
-    split <;> simp [coordOf]
-  · rw [dif_neg low]
-    have bound : i - coordinateBitCount < 254 := by
-      change i < 508 at hi
-      simp only [coordinateBitCount] at low ⊢
-      omega
-    have hy := EntryDelivery.labelY_honest coins.inputMacKey (coins.inputZero .y) (coins.inputDelta .y)
-      (EntryDelivery.coins_key_y coins) u (i - coordinateBitCount) bound
-    unfold Entry.labelY at hy
-    rw [show coordinateBitCount + (i - coordinateBitCount) = i by simp only [coordinateBitCount] at low ⊢; omega]
-      at hy
-    rw [hy]
-    simp only [atNat, dif_pos bound, coinKeys]
-    split <;> simp [coordOf]
+/-- The zero labels of coins of the chain's coin type (`Entry.zeroOf`). -/
+def zeroOfC (coins : crtEntry.Coins) : NoJoins.KeyZeros := Entry.zeroOf coins
 
+/-- The offsets of coins of the chain's coin type (`Entry.deltaOf`). -/
+def deltaOfC (coins : crtEntry.Coins) : Fin 2 → Block := Entry.deltaOf coins
+
+/-- **The labels of `u` of a tape**: the source-form labels of the actual zero labels (the coins' zero labels with the
+table's chunk-tree level sums installed) and the coins' offsets. -/
 theorem tapeLabels_eq [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar)
     (u : AffineInput) (coins : crtEntry.Coins) (table : TagTable) :
-    tapeLabels parameter scalar u (coins, table) = labelsFrom (coinKeys coins) u := by
-  unfold tapeLabels realGarbled
-  dsimp only [crtEntry]
-  unfold Entry.scheme
-  dsimp only
-  erw [EntryCorrect.garbleCM_eval]
-  exact selectedLabels_eq coins u
+    tapeLabels parameter scalar u (coins, table) =
+      NoJoins.sourceLabels (NoJoins.actualZeros (NoJoins.tableAnswers table) (zeroOfC coins)) (deltaOfC coins) u := by
+  unfold tapeLabels
+  rw [ConvSplit.realGarbled_eq]
+  exact NoJoins.encode_table scalar coins u table
+
+/-- The labels of `u` of a tape whose hot chunk-tree positions are filled. -/
+theorem tapeLabels_fillAt [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar)
+    (u : AffineInput) (coins : crtEntry.Coins) (f : Fin 2 × NoJoins.Bits → Block × Block) (table : TagTable) :
+    tapeLabels parameter scalar u (coins, HiddenGuess.fillAt (NoJoins.hotPos u) f table) =
+      NoJoins.sourceLabels (NoJoins.keysEquiv NoJoins.firstFlag (NoJoins.coldSum table u)
+        (zeroOfC coins, fun κ j => f (κ, j))).1 (deltaOfC coins) u := by
+  unfold tapeLabels
+  rw [ConvSplit.realGarbled_eq]
+  exact NoJoins.encode_fillAt scalar coins u f table
 
 theorem withKeys_offsets (coins : Entry.Coins) (keys : LabelKeys) : (withKeys coins keys).offsets = coins.offsets :=
   rfl
@@ -217,6 +207,66 @@ theorem sameOffLabels_withKeys (coins : crtEntry.Coins) (keys : LabelKeys) : Sam
 theorem view_labels_eq [FieldCertificate] [GroupCertificate] (source : Entry.Source) (u : AffineInput) :
     (view).labels source u = labelsFrom (sourceKeys source) u :=
   labels_eq source u
+
+theorem crtEntry_exceptional : crtEntry.exceptional = Entry.exceptional := rfl
+
+/-- The coins with other zero labels. -/
+def setZeros (coins : crtEntry.Coins) (Z : NoJoins.KeyZeros) : crtEntry.Coins :=
+  withKeys coins (Z, (coinKeys coins).2)
+
+theorem zeroOfC_setZeros (coins : crtEntry.Coins) (Z : NoJoins.KeyZeros) : zeroOfC (setZeros coins Z) = Z := by
+  funext κ j
+  unfold zeroOfC Entry.zeroOf setZeros withKeys
+  by_cases hκ : κ = 0
+  · subst hκ
+    rfl
+  · have one : κ = 1 := by omega
+    subst one
+    rfl
+
+theorem deltaOfC_setZeros (coins : crtEntry.Coins) (Z : NoJoins.KeyZeros) :
+    deltaOfC (setZeros coins Z) = deltaOfC coins := by
+  funext κ
+  unfold deltaOfC Entry.deltaOf setZeros withKeys coinKeys
+  by_cases hκ : κ = 0
+  · subst hκ
+    rfl
+  · have one : κ = 1 := by omega
+    subst one
+    rfl
+
+theorem zeroOfC_eq_coinKeys (coins : crtEntry.Coins) : zeroOfC coins = (coinKeys coins).1 := by
+  funext κ j
+  unfold zeroOfC Entry.zeroOf coinKeys
+  by_cases hκ : κ = 0
+  · subst hκ
+    rfl
+  · have one : κ = 1 := by omega
+    subst one
+    rfl
+
+theorem setZeros_zeroOfC (coins : crtEntry.Coins) : setZeros coins (zeroOfC coins) = coins :=
+  (congrArg (fun x => withKeys coins (x, (coinKeys coins).2)) (zeroOfC_eq_coinKeys coins)).trans
+    (withKeys_coinKeys coins)
+
+theorem setZeros_setZeros (coins : crtEntry.Coins) (Z Z' : NoJoins.KeyZeros) :
+    setZeros (setZeros coins Z) Z' = setZeros coins Z' := by
+  have h := congrArg Prod.snd (coinKeys_withKeys coins (Z, (coinKeys coins).2))
+  exact (withKeys_withKeys coins _ _).trans (congrArg (fun d => withKeys coins (Z', d)) h)
+
+theorem doubling_setZeros (scalar : NonZeroScalar) (u : AffineInput) (coins : crtEntry.Coins)
+    (Z : NoJoins.KeyZeros) (t : TagTable) :
+    Doubling crtEntry scalar (setZeros coins Z, t) u ↔ Doubling crtEntry scalar (coins, t) u := by
+  show (∃ o, crtEntry.exceptional scalar (setZeros coins Z) o = some u) ↔
+    ∃ o, crtEntry.exceptional scalar coins o = some u
+  rw [crtEntry_exceptional]
+  exact exists_congr fun o => by
+    rw [show Entry.exceptional scalar (setZeros coins Z) o = Entry.exceptional scalar coins o from
+      exceptional_withKeys scalar coins _ o]
+
+/-- Doubling reads the coins only. -/
+theorem doubling_coins (scalar : NonZeroScalar) (u : AffineInput) (coins : crtEntry.Coins) (t t' : TagTable) :
+    Doubling crtEntry scalar (coins, t) u ↔ Doubling crtEntry scalar (coins, t') u := Iff.rfl
 
 /-! ### 4. The coin law is uniform -/
 
@@ -251,34 +301,119 @@ local instance : Fintype crtEntry.Coins := coinsFintype
 local instance : Nonempty crtEntry.Coins := coinsNonempty
 
 open Classical in
-/-- **`LabelsSplit`**: the labels of `u` read only the coins' label keys, which under the coin law are uniform,
-distributed as the source's label keys, and independent of every weight that `SameOffLabels` and the exceptional
-inputs cannot tell apart from the label keys. -/
+/-- **`LabelsSplit`**: the labels of `u` read the coins' label keys and the table's chunk-tree answers; under the
+swapped tape, off doubling, they are distributed as the source's labels and are independent of every weight on the
+tape that reads the coins up to `SameOffLabels` and the table off the hot chunk-tree tags. -/
 theorem labelsSplit : LabelsSplit := by
-  intro _ _ parameter scalar u
-  refine ⟨fun c table => (tapeLabels_eq parameter scalar u c table).trans
-    (tapeLabels_eq parameter scalar u c zeroTable).symm, ?_⟩
-  intro H hH ℓ
-  let f : crtEntry.Coins → ℝ≥0∞ := fun c => if ∃ o, crtEntry.exceptional scalar c o = some u then 0 else H c
-  let g : LabelKeys → ℝ≥0∞ := fun keys => if labelsFrom keys u = ℓ then 1 else 0
-  have hf : ∀ (c : crtEntry.Coins) keys, f (withKeys c keys) = f c := fun c keys => by
-    have exc : ∀ o, crtEntry.exceptional scalar (withKeys c keys) o = crtEntry.exceptional scalar c o :=
-      exceptional_withKeys scalar c keys
-    simp only [f, exc, hH _ _ (sameOffLabels_withKeys c keys)]
-  have labelsFun : (fun source => (view).labels source u) = fun source => labelsFrom (sourceKeys source) u :=
-    funext fun source => view_labels_eq source u
-  have sourceLaw := @map_comp_get (view).Source _ _ (view).sourceFintype (view).sourceNonempty _ _ sourceKeys withSourceKeys
-    (fun _ _ => rfl) (fun _ => rfl) (fun _ _ _ => rfl) fun keys => labelsFrom keys u
-  rw [labelsFun]
-  erw [sourceLaw]
-  rw [← sum_uniform_ite (fun keys => labelsFrom keys u) ℓ]
-  rw [coinLaw_eq, tsum_fintype, tsum_fintype]
-  refine (Finset.sum_congr rfl fun c _ => ?_).trans
-    ((split_sum (X := crtEntry.Coins) coinKeys withKeys coinKeys_withKeys withKeys_coinKeys withKeys_withKeys f hf
-      g).trans (mul_comm _ _))
-  rw [tapeLabels_eq]
-  simp only [f, g]
-  split_ifs <;> simp_all
+  intro _ _ parameter scalar u H hH ℓ
+  let _ : Fintype (view).Source := (view).sourceFintype
+  have _ : Nonempty (view).Source := (view).sourceNonempty
+  let F : TableTape crtEntry → ℝ≥0∞ := fun tape =>
+    if Doubling crtEntry scalar tape u ∨ tapeLabels parameter scalar u tape ≠ ℓ then 0 else H tape
+  let K := NoJoins.KeyZeros × (Fin 2 × NoJoins.Bits → Block × Block)
+  -- the table averages over the hot chunk-tree answers
+  have fill := HiddenGuess.swappedTableLaw_fill crtLayout (NoJoins.hotPos u) (NoJoins.hotPos_injective u)
+    (NoJoins.hotPos_away u)
+  have tableAvg : ∀ W : TagTable → ℝ≥0∞, ∑' t, swappedTableLaw crtLayout t * W t =
+      ∑' t, swappedTableLaw crtLayout t * ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+        W (HiddenGuess.fillAt (NoJoins.hotPos u) f t) := by
+    intro W
+    conv_lhs => rw [← fill]
+    rw [NoJoins.tsum_bind_mul]
+    exact tsum_congr fun t => congrArg _ (NoJoins.tsum_map_mul _ _ W)
+  -- the coins average over the zero labels
+  have coinAvg : ∀ V : crtEntry.Coins → ℝ≥0∞, ∑' c, coinLaw c * V c =
+      ∑' c, coinLaw c * ∑' Z, PMF.uniformOfFintype NoJoins.KeyZeros Z * V (setZeros c Z) := by
+    intro V
+    rw [coinLaw_eq]
+    conv_lhs => rw [← NoJoins.uniform_resample (X := crtEntry.Coins) zeroOfC setZeros zeroOfC_setZeros
+      setZeros_zeroOfC setZeros_setZeros]
+    rw [NoJoins.tsum_bind_mul]
+    exact tsum_congr fun c => congrArg _ (NoJoins.tsum_map_mul _ _ V)
+  -- the resampled tape: doubling and the weight are unchanged, the labels are the relabelled keys
+  have hD : ∀ c Z t, Doubling crtEntry scalar (setZeros c Z, t) u ↔ Doubling crtEntry scalar (c, t) u := by
+    intro c Z t
+    exact doubling_setZeros scalar u c Z t
+  have hHfill : ∀ c Z f t, H (setZeros c Z, HiddenGuess.fillAt (NoJoins.hotPos u) f t) = H (c, t) := by
+    intro c Z f t
+    refine hH _ _ (sameOffLabels_withKeys c _) fun tag notHot => ?_
+    refine HiddenGuess.fillAt_apply_of_not_mem _ _ _ _ ?_
+    rintro ⟨p, rfl⟩
+    exact notHot ⟨NoJoins.hotPos_family u p, NoJoins.hotPos_hot u p⟩
+  -- ★: for fixed coins and cold table, the average over (zero labels, hot answers)
+  have star : ∀ c t, ∑' Z, PMF.uniformOfFintype NoJoins.KeyZeros Z *
+      ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+        F (setZeros c Z, HiddenGuess.fillAt (NoJoins.hotPos u) f t) =
+      (if Doubling crtEntry scalar (c, t) u then 0 else H (c, t)) * NoJoins.labelLaw u ℓ := by
+    intro c t
+    let L : K → LamportSignature := fun p => NoJoins.sourceLabels (NoJoins.keysEquiv NoJoins.firstFlag
+      (NoJoins.coldSum t u) (p.1, fun κ j => p.2 (κ, j))).1 (deltaOfC c) u
+    have point : ∀ Z f, F (setZeros c Z, HiddenGuess.fillAt (NoJoins.hotPos u) f t) =
+        (if Doubling crtEntry scalar (c, t) u then 0 else H (c, t)) *
+          @ite _ (L (Z, f) = ℓ) (Classical.propDecidable _) 1 0 := by
+      intro Z f
+      simp only [F]
+      rw [tapeLabels_fillAt, zeroOfC_setZeros, deltaOfC_setZeros, hHfill]
+      by_cases D : Doubling crtEntry scalar (c, t) u
+      · rw [if_pos (Or.inl ((hD c Z _).mpr ((doubling_coins scalar u c t
+          (HiddenGuess.fillAt (NoJoins.hotPos u) f t)).mp D))), if_pos D, zero_mul]
+      · rw [if_neg D]
+        by_cases hL : L (Z, f) = ℓ
+        · rw [if_neg (show ¬(Doubling crtEntry scalar (setZeros c Z, HiddenGuess.fillAt (NoJoins.hotPos u) f t) u ∨
+              NoJoins.sourceLabels (NoJoins.keysEquiv NoJoins.firstFlag (NoJoins.coldSum t u)
+                (Z, fun κ j => f (κ, j))).1 (deltaOfC c) u ≠ ℓ) by
+              rintro (h | h)
+              · exact D ((doubling_coins scalar u c t (HiddenGuess.fillAt (NoJoins.hotPos u) f t)).mpr
+                  ((hD c Z _).mp h))
+              · exact h hL), if_pos hL, mul_one]
+        · rw [if_pos (Or.inr hL), if_neg hL, mul_zero]
+    have mass : ((PMF.uniformOfFintype K).map L) ℓ = ∑' Z, PMF.uniformOfFintype NoJoins.KeyZeros Z *
+        ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+          @ite _ (L (Z, f) = ℓ) (Classical.propDecidable _) 1 0 := by
+      rw [map_apply_sum]
+      exact NoJoins.tsum_uniform_pair (fun Z f => @ite _ (L (Z, f) = ℓ) (Classical.propDecidable _) 1 0)
+    have law : (PMF.uniformOfFintype K).map L = NoJoins.labelLaw u :=
+      NoJoins.keysLabels_law NoJoins.firstFlag (NoJoins.coldSum t u) (deltaOfC c) u
+    simp only [point]
+    rw [← law, mass]
+    simp_rw [← ENNReal.tsum_mul_left]
+    refine tsum_congr fun Z => tsum_congr fun f => ?_
+    ring
+  -- the assembly
+  have viewLaw : ((PMF.uniformOfFintype (view).Source).map fun source => (view).labels source u) =
+      NoJoins.labelLaw u := @NoJoins.source_labels_law (view).sourceFintype u
+  rw [viewLaw]
+  calc ∑' tape, swappedTableTape crtEntry tape * F tape
+      = ∑' c, coinLaw c * ∑' t, swappedTableLaw crtLayout t * F (c, t) := tsum_tape F
+    _ = ∑' c, coinLaw c * ∑' t, swappedTableLaw crtLayout t *
+          ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+            F (c, HiddenGuess.fillAt (NoJoins.hotPos u) f t) :=
+        tsum_congr fun c => congrArg _ (tableAvg fun t => F (c, t))
+    _ = ∑' c, coinLaw c * ∑' Z, PMF.uniformOfFintype NoJoins.KeyZeros Z * ∑' t, swappedTableLaw crtLayout t *
+          ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+            F (setZeros c Z, HiddenGuess.fillAt (NoJoins.hotPos u) f t) :=
+        coinAvg fun c => ∑' t, swappedTableLaw crtLayout t *
+          ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+            F (c, HiddenGuess.fillAt (NoJoins.hotPos u) f t)
+    _ = ∑' c, coinLaw c * ∑' t, swappedTableLaw crtLayout t * ∑' Z, PMF.uniformOfFintype NoJoins.KeyZeros Z *
+          ∑' f, PMF.uniformOfFintype (Fin 2 × NoJoins.Bits → Block × Block) f *
+            F (setZeros c Z, HiddenGuess.fillAt (NoJoins.hotPos u) f t) := by
+        refine tsum_congr fun c => congrArg _ ?_
+        simp_rw [← ENNReal.tsum_mul_left]
+        rw [ENNReal.tsum_comm]
+        refine tsum_congr fun t => tsum_congr fun Z => tsum_congr fun f => ?_
+        ring
+    _ = ∑' c, coinLaw c * ∑' t, swappedTableLaw crtLayout t *
+          ((if Doubling crtEntry scalar (c, t) u then 0 else H (c, t)) * NoJoins.labelLaw u ℓ) :=
+        tsum_congr fun c => congrArg _ (tsum_congr fun t => congrArg _ (star c t))
+    _ = NoJoins.labelLaw u ℓ *
+          ∑' tape, swappedTableTape crtEntry tape * (if Doubling crtEntry scalar tape u then 0 else H tape) := by
+        rw [tsum_tape, ← ENNReal.tsum_mul_left]
+        refine tsum_congr fun c => ?_
+        rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_mul_left, ← ENNReal.tsum_mul_left]
+        refine tsum_congr fun t => ?_
+        ring
+
 end
 
 end Kriterion.CRT.Privacy.Laws
