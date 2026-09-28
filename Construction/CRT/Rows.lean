@@ -104,12 +104,12 @@ def evaluateNormRows (rows : Vector NormRow FieldMacToECMac.outputMacCount)
   Vector.ofFn fun index => evaluateNormRow (rows.get index) input (values index)
 
 /-- The unscaled rows of every output key. -/
-def unscaledOf (keys : FieldMacToECMac.OutputKeys) (index : Fin FieldMacToECMac.outputMacCount) :
+abbrev unscaledOf (keys : FieldMacToECMac.OutputKeys) (index : Fin FieldMacToECMac.outputMacCount) :
     Coordinates.Rows :=
   unscaledRows (keys.get index).offset.coordinates (digitEndomorphismBase (keys.get index).digit)
 
 /-- The normalized rows of every output key, from the element offsets. -/
-def normRowsOf (keys : FieldMacToECMac.OutputKeys) (K : FieldMacToECMac.DigitValues)
+abbrev normRowsOf (keys : FieldMacToECMac.OutputKeys) (K : FieldMacToECMac.DigitValues)
     (index : Fin FieldMacToECMac.outputMacCount) : Coordinates.Rows :=
   normRows (unscaledOf keys index) (K index)
 
