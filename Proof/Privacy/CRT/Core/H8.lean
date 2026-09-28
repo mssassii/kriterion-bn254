@@ -47,6 +47,15 @@ open scoped ENNReal
 
 noncomputable section
 
+/-- **The normalization flag of a source**: one of the two hidden cells of a digit (`zC0`, `yC4`, never published)
+is zero. It pays for the bad event of the row normalization (a zero collector offset, `Rows.zeroFlag`), whose coins
+the real side publishes with a set flag (`Core/BmrNorm.lean`). -/
+def normBadSrc (source : Kriterion.CRT.Entry.Source) : Prop := ∃ d, (source.rows d).zC0 = 0 ∨ (source.rows d).yC4 = 0
+
+instance normBadSrcDecidable (source : Kriterion.CRT.Entry.Source) : Decidable (normBadSrc source) := by
+  unfold normBadSrc
+  infer_instance
+
 /-! ### 1. The visible tags -/
 
 /-- **The tags `crtDesigned` shows at `u` off the doubling event**: cold conversion and body positions, the masks and
@@ -295,15 +304,6 @@ def inWrapWindow (w : ℕ) : Prop :=
 def replayWindow (source : (view).Source) (u : AffineInput) (table : TagTable) : Prop :=
   (∃ e, inWrapWindow ((replayCrtValues source u table).1 e)) ∨
     ∃ e, inWrapWindow ((replayCrtValues source u table).2 e)
-
-/-- **The normalization flag of a source**: one of the two hidden cells of a digit (`zC0`, `yC4`, never published)
-is zero. It pays for the bad event of the row normalization (a zero collector offset, `Rows.zeroFlag`), whose coins
-the real side publishes with a set flag (`Core/BmrNorm.lean`). -/
-def normBadSrc (source : Kriterion.CRT.Entry.Source) : Prop := ∃ d, (source.rows d).zC0 = 0 ∨ (source.rows d).yC4 = 0
-
-instance normBadSrcDecidable (source : Kriterion.CRT.Entry.Source) : Decidable (normBadSrc source) := by
-  unfold normBadSrc
-  infer_instance
 
 /-- **The wrap reveal**: the window event, or the source's normalization flag. -/
 def replayWraps (source : (view).Source) (u : AffineInput) (table : TagTable) : Prop :=
