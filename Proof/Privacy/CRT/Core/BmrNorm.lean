@@ -470,7 +470,7 @@ theorem chi_one : chi 1 = 1 := one_pow _
 
 theorem chi_sq_ne (x : BaseField) (ne : x ≠ 0) : chi (x ^ 2) = 1 := by
   unfold chi
-  rw [← pow_mul, mul_comm, JacobianMixed.two_characterExponent]
+  rw [← pow_mul, JacobianMixed.two_characterExponent]
   exact ZMod.pow_card_sub_one_eq_one ne
 
 theorem chi_cases (x : BaseField) (ne : x ≠ 0) : chi x = 1 ∨ chi x = -1 := by
@@ -485,29 +485,30 @@ theorem one_ne_neg_one : (1 : BaseField) ≠ -1 := by
   have two : (2 : BaseField) = 0 := by linear_combination same
   exact Rows.two_ne_zero_base two
 
-theorem signed_false (a : BaseField) : Rows.signed false a = a := rfl
+theorem signed_false (a : BaseField) : Rows.signed false a = a := if_neg Bool.false_ne_true
 
-theorem signed_true (a : BaseField) : Rows.signed true a = -a := rfl
+theorem signed_true (a : BaseField) : Rows.signed true a = -a := if_pos rfl
 
 theorem signed_mul (sign : Bool) (a b : BaseField) : Rows.signed sign (a * b) = Rows.signed sign a * b := by
   cases sign
-  · rfl
+  · rw [signed_false, signed_false]
   · rw [signed_true, signed_true, neg_mul]
 
 theorem signed_signed (sign : Bool) (a : BaseField) : Rows.signed sign (Rows.signed sign a) = a := by
   cases sign
-  · rfl
+  · rw [signed_false, signed_false]
   · rw [signed_true, signed_true, neg_neg]
 
 theorem signed_ne_zero (sign : Bool) (a : BaseField) (ne : a ≠ 0) : Rows.signed sign a ≠ 0 := by
   cases sign
-  · exact ne
+  · rw [signed_false]
+    exact ne
   · rw [signed_true]
     exact neg_ne_zero.mpr ne
 
 theorem chi_signed (sign : Bool) (a : BaseField) : chi (Rows.signed sign a) = Rows.signed sign (chi a) := by
   cases sign
-  · rfl
+  · rw [signed_false, signed_false]
   · rw [signed_true, signed_true, show -a = -1 * a by ring, chi_mul, chi_neg_one]
     ring
 
@@ -551,23 +552,28 @@ theorem root_sq_elem (tau : BaseField) : root (tau ^ 2) = chi tau * tau := by
 /-- `±r` by a bit. -/
 def signedRoot (b : Bool) (x : BaseField) : BaseField := if b then root x else -root x
 
+theorem signedRoot_false (x : BaseField) : signedRoot false x = -root x := if_neg Bool.false_ne_true
+
+theorem signedRoot_true (x : BaseField) : signedRoot true x = root x := if_pos rfl
+
 theorem signedRoot_ne_zero (b : Bool) (x : BaseField) (ne : x ≠ 0) : signedRoot b x ≠ 0 := by
   cases b
-  · exact neg_ne_zero.mpr (root_ne_zero x ne)
-  · exact root_ne_zero x ne
+  · rw [signedRoot_false]
+    exact neg_ne_zero.mpr (root_ne_zero x ne)
+  · rw [signedRoot_true]
+    exact root_ne_zero x ne
 
 theorem signedRoot_sq (b : Bool) (x : BaseField) (square : chi x = 1) : signedRoot b x ^ 2 = x := by
   cases b
-  · show (-root x) ^ 2 = x
-    rw [neg_sq, root_sq x square]
-  · exact root_sq x square
+  · rw [signedRoot_false, neg_sq, root_sq x square]
+  · rw [signedRoot_true, root_sq x square]
 
 theorem chi_signedRoot (b : Bool) (x : BaseField) (square : chi x = 1) :
     chi (signedRoot b x) = Rows.signed (!b) 1 := by
   cases b
-  · show chi (-root x) = -1
-    rw [show -root x = -1 * root x by ring, chi_mul, chi_neg_one, chi_root x square, mul_one]
-  · exact chi_root x square
+  · rw [signedRoot_false, Bool.not_false, signed_true, show -root x = -1 * root x by ring, chi_mul, chi_neg_one,
+      chi_root x square, mul_one]
+  · rw [signedRoot_true, Bool.not_true, signed_false, chi_root x square]
 
 theorem nz_ext {a b : NonZeroBase} (h : a.value = b.value) : a = b := by
   cases a
@@ -584,41 +590,45 @@ def signJoin (q : NonZeroBase × Bool) : NonZeroBase × Bool :=
   (⟨signedRoot q.2 (Rows.signed (decide (chi q.1.value = -1)) q.1.value),
       signedRoot_ne_zero _ _ (signed_ne_zero _ _ q.1.nonzero)⟩, decide (chi q.1.value = -1))
 
+theorem signSplit_fst (p : NonZeroBase × Bool) :
+    (signSplit p).1.value = Rows.signed p.2 (p.1.value ^ 2) := rfl
+
+theorem signSplit_snd (p : NonZeroBase × Bool) : (signSplit p).2 = decide (chi p.1.value = 1) := rfl
+
+theorem signJoin_fst (q : NonZeroBase × Bool) :
+    (signJoin q).1.value = signedRoot q.2 (Rows.signed (decide (chi q.1.value = -1)) q.1.value) := rfl
+
+theorem signJoin_snd (q : NonZeroBase × Bool) : (signJoin q).2 = decide (chi q.1.value = -1) := rfl
+
 theorem signJoin_signSplit (p : NonZeroBase × Bool) : signJoin (signSplit p) = p := by
   obtain ⟨⟨tau, ne⟩, sign⟩ := p
   have signEq : decide (chi (Rows.signed sign (tau ^ 2)) = -1) = sign := by
     rw [chi_signed, chi_sq_ne tau ne]
     exact decide_signed_one sign
-  refine Prod.ext (nz_ext ?_) signEq
-  show signedRoot (decide (chi tau = 1)) (Rows.signed (decide (chi (Rows.signed sign (tau ^ 2)) = -1))
-    (Rows.signed sign (tau ^ 2))) = tau
-  rw [signEq, signed_signed]
-  rcases chi_cases tau ne with one | minus
-  · rw [show decide (chi tau = 1) = true from decide_eq_true one]
-    show root (tau ^ 2) = tau
-    rw [root_sq_elem, one, one_mul]
-  · rw [show decide (chi tau = 1) = false from decide_eq_false (by rw [minus]; exact one_ne_neg_one.symm)]
-    show -root (tau ^ 2) = tau
-    rw [root_sq_elem, minus]
-    ring
+  refine Prod.ext (nz_ext ?_) ?_
+  · rw [signJoin_fst, signSplit_fst, signSplit_snd, signEq, signed_signed]
+    rcases chi_cases tau ne with one | minus
+    · rw [show decide (chi tau = 1) = true from decide_eq_true one, signedRoot_true, root_sq_elem, one, one_mul]
+    · rw [show decide (chi tau = 1) = false from decide_eq_false (by rw [minus]; exact one_ne_neg_one.symm),
+        signedRoot_false, root_sq_elem, minus]
+      ring
+  · rw [signJoin_snd, signSplit_fst]
+    exact signEq
 
 theorem signSplit_signJoin (q : NonZeroBase × Bool) : signSplit (signJoin q) = q := by
   obtain ⟨⟨kappa, ne⟩, b⟩ := q
   have square : chi (Rows.signed (decide (chi kappa = -1)) kappa) = 1 := by
     rw [chi_signed]
     rcases chi_cases kappa ne with one | minus
-    · rw [show decide (chi kappa = -1) = false from decide_eq_false (by rw [one]; exact one_ne_neg_one), one]
-      rfl
+    · rw [show decide (chi kappa = -1) = false from decide_eq_false (by rw [one]; exact one_ne_neg_one), one,
+        signed_false]
     · rw [show decide (chi kappa = -1) = true from decide_eq_true minus, minus, signed_true, neg_neg]
   refine Prod.ext (nz_ext ?_) ?_
-  · show Rows.signed (decide (chi kappa = -1))
-      (signedRoot b (Rows.signed (decide (chi kappa = -1)) kappa) ^ 2) = kappa
-    rw [signedRoot_sq _ _ square, signed_signed]
-  · show decide (chi (signedRoot b (Rows.signed (decide (chi kappa = -1)) kappa)) = 1) = b
-    rw [chi_signedRoot _ _ square]
+  · rw [signSplit_fst, signJoin_fst, signJoin_snd, signedRoot_sq _ _ square, signed_signed]
+  · rw [signSplit_snd, signJoin_fst, chi_signedRoot _ _ square]
     cases b
     · exact decide_eq_false (by rw [Bool.not_false, signed_true]; exact one_ne_neg_one.symm)
-    · exact decide_eq_true rfl
+    · exact decide_eq_true (by rw [Bool.not_true, signed_false])
 
 /-- **The sign split is a bijection.** -/
 def signEquiv : NonZeroBase × Bool ≃ NonZeroBase × Bool :=
