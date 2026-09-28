@@ -159,14 +159,12 @@ theorem evaluateNormRow_encoded [FieldCertificate] (rows : Coordinates.Rows) (K 
     rw [show (normRows rows K).z.y = 0 from h5, show (normRows rows K).z.xy = 0 from h6,
       show (normRows rows K).z.xSquared = 0 from h7, show (normRows rows K).z.ySquared = 0 from h8]
     ring
-  show FieldMacToECMac.HomogeneousValue.mk
-      (Biquadratic.evaluateX (Biquadratic.garbleX (normRows rows K).x.constant K) input
-        (Biquadratic.delivered (normRows rows K) x y z K input))
-      (signed (signBit (kappaOf rows K))
-        (Biquadratic.evaluateY { c4 := flagValue (zeroFlag (K (.inl .rowY_cubic))) } input
-          (Biquadratic.delivered (normRows rows K) x y z K input)))
-      (Biquadratic.evaluateZ { c0 := flagValue (zeroFlag (K (.inl .rowZ_x9))) } input
-        (Biquadratic.delivered (normRows rows K) x y z K input)) = corrected rows K input
+  have hx : (garbleNormRow rows K).xC0 = (Biquadratic.garbleX (normRows rows K).x.constant K).c0 := rfl
+  have hs : (garbleNormRow rows K).sFlag = zeroFlag (K (.inl .rowY_cubic)) := rfl
+  have hz : (garbleNormRow rows K).zFlag = zeroFlag (K (.inl .rowZ_x9)) := rfl
+  have hn : (garbleNormRow rows K).sign = signBit (kappaOf rows K) := rfl
+  unfold evaluateNormRow
+  rw [hx, hs, hz, hn]
   rw [xRow, yRow, zRow]
   unfold corrected
   rw [ex, ey, ez]
@@ -257,8 +255,7 @@ theorem corrected_none [FieldCertificate] (offset : AffineInput) (K : Biquadrati
   have ez : Coordinates.evaluate (unscaledRows offset none).z input = 1 := by
     simp [unscaledRows, Coordinates.evaluateScaleNone]
   rw [ex, ey, ez]
-  simp only [FieldMacToECMac.HomogeneousValue.mk.injEq]
-  refine ⟨by ring, by ring, by ring⟩
+  congr 1 <;> ring
 
 /-! ### The decoder does not see a square factor of the sign row -/
 
