@@ -266,19 +266,17 @@ theorem normTrueRows_layer (scalar : NonZeroScalar) (u : AffineInput) (coins : K
 theorem valid_ctx (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) :
     (BmrEntry.bmrContextOf scalar coins).Valid := by
   intro d
-  have z := Rows.z0_ne_zero ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.coordinates
-    (digitEndomorphismBase ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit)
-    ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.onCurve
-  have s4 := Rows.s4_ne_zero ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.coordinates
-    (digitEndomorphismBase ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit)
-    ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.onCurve
-    (fun phi => digitEndomorphismBasePowSix ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit phi)
-  exact ⟨z, s4⟩
+  simp only [BmrEntry.bmrContextOf, NormRows.nctxOf, Rows.unscaledOf]
+  generalize (Kriterion.CRT.Entry.outputKeysOf scalar coins).get d = key
+  exact ⟨Rows.z0_ne_zero _ _ key.offset.onCurve,
+    Rows.s4_ne_zero _ _ key.offset.onCurve (fun phi => digitEndomorphismBasePowSix _ phi)⟩
 
 theorem sparse_ctx (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) :
-    (BmrEntry.bmrContextOf scalar coins).Sparse := fun d =>
-  Rows.unscaledRows_sparse ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).offset.coordinates
-    (digitEndomorphismBase ((Kriterion.CRT.Entry.outputKeysOf scalar coins).get d).digit)
+    (BmrEntry.bmrContextOf scalar coins).Sparse := by
+  intro d
+  simp only [BmrEntry.bmrContextOf, NormRows.nctxOf, Rows.unscaledOf]
+  generalize (Kriterion.CRT.Entry.outputKeysOf scalar coins).get d = key
+  exact Rows.unscaledRows_sparse _ _
 
 open Classical in
 /-- **`CrtBmrSplit` from the kernel, the two readings and the coin split.** -/
