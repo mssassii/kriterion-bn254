@@ -86,10 +86,10 @@ def hlong (H : HashN) (label : Block) (tagOf : Nat → Nat) (count : Nat) : Nat 
 
 /-! ### Arithmetic labels and the cast reading (D11) -/
 
-/-- The lanes of an arithmetic label: one per bit of a block. -/
+/-- The lanes of an arithmetic label: one per bit of a conversion label. -/
 abbrev laneCount : Nat := labelBits
 
-/-- An arithmetic label over `Z_{2^width}`: one lane per bit of a block. -/
+/-- An arithmetic label over `Z_{2^width}`: one lane per bit of a conversion label. -/
 abbrev Lanes (width : Nat) := Narrow.LLanes width
 
 /-- Lanes per 128-bit block in a cast of width `width` (no lane straddles a block). -/

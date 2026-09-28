@@ -19,7 +19,7 @@ open Cryptography Kriterion.CRT Kriterion.CRT.ExtractSpec Kriterion.ArgoMAC
 
 /-! ### Folds over `Fin` as `xsum` -/
 
-theorem foldl_ite_eq_xorFold {c : Nat} (P : Fin c → Prop) [DecidablePred P] (f : Fin c → Label) :
+theorem foldl_ite_eq_xorFold {width c : Nat} (P : Fin c → Prop) [DecidablePred P] (f : Fin c → BitVec width) :
     Fin.foldl c (fun acc x => if P x then acc ^^^ f x else acc) 0 =
       xorFold (fun x => if P x then f x else 0) := by
   unfold xorFold
@@ -98,7 +98,7 @@ theorem foldSource_eq_iff {m : Nat} (ρ : Fin m) (shift hot : Nat) (hhot : hot <
     rw [ZMod.natCast_eq_natCast_iff', Nat.mod_eq_of_lt hhot] at hz'
     exact hz'
 
-theorem foldl_skip_eq_xorFoldExcept {m : Nat} (hot : Nat) (hhot : hot < m) (f : Fin m → Label) :
+theorem foldl_skip_eq_xorFoldExcept {width m : Nat} (hot : Nat) (hhot : hot < m) (f : Fin m → BitVec width) :
     Fin.foldl m (fun acc other => if other.val = hot then acc else acc ^^^ f other) 0 =
       xorFoldExcept ⟨hot, hhot⟩ f := by
   unfold xorFoldExcept

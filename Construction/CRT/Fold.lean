@@ -6,7 +6,7 @@ evaluator's active slot at the level with `2 ^ n` entries is `σ_m mod 2 ^ n`.
 
 Reindex: `h[ρ] = XOR_{α < 2 ^ keep, α ≡ ρ (mod m)} K_α`; its hot index is `(σ mod 2 ^ keep) mod m`
 (L12). Fold at bit position `j` (`keep ≤ j < ell`), shift `s_j = 2 ^ j mod m`: materials
-`u_ρ = h128(h[ρ], fold tag (j, ρ))`, join `(XOR_ρ u_ρ) ⊕ b_j`, new vector
+`u_ρ = hLabel(h[ρ], fold tag (j, ρ))`, join `(XOR_ρ u_ρ) ⊕ b_j`, new vector
 `h'[ρ] = h[ρ] ⊕ u_ρ ⊕ u_{(ρ - s_j) mod m}`; the evaluator hashes the `m - 1` cold slots (ascending),
 solves `u_hot = b_j^E ⊕ join ⊕ (XOR_{ρ ≠ hot} u_ρ)`, and the hot index moves by `b_j * s_j` (L13).
 -/

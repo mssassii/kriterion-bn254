@@ -20,19 +20,19 @@ open Cryptography Kriterion.CRT Kriterion.CRT.ExtractSpec Kriterion.ArgoMAC
 
 /-! ### XOR folds (the proofs of xinshu's `Proof/Correctness/PGS/OneHot.lean`, same text) -/
 
-theorem xorFoldExcept_eq_update {count : Nat} (skip : Fin count) (family : Fin count → Label) :
+theorem xorFoldExcept_eq_update {width count : Nat} (skip : Fin count) (family : Fin count → BitVec width) :
     xorFoldExcept skip family = xorFold (Function.update family skip 0) := by
   unfold xorFoldExcept xorFold
-  have body : (fun (acc : Label) (entry : Fin count) =>
+  have body : (fun (acc : BitVec width) (entry : Fin count) =>
         if entry = skip then acc else acc ^^^ family entry)
-      = fun (acc : Label) (entry : Fin count) => acc ^^^ Function.update family skip 0 entry := by
+      = fun (acc : BitVec width) (entry : Fin count) => acc ^^^ Function.update family skip 0 entry := by
     funext acc entry
     by_cases hit : entry = skip
     · subst hit; simp
     · simp [hit]
   rw [body]
 
-theorem xorFoldExcept_congr {count : Nat} (skip : Fin count) (first second : Fin count → Label)
+theorem xorFoldExcept_congr {width count : Nat} (skip : Fin count) (first second : Fin count → BitVec width)
     (agree : ∀ entry, entry ≠ skip → first entry = second entry) :
     xorFoldExcept skip first = xorFoldExcept skip second := by
   rw [xorFoldExcept_eq_update, xorFoldExcept_eq_update]
@@ -42,8 +42,8 @@ theorem xorFoldExcept_congr {count : Nat} (skip : Fin count) (first second : Fin
   · subst hit; simp
   · simp [Function.update_of_ne hit, agree entry hit]
 
-theorem xorFoldExcept_xor {count : Nat} :
-    ∀ (skip : Fin count) (family : Fin count → Label),
+theorem xorFoldExcept_xor {width count : Nat} :
+    ∀ (skip : Fin count) (family : Fin count → BitVec width),
       xorFoldExcept skip family ^^^ family skip = xorFold family := by
   induction count with
   | zero => intro skip; exact skip.elim0
@@ -62,7 +62,7 @@ theorem xorFoldExcept_xor {count : Nat} :
       rw [BitVec.xor_assoc, BitVec.xor_comm (family (Fin.last n)) (family j.castSucc),
         ← BitVec.xor_assoc, restore]
 
-theorem xorFoldExcept_eq {count : Nat} (skip : Fin count) (family : Fin count → Label) :
+theorem xorFoldExcept_eq {width count : Nat} (skip : Fin count) (family : Fin count → BitVec width) :
     xorFoldExcept skip family = xorFold family ^^^ family skip := by
   conv_rhs => rw [← xorFoldExcept_xor skip family]
   rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]

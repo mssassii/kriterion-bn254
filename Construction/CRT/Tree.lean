@@ -6,7 +6,7 @@ one-hot all use one level step.
 A level of `2 ^ n` labels is extended by one bit exactly as xinshu's `extendLevel`: the right child
 of slot `s` is the material `y_s`, the left child is `G_s ⊕ y_s`, entries `0 .. 2 ^ n - 1` of the new
 level are the left children, so the hot index moves from `h` to `h + b * 2 ^ n` (little-endian).
-The material is one field-hash block, `y_s = h128(G_s, tag(level n, slot s))`, one query per slot.
+The material is one field-hash block, `y_s = hLabel(G_s, tag(level n, slot s))`, one query per slot.
 Level 0 is the constant wire (garbler `Δ`, evaluator `0`); step 0 is free and appends the bit-0
 label, so level 1 is `(z ⊕ Δ, z)` for the garbler and `(z ⊕ b Δ, z ⊕ b Δ)` for the evaluator.
 
@@ -25,11 +25,11 @@ namespace Kriterion.CRT
 open Cryptography Kriterion.ArgoMAC
 
 /-- The XOR of a finite family of blocks. -/
-def xorFold {count : Nat} (family : Fin count → Label) : Label :=
+def xorFold {width count : Nat} (family : Fin count → BitVec width) : BitVec width :=
   Fin.foldl count (fun acc entry => acc ^^^ family entry) 0
 
 /-- The XOR of a finite family of blocks with one entry skipped. -/
-def xorFoldExcept {count : Nat} (skip : Fin count) (family : Fin count → Label) : Label :=
+def xorFoldExcept {width count : Nat} (skip : Fin count) (family : Fin count → BitVec width) : BitVec width :=
   Fin.foldl count (fun acc entry => if entry = skip then acc else acc ^^^ family entry) 0
 
 /-- Extend one level: entries `0 .. 2 ^ n - 1` are the left children `parent ⊕ right`, entries
