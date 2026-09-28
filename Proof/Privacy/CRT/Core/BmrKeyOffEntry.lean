@@ -73,10 +73,12 @@ theorem not_inWindow_of_not_nearEdge (ctx : BMR.Context) (u : AffineInput) (c : 
   exact not_inWindow_of_far Flags.Wrap.entryTableFacts ctx u c e far.1 (Nat.le_of_not_lt (by omega))
 
 /-- **Window-free curve encodings** when every curve encoding's offset is far from the edges. -/
-theorem curveWindowFree_of_far (ctx : BMR.Context) (u : AffineInput) (c : BMR.Coins Tb)
+theorem curveWindowFree_of_far (nctx : BMR.NContext) (u : AffineInput) (c : BMR.Coins Tb)
     (far : ∀ element, ¬ StageTwo.nearEdge (BMR.offset c (BMR.curveEnc element))) :
-    BmrOff.CurveWindowFree u (BmrOff.cellsOfOut (BMR.realOutOff ctx u c)) :=
-  fun element => not_inWindow_of_not_nearEdge ctx u c _ (far element)
+    BmrOff.nFree u (BMR.nRealOutOff nctx u c) := fun element => by
+  show ¬ BMR.InWindow Tb (BMR.evalInt u (BMR.nJoin nctx c) (BMR.coldOf u c) (BMR.curveEnc element))
+  rw [BmrOff.nJoin_key]
+  exact not_inWindow_of_not_nearEdge _ u c _ (far element)
 
 /-- Below `p` the scheme's reading of the table oracle is `tagHash`: the `x` coordinate's garbling. -/
 theorem gxOf_tableOracle (table : TagTable) (coins : Kriterion.ArgoMAC.Scheme.Coins) :
@@ -249,7 +251,7 @@ section Bound
 variable [FieldCertificate] [GroupCertificate]
 
 /-- P45's context of a rest (every layer gives the same context, `bmrContextOf_congr`). -/
-def ctxOf (scalar : NonZeroScalar) (r : Rest) : BMR.Context :=
+def ctxOf (scalar : NonZeroScalar) (r : Rest) : BMR.NContext :=
   BmrEntry.bmrContextOf scalar (splitEquiv.symm (r, Classical.arbitrary Layer))
 
 theorem ctxOf_eq (scalar : NonZeroScalar) (r : Rest) (l : Layer) :
@@ -261,8 +263,8 @@ publish the same cells and hints and whose tables agree off the hidden positions
 def ViewFD {α : Type} (scalar : NonZeroScalar) (u : AffineInput)
     (V : Kriterion.ArgoMAC.Scheme.Coins → TagTable → α) : Prop :=
   ∀ (r : Rest) (l l' : Layer) (T T' : TagTable),
-    (BMR.realOutOff (ctxOf scalar r) u (BmrEntry.bmrCoinsOf (splitEquiv.symm (r, l)) T)).1 =
-        (BMR.realOutOff (ctxOf scalar r) u (BmrEntry.bmrCoinsOf (splitEquiv.symm (r, l')) T')).1 →
+    (BMR.nRealOutOff (ctxOf scalar r) u (BmrEntry.bmrCoinsOf (splitEquiv.symm (r, l)) T)).1 =
+        (BMR.nRealOutOff (ctxOf scalar r) u (BmrEntry.bmrCoinsOf (splitEquiv.symm (r, l')) T')).1 →
       restrictOff u T = restrictOff u T' → V (splitEquiv.symm (r, l)) T = V (splitEquiv.symm (r, l')) T'
 
 /-- The view's conditional mass given the coins and the targets. -/
@@ -281,7 +283,7 @@ theorem coins_of_support (coins : Kriterion.ArgoMAC.Scheme.Coins) (τ : Targets)
 theorem phi_congr {α : Type} (scalar : NonZeroScalar) (u : AffineInput)
     (V : Kriterion.ArgoMAC.Scheme.Coins → TagTable → α) (fd : ViewFD scalar u V) (v : α) (r : Rest)
     (l l' : Layer) (τ τ' : Targets)
-    (same : BMR.realOutOff (ctxOf scalar r) u (coinsOf τ l) = BMR.realOutOff (ctxOf scalar r) u (coinsOf τ' l')) :
+    (same : BMR.nRealOutOff (ctxOf scalar r) u (coinsOf τ l) = BMR.nRealOutOff (ctxOf scalar r) u (coinsOf τ' l')) :
     phi V v (splitEquiv.symm (r, l)) τ = phi V v (splitEquiv.symm (r, l')) τ' := by
   unfold phi
   refine outer_eq_of_fd _ _ (restrictOff u) (given_restrictOff u τ τ' (congrArg Prod.snd same)) _ _
@@ -296,8 +298,8 @@ theorem phi_congr {α : Type} (scalar : NonZeroScalar) (u : AffineInput)
 
 open Classical in
 /-- The indicator of window-free curve encodings and the key label, at P45's coins. -/
-def keyInd (ctx : BMR.Context) (u : AffineInput) (ℓ : ℕ) (c : BMR.Coins Tb) : ℝ≥0∞ :=
-  if BmrOff.CurveWindowFree u (BmrOff.cellsOfOut (BMR.realOutOff ctx u c)) ∧ (c.bridge).val % 2 ^ 128 = ℓ then 1
+def keyInd (ctx : BMR.NContext) (u : AffineInput) (ℓ : ℕ) (c : BMR.Coins Tb) : ℝ≥0∞ :=
+  if BmrOff.nFree u (BMR.nRealOutOff ctx u c) ∧ (c.bridge).val % 2 ^ 128 = ℓ then 1
   else 0
 
 /-- P45's summed bound at a fixed rest, through the targets and the layer. -/
@@ -306,25 +308,29 @@ theorem rest_le {α : Type} (scalar : NonZeroScalar) (u : AffineInput) (off : ¬
     ∑' l : Layer, ∑' τ : Targets, phi V v (splitEquiv.symm (r, l)) τ * keyInd (ctxOf scalar r) u ℓ (coinsOf τ l) ≤
       BmrOff.keyError * ∑' l : Layer, ∑' τ : Targets, phi V v (splitEquiv.symm (r, l)) τ := by
   classical
-  let F : BMR.OutOff Tb u → ℝ≥0∞ := fun o =>
-    if h : ∃ p : Targets × Layer, BMR.realOutOff (ctxOf scalar r) u (coinsOf p.1 p.2) = o then
+  let F : BMR.NOutOff Tb u → ℝ≥0∞ := fun o =>
+    if h : ∃ p : Targets × Layer, BMR.nRealOutOff (ctxOf scalar r) u (coinsOf p.1 p.2) = o then
       phi V v (splitEquiv.symm (r, h.choose.2)) h.choose.1 else 0
   have F_spec : ∀ (l : Layer) (τ : Targets),
-      phi V v (splitEquiv.symm (r, l)) τ = F (BMR.realOutOff (ctxOf scalar r) u (coinsOf τ l)) := by
+      phi V v (splitEquiv.symm (r, l)) τ = F (BMR.nRealOutOff (ctxOf scalar r) u (coinsOf τ l)) := by
     intro l τ
     have h : ∃ p : Targets × Layer,
-        BMR.realOutOff (ctxOf scalar r) u (coinsOf p.1 p.2) = BMR.realOutOff (ctxOf scalar r) u (coinsOf τ l) :=
+        BMR.nRealOutOff (ctxOf scalar r) u (coinsOf p.1 p.2) = BMR.nRealOutOff (ctxOf scalar r) u (coinsOf τ l) :=
       ⟨(τ, l), rfl⟩
     simp only [F, dif_pos h]
     exact phi_congr scalar u V fd v r l h.choose.2 τ h.choose.1 h.choose_spec.symm
-  have reidx : ∀ H : BMR.Coins Tb → ℝ≥0∞, ∑' l : Layer, ∑' τ : Targets, H (coinsOf τ l) = ∑' c, H c := by
+  have reidx : ∀ H : BMR.Coins Tb → ℝ≥0∞, ∑' l : Layer, ∑' τ : Targets, H (coinsOf τ l) =
+      ∑' _s : Fin 91 → NonZeroBase × NonZeroBase, ∑' c, H c := by
     intro H
+    rw [ENNReal.tsum_prod']
+    refine tsum_congr fun _ => ?_
     rw [ENNReal.tsum_comm, ← ENNReal.tsum_prod]
     exact coinsEquiv.tsum_eq H
   simp only [F_spec]
-  rw [reidx (fun c => F (BMR.realOutOff (ctxOf scalar r) u c) * keyInd (ctxOf scalar r) u ℓ c),
-    reidx (fun c => F (BMR.realOutOff (ctxOf scalar r) u c))]
-  have w := BmrOff.keyLabel_weighted Flags.Wrap.entryTableFacts (ctxOf scalar r) u off F ℓ
+  rw [reidx (fun c => F (BMR.nRealOutOff (ctxOf scalar r) u c) * keyInd (ctxOf scalar r) u ℓ c),
+    reidx (fun c => F (BMR.nRealOutOff (ctxOf scalar r) u c)), ← ENNReal.tsum_mul_left]
+  refine ENNReal.tsum_le_tsum fun _ => ?_
+  have w := BmrOff.nKeyLabel_weighted Flags.Wrap.entryTableFacts (ctxOf scalar r) u off F ℓ
   rw [← tsum_fintype (L := SummationFilter.unconditional _),
     ← tsum_fintype (L := SummationFilter.unconditional _)] at w
   exact w
