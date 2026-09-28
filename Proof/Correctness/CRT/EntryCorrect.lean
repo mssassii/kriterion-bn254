@@ -377,12 +377,14 @@ theorem corrected_decode [FieldCertificate] [GroupCertificate] (keys : FieldMacT
         ((FieldMacToECMac.rowsForOutputKeys keys (normRandomness keys K base)).get index) input)
         exceptionDigit tripleDigit inputPoint := by
   have keyOn : OnCurve (keys.get index).offset.coordinates := (keys.get index).offset.onCurve
-  have zNe := Rows.z0_ne_zero _ (digitEndomorphismBase (keys.get index).digit) keyOn
-  have sNe := Rows.s4_ne_zero _ (digitEndomorphismBase (keys.get index).digit) keyOn
-    (fun phi => digitEndomorphismBasePowSix _ phi)
+  have zNe : (Rows.unscaledOf keys index).z.constant ≠ 0 :=
+    Rows.z0_ne_zero _ (digitEndomorphismBase (keys.get index).digit) keyOn
+  have sNe : (Rows.unscaledOf keys index).y.xSquared ≠ 0 :=
+    Rows.s4_ne_zero _ (digitEndomorphismBase (keys.get index).digit) keyOn
+      (fun phi => digitEndomorphismBasePowSix _ phi)
   rw [normRandomness_get, nonZeroOf_value _ (Rows.rhoOf_ne_zero _ _ zNe),
     nonZeroOf_value _ (Rows.tauOf_ne_zero _ (Rows.kappaOf_ne_zero _ _ sNe))]
-  unfold Rows.unscaledOf
+  unfold Rows.unscaledOf at zNe sNe ⊢
   generalize digitEndomorphismBase (keys.get index).digit = endo at zNe sNe
   cases endo with
   | none =>
@@ -403,9 +405,18 @@ theorem homog_eq [FieldCertificate] (H : HashN) (scalar : NonZeroScalar) (coins 
   rw [rowValues_delivered H scalar coins input out hX hY hmasks, pubOf_rows]
   unfold Rows.evaluateNormRows
   refine congrArg Vector.ofFn (funext fun index => ?_)
-  rw [vector_get_ofFn]
-  unfold FieldMacToECMac.delivered rowsOf normRowsVec
-  rw [vector_get_ofFn]
+  have e1 : (Vector.ofFn fun digit => Rows.garbleNormRow (Rows.unscaledOf (outputKeysOf scalar coins) digit)
+      (KOf H coins digit)).get index =
+      Rows.garbleNormRow (Rows.unscaledOf (outputKeysOf scalar coins) index) (KOf H coins index) :=
+    vector_get_ofFn _ _
+  have e2 : FieldMacToECMac.delivered (rowsOf H scalar coins) coins.pointRandomness (KOf H coins) input index =
+      Biquadratic.delivered (Rows.normRows (Rows.unscaledOf (outputKeysOf scalar coins) index) (KOf H coins index))
+        (coins.pointRandomness.get index).x (coins.pointRandomness.get index).y (coins.pointRandomness.get index).z
+        (KOf H coins index) input := by
+    unfold FieldMacToECMac.delivered rowsOf normRowsVec
+    rw [vector_get_ofFn]
+    rfl
+  rw [e1, e2]
   have keyOn : OnCurve ((outputKeysOf scalar coins).get index).offset.coordinates :=
     ((outputKeysOf scalar coins).get index).offset.onCurve
   exact Rows.evaluateNormRow_encoded _ _ _ _ _ input onCurve (Rows.z0_ne_zero _ _ keyOn)
