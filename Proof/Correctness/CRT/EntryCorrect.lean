@@ -420,11 +420,15 @@ theorem homog_eq [FieldCertificate] (H : HashN) (scalar : NonZeroScalar) (coins 
   have keyOn : OnCurve ((outputKeysOf scalar coins).get index).offset.coordinates :=
     ((outputKeysOf scalar coins).get index).offset.onCurve
   have zNe : (Rows.unscaledOf (outputKeysOf scalar coins) index).z.constant ≠ 0 :=
-    Rows.z0_ne_zero _ _ keyOn
+    Rows.z0_ne_zero ((outputKeysOf scalar coins).get index).offset.coordinates
+      (digitEndomorphismBase ((outputKeysOf scalar coins).get index).digit) keyOn
   have sNe : (Rows.unscaledOf (outputKeysOf scalar coins) index).y.xSquared ≠ 0 :=
-    Rows.s4_ne_zero _ _ keyOn (fun phi => digitEndomorphismBasePowSix _ phi)
+    Rows.s4_ne_zero ((outputKeysOf scalar coins).get index).offset.coordinates
+      (digitEndomorphismBase ((outputKeysOf scalar coins).get index).digit) keyOn
+      (fun phi => digitEndomorphismBasePowSix ((outputKeysOf scalar coins).get index).digit phi)
   have sparse : FieldMacToECMac.SparseRow (Rows.unscaledOf (outputKeysOf scalar coins) index) :=
-    Rows.unscaledRows_sparse _ _
+    Rows.unscaledRows_sparse ((outputKeysOf scalar coins).get index).offset.coordinates
+      (digitEndomorphismBase ((outputKeysOf scalar coins).get index).digit)
   exact Rows.evaluateNormRow_encoded (Rows.unscaledOf (outputKeysOf scalar coins) index) (KOf H coins index)
     (coins.pointRandomness.get index).x (coins.pointRandomness.get index).y (coins.pointRandomness.get index).z
     input onCurve zNe sNe sparse
