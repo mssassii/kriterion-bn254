@@ -250,14 +250,10 @@ theorem exec_stagePrefix (cells : StageCells) (w rb value : Nat) (remainder : La
     exact subA i
   · rw [ramH, Function.update_of_ne (ne_of_sw outside (sw_node cells w rb (x := value % 2 ^^^ 1) (by omega))),
       Function.update_of_ne (ne_of_sw outside (sw_slot cells w rb)),
-      offG address fun k kb => ne_of_sw outside (by
-        have : k = 128 * (k / 128) + k % 128 := (Nat.div_add_mod k 128).symm
-        rw [this, ← Nat.add_assoc]
-        exact sw_cast cells w rb (by omega) (by omega)),
-      offF address fun k kb => ne_of_sw outside (by
-        have : k = 128 * (k / 128) + k % 128 := (Nat.div_add_mod k 128).symm
-        rw [this, ← Nat.add_assoc]
-        exact sw_class cells w rb (by omega) (by omega)),
+      offG address fun k kb => ne_of_sw outside
+        (Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl ⟨k, kb, rfl⟩),
+      offF address fun k kb => ne_of_sw outside
+        (Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl ⟨k, kb, rfl⟩),
       offE address fun k kb => ne_of_sw outside (sw_levelSum cells w rb kb), ramD,
       Function.update_of_ne (ne_of_sw outside (by simpa using sw_bit cells w rb (b := 0) (by omega))),
       ramC, Function.update_of_ne (ne_of_sw outside (sw_active cells w rb)), ramB,
