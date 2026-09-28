@@ -1,0 +1,12 @@
+$ env LEAN_NUM_THREADS=6 lake env lean Scratch/Chunk9Feasibility.lean
+# HEAD fb6af8517cb59e1dac8e1a4c4db7f34df8e905ed
+# tracked changes:
+
+'Kriterion.CRT.Chunk9Research.correctTable' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Chunk9Research.rows_ok' depends on axioms: [propext, Quot.sound]
+'Kriterion.CRT.Chunk9Research.records_fit' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Kriterion.CRT.Chunk9Research.word_target' depends on axioms: [propext, Classical.choice, Quot.sound]
+29
+2452978697415107513038671885950808708576773758024011642373855069263803135018916060355789450977562892655133304438841250437218410583828484965347247695348663914155324386308882414364779072000
+1062388
+1055556

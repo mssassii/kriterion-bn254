@@ -1,0 +1,15 @@
+{
+  "command": [
+    "env",
+    "LEAN_NUM_THREADS=6",
+    "lake",
+    "env",
+    "lean",
+    "Scratch/Chunk9Feasibility.lean"
+  ],
+  "head": "fb6af8517cb59e1dac8e1a4c4db7f34df8e905ed",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 5.3,
+  "log": "evidence/chunk9-feasibility/lean-metrics.log"
+}

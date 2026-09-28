@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "Scratch/chunk9_feasibility.py"
+  ],
+  "head": "fb6af8517cb59e1dac8e1a4c4db7f34df8e905ed",
+  "tracked_changes": [],
+  "exit": 0,
+  "seconds": 0.0,
+  "log": "evidence/chunk9-feasibility/model-second.log"
+}

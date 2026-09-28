@@ -1,0 +1,83 @@
+$ python3 -B Scratch/digit_radix_research.py
+# HEAD fb6af8517cb59e1dac8e1a4c4db7f34df8e905ed
+# tracked changes:
+
+{
+  "status": "finite alphabet arithmetic only; information counts are not a bounded digit algorithm or proof",
+  "assumption": "optimistically retain seven affine records and265 public bits per digit, existing conversion data; new endomorphism rows and privacy are unproved",
+  "results": [
+    {
+      "norm": 7,
+      "radix": [
+        2,
+        -1
+      ],
+      "quotient_omega": 2,
+      "alphabet_count": 7,
+      "digit_norm_counts": {
+        "0": 1,
+        "1": 6
+      },
+      "information_count": 91,
+      "seven_records_per_digit_hypothetical_bytes": 125711,
+      "hypothetical_records": 642
+    },
+    {
+      "norm": 13,
+      "radix": [
+        4,
+        1
+      ],
+      "quotient_omega": 9,
+      "alphabet_count": 13,
+      "digit_norm_counts": {
+        "0": 1,
+        "1": 6,
+        "4": 6
+      },
+      "information_count": 69,
+      "seven_records_per_digit_hypothetical_bytes": 113048,
+      "hypothetical_records": 488
+    },
+    {
+      "norm": 19,
+      "radix": [
+        5,
+        2
+      ],
+      "quotient_omega": 7,
+      "alphabet_count": 19,
+      "digit_norm_counts": {
+        "0": 1,
+        "1": 6,
+        "3": 6,
+        "4": 6
+      },
+      "information_count": 60,
+      "seven_records_per_digit_hypothetical_bytes": 107867,
+      "hypothetical_records": 425
+    },
+    {
+      "norm": 49,
+      "radix": [
+        3,
+        -5
+      ],
+      "quotient_omega": 30,
+      "alphabet_count": 49,
+      "digit_norm_counts": {
+        "0": 1,
+        "1": 6,
+        "3": 6,
+        "4": 6,
+        "7": 12,
+        "9": 6,
+        "12": 6,
+        "13": 6
+      },
+      "information_count": 46,
+      "seven_records_per_digit_hypothetical_bytes": 99808,
+      "hypothetical_records": 327
+    }
+  ]
+}
