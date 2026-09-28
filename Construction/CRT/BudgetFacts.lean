@@ -36,7 +36,7 @@ theorem budgets_within_gates : garbleBudget ≤ 1759967 ∧ evaluateBudget ≤ 1
   decide
 
 set_option maxRecDepth 100000 in
-/-- The published conversion vector of one coordinate has 3,178 blocks. -/
+/-- The published conversion vector of one coordinate has 2,956 blocks (no chunk joins). -/
 theorem convBlocks_table : table.convBlocks = convCount := by decide +kernel
 
 end Kriterion.CRT.Entry

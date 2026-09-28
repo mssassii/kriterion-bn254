@@ -4,7 +4,15 @@ the scheme.
 
 Garbler order (queries): the CRT layer of `x` (`coordGarbleM table 367 0`), of `y`
 (`coordGarbleM table 275 1`), the key `K = (H t.val).1` (`keyM`), the 1,092 mask answers
-(`maskAnswersM`), the digest labels and finals (`digestGarbleM`). Then the pure assembly
+(`maskAnswersM`), the digest labels and finals (`digestGarbleM`, on the actual zero labels).
+
+**No chunk joins** (ROUND2 §5). The coordinate garblers run on the coins' zero labels `Z_j` (clipped);
+the chunk-tree joins `J_{c,n}` they return are not published but absorbed into the returned Lamport
+key: the actual zero label of bit `j = 8 c + n` is `Z'_j = Z_j ⊕ embed(J_{c,n})` for `n ≥ 1` and
+`Z_j` at each chunk's first bit (`keyZeroOf`, `absorbedOf`), with the pairs `(Z'_j, Z'_j ⊕ Δ)`
+(`keyOfZeros`, the coins' full `Δ`). The digest hashes the actual labels. The evaluator runs the chunk
+trees with zero joins; its active material `0 ⊕ clip(Z'_j ⊕ bΔ) ⊕ cold = J ⊕ clip(Z_j ⊕ bΔ) ⊕ cold`
+is the joined one. Query counts are unchanged. Then the pure assembly
 (release-r1's "offsets first, slopes derived from offsets, joins last"): the element offset of
 a curve encoding is `O_e mod p`, of a row encoding `(O_e mod p) - π_e`; slopes by
 `CurveMembership.slopes` and `Biquadratic.slopes`; row constants by
@@ -101,6 +109,28 @@ def zeroOf (coins : Coins) (coord : Fin 2) : Fin coordinateBitCount → Block :=
 /-- Coordinate `κ`'s `Δ`. -/
 def deltaOf (coins : Coins) (coord : Fin 2) : Block :=
   if coord = 0 then coins.inputDelta .x else coins.inputDelta .y
+
+/-! ### The actual Lamport key: chunk joins absorbed into the zero labels -/
+
+/-- The chunk join absorbed into bit `j` of coordinate `coord` (`0` at each chunk's first bit),
+lifted to a raw block. -/
+def absorbedOf (gx : CoordGarbled table xCount) (gy : CoordGarbled table yCount) (coord : Fin 2)
+    (j : Nat) : Block :=
+  embed (table.chunkShift (if coord = 0 then gx.pub.chunkJoin else gy.pub.chunkJoin) j)
+
+/-- **The actual zero labels**: the coins' zero label XOR the absorbed chunk join. -/
+def keyZeroOf (coins : Coins) (absorbed : Fin 2 → Nat → Block) (coord : Fin 2)
+    (position : Fin coordinateBitCount) : Block :=
+  zeroOf coins coord position ^^^ absorbed coord position.val
+
+/-- The Lamport key of zero labels and offsets: the pairs `(Z_j, Z_j ⊕ Δ)`. -/
+def keyOfZeros (zero : Fin 2 → Fin coordinateBitCount → Block) (delta : Fin 2 → Block) : Key :=
+  { x := Vector.ofFn fun position =>
+      { falseLabel := zero 0 position
+        trueLabel := zero 0 position ^^^ delta 0 }
+    y := Vector.ofFn fun position =>
+      { falseLabel := zero 1 position
+        trueLabel := zero 1 position ^^^ delta 1 } }
 
 /-! ### Element offsets, slopes, rows -/
 
@@ -211,7 +241,8 @@ def assemble (scalar : NonZeroScalar) (coins : Coins) (gx : CoordGarbled table x
 
 /-! ### The garbler -/
 
-/-- **The garbler program** over the layer's hash. -/
+/-- **The garbler program** over the layer's hash. The returned key and the digest use the actual
+zero labels `keyZeroOf coins (absorbedOf gx gy)` (the chunk joins absorbed). -/
 def garbleCM (scalar : NonZeroScalar) (coins : Coins) : CM (Public × Key) :=
   let outputKeys := outputKeysOf scalar coins
   coordGarbleM table xCount 0 (clip (coins.inputDelta .x))
@@ -220,10 +251,11 @@ def garbleCM (scalar : NonZeroScalar) (coins : Coins) : CM (Public × Key) :=
         (fun j => clip (atNat (coins.inputZero .y) 0 j)) >>= fun gy =>
       keyM coins.bridgeKey >>= fun K =>
         maskAnswersM K digitCount >>= fun masks =>
-          digestGarbleM coordinateBitCount digitCount (zeroOf coins) (deltaOf coins)
+          digestGarbleM coordinateBitCount digitCount (keyZeroOf coins (absorbedOf gx gy)) (deltaOf coins)
               (fun o => (outputKeys.get o).digit) (fun o => (outputKeys.get o).offset.coordinates)
               (fun o => coins.exceptionPad.get o) >>= fun entries =>
-            pure (assemble scalar coins gx gy masks entries, coins.inputMacKey)
+            pure (assemble scalar coins gx gy masks entries,
+              keyOfZeros (keyZeroOf coins (absorbedOf gx gy)) (deltaOf coins))
 
 /-- The garbler over the contest's public oracle. -/
 def garbleM (scalar : NonZeroScalar) (coins : Coins) : FreeQuery Spec (Public × Key) :=
