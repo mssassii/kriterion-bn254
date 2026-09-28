@@ -334,7 +334,7 @@ theorem nBackward_nForward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (c
   exact Joint.backward_forward _ u good c
 
 theorem nBackwardOff_nForwardOff (u : AffineInput) (c : Coins T) :
-    nBackwardOff nctx (nForwardOff nctx u c) = c := by
+    nBackwardOff nctx u (nForwardOff nctx u c) = c := by
   unfold nBackwardOff nForwardOff
   simp only
   rw [expand_compress_fs nctx valid c _ rfl]
@@ -345,8 +345,8 @@ theorem fsScales_nBackward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (x
   funext d
   unfold fsScales nBackward
   rw [Joint.rowOffset_backward, Joint.rowOffset_backward]
-  show (solvedK _ u _ _ (.inl .rowZ_x9) * _, solvedK _ u _ _ (.inl .rowY_cubic) * _) = x.1 d
-  simp only [solvedK, fsContext, Rows.scaled, Rows.multiply, expandSrc, sub_zero]
+  simp only [Joint.recovered, rowEquiv, Equiv.coe_fn_symm_mk, solvedK, fsContext, Rows.scaled, Rows.multiply,
+    expandSrc, sub_zero]
   rw [mul_assoc, mul_inv_cancel₀ (valid d).1, mul_one, mul_assoc, mul_inv_cancel₀ (valid d).2, mul_one]
 
 theorem fsScales_nBackwardOff (u : AffineInput) (x : NImageOff T u) :
@@ -365,6 +365,7 @@ theorem nForward_nBackward (u : AffineInput) (good : u.x ≠ 0 ∧ u.y ≠ 0) (x
   rw [scales]
   unfold nBackward at image ⊢
   rw [image]
+  rfl
 
 theorem nForwardOff_nBackwardOff (u : AffineInput) (x : NImageOff T u) :
     nForwardOff nctx u (nBackwardOff nctx u x) = x := by
@@ -374,6 +375,7 @@ theorem nForwardOff_nBackwardOff (u : AffineInput) (x : NImageOff T u) :
   rw [scales]
   unfold nBackwardOff at image ⊢
   rw [image]
+  rfl
 
 variable (T) in
 /-- **The normalized bijection on the curve.** -/
