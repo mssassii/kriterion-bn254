@@ -9,8 +9,11 @@ import Proof.Privacy.CRT.Flags.CurveWindow
 import Proof.Privacy.CRT.Flags.ConvCoincide
 import Lean
 
+set_option autoImplicit false
+
 namespace NarrowPrivacyAudit
 
+open Kriterion
 open BN254 Cryptography GarbledCircuit Kriterion.ArgoMAC Kriterion.CRT Kriterion.CRT.Privacy
 open scoped ENNReal
 
