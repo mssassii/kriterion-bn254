@@ -20,7 +20,7 @@ delivery of the affine encodings replaced:
 
 * **the delivery layer**: the switch systems are replaced by the CRT-residue projectivization of Duty-Free
   Bits (Khambhati, Bhattacharya and Heath), applied to Argo MAC encodings as in ePrint 2026/2100: per coordinate, one conversion of the 254 input bits into
-  one-hot labels of the residues modulo 85 small moduli (3,412 published blocks), then one 78-byte record
+  one-hot labels of the residues modulo 85 small moduli (3,378 published blocks), then one 78-byte record
   per encoding;
 * **the gating**: the rows are masked by hash outputs keyed by the curve check's value, in place of the
   second switch system on labels whitened by EncPRF pads;
@@ -34,9 +34,9 @@ are xinshu's.
 
 | metric | value | rule |
 |---|---|---|
-| `ciphertextBytes` | **147,711** `= 96 + 91·96 + 91·1 + 2·44,356 + 642·78` | ranked, lower is better |
-| `garbleQueries` | **964,502** `≤ 1,759,967` | acceptance gate |
-| `evaluateQueries` | **957,536** `≤ 1,055,879` (98,343 below) | acceptance gate |
+| `ciphertextBytes` | **146,827** `= 96 + 91·96 + 91·1 + 2·43,914 + 642·78` | ranked, lower is better |
+| `garbleQueries` | **988,438** `≤ 1,759,967` | acceptance gate |
+| `evaluateQueries` | **981,506** `≤ 1,055,879` (74,373 below) | acceptance gate |
 
 The baseline supplied proofs for every field of `Kriterion.Solution`, with no `sorry`, and its
 axiom audits reported only `propext`, `Classical.choice` and `Quot.sound`. This branch preserves the
@@ -179,26 +179,26 @@ no final) and 690 evaluation queries (`2·254 + 2·91`), 91 more on each side th
 | `curve` | 3 curve-check constants | 96 |
 | `rows` | 91 digits × 3 constants × 32 B | 8,736 |
 | `exception` | 91 digits × one-byte entry | 91 |
-| `crtX`, `crtY` | 3,412 labels × 13 B per coordinate | 88,712 |
+| `crtX`, `crtY` | 3,378 labels × 13 B per coordinate | 87,828 |
 | `recX`, `recY` | 642 records × 78 B (367 of `x`, 275 of `y`) | 50,076 |
-| **total** | | **147,711** |
+| **total** | | **146,827** |
 
 A record is `h_e·M + Σ_i J_{e,i}·Π_{i'<i} m_{i'}`, below `2M < 2^624`. Every field has a fixed width, so
 every public value encodes to the same length (`Entry.Wire.encoding_length`). Against `de8f397`, the sign
 row saves 91 records (7,098 B) and 91 row constants (2,912 B), and the second exceptional case adds 6
 bytes per digit (546 B) in the original layout: 9,464 B less. The fallback schedule saves another 4,288 B,
-and compacting both exceptional kinds into one byte saves 1,001 B, and 104-bit conversion labels save 20,472 B, for 35,225 B less in total.
+first extraction width 8 on every odd row saves 884 B more, and compacting both exceptional kinds into one byte saves 1,001 B, and 104-bit conversion labels save 20,472 B, for 36,109 B less in total.
 
 ## 3. Query accounting
 
 | part | garbling | evaluation |
 |---|---:|---:|
-| coordinate `x` (chunks 55,936 / 55,522; conversions 232,873 / 230,919; body 217,950 / 216,976) | 506,759 | 503,417 |
-| coordinate `y` (chunks and conversions as `x`; body 166,643 / 165,895) | 455,452 | 452,336 |
+| coordinate `x` (chunks 55,936 / 55,522; conversions 244,841 / 242,904; body 217,950 / 216,976) | 518,727 | 515,402 |
+| coordinate `y` (chunks and conversions as `x`; body 166,643 / 165,895) | 467,420 | 464,321 |
 | mask key | 1 | 1 |
 | masks | 1,092 | 1,092 |
 | exception digest | 1,198 | 690 |
-| **total** | **964,502** | **957,536** |
+| **total** | **988,438** | **981,506** |
 
 The budgets are term-by-term sums over the 85 moduli (`Entry.garbleBudgetOf`, `Entry.evaluateBudgetOf`),
 with certificates using `decide +kernel` in `Construction/CRT/BudgetFacts.lean`. The evaluator's count is the same for
@@ -265,8 +265,8 @@ lake env lean Scratch/ProofAudit.lean   # the three axioms over every declaratio
 ```
 
 `Scratch/` is not a Lean library and the verifier ignores it. `Scratch/Audit.lean` fails if the bytes
-(147,711, from the metric and from encoding an all-zero public value), the garbling budget (964,502) or
-the evaluation budget (957,536) differ, or if a budget comes within 500 queries of its gate, and it checks
+(146,827, from the metric and from encoding an all-zero public value), the garbling budget (988,438) or
+the evaluation budget (981,506) differ, or if a budget comes within 500 queries of its gate, and it checks
 the axioms of the solution and of the privacy field. Build time depends strongly on available
 memory; this fallback draft has not been built, and no build-time estimate is claimed here.
 
