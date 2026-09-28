@@ -196,13 +196,13 @@ def bcOf (c : Entry.Coins) (P : BMR.Pads table) (R : TagTable) : BMR.Coins table
 /-- **The published value from the coins, the pads and the rest of the table.** -/
 def pubParts (scalar : NonZeroScalar) (c : Entry.Coins) (P : BMR.Pads table) (R : TagTable) : Entry.Public where
   curve := BMR.curveTable (bcOf c P R)
-  rows := Vector.ofFn fun d => BMR.gamma (BmrEntry.bmrContextOf scalar c) (bcOf c P R) d
+  rows := Vector.ofFn fun d => BMR.nGamma (BmrEntry.bmrContextOf scalar c) (bcOf c P R) d
   exception := Vector.ofFn (EntryCorrect.entriesOf (H8.tagHash R) scalar c)
   crtX := convVector (EntryCorrect.gxOf (H8.tagHash R) c).pub
   crtY := convVector (EntryCorrect.gyOf (H8.tagHash R) c).pub
-  recX := Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.join (BmrEntry.bmrContextOf scalar c)
+  recX := Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar c)
     (bcOf c P R)) (BMR.hint (bcOf c P R)) (.inl (BMR.xEncEquiv.symm e)))
-  recY := Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.join (BmrEntry.bmrContextOf scalar c)
+  recY := Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar c)
     (bcOf c P R)) (BMR.hint (bcOf c P R)) (.inr (BMR.yEncEquiv.symm e)))
 
 /-- A published value is the structure of its fields. -/
@@ -224,7 +224,7 @@ theorem pubT_eq [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar) (
     rw [← bmrCoinsOf_eq]
     exact BmrEntry.curve_eq scalar c T
   have hrows : (pubT scalar c T).rows =
-      Vector.ofFn fun d => BMR.gamma (BmrEntry.bmrContextOf scalar c) (bcOf c (padsOf T) (restOff T)) d := by
+      Vector.ofFn fun d => BMR.nGamma (BmrEntry.bmrContextOf scalar c) (bcOf c (padsOf T) (restOff T)) d := by
     rw [← bmrCoinsOf_eq]
     exact BmrReal.vector_eq_ofFn _ _ fun d => BmrEntry.rows_eq scalar c T d
   have hexc : (pubT scalar c T).exception = Vector.ofFn (EntryCorrect.entriesOf (H8.tagHash (restOff T)) scalar c) := by
@@ -241,12 +241,12 @@ theorem pubT_eq [FieldCertificate] [GroupCertificate] (scalar : NonZeroScalar) (
     unfold EntryCorrect.gyOf
     exact convVector_congr _ 1 (by norm_num) (by decide) _ _ (offPads_restOff T)
   have hrecX : (pubT scalar c T).recX = Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf
-      (BMR.join (BmrEntry.bmrContextOf scalar c) (bcOf c (padsOf T) (restOff T)))
+      (BMR.nJoin (BmrEntry.bmrContextOf scalar c) (bcOf c (padsOf T) (restOff T)))
       (BMR.hint (bcOf c (padsOf T) (restOff T))) (.inl (BMR.xEncEquiv.symm e))) := by
     rw [← bmrCoinsOf_eq]
     exact BmrReal.recX_vec scalar c T
   have hrecY : (pubT scalar c T).recY = Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf
-      (BMR.join (BmrEntry.bmrContextOf scalar c) (bcOf c (padsOf T) (restOff T)))
+      (BMR.nJoin (BmrEntry.bmrContextOf scalar c) (bcOf c (padsOf T) (restOff T)))
       (BMR.hint (bcOf c (padsOf T) (restOff T))) (.inr (BMR.yEncEquiv.symm e))) := by
     rw [← bmrCoinsOf_eq]
     exact BmrReal.recY_vec scalar c T
@@ -363,6 +363,18 @@ theorem join (ctx : BMR.Context) : BMR.join ctx c' = BMR.join ctx c := by
     · show _ + 0 + ((-(BMR.curveK c') (.inr .y4)).val : ZMod (T.modulus i)) =
         _ + ((-(BMR.curveK c) (.inr .y4)).val : ZMod (T.modulus i))
       rw [h.curveK, add_zero]
+
+theorem rowKey : BmrOff.rowKey c' = BmrOff.rowKey c := by
+  funext d
+  unfold BmrOff.rowKey
+  rw [h.rowOffset, h.rowOffset]
+
+theorem nGamma (nctx : BMR.NContext) : BMR.nGamma nctx c' = BMR.nGamma nctx c := by
+  funext d
+  rw [BmrOff.nGamma_key, BmrOff.nGamma_key, h.rowKey, h.gamma]
+
+theorem nJoin (nctx : BMR.NContext) : BMR.nJoin nctx c' = BMR.nJoin nctx c := by
+  rw [BmrOff.nJoin_key, BmrOff.nJoin_key, h.rowKey, h.join]
 
 end Moved
 
@@ -509,18 +521,18 @@ theorem pubParts_move (scalar : NonZeroScalar) (x : Entry.Coins × BMR.Pads tabl
     pubParts scalar (move x m).1 (move x m).2 R = pubParts scalar x.1 x.2 R := by
   have h := moved x m R
   have e1 := h.curveTable
-  have e2 := h.gamma (BmrEntry.bmrContextOf scalar x.1)
-  have e3 := h.join (BmrEntry.bmrContextOf scalar x.1)
+  have e2 := h.nGamma (BmrEntry.bmrContextOf scalar x.1)
+  have e3 := h.nJoin (BmrEntry.bmrContextOf scalar x.1)
   have e4 := h.hint
   unfold pubParts
   show (⟨BMR.curveTable (bcOf (move x m).1 (move x m).2 R),
-      Vector.ofFn fun d => BMR.gamma (BmrEntry.bmrContextOf scalar (moveCoins x.1 m)) (bcOf (move x m).1 (move x m).2 R) d,
+      Vector.ofFn fun d => BMR.nGamma (BmrEntry.bmrContextOf scalar (moveCoins x.1 m)) (bcOf (move x m).1 (move x m).2 R) d,
       Vector.ofFn (EntryCorrect.entriesOf (H8.tagHash R) scalar (moveCoins x.1 m)),
       convVector (EntryCorrect.gxOf (H8.tagHash R) (moveCoins x.1 m)).pub,
       convVector (EntryCorrect.gyOf (H8.tagHash R) (moveCoins x.1 m)).pub,
-      Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.join (BmrEntry.bmrContextOf scalar (moveCoins x.1 m))
+      Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar (moveCoins x.1 m))
         (bcOf (move x m).1 (move x m).2 R)) (BMR.hint (bcOf (move x m).1 (move x m).2 R)) (.inl (BMR.xEncEquiv.symm e))),
-      Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.join (BmrEntry.bmrContextOf scalar (moveCoins x.1 m))
+      Vector.ofFn fun e => Entry.toRecord (BmrSplit.recordOf (BMR.nJoin (BmrEntry.bmrContextOf scalar (moveCoins x.1 m))
         (bcOf (move x m).1 (move x m).2 R)) (BMR.hint (bcOf (move x m).1 (move x m).2 R)) (.inr (BMR.yEncEquiv.symm e)))⟩ :
       Entry.Public) = _
   rw [ctx_move, entries_move, gx_move, gy_move, e1, e2, e3, e4]
