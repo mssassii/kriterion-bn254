@@ -83,7 +83,7 @@ theorem badMass_le [FieldCertificate] :
     have mass := congrArg (fun μ : PMF BaseField => μ.toOuterMeasure {0}) law
     rw [PMF.toOuterMeasure_map_apply, PMF.toOuterMeasure_apply_singleton, PMF.uniformOfFintype_apply,
       ZMod.card] at mass
-    convert mass using 2
+    exact mass
   have union : {h : BMR.Scales | ¬ BMR.GoodScales h} ⊆
       ⋃ x : Fin 91 × Fin 2, {h | (if x.2 = 0 then (h x.1).1 else (h x.1).2) = 0} := by
     intro h bad
@@ -105,6 +105,7 @@ theorem badMass_le [FieldCertificate] :
   rw [ENNReal.ofReal_div_of_pos (by exact_mod_cast p_pos), ENNReal.ofReal_natCast, ENNReal.ofReal_natCast,
     baseFieldModulus_eq, div_eq_mul_inv]
 
+open Classical in
 /-- **The normalization flag against a weight on the published value**: at most `182/p` times the weight. -/
 theorem normFlag_le [FieldCertificate] [GroupCertificate] (weight : Entry.Public → ℝ≥0∞)
     [Fintype Entry.Source] [Nonempty Entry.Source] :
