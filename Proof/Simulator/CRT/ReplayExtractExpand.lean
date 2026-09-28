@@ -74,12 +74,12 @@ cast sums, the active label, the first `known` bit labels, the leaves of the nod
 `≤ closed` (every `α` off the path at level `closed`), `sub`, and the frame since the stage's start. -/
 structure StageRel (cells : StageCells) (w rb value : Nat) (sub : Lanes w) (closed known : Nat)
     (mStart : Memory) (state : StageState rb) (m : Memory) : Prop where
-  levelSums : ∀ L, L < w → m.ram (word (cells.levelSumBase + L)) = blockWord (state.levelSum L)
+  levelSums : ∀ L, L < w → m.ram (word (cells.levelSumBase + L)) = labelWord (state.levelSum L)
   sums : SumCells cells w rb state.classSum state.castSum m
-  active : m.ram (word cells.active) = blockWord state.active
-  bits : ∀ b, b < known → m.ram (word (cells.bitBase + b)) = blockWord (state.bits b)
+  active : m.ram (word cells.active) = labelWord state.active
+  bits : ∀ b, b < known → m.ram (word (cells.bitBase + b)) = labelWord (state.bits b)
   leaves : ∀ α, α < 2 ^ w → α % 2 ^ closed ≠ value % 2 ^ closed →
-    m.ram (word (cells.nodeBase + α)) = blockWord (state.leaves α)
+    m.ram (word (cells.nodeBase + α)) = labelWord (state.leaves α)
   subCells : ∀ i : Fin laneCount, m.ram (word (cells.subBase + i.val)) = word (sub i).val
   frame : Frame (stageWrites cells w rb) stageClobbers mStart m
 
@@ -115,10 +115,10 @@ theorem agree_expandReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes 
     (castSmall : ∀ x, x < 2 ^ w → castBase + stride * x + castAnswers rb < 2 ^ 127)
     (n known : Nat) (nLt : n + 1 ≤ w) (knownLe : known ≤ w) (slot : Nat) (slotLt : slot < 2 ^ (n + 1))
     (slotLow : slot % 2 ^ n = value % 2 ^ n) (slotNe : slot ≠ value % 2 ^ (n + 1))
-    (label : Block) (mStart : Memory) (state : StageState rb) (m : Memory)
+    (label : Label) (mStart : Memory) (state : StageState rb) (m : Memory)
     (rel : StageRel cells w rb value sub n known mStart state m)
     (slotCell : m.ram (word cells.slot) = word slot)
-    (nodeCell : m.ram (word (cells.nodeBase + slot)) = blockWord label) :
+    (nodeCell : m.ram (word (cells.nodeBase + slot)) = labelWord label) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
       (StageRel cells w rb value sub (n + 1) known mStart)
       ((expandReplay cells w rb (n + 1) treeBase castBase stride).tree m)
@@ -127,7 +127,7 @@ theorem agree_expandReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes 
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have powSplit : 2 ^ (n + 1) * 2 ^ (w - (n + 1)) = 2 ^ w := by
     rw [← pow_add, Nat.add_sub_cancel' nLt]
   have powPos := Nat.two_pow_pos (n + 1)
@@ -170,7 +170,7 @@ theorem agree_expandReplay (cells : StageCells) (w rb value : Nat) (sub : Lanes 
     fun i => ?_, ⟨fun address outside => ?_, ?_, fun register outside => ?_⟩⟩
   · -- level XORs
     dsimp only
-    rw [off2 _ (Or.inl (by omega)) (by omega), sums1 L Lw, rel.levelSums L Lw, blockWord_xor]
+    rw [off2 _ (Or.inl (by omega)) (by omega), sums1 L Lw, rel.levelSums L Lw, labelWord_xor]
   · -- class and cast sums
     have jLt : j < w + 1 := by omega
     have h := sums2 j jb i

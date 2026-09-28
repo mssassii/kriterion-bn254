@@ -35,13 +35,13 @@ theorem det_absSlot (cells : StageCells) (start t : Nat) : (absSlot cells start 
   ⟨⟨trivial, trivial⟩, trivial, trivial⟩
 
 theorem exec_nodeInput (cells : StageCells) (base stride : Nat) (memory : Memory) (x : Nat)
-    (label : Block) (xReg : memory.registers rF = word x)
-    (nodeCell : memory.ram (word (cells.nodeBase + x)) = blockWord label)
+    (label : Label) (xReg : memory.registers rF = word x)
+    (nodeCell : memory.ram (word (cells.nodeBase + x)) = labelWord label)
     (addrSmall : cells.nodeBase + x < 2 ^ 256) (strideSmall : stride < 2 ^ 64)
     (tagSmall : base + stride * x < 2 ^ 127) :
     ∃ after, (nodeInput cells base stride).exec memory = some after ∧ after.ram = memory.ram ∧
       after.bits = memory.bits ∧
-      after.registers rInput = word (hashInput label (base + stride * x)) ∧
+      after.registers rInput = word (hashInput (embed label) (base + stride * x)) ∧
       ∀ register, register ≠ rInput → register ≠ rB → register ≠ rC → register ≠ rAddr →
         after.registers register = memory.registers register := by
   have xSmall : x < 2 ^ 256 := by omega
@@ -61,10 +61,11 @@ theorem exec_nodeInput (cells : StageCells) (base stride : Nat) (memory : Memory
   refine ⟨_, rfl, rfl, rfl, ?_, fun register notI notB notC notAddr => ?_⟩
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, xReg]
     rw [eval_add_word x cells.nodeBase (by omega), Nat.add_comm x cells.nodeBase, nodeCell,
-      blockWord_eq_word, eval_mul_word x (2 ^ 128 * stride) prodSmall, eval_add_word _ _ sum1,
+      labelWord_eq_word, eval_mul_word x (2 ^ 128 * stride) prodSmall, eval_add_word _ _ sum1,
       eval_add_word _ _ sum2]
     congr 1
     unfold hashInput
+    simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
     ring
   · simp only [reg_setReg, if_neg notI, if_neg notB, if_neg notC, if_neg notAddr]
 
@@ -177,9 +178,9 @@ theorem ne_of_not_stage {register : Register} (outside : ¬ stageClobbers regist
 /-! ### The XOR of a vector -/
 
 /-- The XOR of the entries of a vector. -/
-def xorOf {count : Nat} (values : Vector Block count) : Block := xorFold values.get
+def xorOf {count : Nat} (values : Vector Label count) : Label := xorFold values.get
 
-theorem xorOf_push {count : Nat} (values : Vector Block count) (value : Block) :
+theorem xorOf_push {count : Nat} (values : Vector Label count) (value : Label) :
     xorOf (values.push value) = xorOf values ^^^ value := by
   unfold xorOf xorFold
   rw [Fin.foldl_succ_last]
@@ -189,14 +190,14 @@ theorem xorOf_push {count : Nat} (values : Vector Block count) (value : Block) :
   funext acc i
   rw [Vector.getElem_push_lt i.isLt]
 
-theorem xorOf_zero (values : Vector Block 0) : xorOf values = 0 := rfl
+theorem xorOf_zero (values : Vector Label 0) : xorOf values = 0 := rfl
 
 theorem word_xor_zero' (a : Word) : a ^^^ (0 : Word) = a := by
   apply BitVec.eq_of_getLsbD_eq; intro i _
   simp
 
-theorem xor_blockWord_zero (a : Word) : a ^^^ blockWord 0 = a := by
-  rw [blockWord_zero, word_xor_zero']
+theorem xor_labelWord_zero (a : Word) : a ^^^ labelWord 0 = a := by
+  rw [labelWord_zero, word_xor_zero']
 
 section Agreement
 
@@ -205,10 +206,10 @@ variable [BN254.FieldCertificate] {FixedIndex EncIndex : Type}
 
 /-- The invariant of the hash loop of one level after `count` relative slots. -/
 def HashInv (cells : StageCells) (w level : Nat) (start : Memory) (count : Nat)
-    (values : Vector Block count) (memory : Memory) : Prop :=
-  (∀ t (bound : t < count), memory.ram (word (cells.matBase + t)) = blockWord (values[t]'bound)) ∧
+    (values : Vector Label count) (memory : Memory) : Prop :=
+  (∀ t (bound : t < count), memory.ram (word (cells.matBase + t)) = labelWord (values[t]'bound)) ∧
     memory.ram (word (cells.levelSumBase + level)) =
-      start.ram (word (cells.levelSumBase + level)) ^^^ blockWord (xorOf values) ∧
+      start.ram (word (cells.levelSumBase + level)) ^^^ labelWord (xorOf values) ∧
     (∀ address, address ≠ word (cells.levelSumBase + level) →
       (∀ t, t < 2 ^ w → address ≠ word (cells.matBase + t)) → memory.ram address = start.ram address) ∧
     memory.bits = start.bits ∧
@@ -217,18 +218,18 @@ def HashInv (cells : StageCells) (w level : Nat) (start : Memory) (count : Nat)
 /-- **One hashed node of a subtree level.** -/
 theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout cells w rb)
     (start d base stride : Nat) (strideSmall : stride < 2 ^ 64) (slot : Nat) (slotLt : slot < 2 ^ start)
-    (levelLt : start + d < w) (parent : Fin (2 ^ d) → Block) (m0 : Memory)
+    (levelLt : start + d < w) (parent : Fin (2 ^ d) → Label) (m0 : Memory)
     (slotCell : m0.ram (word cells.slot) = word slot)
     (nodeCells : ∀ t : Fin (2 ^ d),
-      m0.ram (word (cells.nodeBase + (slot + 2 ^ start * t.val))) = blockWord (parent t))
+      m0.ram (word (cells.nodeBase + (slot + 2 ^ start * t.val))) = labelWord (parent t))
     (tagSmall : ∀ t, t < 2 ^ d → base + stride * (slot + 2 ^ start * t) < 2 ^ 127)
-    (index : Fin (2 ^ d)) (values : Vector Block index.val) (memory : Memory)
+    (index : Fin (2 ^ d)) (values : Vector Label index.val) (memory : Memory)
     (holds : HashInv cells w (start + d) m0 index.val values memory) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
-      (fun (result : Block) after =>
+      (fun (result : Label) after =>
         HashInv cells w (start + d) m0 (index.val + 1) (values.push result) after)
       ((hashEntry cells start (start + d) base stride index.val).tree memory)
-      (liftHash (h128M (parent index) (base + stride * (slot + 2 ^ start * index.val)))) := by
+      (liftHash (hLabelM (parent index) (base + stride * (slot + 2 ^ start * index.val)))) := by
   obtain ⟨mats, sumCell, frame, bitsSame, regs⟩ := holds
   have c5 := layout.c5; have c6 := layout.c6; have c7 := layout.c7; have c8 := layout.c8
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
@@ -248,7 +249,7 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
       (fun t tb => word_ne (by omega) (by omega) (by omega))]
     exact slotCell
   have nodeNow : memory.ram (word (cells.nodeBase + (slot + 2 ^ start * index.val))) =
-      blockWord (parent index) := by
+      labelWord (parent index) := by
     rw [frame _ (word_ne (by omega) (by omega) (by omega))
       (fun t tb => word_ne (by omega) (by omega) (by omega))]
     exact nodeCells index
@@ -257,16 +258,17 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
   obtain ⟨m2, run2, ram2, bits2, input2, regs2⟩ :=
     exec_nodeInput cells base stride m1 _ (parent index) rF1 (by rw [ram1]; exact nodeNow)
       (by omega) strideSmall (tagSmall _ tLt)
-  have hashSmall : hashInput (parent index) (base + stride * (slot + 2 ^ start * index.val)) <
+  have hashSmall : hashInput (embed (parent index)) (base + stride * (slot + 2 ^ start * index.val)) <
       2 ^ 256 := by
     unfold hashInput
+    simp only [show ∀ l : Label, (embed l).toNat = l.toNat from Narrow.embed_toNat]
     have := (parent index).isLt
     have := tagSmall _ tLt
     omega
   unfold hashEntry
   rw [tree_seq_exec _ _ (det_absSlot cells start index.val) memory m1 run1,
     tree_seq_exec _ _ (det_nodeInput cells base stride) m1 m2 run2,
-    tree_query_hash _ m2 _ hashSmall input2, liftHash_h128M]
+    tree_query_hash _ m2 _ hashSmall input2, liftHash_hLabelM]
   refine .node _ fun answer => ?_
   rw [tree_eq_exec _ (det_matStore cells (start + d) index.val)]
   set m3 := writePair m2 rFirst rSecond (blockWord answer.1, blockWord answer.2) with m3Def
@@ -286,7 +288,7 @@ theorem agree_hashEntry (cells : StageCells) (w rb : Nat) (layout : StageLayout 
         ram1, Vector.getElem_push_lt tSmall]
       exact mats t tSmall
   · rw [ram4, Function.update_self, first3, m3Def, writePair_ram, ram2, ram1, sumCell,
-      xorOf_push, BitVec.xor_assoc, blockWord_xor]
+      xorOf_push, BitVec.xor_assoc, labelWord_xor]
   · rw [ram4, Function.update_of_ne offSum, Function.update_of_ne (offMat index.val tLtw), m3Def,
       writePair_ram, ram2, ram1]
     exact frame address offSum offMat
@@ -397,10 +399,10 @@ program's `subtreeM` result `r`: the level-`start + d` labels at their absolute 
 XORs added into `Y_L`, and the frame (only nodes of the subtree's class, the materials and the level
 XORs written). `m0` is the memory at the subtree's start. -/
 def SubtreePost (cells : StageCells) (w start slot : Nat) (m0 : Memory) (d : Nat)
-    (r : (Fin (2 ^ d) → Block) × (Nat → Block)) (m : Memory) : Prop :=
-  (∀ t : Fin (2 ^ d), m.ram (word (cells.nodeBase + (slot + 2 ^ start * t.val))) = blockWord (r.1 t)) ∧
+    (r : (Fin (2 ^ d) → Label) × (Nat → Label)) (m : Memory) : Prop :=
+  (∀ t : Fin (2 ^ d), m.ram (word (cells.nodeBase + (slot + 2 ^ start * t.val))) = labelWord (r.1 t)) ∧
     (∀ L, L < w → m.ram (word (cells.levelSumBase + L)) =
-      m0.ram (word (cells.levelSumBase + L)) ^^^ blockWord (r.2 L)) ∧
+      m0.ram (word (cells.levelSumBase + L)) ^^^ labelWord (r.2 L)) ∧
     (∀ L, start + d ≤ L → r.2 L = 0) ∧
     (∀ address, (∀ x, x < 2 ^ w → x % 2 ^ start = slot → address ≠ word (cells.nodeBase + x)) →
       (∀ t, t < 2 ^ w → address ≠ word (cells.matBase + t)) →
@@ -419,7 +421,7 @@ theorem agree_subtreeLevel (cells : StageCells) (w rb : Nat) (layout : StageLayo
     (hTag : ∀ x, treeTag (start + d) x = base + stride * x)
     (tagSmall : ∀ t, t < 2 ^ d → base + stride * (slot + 2 ^ start * t) < 2 ^ 127)
     (m0 : Memory) (slotCell : m0.ram (word cells.slot) = word slot)
-    (prev : (Fin (2 ^ d) → Block) × (Nat → Block)) (m : Memory)
+    (prev : (Fin (2 ^ d) → Label) × (Nat → Label)) (m : Memory)
     (post : SubtreePost cells w start slot m0 d prev m) :
     Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
       (SubtreePost cells w start slot m0 (d + 1))
@@ -453,7 +455,7 @@ theorem agree_subtreeLevel (cells : StageCells) (w rb : Nat) (layout : StageLayo
       (fun index values current holds =>
         agree_hashEntry cells w rb layout start d base stride strideSmall slot slotLt levelLt prev.1 m
           slotNow nodes tagSmall index values current holds)
-      m ⟨fun t bound => absurd bound (Nat.not_lt_zero _), by rw [xorOf_zero, xor_blockWord_zero],
+      m ⟨fun t bound => absurd bound (Nat.not_lt_zero _), by rw [xorOf_zero, xor_labelWord_zero],
         fun _ _ _ => rfl, rfl, fun _ _ => rfl⟩)
   obtain ⟨mats, sumCell, frameH, bitsH, regsH⟩ := inv
   have slotAfter : after.ram (word cells.slot) = word slot := by
@@ -476,12 +478,12 @@ theorem agree_subtreeLevel (cells : StageCells) (w rb : Nat) (layout : StageLayo
     obtain ⟨c1, c2⟩ := cells2 (t'.val % 2 ^ d) rLt
     have xr := posLt _ rLt
     have nodePrev : after.ram (word (cells.nodeBase + (slot + 2 ^ start * (t'.val % 2 ^ d)))) =
-        blockWord (prev.1 ⟨t'.val % 2 ^ d, rLt⟩) := by
+        labelWord (prev.1 ⟨t'.val % 2 ^ d, rLt⟩) := by
       rw [frameH _ (word_ne (by omega) (by omega) (by omega))
         (fun t tb => word_ne (by omega) (by omega) (by omega))]
       exact nodes ⟨_, rLt⟩
     have matR : after.ram (word (cells.matBase + t'.val % 2 ^ d)) =
-        blockWord (materials.get ⟨t'.val % 2 ^ d, rLt⟩) := by
+        labelWord (materials.get ⟨t'.val % 2 ^ d, rLt⟩) := by
       rw [mats _ rLt]; rfl
     simp only [stored_eq]
     rw [Kriterion.CRT.SliceC.extendLevel_eq]
@@ -496,7 +498,7 @@ theorem agree_subtreeLevel (cells : StageCells) (w rb : Nat) (layout : StageLayo
       simp only [hb, Bool.false_eq_true, if_false] at hsplit
       have hpos : slot + 2 ^ start * t'.val = slot + 2 ^ start * (t'.val % 2 ^ d) := by
         congr 2
-      rw [hpos, c1, nodePrev, matR, blockWord_xor]
+      rw [hpos, c1, nodePrev, matR, labelWord_xor]
   · have xAll : ∀ t, t < 2 ^ d → cells.nodeBase + (slot + 2 ^ start * t) + 2 ^ (start + d) < cells.matBase :=
       fun t tb => by have := posLt t tb; omega
     rw [frame2 _ fun t tb => ⟨word_ne (by omega) (by have := xAll t tb; omega)
@@ -505,7 +507,7 @@ theorem agree_subtreeLevel (cells : StageCells) (w rb : Nat) (layout : StageLayo
     dsimp only
     by_cases hLd : L = start + d
     · subst hLd
-      rw [sumCell, if_pos rfl, sums _ Lw, zero _ le_rfl, xor_blockWord_zero]
+      rw [sumCell, if_pos rfl, sums _ Lw, zero _ le_rfl, xor_labelWord_zero]
       rfl
     · rw [if_neg hLd, frameH _ (word_ne (by omega) (by omega) (by omega))
         (fun t tb => word_ne (by omega) (by omega) (by omega)), sums L Lw]
@@ -528,8 +530,8 @@ theorem agree_subtreeReplay (cells : StageCells) (w rb : Nat) (layout : StageLay
     (slotLt : slot < 2 ^ start) (treeTag : Nat → Nat → Nat)
     (hTag : ∀ L x, L < w → treeTag L x = treeBase L + stride * x)
     (tagSmall : ∀ L x, L < w → x < 2 ^ w → treeBase L + stride * x < 2 ^ 127)
-    (m0 : Memory) (slotCell : m0.ram (word cells.slot) = word slot) (label : Block)
-    (nodeCell : m0.ram (word (cells.nodeBase + slot)) = blockWord label) :
+    (m0 : Memory) (slotCell : m0.ram (word cells.slot) = word slot) (label : Label)
+    (nodeCell : m0.ram (word (cells.nodeBase + slot)) = labelWord label) :
     ∀ depth, start + depth ≤ w →
       Agree (FixedIndex := FixedIndex) (EncIndex := EncIndex)
         (SubtreePost cells w start slot m0 depth)
@@ -538,7 +540,7 @@ theorem agree_subtreeReplay (cells : StageCells) (w rb : Nat) (layout : StageLay
   | 0, _ => by
       unfold subtreeReplay
       rw [Prog.rep, subtreeM]
-      refine .leaf ⟨fun t => ?_, fun L _ => (xor_blockWord_zero _).symm, fun _ _ => rfl,
+      refine .leaf ⟨fun t => ?_, fun L _ => (xor_labelWord_zero _).symm, fun _ _ => rfl,
         fun _ _ _ _ => rfl, rfl, fun _ _ => rfl⟩
       have t0 : t.val = 0 := Nat.lt_one_iff.mp (lt_of_lt_of_eq t.isLt (pow_zero 2))
       rw [t0, Nat.mul_zero, Nat.add_zero]

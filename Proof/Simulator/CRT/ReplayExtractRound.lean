@@ -49,10 +49,10 @@ theorem bitsUpTo_step (f : Nat → Bool) (i : Nat) (D : Word) (holds : BitsUpTo 
 theorem bitsUpTo_laneBit {l : Nat} (A : Lanes l) (n : Nat) (D : Word)
     (holds : BitsUpTo (fun k => if h : k < laneCount then (A ⟨k, h⟩).val.testBit n else false)
       laneCount D) :
-    D = blockWord (laneBit A n) := by
+    D = labelWord (laneBit A n) := by
   apply BitVec.eq_of_getLsbD_eq
   intro k hk
-  rw [holds k, blockWord, BitVec.getLsbD_ofNat, BitVec.testBit_toNat, laneBit, BitVec.getLsbD_ofFnLE]
+  rw [holds k, labelWord, BitVec.getLsbD_ofNat, BitVec.testBit_toNat, laneBit, BitVec.getLsbD_ofFnLE]
   by_cases hk' : k < laneCount
   · simp [hk', hk]
   · simp [hk', hk]
@@ -167,10 +167,10 @@ theorem exec_lanePack {l : Nat} (base b : Nat) (memory : Memory) (lanes : Lanes 
     (laneCells : ∀ i : Fin laneCount, memory.ram (word (base + i.val)) = word (lanes i).val)
     (lSmall : l ≤ 256) (bSmall : b < 256) :
     ∃ after, (lanePack base b).exec memory = some after ∧ after.ram = memory.ram ∧
-      after.bits = memory.bits ∧ after.registers rD = blockWord (laneBit lanes b) ∧
+      after.bits = memory.bits ∧ after.registers rD = labelWord (laneBit lanes b) ∧
       ∀ register, register ≠ rB → register ≠ rD → register ≠ rE → register ≠ rAddr →
         after.registers register = memory.registers register := by
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have powL : 2 ^ l ≤ 2 ^ 256 := Nat.pow_le_pow_right (by norm_num) lSmall
   set f : Nat → Bool := fun k => if h : k < laneCount then (lanes ⟨k, h⟩).val.testBit b else false
     with fDef
@@ -242,12 +242,12 @@ theorem exec_roundLanes (cells : StageCells) (w rb : Nat) (rbLe : rb ≤ 128) (w
     (subCells : ∀ i : Fin laneCount, m0.ram (word (cells.subBase + i.val)) = word (sub i).val) :
     ∃ m1, (Prog.rep laneCount (roundLane cells w rb n)).exec m0 = some m1 ∧ m1.ram = m0.ram ∧
       m1.bits = m0.bits ∧
-      m1.registers rD = blockWord (laneBit (sub - reduceTo w (materialize (R + scaleLanes q (pin - T)))) n) ∧
+      m1.registers rD = labelWord (laneBit (sub - reduceTo w (materialize (R + scaleLanes q (pin - T)))) n) ∧
       ∀ register, register ≠ rB → register ≠ rC → register ≠ rD → register ≠ rE → register ≠ rAddr →
         m1.registers register = m0.registers register := by
   haveI : NeZero (2 ^ rb) := ⟨by positivity⟩
   haveI : NeZero (2 ^ w) := ⟨by positivity⟩
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   have powRb : 2 ^ rb ≤ 2 ^ 128 := Nat.pow_le_pow_right (by norm_num) rbLe
   set A := sub - reduceTo w (materialize (R + scaleLanes q (pin - T))) with ADef
@@ -293,21 +293,21 @@ theorem exec_roundLanes (cells : StageCells) (w rb : Nat) (rbLe : rb ≤ 128) (w
     m0 ⟨rfl, rfl, by rw [dReg]; exact bitsUpTo_zero f, fun _ _ _ _ _ _ => rfl⟩
   exact ⟨m1, run, ram1, bits1, bitsUpTo_laneBit A n _ bits1', regs1⟩
 
-theorem exec_roundHot (cells : StageCells) (n : Nat) (memory : Memory) (bit J Y A : Block)
-    (dReg : memory.registers rD = blockWord bit)
-    (joinCell : memory.ram (word (cells.joinBase + n)) = blockWord J)
-    (levelCell : memory.ram (word (cells.levelSumBase + n)) = blockWord Y)
-    (activeCell : memory.ram (word cells.active) = blockWord A) :
+theorem exec_roundHot (cells : StageCells) (n : Nat) (memory : Memory) (bit J Y A : Label)
+    (dReg : memory.registers rD = labelWord bit)
+    (joinCell : memory.ram (word (cells.joinBase + n)) = labelWord J)
+    (levelCell : memory.ram (word (cells.levelSumBase + n)) = labelWord Y)
+    (activeCell : memory.ram (word cells.active) = labelWord A) :
     ∃ after, (roundHot cells n).exec memory = some after ∧ after.ram = memory.ram ∧
-      after.bits = memory.bits ∧ after.registers rD = blockWord (bit ^^^ J ^^^ Y) ∧
-      after.registers rE = blockWord (A ^^^ (bit ^^^ J ^^^ Y)) ∧
+      after.bits = memory.bits ∧ after.registers rD = labelWord (bit ^^^ J ^^^ Y) ∧
+      after.registers rE = labelWord (A ^^^ (bit ^^^ J ^^^ Y)) ∧
       ∀ register, register ≠ rD → register ≠ rE → register ≠ rAddr →
         after.registers register = memory.registers register := by
   refine ⟨_, rfl, rfl, rfl, ?_, ?_, fun register notD notE notAddr => ?_⟩
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, dReg, joinCell,
-      levelCell, eval_xor, blockWord_xor]
+      levelCell, eval_xor, labelWord_xor]
   · simp (config := { decide := true }) only [reg_setReg, ram_setReg, reduceIte, dReg, joinCell,
-      levelCell, activeCell, eval_xor, blockWord_xor]
+      levelCell, activeCell, eval_xor, labelWord_xor]
   · simp only [reg_setReg, if_neg notD, if_neg notE, if_neg notAddr]
 
 theorem exec_roundTest (cells : StageCells) (n : Nat) (memory : Memory) (value : Nat)
@@ -400,17 +400,17 @@ theorem word_bit_eq_zero (x : Nat) : word (x % 2 ^ 1) = 0 ↔ x % 2 = 0 := by
 
 /-- **The branch of round `n`**: the kept child becomes active, the other is closed at
 `roundSlot value n` with its label at its node. -/
-theorem exec_roundBranch (cells : StageCells) (w n : Nat) (memory : Memory) (value : Nat) (hot A : Block)
+theorem exec_roundBranch (cells : StageCells) (w n : Nat) (memory : Memory) (value : Nat) (hot A : Label)
     (fits : cells.nodeBase + 2 ^ w < 2 ^ 256) (nLt : n < w)
     (aReg : memory.registers rA = word (value / 2 ^ n % 2 ^ 1))
     (fReg : memory.registers rF = word (value % 2 ^ n))
-    (dReg : memory.registers rD = blockWord hot)
-    (eReg : memory.registers rE = blockWord (A ^^^ hot)) :
+    (dReg : memory.registers rD = labelWord hot)
+    (eReg : memory.registers rE = labelWord (A ^^^ hot)) :
     ∃ after, (Prog.ite rA (roundSet cells) (roundClear cells n)).exec memory = some after ∧
       after.ram = Function.update (Function.update (Function.update memory.ram (word cells.active)
-          (blockWord (if value.testBit n then hot else A ^^^ hot)))
+          (labelWord (if value.testBit n then hot else A ^^^ hot)))
         (word cells.slot) (word (roundSlot value n))) (word (cells.nodeBase + roundSlot value n))
-          (blockWord (if value.testBit n then A ^^^ hot else hot)) ∧
+          (labelWord (if value.testBit n then A ^^^ hot else hot)) ∧
       after.bits = memory.bits ∧
       ∀ register, register ≠ rB → register ≠ rF → register ≠ rAddr →
         after.registers register = memory.registers register := by
@@ -448,10 +448,10 @@ theorem exec_roundBit (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
     (subCells : ∀ i : Fin laneCount, m.ram (word (cells.subBase + i.val)) = word (sub i).val) :
     ∃ m1, (roundBit cells w rb n).exec m = some m1 ∧
       m1.ram = Function.update m.ram (word (cells.bitBase + n))
-        (blockWord (laneBit (sub - reduceTo w (materialize (R + scaleLanes (value % 2 ^ n) (pin - T)))) n)) ∧
+        (labelWord (laneBit (sub - reduceTo w (materialize (R + scaleLanes (value % 2 ^ n) (pin - T)))) n)) ∧
       m1.bits = m.bits ∧
       m1.registers rD =
-        blockWord (laneBit (sub - reduceTo w (materialize (R + scaleLanes (value % 2 ^ n) (pin - T)))) n) ∧
+        labelWord (laneBit (sub - reduceTo w (materialize (R + scaleLanes (value % 2 ^ n) (pin - T)))) n) ∧
       m1.registers rF = word (value % 2 ^ n) ∧
       ∀ register, register ≠ rB → register ≠ rC → register ≠ rD → register ≠ rE → register ≠ rF →
         register ≠ rAddr → m1.registers register = m.registers register := by
@@ -490,10 +490,10 @@ theorem exec_roundBit (cells : StageCells) (w rb : Nat) (layout : StageLayout ce
 
 /-- The stage's inputs in RAM: the stage value, the remainder label's lanes, the joins, the pin. -/
 structure StageInputs (cells : StageCells) (w rb value : Nat) (remainder : Lanes rb)
-    (joins : Nat → Block) (pin : Lanes rb) (m : Memory) : Prop where
+    (joins : Nat → Label) (pin : Lanes rb) (m : Memory) : Prop where
   valueCell : m.ram (word cells.value) = word value
   remCells : ∀ i : Fin laneCount, m.ram (word (cells.remBase + i.val)) = word (remainder i).val
-  joinCells : ∀ n, 1 ≤ n → n < w → m.ram (word (cells.joinBase + n)) = blockWord (joins n)
+  joinCells : ∀ n, 1 ≤ n → n < w → m.ram (word (cells.joinBase + n)) = labelWord (joins n)
   pinCells : ∀ i : Fin laneCount, m.ram (word (cells.pinBase + i.val)) = word (pin i).val
 
 theorem not_sw_below (cells : StageCells) (w rb : Nat) (layout : StageLayout cells w rb) {k : Nat}
@@ -501,7 +501,7 @@ theorem not_sw_below (cells : StageCells) (w rb : Nat) (layout : StageLayout cel
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have hw := Nat.two_pow_pos w
   intro h
   simp only [stageWrites, Writes.union, Writes.region, Writes.cell, Region.Holds] at h
@@ -510,12 +510,12 @@ theorem not_sw_below (cells : StageCells) (w rb : Nat) (layout : StageLayout cel
     exact absurd h (word_ne (by omega) (by omega) (by omega))
 
 theorem StageInputs.at {cells : StageCells} {w rb value : Nat} {remainder : Lanes rb}
-    {joins : Nat → Block} {pin : Lanes rb} {mStart m : Memory}
+    {joins : Nat → Label} {pin : Lanes rb} {mStart m : Memory}
     (inputs : StageInputs cells w rb value remainder joins pin mStart) (layout : StageLayout cells w rb)
     (frame : Frame (stageWrites cells w rb) stageClobbers mStart m) :
     StageInputs cells w rb value remainder joins pin m := by
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   refine ⟨?_, fun i => ?_, fun n h1 h2 => ?_, fun i => ?_⟩
   · rw [frame.ram _ (not_sw_below cells w rb layout c1)]; exact inputs.valueCell
   · rw [frame.ram _ (not_sw_below cells w rb layout (by have := i.isLt; omega))]
@@ -528,17 +528,17 @@ theorem StageInputs.at {cells : StageCells} {w rb value : Nat} {remainder : Lane
 
 /-- The bit label `b_n^E` of round `n`. -/
 def roundBitLabel {rb : Nat} (w : Nat) (sub : Lanes w) (pin : Lanes rb) (value n : Nat)
-    (state : StageState rb) : Block :=
+    (state : StageState rb) : Label :=
   laneBit (sub - reduceTo w (materialize (state.classSum n + scaleLanes (value % 2 ^ n)
     (pin - state.castSum n)))) n
 
 /-- The hot material `b_n^E ⊕ J_n ⊕ Y_n` of round `n`. -/
-def roundHotLabel {rb : Nat} (w : Nat) (sub : Lanes w) (pin : Lanes rb) (joins : Nat → Block)
-    (value n : Nat) (state : StageState rb) : Block :=
+def roundHotLabel {rb : Nat} (w : Nat) (sub : Lanes w) (pin : Lanes rb) (joins : Nat → Label)
+    (value n : Nat) (state : StageState rb) : Label :=
   roundBitLabel w sub pin value n state ^^^ joins n ^^^ state.levelSum n
 
 /-- The state after the deterministic part of round `n`: the kept child active, bit `n` known. -/
-def roundState {rb : Nat} (w : Nat) (sub : Lanes w) (pin : Lanes rb) (joins : Nat → Block)
+def roundState {rb : Nat} (w : Nat) (sub : Lanes w) (pin : Lanes rb) (joins : Nat → Label)
     (value n : Nat) (state : StageState rb) : StageState rb :=
   { state with
     active := if value.testBit n then roundHotLabel w sub pin joins value n state
@@ -549,7 +549,7 @@ def roundState {rb : Nat} (w : Nat) (sub : Lanes w) (pin : Lanes rb) (joins : Na
 known to the state with bit `n` known, the kept child active, and the other child's label at its
 node, its slot in `cells.slot`. -/
 theorem exec_roundPrefix (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
-    (remainder : Lanes rb) (joins : Nat → Block) (pin : Lanes rb) (layout : StageLayout cells w rb)
+    (remainder : Lanes rb) (joins : Nat → Label) (pin : Lanes rb) (layout : StageLayout cells w rb)
     (rbLe : rb ≤ 128) (wSmall : w ≤ 64) (n : Nat) (nPos : 1 ≤ n) (nLt : n < w)
     (valueLt : value < 2 ^ w) (mStart : Memory)
     (inputs : StageInputs cells w rb value remainder joins pin mStart) (state : StageState rb)
@@ -558,13 +558,13 @@ theorem exec_roundPrefix (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
       StageRel cells w rb value sub n (n + 1) mStart (roundState w sub pin joins value n state) m1 ∧
       m1.ram (word cells.slot) = word (roundSlot value n) ∧
       m1.ram (word (cells.nodeBase + roundSlot value n)) =
-        blockWord (if value.testBit n then state.active ^^^ roundHotLabel w sub pin joins value n state
+        labelWord (if value.testBit n then state.active ^^^ roundHotLabel w sub pin joins value n state
           else roundHotLabel w sub pin joins value n state) := by
   have c5 := layout.c5; have c6 := layout.c6; have c11 := layout.c11; have c12 := layout.c12
   have c13 := layout.c13; have c14 := layout.c14; have c15 := layout.c15; have c16 := layout.c16
   have c7 := layout.c7; have c8 := layout.c8; have c9 := layout.c9; have c10 := layout.c10
   have c1 := layout.c1; have c2 := layout.c2; have c3 := layout.c3; have c4 := layout.c4
-  have lc : laneCount = 128 := rfl
+  have lc : laneCount = 104 := rfl
   have powW : 2 ^ w ≤ 2 ^ 64 := Nat.pow_le_pow_right (by norm_num) wSmall
   have powN1 : 2 ^ (n + 1) ≤ 2 ^ w := Nat.pow_le_pow_right (by norm_num) nLt
   have slotLt := roundSlot_lt value n
@@ -612,11 +612,11 @@ theorem exec_roundPrefix (cells : StageCells) (w rb value : Nat) (sub : Lanes w)
         Function.update_of_ne (word_ne (by omega) (by omega) (by omega)),
         Function.update_of_ne (word_ne (by omega) (by omega) (by omega)), ram3, ram2, ram1,
         Function.update_self]
-      show _ = blockWord (if b = b then _ else _)
+      show _ = labelWord (if b = b then _ else _)
       rw [if_pos rfl]
       rfl
     · rw [hram _ (by omega) (by omega) (by omega) (by omega) (by omega)]
-      show _ = blockWord (if b = n then _ else _)
+      show _ = labelWord (if b = n then _ else _)
       rw [if_neg here]
       exact rel.bits b (by omega)
   · have ne : α ≠ roundSlot value n := fun same => αNe (by rw [same, roundSlot_low])

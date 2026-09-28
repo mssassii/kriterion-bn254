@@ -26,6 +26,7 @@ oracle operands `rInput`, `rFirst`, `rSecond`.
 -/
 
 import Construction.Simulator.CRT.Arith
+import Construction.CRT.Interface
 
 namespace Kriterion.CRT.SimMachine
 
