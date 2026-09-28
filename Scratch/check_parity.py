@@ -37,6 +37,6 @@ for width in range(1, 15):
             checks += 1
 
 assert 2 * 200 * LABEL_BITS // 8 == 5200
-assert 147828 - 5200 == 142628
+assert 146827 - 5200 == 141627
 print(f"Computed: {checks} parity/codec cases passed, including zero delta and stored width zero.")
-print("Computed: 400 omitted 104-bit planes save 5200 bytes; target 142628 bytes.")
+print("Computed: 400 omitted 104-bit planes save 5200 bytes; target 141627 bytes (one-byte exception entries).")
