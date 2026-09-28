@@ -431,7 +431,8 @@ theorem maskCase : OneCase (fun τ => tagFamily τ = 7) ((2 : ℝ≥0∞) ^ 128)
 theorem final_input (scalar : NonZeroScalar) (coins : Entry.Coins) (A : TagTable) (N : ℕ)
     (inside : N ∈ asked (H8.tagHash A) (garbleCM scalar coins)) (fam : tagFamily (N / 2 ^ 128) = 9) :
     ∃ (o : DigestSplit.FinalSite) (w : AffineInput), exceptional scalar coins o.val = some w ∧
-      N = hashInput (garblerKey (digestTable (H8.tagHash A) coordinateBitCount (zeroOf coins) (deltaOf coins)) w)
+      N = hashInput (garblerKey (digestTable (H8.tagHash A) coordinateBitCount (EntryCorrect.keyZero (H8.tagHash A) coins)
+        (deltaOf coins)) w)
         (digestFinalTag o.val) := by
   unfold garbleCM at inside
   simp only [asked_bind, asked_pure, List.append_nil, List.mem_append] at inside
@@ -618,7 +619,8 @@ theorem finalCase : OneCase (fun τ => tagFamily τ = 9) ((2 : ℝ≥0∞) ^ 128
         rw [selected]
         rfl
       show (tape.2 (keyPos0 (excOf scalar tape.1 o))).1 ^^^ F tape.1 tape.2 = g
-      have label : g = garblerKey (digestTable (H8.tagHash tape.2) coordinateBitCount (zeroOf tape.1) (deltaOf tape.1))
+      have label : g = garblerKey (digestTable (H8.tagHash tape.2) coordinateBitCount
+          (EntryCorrect.keyZero (H8.tagHash tape.2) tape.1) (deltaOf tape.1))
           (excOf scalar tape.1 o) := by
         rw [hg, same, label_of_hashInput, exc]
       rw [label, garblerKey_tagHash, key_split, BitVec.xor_comm]

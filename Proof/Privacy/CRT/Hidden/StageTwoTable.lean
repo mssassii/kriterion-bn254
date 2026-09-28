@@ -247,9 +247,16 @@ theorem coordY_tagged (coins : Entry.Coins) :
       (coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))) :=
   Paths.coordGarbleM_tagged Entry.table Entry.yCount 1 (Paths.bn254_ranges _ (by decide)) (by norm_num) _ _
 
-theorem digest_tagged (scalar : NonZeroScalar) (coins : Entry.Coins) :
+/-- The garbler's actual zero labels on a table (no chunk joins: the coins' zero labels XOR the absorbed chunk joins
+of the coordinate garblings on that table). -/
+def zeroOn (coins : Entry.Coins) (T : TagTable) : Fin 2 → Fin coordinateBitCount → Block :=
+  Entry.keyZeroOf coins (Entry.absorbedOf
+    ((coordGarbleM Entry.table Entry.xCount 0 (clip (coins.inputDelta .x)) (fun j => clip (atNat (coins.inputZero .x) 0 j))).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)))
+    ((coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))))
+
+theorem digest_tagged (scalar : NonZeroScalar) (coins : Entry.Coins) (zero : Fin 2 → Fin coordinateBitCount → Block) :
     Paths.Tagged (Paths.digestLabelKeys coordinateBitCount ∪ Paths.digestFinalKeys digitCount)
-      (digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
+      (digestGarbleM coordinateBitCount digitCount zero (Entry.deltaOf coins)
         (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)
         (fun o => ((Entry.outputKeysOf scalar coins).get o).offset.coordinates)
         (fun o => coins.exceptionPad.get o)) :=
@@ -265,7 +272,7 @@ theorem garbleCM_eval_keyFree (scalar : NonZeroScalar) (coins : Entry.Coins) (T 
   rw [(keyFree_congr (coordX_tagged coins) coordKeys_fam T T' agree).2,
     (keyFree_congr (coordY_tagged coins) coordKeys_fam T T' agree).2,
     maskValues_keyFree T T' agree _ _,
-    (keyFree_congr (digest_tagged scalar coins) digestKeys_fam T T' agree).2]
+    (keyFree_congr (digest_tagged scalar coins _) digestKeys_fam T T' agree).2]
 
 /-- The scheme's garbling is the garbler program's value. -/
 theorem scheme_garble [field : FieldCertificate] [group : GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar)
@@ -309,11 +316,11 @@ theorem gAsked_eq (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagTable) 
                 (maskAnswersM ((keyM coins.bridgeKey).eval (schemeHash (tableOracle (FI := Empty) (EI := Empty) T)))
                   digitCount) ++
               asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))
-                (digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
+                (digestGarbleM coordinateBitCount digitCount (zeroOn coins T) (Entry.deltaOf coins)
                   (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)
                   (fun o => ((Entry.outputKeysOf scalar coins).get o).offset.coordinates)
                   (fun o => coins.exceptionPad.get o))))) := by
-  unfold gAsked Entry.garbleCM
+  unfold gAsked Entry.garbleCM zeroOn
   rw [asked_bind]
   refine congrArg _ ?_
   rw [asked_bind]
@@ -363,6 +370,13 @@ theorem keyInput_fam (t : BaseField) : tagFamily (maskKeyInput t / 2 ^ 128) = 10
   rw [hashInput_div]
   exact maskKeyTag_family
 
+/-- The actual zero labels do not read the key's position. -/
+theorem zeroOn_keyFree (coins : Entry.Coins) (T T' : TagTable) (agree : ∀ q, q ≠ keyPos → T q = T' q) :
+    zeroOn coins T = zeroOn coins T' := by
+  unfold zeroOn
+  rw [(keyFree_congr (coordX_tagged coins) coordKeys_fam T T' agree).2,
+    (keyFree_congr (coordY_tagged coins) coordKeys_fam T T' agree).2]
+
 /-- **The stage-2 view off the curve does not read the key's position.** -/
 theorem stageTwoView_keyFree [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar)
     (u : AffineInput) (off : validate u = false) (coins : Entry.Coins) (T T' : TagTable)
@@ -388,8 +402,8 @@ theorem stageTwoView_keyFree [FieldCertificate] [GroupCertificate] (parameter : 
         (List.filter (fun n => designTag Entry.table (Entry.exceptional scalar coins) u (n / 2 ^ 128))
           (gAsked scalar (coins, T'))) := by
     rw [gAsked_eq, gAsked_eq, (keyFree_congr (coordX_tagged coins) coordKeys_fam T T' agree).1,
-      (keyFree_congr (coordY_tagged coins) coordKeys_fam T T' agree).1,
-      (keyFree_congr (digest_tagged scalar coins) digestKeys_fam T T' agree).1]
+      (keyFree_congr (coordY_tagged coins) coordKeys_fam T T' agree).1, zeroOn_keyFree coins T T' agree,
+      (keyFree_congr (digest_tagged scalar coins _) digestKeys_fam T T' agree).1]
     have maskGone : ∀ H K, (asked H (maskAnswersM K digitCount)).filter
         (fun n => designTag Entry.table (Entry.exceptional scalar coins) u (n / 2 ^ 128)) = [] := by
       intro H K
@@ -412,7 +426,7 @@ theorem stageTwoView_keyFree [FieldCertificate] [GroupCertificate] (parameter : 
         n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T'))
           (coordGarbleM Entry.table Entry.yCount 1 (clip (coins.inputDelta .y)) (fun j => clip (atNat (coins.inputZero .y) 0 j))) ∨
         n ∈ asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T'))
-          (digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
+          (digestGarbleM coordinateBitCount digitCount (zeroOn coins T') (Entry.deltaOf coins)
             (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)
             (fun o => ((Entry.outputKeysOf scalar coins).get o).offset.coordinates)
             (fun o => coins.exceptionPad.get o)) := by
@@ -436,7 +450,7 @@ theorem stageTwoView_keyFree [FieldCertificate] [GroupCertificate] (parameter : 
       rcases member with a | a | a
       · exact answer (coordX_tagged coins) coordKeys_fam a
       · exact answer (coordY_tagged coins) coordKeys_fam a
-      · exact answer (digest_tagged scalar coins) digestKeys_fam a
+      · exact answer (digest_tagged scalar coins _) digestKeys_fam a
     rw [same]
   dsimp only
   rw [hl]
@@ -511,7 +525,7 @@ theorem mask_of_fam7 (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagTabl
     rw [inKey, keyInput_fam] at fam
     exact absurd fam (by decide)
   · exact inMask
-  · obtain ⟨k, member, range, label, rfl⟩ := asked_of_tagged (digest_tagged scalar coins) _ _ inDigest
+  · obtain ⟨k, member, range, label, rfl⟩ := asked_of_tagged (digest_tagged scalar coins _) _ _ inDigest
     rw [hashInput_div, tagFamily_key range] at fam
     simp only [Paths.digestLabelKeys, Paths.digestFinalKeys, Set.mem_union, Set.mem_setOf_eq] at member
     omega
@@ -760,7 +774,7 @@ theorem gAsked_labelled (scalar : NonZeroScalar) (coins : Entry.Coins) (T : TagT
   · rw [asked_keyM, List.mem_singleton] at a
     exact ⟨_, _, maskKeyTag_lt, a⟩
   · exact tagged (mask_tagged _) a
-  · exact tagged (digest_tagged scalar coins) a
+  · exact tagged (digest_tagged scalar coins _) a
 
 /-- The garbler's key at `u` does not read the other bit's label at `u`. -/
 theorem key_otherFree (u : AffineInput) (κ : Fin 2) (i : Fin coordinateBitCount) (T T' : TagTable)
@@ -791,16 +805,17 @@ theorem final_filter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u
   rw [designed, key_otherFree u κ i T T' agree]
 
 /-- **The designed digest inputs do not read the other bit's label.** -/
-theorem digestFilter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2)
+theorem digestFilter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins)
+    (zero : Fin 2 → Fin coordinateBitCount → Block) (u : AffineInput) (κ : Fin 2)
     (i : Fin coordinateBitCount) (T T' : TagTable) (agree : ∀ q, q ≠ otherPos u κ i → T q = T' q) :
     (asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T))
-        (digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
+        (digestGarbleM coordinateBitCount digitCount zero (Entry.deltaOf coins)
           (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)
           (fun o => ((Entry.outputKeysOf scalar coins).get o).offset.coordinates)
           (fun o => coins.exceptionPad.get o))).filter
         (fun n => designTag Entry.table (Entry.exceptional scalar coins) u (n / 2 ^ 128)) =
       (asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) T'))
-        (digestGarbleM coordinateBitCount digitCount (Entry.zeroOf coins) (Entry.deltaOf coins)
+        (digestGarbleM coordinateBitCount digitCount zero (Entry.deltaOf coins)
           (fun o => ((Entry.outputKeysOf scalar coins).get o).digit)
           (fun o => ((Entry.outputKeysOf scalar coins).get o).offset.coordinates)
           (fun o => coins.exceptionPad.get o))).filter
@@ -834,6 +849,13 @@ theorem digestFilter_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u
         · rw [if_pos d1, if_pos d1, e1 d1]
         · rw [if_neg d1, if_neg d1]
 
+/-- The actual zero labels do not read the other bit's label (the coordinate garblings ask families 0 to 6). -/
+theorem zeroOn_otherFree (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2) (i : Fin coordinateBitCount)
+    (T T' : TagTable) (agree : ∀ q, q ≠ otherPos u κ i → T q = T' q) : zeroOn coins T = zeroOn coins T' := by
+  unfold zeroOn
+  rw [(posFree_congr (coordX_tagged coins) _ (avoid_of_fam coordKeys_fam8 u κ i) T T' agree).2,
+    (posFree_congr (coordY_tagged coins) _ (avoid_of_fam coordKeys_fam8 u κ i) T T' agree).2]
+
 /-- **The designed garbler inputs do not read the other bit's label.** -/
 theorem designedInputs_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) (u : AffineInput) (κ : Fin 2)
     (i : Fin coordinateBitCount) (T T' : TagTable) (agree : ∀ q, q ≠ otherPos u κ i → T q = T' q) :
@@ -848,7 +870,7 @@ theorem designedInputs_otherFree (scalar : NonZeroScalar) (coins : Entry.Coins) 
     asked_keyM, asked_keyM,
     List.filter_append, List.filter_append, List.filter_append, List.filter_append,
     List.filter_append, List.filter_append, List.filter_append, List.filter_append,
-    digestFilter_otherFree scalar coins u κ i T T' agree]
+    zeroOn_otherFree coins u κ i T T' agree, digestFilter_otherFree scalar coins _ u κ i T T' agree]
 
 /-- **The stage-2 view does not read the other bit's label.** -/
 theorem stageTwoView_otherFree [FieldCertificate] [GroupCertificate] (parameter : ℕ) (scalar : NonZeroScalar)

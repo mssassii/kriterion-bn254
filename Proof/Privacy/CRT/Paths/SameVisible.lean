@@ -104,7 +104,7 @@ variable (H : HashN) (scalar : NonZeroScalar) (coins : Kriterion.CRT.Entry.Coins
 
 /-- The conversion blocks of the reach are labelled and visible (they are cold). -/
 theorem conv_visible :
-    ∀ n ∈ asked H (Kriterion.CRT.Entry.replayConv (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor coins u)),
+    ∀ n ∈ asked H (Kriterion.CRT.Entry.replayConv (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor H coins u)),
       Labelled n ∧ H8.visTag Kriterion.CRT.Entry.table u (n / 2 ^ 128) = true := by
   intro n inside
   obtain ⟨cold, _⟩ := (Align.replayConv_aligned H scalar coins u).sound n inside
@@ -120,7 +120,7 @@ theorem conv_visible :
 
 /-- On the curve, the whole replay (conversion blocks, key, masks) is labelled and visible. -/
 theorem replay_visible (valid : validate u = true) :
-    ∀ n ∈ asked H (Kriterion.CRT.Entry.replay (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor coins u)),
+    ∀ n ∈ asked H (Kriterion.CRT.Entry.replay (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor H coins u)),
       Labelled n ∧ H8.visTag Kriterion.CRT.Entry.table u (n / 2 ^ 128) = true := by
   intro n inside
   unfold Kriterion.CRT.Entry.replay at inside
@@ -132,7 +132,7 @@ theorem replay_visible (valid : validate u = true) :
     refine ⟨⟨keyKey, keyKey_range, _, rfl⟩, ?_⟩
     have fam : tagFamily (maskKeyInput (Kriterion.CRT.Entry.curveOutput (EntryCorrect.pubOf H scalar coins) u
         ((Kriterion.CRT.Entry.replayConv (EntryCorrect.pubOf H scalar coins) u
-          (EntryCorrect.labelsFor coins u)).eval H)) / 2 ^ 128) = 10 := by
+          (EntryCorrect.labelsFor H coins u)).eval H)) / 2 ^ 128) = 10 := by
       unfold maskKeyInput
       rw [hashInput_div]
       exact Align.maskKeyTag_family
@@ -174,12 +174,12 @@ variable (H Hv : HashN) (scalar : NonZeroScalar) (coins : Kriterion.CRT.Entry.Co
 
 include agree in
 theorem asked_digestEvalM_invariant (entries : Fin digitCount → Exception.Entry) :
-    asked Hv (digestEvalM coordinateBitCount digitCount (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor coins u))
+    asked Hv (digestEvalM coordinateBitCount digitCount (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor H coins u))
         u entries) =
-      asked H (digestEvalM coordinateBitCount digitCount (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor coins u))
+      asked H (digestEvalM coordinateBitCount digitCount (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor H coins u))
         u entries) := by
   have same := asked_congr H Hv (digestKeyM coordinateBitCount
-    (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor coins u)) u) fun n inside => by
+    (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor H coins u)) u) fun n inside => by
       obtain ⟨labelled, vis⟩ := digestKey_visible H u _ n inside
       exact (agree n labelled vis).symm
   rw [asked_digestEvalM, asked_digestEvalM, same.1, ← eval_digestKeyM Hv, ← eval_digestKeyM H, same.2]
@@ -187,8 +187,8 @@ theorem asked_digestEvalM_invariant (entries : Fin digitCount → Exception.Entr
 include agree in
 /-- **The reach asks the same inputs on the view's hash.** -/
 theorem asked_reachDecodedCM_invariant [FieldCertificate] [GroupCertificate] :
-    asked Hv (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor coins u)) =
-      asked H (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor coins u)) := by
+    asked Hv (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor H coins u)) =
+      asked H (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor H coins u)) := by
   unfold reachDecodedCM
   simp only [asked_bind, asked_pure, List.append_nil]
   by_cases valid : validate u = true
@@ -196,7 +196,7 @@ theorem asked_reachDecodedCM_invariant [FieldCertificate] [GroupCertificate] :
     unfold Kriterion.CRT.Entry.reachCM
     simp only [asked_bind, asked_pure, List.append_nil]
     have replaySame := (asked_congr H Hv (Kriterion.CRT.Entry.replay (EntryCorrect.pubOf H scalar coins) u
-      (EntryCorrect.labelsFor coins u)) fun n inside => by
+      (EntryCorrect.labelsFor H coins u)) fun n inside => by
         obtain ⟨labelled, vis⟩ := replay_visible H scalar coins u valid n inside
         exact (agree n labelled vis).symm).1
     rw [replaySame, asked_digestEvalM_invariant H Hv coins u agree]
@@ -204,7 +204,7 @@ theorem asked_reachDecodedCM_invariant [FieldCertificate] [GroupCertificate] :
     unfold EntryReading.reachOffCM
     simp only [asked_bind, asked_pure, List.append_nil]
     have convSame := (asked_congr H Hv (Kriterion.CRT.Entry.replayConv (EntryCorrect.pubOf H scalar coins) u
-      (EntryCorrect.labelsFor coins u)) fun n inside => by
+      (EntryCorrect.labelsFor H coins u)) fun n inside => by
         obtain ⟨labelled, vis⟩ := conv_visible H scalar coins u n inside
         exact (agree n labelled vis).symm).1
     rw [convSame, asked_digestEvalM_invariant H Hv coins u agree]
@@ -221,7 +221,7 @@ variable (H : HashN) (scalar : NonZeroScalar) (coins : Kriterion.CRT.Entry.Coins
 theorem garbler_to_reach [FieldCertificate] [GroupCertificate] :
     ∀ n ∈ asked H (Kriterion.CRT.Entry.garbleCM scalar coins),
       H8.visTag Kriterion.CRT.Entry.table u (n / 2 ^ 128) = true →
-      n ∈ asked H (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor coins u)) := by
+      n ∈ asked H (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor H coins u)) := by
   intro n inside vis
   obtain ⟨k, member, range, label, same⟩ := asked_of_tagged (garbleCM_tagged scalar coins) H n inside
   have small : tagFamily (n / 2 ^ 128) ≤ 10 := by
@@ -256,24 +256,26 @@ theorem garbler_of_mem {n : ℕ}
           (fun j => clip (atNat (coins.inputZero .y) 0 j))) ∨
       n ∈ asked H (keyM coins.bridgeKey) ∨
       n ∈ asked H (maskAnswersM ((keyM coins.bridgeKey).eval H) digitCount) ∨
-      n ∈ asked H (digestTableM coordinateBitCount (Kriterion.CRT.Entry.zeroOf coins)
+      n ∈ asked H (digestTableM coordinateBitCount (EntryCorrect.keyZero H coins)
           (Kriterion.CRT.Entry.deltaOf coins))) :
     n ∈ asked H (Kriterion.CRT.Entry.garbleCM scalar coins) := by
+  -- the garbler's digest table is at its actual zero labels `keyZero H coins` (the chunk joins absorbed)
+  unfold EntryCorrect.keyZero EntryCorrect.gxOf EntryCorrect.gyOf at h
   unfold Kriterion.CRT.Entry.garbleCM digestGarbleM
   simp only [asked_bind, asked_pure, List.append_nil, List.mem_append]
   rcases h with h | h | h | h | h <;> simp only [h, true_or, or_true]
 
 /-- A digest label the reach asks at `u`'s bit is one of the garbler's digest table inputs. -/
 theorem label_in_table (c : Fin 2) (p : Fin coordinateBitCount) :
-    hashInput (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor coins u) c p)
+    hashInput (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor H coins u) c p)
         (digestLabelTag c.val p.val (coordBit u c p.val)) ∈
-      asked H (digestTableM coordinateBitCount (Kriterion.CRT.Entry.zeroOf coins)
+      asked H (digestTableM coordinateBitCount (EntryCorrect.keyZero H coins)
         (Kriterion.CRT.Entry.deltaOf coins)) := by
   rw [asked_digestTableM]
   simp only [List.mem_flatMap, List.mem_finRange, true_and, List.mem_cons, List.mem_singleton,
     List.not_mem_nil, or_false]
   refine ⟨c, p, ?_⟩
-  rw [EntryCorrect.labelsOf_honest coins u c p]
+  rw [EntryCorrect.labelsOf_honest H coins u c p]
   have bit := coordBit_lt u c p.val
   rcases (show coordBit u c p.val = 0 ∨ coordBit u c p.val = 1 by omega) with zero | one
   · left
@@ -286,7 +288,7 @@ theorem label_in_table (c : Fin 2) (p : Fin coordinateBitCount) :
 /-- The reach's conversion blocks are garbler inputs. -/
 theorem conv_to_garbler {n : ℕ}
     (inConv : n ∈ asked H (Kriterion.CRT.Entry.replayConv (EntryCorrect.pubOf H scalar coins) u
-      (EntryCorrect.labelsFor coins u))) :
+      (EntryCorrect.labelsFor H coins u))) :
     n ∈ asked H (Kriterion.CRT.Entry.garbleCM scalar coins) := by
   refine garbler_of_mem H scalar coins ?_
   rcases List.mem_append.mp ((Align.replayConv_aligned H scalar coins u).sound n inConv).2 with inX | inY
@@ -297,7 +299,7 @@ theorem conv_to_garbler {n : ℕ}
 theorem digest_to_garbler {n : ℕ} (entries : Fin digitCount → Exception.Entry)
     (vis : H8.visTag Kriterion.CRT.Entry.table u (n / 2 ^ 128) = true)
     (inDigest : n ∈ asked H (digestEvalM coordinateBitCount digitCount
-      (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor coins u)) u entries)) :
+      (Kriterion.CRT.Entry.labelsOf (EntryCorrect.labelsFor H coins u)) u entries)) :
     n ∈ asked H (Kriterion.CRT.Entry.garbleCM scalar coins) := by
   rw [asked_digestEvalM, List.mem_append] at inDigest
   rcases inDigest with inLabels | inFinals
@@ -319,7 +321,7 @@ theorem digest_to_garbler {n : ℕ} (entries : Fin digitCount → Exception.Entr
 
 /-- **A reach input at a visible tag is the garbler's.** -/
 theorem reach_to_garbler [FieldCertificate] [GroupCertificate] :
-    ∀ n ∈ asked H (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor coins u)),
+    ∀ n ∈ asked H (reachDecodedCM (EntryCorrect.pubOf H scalar coins) u (EntryCorrect.labelsFor H coins u)),
       H8.visTag Kriterion.CRT.Entry.table u (n / 2 ^ 128) = true →
       n ∈ asked H (Kriterion.CRT.Entry.garbleCM scalar coins) := by
   intro n inside vis
@@ -367,7 +369,7 @@ theorem SameVisible.assemble [FieldCertificate] [GroupCertificate] (scalar : Non
         entryVisible Kriterion.CRT.Entry.table u entry = true) ↔
       entry ∈ ((asked (schemeHash (tableOracle (FI := Empty) (EI := Empty) X))
           (reachDecodedCM (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) scalar
-            coins) u (EntryCorrect.labelsFor coins u))).map
+            coins) u (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u))).map
           (fun n : ℕ => (⟨.hash (n : BaseField), (tableOracle (FI := Empty) (EI := Empty) X).2.2 (n : BaseField)⟩ :
             Privacy.Entry Empty Empty))).filter p := by
   have answerSame : ∀ n, Labelled n → H8.visTag Kriterion.CRT.Entry.table u (n / 2 ^ 128) = true →
@@ -416,20 +418,21 @@ theorem crtEntry_sameVisible :
   obtain ⟨coins, table⟩ := tape
   have hgarble : (@Kriterion.CRT.Entry.scheme field group).garble parameter scalar (coins, tableOracle table) =
       (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) scalar coins,
-        coins.inputMacKey) := by
+        EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins) := by
     refine (entry_garble_eval field group parameter scalar coins (tableOracle table)).trans ?_
     unfold Kriterion.CRT.Entry.garbleProgram
     rw [FreeQuery.eval_toProgram]
     unfold Kriterion.CRT.Entry.garbleM
     rw [eval_liftHash]
     exact EntryCorrect.garbleCM_eval _ scalar coins
-  have hencode : (@Kriterion.CRT.Entry.scheme field group).encode coins.inputMacKey u =
-      EntryCorrect.labelsFor coins u := by
+  have hencode : (@Kriterion.CRT.Entry.scheme field group).encode
+      (EntryCorrect.keyOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins) u =
+      EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u := by
     unfold Kriterion.CRT.Entry.scheme EntryCorrect.labelsFor
     rfl
   have hview : H8.realView Instance.crtEntry Kriterion.CRT.Entry.table parameter scalar u (coins, table) =
       (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) scalar coins,
-        EntryCorrect.labelsFor coins u, fun tag => table tag.1) := by
+        EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u, fun tag => table tag.1) := by
     unfold H8.realView H8.realGarbled
     dsimp only [Instance.crtEntry]
     rw [hgarble]
@@ -444,7 +447,7 @@ theorem crtEntry_sameVisible :
   unfold Kriterion.CRT.Entry.garbleProgram Kriterion.CRT.Entry.garbleM EntryReading.reachProgram
   rw [transcriptG, Align.ftranscript_liftHash, Align.transcript_toProgram _
     (EntryReading.reachDecodedM (EntryCorrect.pubOf (schemeHash (tableOracle (FI := Empty) (EI := Empty) table))
-      scalar coins) u (EntryCorrect.labelsFor coins u)) Kriterion.CRT.Entry.evaluateBudget
+      scalar coins) u (EntryCorrect.labelsFor (schemeHash (tableOracle (FI := Empty) (EI := Empty) table)) coins u)) Kriterion.CRT.Entry.evaluateBudget
     (EntryReading.bounded_reachDecodedM _ u _), reachDecodedM_eq, Align.ftranscript_liftHash]
   refine assemble scalar coins u table _ ?_ _ ?_ entry
   · intro tag vis
