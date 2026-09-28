@@ -262,7 +262,9 @@ theorem corrected_none [FieldCertificate] (offset : AffineInput) (K : Biquadrati
     rw [Coordinates.evaluateScaleNone]
     ring
   rw [ex, ey, ez]
-  congr 1 <;> ring
+  generalize rhoOf (unscaledRows offset none) K = rho
+  generalize tauOf (kappaOf (unscaledRows offset none) K) = tau
+  rw [mul_one, show tau ^ 2 * (offset.y * input.x ^ 2) = input.x ^ 2 * (tau ^ 2 * offset.y) by ring]
 
 /-! ### The decoder does not see a square factor of the sign row -/
 
