@@ -119,8 +119,23 @@ theorem totalCost_le (b : Blocks) (within : b.Within (2 ^ 55)) : totalCost b ≤
 
 /-! ### The blocks the machine already has -/
 
-theorem size_solveDigit (d : Nat) : (Solve.solveDigit d).size = 66 := rfl
-theorem cost_solveDigit (d : Nat) : (Solve.solveDigit d).cost = 66 := rfl
+theorem size_solvePrefix : Solve.solvePrefix.size = 5 := rfl
+theorem cost_solvePrefix : Solve.solvePrefix.cost = 5 := rfl
+theorem size_rowX (d : Nat) : (Solve.rowX d).size = 23 := rfl
+theorem cost_rowX (d : Nat) : (Solve.rowX d).cost = 23 := rfl
+theorem size_rowY (d : Nat) : (Solve.rowY d).size = 29 := rfl
+theorem cost_rowY (d : Nat) : (Solve.rowY d).cost = 29 := rfl
+theorem size_rowZ (d : Nat) : (Solve.rowZ d).size = 9 := rfl
+theorem cost_rowZ (d : Nat) : (Solve.rowZ d).cost = 9 := rfl
+
+/-- One digit of the solve (row by row: a single `rfl` on the whole digit makes `whnf` time out). -/
+theorem size_solveDigit (d : Nat) : (Solve.solveDigit d).size = 66 := by
+  simp only [Solve.solveDigit, Prog.seqList, Prog.size_seq, size_solvePrefix, size_rowX, size_rowY, size_rowZ,
+    Prog.size]
+
+theorem cost_solveDigit (d : Nat) : (Solve.solveDigit d).cost = 66 := by
+  simp only [Solve.solveDigit, Prog.seqList, Prog.cost_seq, cost_solvePrefix, cost_rowX, cost_rowY, cost_rowZ,
+    Prog.cost]
 
 theorem size_solve : Solve.solve.size = 91 * 66 := Prog.size_rep _ _ _ fun _ _ => size_solveDigit _
 theorem cost_solve : Solve.solve.cost = 91 * 66 := Prog.cost_rep _ _ _ fun _ _ => cost_solveDigit _

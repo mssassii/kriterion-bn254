@@ -129,6 +129,7 @@ theorem signed_eq (sign : Bool) (w : BaseField) :
   · simp only [Rows.flagValue, Rows.signed, if_true]
     ring
 
+set_option maxHeartbeats 1000000 in
 /-- **`RAM[out] = v − ((−1)^ν w − acc) · z⁻¹`**, `z` in `rC`, `ν` in `RAM[sign]`. -/
 theorem exec_finishMaskSigned (sign row dec out : Nat) (memory : Memory) (acc w v z : BaseField) (ν : Bool)
     (signCell : memory.ram (word sign) = fieldWord (Rows.flagValue ν))

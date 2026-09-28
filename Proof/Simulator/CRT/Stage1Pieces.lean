@@ -74,7 +74,7 @@ theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds r
           lsbs 256 (Entry.publish source).rows[digit.val].xC0.val ++
             lsbs 8 (CrtWire.flagsOf (Entry.publish source).rows[digit.val])).flatten := by
   unfold pieceListBits rowPieces
-  rw [List.map_flatten, List.flatten_flatten, List.map_map, map_range_eq_ofFn]
+  rw [List.map_flatten, List.flatten_flatten, List.map_map, map_range_eq_ofFn, List.map_ofFn]
   refine congrArg List.flatten (congrArg List.ofFn (funext fun digit => ?_))
   have digitSmall : digit.val < 91 := digit.isLt
   simp only [Function.comp_apply, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil,
