@@ -19,10 +19,9 @@ noncomputable section
 
 variable [FieldCertificate] [GroupCertificate]
 
-/-- The scheme's coins other than the layer: the clamped offsets, `(ρ, τ)`, the exception pad and the input labels. -/
+/-- The scheme's coins other than the layer: the clamped offsets, the exception pad and the input labels. -/
 abbrev Rest := {o : FieldMacToECMac.SuccessfulOffsets // ∀ [FieldCertificate] [GroupCertificate], o.IsClamped} ×
-  (Fin 91 → NonZeroBase × NonZeroBase) × FieldMacToECMac.ExceptionPad ×
-  (PlanB.Coord → Fin coordinateBitCount → Block) × (PlanB.Coord → Block)
+  FieldMacToECMac.ExceptionPad × (PlanB.Coord → Fin coordinateBitCount → Block) × (PlanB.Coord → Block)
 
 /-- The row randomness of one digit from its `(ρ, τ)`, its `r4` and its seven unused randomizers. -/
 def rowOf (scales : NonZeroBase × NonZeroBase) (r4 : BaseField) (unused : Fin 7 → BaseField) :
@@ -47,30 +46,29 @@ theorem rowOf_parts (row : FieldMacToECMac.RowRandomness) :
 
 /-- The rest and the layer of the scheme's coins. -/
 def splitFun (c : Kriterion.ArgoMAC.Scheme.Coins) : Rest × Layer :=
-  ((⟨c.offsets, c.offsetsClamped⟩, fun d => ((c.pointRandomness.get d).rho, (c.pointRandomness.get d).tau),
-      c.exceptionPad, c.inputZero, c.inputDelta),
-    layerOf c)
+  ((⟨c.offsets, c.offsetsClamped⟩, c.exceptionPad, c.inputZero, c.inputDelta), layerOf c)
 
 /-- The scheme's coins from the rest and the layer. -/
 def joinFun (x : Rest × Layer) : Kriterion.ArgoMAC.Scheme.Coins where
   offsets := x.1.1.1
   offsetsClamped := x.1.1.2
-  pointRandomness := Vector.ofFn fun d => rowOf (x.1.2.1 d) (x.2.1 d) (x.2.2.1 d)
-  exceptionPad := x.1.2.2.1
-  bridgeKey := x.2.2.2.1
-  curveMask := ⟨x.2.2.2.2.1.1, x.2.2.2.2.1.2⟩
-  curveR1 := x.2.2.2.2.2.1
-  curveR2 := x.2.2.2.2.2.2
-  inputZero := x.1.2.2.2.1
-  inputDelta := x.1.2.2.2.2
+  pointRandomness := Vector.ofFn fun d => rowOf (x.2.1 d) (x.2.2.1 d) (x.2.2.2.1 d)
+  exceptionPad := x.1.2.1
+  bridgeKey := x.2.2.2.2.1
+  curveMask := ⟨x.2.2.2.2.2.1.1, x.2.2.2.2.2.1.2⟩
+  curveR1 := x.2.2.2.2.2.2.1
+  curveR2 := x.2.2.2.2.2.2.2
+  inputZero := x.1.2.2.1
+  inputDelta := x.1.2.2.2
 
 theorem joinFun_row (x : Rest × Layer) (d : Fin 91) :
-    (joinFun x).pointRandomness.get d = rowOf (x.1.2.1 d) (x.2.1 d) (x.2.2.1 d) := by
+    (joinFun x).pointRandomness.get d = rowOf (x.2.1 d) (x.2.2.1 d) (x.2.2.2.1 d) := by
   unfold joinFun
   erw [Vector.get_ofFn]
 
 theorem layerOf_eq (c : Kriterion.ArgoMAC.Scheme.Coins) :
-    layerOf c = (fun d => (c.pointRandomness.get d).y.r4, fun d => unusedOf (c.pointRandomness.get d),
+    layerOf c = (fun d => ((c.pointRandomness.get d).rho, (c.pointRandomness.get d).tau),
+      fun d => (c.pointRandomness.get d).y.r4, fun d => unusedOf (c.pointRandomness.get d),
       (c.bridgeKey, ⟨c.curveMask.value, c.curveMask.nonzero⟩, c.curveR1, c.curveR2)) := rfl
 
 theorem join_split (c : Kriterion.ArgoMAC.Scheme.Coins) : joinFun (splitFun c) = c := by
@@ -86,8 +84,8 @@ theorem join_split (c : Kriterion.ArgoMAC.Scheme.Coins) : joinFun (splitFun c) =
   rw [rows]
 
 theorem split_join (x : Rest × Layer) : splitFun (joinFun x) = x := by
-  obtain ⟨⟨⟨offsets, clamped⟩, rho, pad, zero, delta⟩, r4, unused, bridge, ⟨mask, nonzero⟩, r1, r2⟩ := x
-  have row := joinFun_row (((⟨offsets, clamped⟩, rho, pad, zero, delta), r4, unused, bridge, ⟨mask, nonzero⟩, r1, r2))
+  obtain ⟨⟨⟨offsets, clamped⟩, pad, zero, delta⟩, rho, r4, unused, bridge, ⟨mask, nonzero⟩, r1, r2⟩ := x
+  have row := joinFun_row (((⟨offsets, clamped⟩, pad, zero, delta), rho, r4, unused, bridge, ⟨mask, nonzero⟩, r1, r2))
   dsimp only at row
   unfold splitFun
   rw [layerOf_eq]
@@ -104,9 +102,9 @@ theorem layerOf_symm (x : Rest × Layer) : layerOf (splitEquiv.symm x) = x.2 :=
 theorem symm_apply (x : Rest × Layer) : splitEquiv.symm x = joinFun x := rfl
 
 theorem ctxPart_splitFun (c : Kriterion.ArgoMAC.Scheme.Coins) :
-    ctxPart c = ((splitFun c).1.1.1, (splitFun c).1.2.1) := rfl
+    ctxPart c = (splitFun c).1.1.1 := rfl
 
-theorem ctxPart_symm (x : Rest × Layer) : ctxPart (splitEquiv.symm x) = (x.1.1.1, x.1.2.1) := by
+theorem ctxPart_symm (x : Rest × Layer) : ctxPart (splitEquiv.symm x) = x.1.1.1 := by
   rw [symm_apply, ctxPart_splitFun, split_join]
 
 /-- **The layer is uniform and independent of the context part.** -/
