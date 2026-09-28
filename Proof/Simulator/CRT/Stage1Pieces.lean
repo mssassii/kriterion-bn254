@@ -68,6 +68,20 @@ theorem flagsOf_publish (source : Source) (d : Fin digitCount) :
   simp only [Entry.publish, Vector.getElem_ofFn, Entry.Source.normRow, CrtWire.flagsOf, NormRow.flagByte]
   cases source.signs d <;> rfl
 
+theorem fieldOf_xC0 (source : Source) (d : Fin digitCount) :
+    fieldOf source (3 + 3 * d.val) = (source.rows d).xC0 := by
+  have dSmall : d.val < 91 := d.isLt
+  show fieldOf source (3 + 3 * d.val) = CrtWire.rowField (source.rows d) 0
+  unfold fieldOf
+  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), dif_pos (by omega)]
+  congr 2
+  · exact Fin.ext (by simp only; omega)
+  · omega
+
+theorem publish_xC0 (source : Source) (d : Fin digitCount) :
+    (Entry.publish source).rows[d.val].xC0 = (source.rows d).xC0 := by
+  simp only [Entry.publish, Vector.getElem_ofFn, Entry.Source.normRow]
+
 theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
     pieceListBits ram rowPieces =
       (List.ofFn fun digit : Fin digitCount =>
@@ -82,13 +96,7 @@ theorem rows_bits (ram : Word → Word) (source : Source) (holds : SourceHolds r
   rw [holds.fields (3 + 3 * digit.val) (by unfold fieldCount curveCellCount rowCellCount; omega), fieldWord,
     bitRun_ofNat _ _ le_rfl, holds.signs digit, bitRun_ofNat _ _ (by norm_num)]
   refine congrArg₂ (· ++ ·) (congrArg (lsbs 256) ?_) (congrArg (lsbs 8) (flagsOf_publish source digit).symm)
-  congr 1
-  unfold fieldOf
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), dif_pos (by omega)]
-  simp only [Entry.publish, Vector.getElem_ofFn, Entry.Source.normRow]
-  rw [show 3 + 3 * digit.val - 3 = 3 * digit.val by omega, show 3 * digit.val / 3 = digit.val by omega,
-    show 3 * digit.val % 3 = 0 by omega]
-  rfl
+  rw [fieldOf_xC0 source digit, publish_xC0 source digit]
 
 theorem bytes_bits (ram : Word → Word) (source : Source) (holds : SourceHolds ram source) :
     pieceListBits ram ((List.range exceptionCellCount).map fun index => Piece.word (exceptionBase + index) 4) =
