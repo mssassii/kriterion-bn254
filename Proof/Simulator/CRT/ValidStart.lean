@@ -312,7 +312,8 @@ theorem validStart_of_prefix (memory middle : Memory) (retained : Retained memor
     generalize CrtSource.extract memory.ram = src
     rw [gammaOf_publish src d, fieldOf_row src d 0 (by decide)]
     exact ⟨rfl, rfl⟩
-  · rw [gammaOf_publish]
+  · generalize CrtSource.extract memory.ram = src
+    rw [gammaOf_publish src d]
     exact ⟨rfl, rfl⟩
 
 end Start
