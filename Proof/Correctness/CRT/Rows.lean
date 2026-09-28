@@ -159,10 +159,11 @@ theorem evaluateNormRow_encoded [FieldCertificate] (rows : Coordinates.Rows) (K 
     rw [show (normRows rows K).z.y = 0 from h5, show (normRows rows K).z.xy = 0 from h6,
       show (normRows rows K).z.xSquared = 0 from h7, show (normRows rows K).z.ySquared = 0 from h8]
     ring
-  have hx : (garbleNormRow rows K).xC0 = (Biquadratic.garbleX (normRows rows K).x.constant K).c0 := rfl
-  have hs : (garbleNormRow rows K).sFlag = zeroFlag (K (.inl .rowY_cubic)) := rfl
-  have hz : (garbleNormRow rows K).zFlag = zeroFlag (K (.inl .rowZ_x9)) := rfl
-  have hn : (garbleNormRow rows K).sign = signBit (kappaOf rows K) := rfl
+  have hx : (garbleNormRow rows K).xC0 = (Biquadratic.garbleX (normRows rows K).x.constant K).c0 := by
+    simp only [garbleNormRow]
+  have hs : (garbleNormRow rows K).sFlag = zeroFlag (K (.inl .rowY_cubic)) := by simp only [garbleNormRow]
+  have hz : (garbleNormRow rows K).zFlag = zeroFlag (K (.inl .rowZ_x9)) := by simp only [garbleNormRow]
+  have hn : (garbleNormRow rows K).sign = signBit (kappaOf rows K) := by simp only [garbleNormRow]
   unfold evaluateNormRow
   rw [hx, hs, hz, hn]
   rw [xRow, yRow, zRow]
@@ -249,11 +250,17 @@ theorem corrected_none [FieldCertificate] (offset : AffineInput) (K : Biquadrati
           (tauOf (kappaOf (unscaledRows offset none) K))) input).z } := by
   rw [corrected_eq _ _ _ sNe, FieldMacToECMac.evaluateRowsNone]
   have ex : Coordinates.evaluate (unscaledRows offset none).x input = offset.x := by
-    simp [unscaledRows, Coordinates.evaluateScaleNone]
+    show Coordinates.evaluate (Coordinates.scale none 1 2 offset.x (Coordinates.xCoefficients offset)) input = _
+    rw [Coordinates.evaluateScaleNone]
+    ring
   have ey : Coordinates.evaluate (unscaledRows offset none).y input = offset.y * input.x ^ 2 := by
-    simp [unscaledRows, zeroSign, Coordinates.evaluate]
+    show Coordinates.evaluate (zeroSign offset) input = _
+    unfold Coordinates.evaluate zeroSign
+    ring
   have ez : Coordinates.evaluate (unscaledRows offset none).z input = 1 := by
-    simp [unscaledRows, Coordinates.evaluateScaleNone]
+    show Coordinates.evaluate (Coordinates.scale none 1 1 1 (Coordinates.zCoefficients offset)) input = _
+    rw [Coordinates.evaluateScaleNone]
+    ring
   rw [ex, ey, ez]
   congr 1 <;> ring
 
@@ -287,5 +294,4 @@ theorem decodeHomogeneous_scale_y [FieldCertificate] [GroupCertificate] (value :
     · simp only [yZero, mul_zero, if_true]
     · rw [if_neg (fun zero => yZero (zeroIff.mp zero)), if_neg yZero, fieldPower_character_mul_sq _ _ ne]
 
-end Kriterion.CRT.Rows
 end Kriterion.CRT.Rows
