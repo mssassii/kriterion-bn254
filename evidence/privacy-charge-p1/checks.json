@@ -1,0 +1,35 @@
+{
+  "base": "32f1fb34884ca33a84ac9dd4db687ca30187aeed",
+  "experiment": "P1 numerator refinement at 104 bits; byte-neutral",
+  "started_utc": "2026-09-28 13:30:36",
+  "all_checks_observed_complete_utc": "2026-09-28 13:34:38",
+  "build": {
+    "command": "env LEAN_NUM_THREADS=6 lake build",
+    "exit_code": 0,
+    "jobs": 3844,
+    "attempts": 1
+  },
+  "audit": {
+    "command": "env LEAN_NUM_THREADS=3 lake env lean Scratch/P1Audit.lean",
+    "exit_code": 0
+  },
+  "proof_audit": {
+    "command": "env LEAN_NUM_THREADS=3 lake env lean Scratch/ProofAudit.lean",
+    "exit_code": 0,
+    "declarations": 23742,
+    "axioms": [
+      "Quot.sound",
+      "Classical.choice",
+      "propext"
+    ]
+  },
+  "metrics": {
+    "ciphertext_bytes": 128276,
+    "garble_queries": 1061622,
+    "evaluate_queries": 1054788
+  },
+  "source_manifest_sha256": "8ac97107f82c0ee1f3860b68c5c6c06247a1eb3121e9559338c32557202aeafc",
+  "source_files": 448,
+  "repairs": 0,
+  "published": false
+}

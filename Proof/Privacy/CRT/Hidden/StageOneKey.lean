@@ -89,7 +89,7 @@ def keyEps : ℝ≥0∞ := ENNReal.ofReal (2 / 2 ^ 128 + 1 / ((BN254.baseFieldMo
 theorem keyEps_le : keyEps ≤ ENNReal.ofReal crtHiddenCharge := by
   refine ENNReal.ofReal_le_ofReal ?_
   rw [crtHiddenCharge_eq]
-  have two : (2 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ labelBits := by norm_num [labelBits]
+  have two : (2 : ℝ) / 2 ^ 128 ≤ 1 / 2 ^ labelBits := by norm_num [labelBits]
   linarith
 
 /-! ### P2. The pad positions and what reads them -/

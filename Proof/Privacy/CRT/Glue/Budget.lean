@@ -5,7 +5,7 @@
 |---|---|---|
 | `G0 → G0T` | `tCollisionError = 1,759,967 / p` (`t` equal to a labelled garbler input) | `2^-232.85` |
 | `G0T → G0U` | `padSwapError`: the pad-reading biases `Σ_κ Σ_{m odd} m · m^S / 2^(256 q)` and `637 δ₃` | `2^-113.5` |
-| `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (4/2^104 + 1/(p − 1))` | linear |
+| `G0U → G1U` | `hiddenPointError (q₁ + q₂) = (q₁ + q₂) (1/2^104 + 1/(p − 1))` | linear |
 | `G0U → G1U` | `hiddenWindowError = smudgeError` (the curve encodings' wrap window) | `2^-100.65` |
 | `G1U → HW` | `stageOneTouchError q₁ + smudgeError + exceptionalError + coincidenceError + padSwapError` | linear + `2^-100.65` + ... |
 | `HW → H` | `outputKernelError = 455/(r − 1)` | `2^-244.8` |
@@ -97,18 +97,18 @@ the wrap window, where its hint could pin the curve mask; charged once, outside 
 smudge term (five encodings against its 642-encoding union bound). -/
 def hiddenWindowError : ℝ := smudgeError
 
-/-- The per-query charge of the hidden hop, `4/2^104 + 1/(p − 1)`. -/
-def crtHiddenCharge : ℝ := frac (4 * (BudgetData.p - 1) + 2 ^ 104) (2 ^ 104 * (BudgetData.p - 1))
+/-- The per-query charge of the hidden hop, `1/2^104 + 1/(p − 1)`. -/
+def crtHiddenCharge : ℝ := frac (1 * (BudgetData.p - 1) + 2 ^ 104) (2 ^ 104 * (BudgetData.p - 1))
 
-/-- `G0U → G1U`: `q · (4/2^104 + 1/(p − 1))`. -/
+/-- `G0U → G1U`: `q · (1/2^104 + 1/(p − 1))`. -/
 def hiddenPointError (queries : ℕ) : ℝ := (queries : ℝ) * crtHiddenCharge
 
 /-- The per-query charge of a stage-1 touch of a designed-visible garbler point: the hidden hop's charge
-`4/2^104 + 1/(p − 1)` (`M'`'s touch is bounded through the core by the real touch of a garbler
+`1/2^104 + 1/(p − 1)` (`M'`'s touch is bounded through the core by the real touch of a garbler
 entry, `CrtStageOneGuess E crtHiddenCharge`). -/
 def stageOneTouchCharge : ℝ := crtHiddenCharge
 
-/-- The stage-1 touch flag of `G1U → HW`: `q₁ · (4/2^104 + 1/(p − 1))`. -/
+/-- The stage-1 touch flag of `G1U → HW`: `q₁ · (1/2^104 + 1/(p − 1))`. -/
 def stageOneTouchError (first : ℕ) : ℝ := (first : ℝ) * stageOneTouchCharge
 
 /-- The digit doublings, `364/(r − 1)` (route M's doubling flag covers `T = K`, `T = −K` and the sign row's
@@ -141,7 +141,7 @@ def chainError (first second : ℕ) : ℝ :=
 /-! ### Readable forms -/
 
 theorem crtHiddenCharge_eq :
-    crtHiddenCharge = 4 / 2 ^ 104 + 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
+    crtHiddenCharge = 1 / 2 ^ 104 + 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
   have hp : (1 : ℝ) < (BudgetData.p : ℝ) := by exact_mod_cast one_lt_p
   have cast : ((BudgetData.p - 1 : ℕ) : ℝ) = (BudgetData.p : ℝ) - 1 := by
     rw [Nat.cast_sub one_lt_p.le, Nat.cast_one]
@@ -167,7 +167,7 @@ theorem machineCutoffError_eq : machineCutoffError = 1 / 2 ^ 128 := by
   norm_num
 
 theorem stageOneTouchCharge_eq :
-    stageOneTouchCharge = 4 / 2 ^ 104 + 1 / ((BN254.baseFieldModulus : ℝ) - 1) :=
+    stageOneTouchCharge = 1 / 2 ^ 104 + 1 / ((BN254.baseFieldModulus : ℝ) - 1) :=
   crtHiddenCharge_eq
 
 /-! ### The shares, decided by the kernel (the inequalities of `BudgetData`, section "Each term") -/
@@ -206,9 +206,9 @@ theorem coincidence_share : 185 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kerne
 
 theorem machineCutoff_share : 1 * 2 ^ 100 * 1000 ≤ 2 ^ 128 := by decide +kernel
 
-theorem hiddenCharge_share : (4 * (BudgetData.p - 1) + 2 ^ 104) * 2 ^ 100 * 3 ≤ 2 ^ 104 * (BudgetData.p - 1) := by decide +kernel
+theorem hiddenCharge_share : (1 * (BudgetData.p - 1) + 2 ^ 104) * 2 ^ 100 * 3 ≤ 2 ^ 104 * (BudgetData.p - 1) := by decide +kernel
 
-theorem stageOneTouch_share : 4 * 2 ^ 100 * 3 ≤ 2 ^ 104 := by decide +kernel
+theorem stageOneTouch_share : 1 * 2 ^ 100 * 3 ≤ 2 ^ 104 := by decide +kernel
 
 /-! ### Each term against its share of the unit -/
 

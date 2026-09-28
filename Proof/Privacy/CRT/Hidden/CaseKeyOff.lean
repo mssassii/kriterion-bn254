@@ -467,12 +467,12 @@ theorem keyOff_case : GuessCase keyOff notNearEdge BmrOff.keyError := by
   exact KeyOffEntry.keyLabel_entry scalar u notOn _ (CaseKeyOff.stageTwoView_fd parameter scalar u off) view
     (N % 2 ^ 128)
 
-/-- The key case's error is within the hidden charge: `2/2^128 + 1/(p − 1) ≤ 4/2^104 + 1/(p − 1)`. -/
+/-- The key case's error is within the hidden charge: `2/2^128 + 1/(p − 1) ≤ 1/2^104 + 1/(p − 1)`. -/
 theorem keyOff_error_le : BmrOff.keyError ≤ ENNReal.ofReal crtHiddenCharge := by
   unfold BmrOff.keyError
   refine ENNReal.ofReal_le_ofReal ?_
   rw [crtHiddenCharge_eq]
-  have two : (2 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ labelBits := by norm_num [labelBits]
+  have two : (2 : ℝ) / 2 ^ 128 ≤ 1 / 2 ^ labelBits := by norm_num [labelBits]
   linarith
 
 end Kriterion.CRT.Privacy.StageTwo

@@ -162,7 +162,7 @@ theorem inv_le_charge : ((2 : ℝ≥0∞) ^ labelBits)⁻¹ ≤ ENNReal.ofReal c
     have pos : 0 ≤ 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
       unfold BN254.baseFieldModulus
       norm_num
-    have four : (1 : ℝ) / 2 ^ labelBits ≤ 4 / 2 ^ labelBits := by norm_num
+    have hashBound : (1 : ℝ) / 2 ^ labelBits ≤ 1 / 2 ^ labelBits := by norm_num
     linarith
   calc ((2 : ℝ≥0∞) ^ labelBits)⁻¹ = ENNReal.ofReal (1 / 2 ^ labelBits) := by
         rw [one_div, ENNReal.ofReal_inv_of_pos (by positivity), ENNReal.ofReal_pow (by norm_num)]

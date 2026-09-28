@@ -1,3 +1,9 @@
+> **P1 research branch — byte-neutral proof refinement.** This branch tests the tighter hidden/touch
+> charge `1/2^104 + 1/(p−1)` on the submitted combined source `32f1fb34884ca33a84ac9dd4db687ca30187aeed`.
+> Labels remain 104 bits; construction, encoding and all three metrics are unchanged. The full build
+> and both audits passed locally. The remainder of this README describes the submitted combined construction.
+> See [P1 evidence](evidence/privacy-charge-p1/verification.md). No P1 publication or submission is planned.
+
 # CRT-residue ArgoMAC with selected width-9 extraction and 84 moduli
 
 This entry implements garbled BN254 scalar multiplication for Kriterion's `scalar-multiplication`

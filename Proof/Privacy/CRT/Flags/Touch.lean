@@ -535,10 +535,10 @@ theorem viewed_touches (parameter : ℕ) (scalar : NonZeroScalar) (tape : TableT
   exact congrArg PublicQuery.hash same
 
 omit [FieldCertificate] [GroupCertificate] in
-/-- The touch charge `4/2^104 + 1/(p − 1)` covers the full-width tail guess `1/2^128`. -/
+/-- The touch charge `1/2^104 + 1/(p − 1)` covers the full-width tail guess `1/2^128`. -/
 theorem inv_le_touchCharge : (1 : ℝ) / 2 ^ 128 ≤ stageOneTouchCharge := by
   rw [stageOneTouchCharge_eq]
-  have four : (1 : ℝ) / 2 ^ 128 ≤ 4 / 2 ^ 104 := by norm_num
+  have hashBound : (1 : ℝ) / 2 ^ 128 ≤ 1 / 2 ^ 104 := by norm_num
   have nonneg : 0 ≤ 1 / ((BN254.baseFieldModulus : ℝ) - 1) := by
     unfold BN254.baseFieldModulus
     norm_num
