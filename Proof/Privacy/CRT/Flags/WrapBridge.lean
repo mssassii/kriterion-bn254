@@ -96,7 +96,7 @@ theorem replayWraps_congr (source : (view).Source) (u : AffineInput) (T T' : Tag
       (Kriterion.CRT.Entry.replayConv ((view).publish source) u ((view).labels source u)),
       tagHash T n = tagHash T' n) :
     replayWraps source u T ↔ replayWraps source u T' := by
-  unfold replayWraps
+  unfold replayWraps replayWindow
   rw [replayCrtValues_congr source u T T' agree]
 
 end Wrap

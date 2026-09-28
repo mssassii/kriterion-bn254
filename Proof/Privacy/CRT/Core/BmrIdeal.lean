@@ -779,7 +779,7 @@ theorem view_gammaOf (pub : Kriterion.CRT.Entry.Public) :
     (Instance.view).gammaOf pub = Kriterion.CRT.Entry.gammaOf pub := rfl
 
 theorem publish_rows (s : Kriterion.CRT.Entry.Source) :
-    (Kriterion.CRT.Entry.publish s).rows = Vector.ofFn s.rows := rfl
+    (Kriterion.CRT.Entry.publish s).rows = Vector.ofFn fun d => BMR.srcRow (s.rows d) (s.signs d) := rfl
 
 /-- The non-collector masks of route M's replay on a tag table are the table's masks. -/
 theorem replayMasks_eq (pub : Kriterion.CRT.Entry.Public) (u : AffineInput) (labels : LamportSignature)
@@ -822,20 +822,10 @@ theorem rowTarget_eq_evaluateRow (rows : Coordinates.Rows) (u : AffineInput)
     zY2]
   congr 1 <;> ring
 
-/-- **The true rows are P45's row targets at the coins' context.** -/
-theorem trueRows_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
-    (d : Fin 91) :
-    Security.Phase3.trueRows scalar coins u d = BMR.rowTarget ((BmrEntry.bmrContextOf scalar coins).rows d) u := by
-  have rows : (BmrEntry.bmrContextOf scalar coins).rows d =
-      (FieldMacToECMac.rowsForOutputKeys (FieldMacToECMac.outputKeys construction scalar.value coins.offsets)
-        coins.pointRandomness).get d := rfl
-  rw [rows, rowTarget_eq_evaluateRow _ _ (FieldMacToECMac.rowsForOutputKeysSparse _ _ d)]
-  rfl
-
 /-- The ideal output of P45 at a source's cells and targets. -/
 def oI (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
-    (s : Kriterion.CRT.Entry.Source) (τ : TargetLaw.Targets) : BMR.Out Tb u :=
-  BMR.idealOut (BmrEntry.bmrContextOf scalar coins) u (BmrOff.srcOf s, visOf u τ)
+    (s : Kriterion.CRT.Entry.Source) (τ : TargetLaw.Targets) : BMR.NOut Tb u :=
+  BMR.nIdealOut (NormRows.normTrueRows scalar coins u) u (BmrOff.srcOf s, visOf u τ)
 
 /-- **Route M's collector masks on a kernel table are P45's ideal collector masks.** -/
 theorem collectorMasks_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
@@ -843,24 +833,23 @@ theorem collectorMasks_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Sc
     (reads : bmrTargetsOf t = τ) :
     collectorMasks u (((Instance.view).replayProgram ((Instance.view).publish s) u ((Instance.view).labels s u)).eval
         (H8.tagHash t)) ((Instance.view).gammaOf ((Instance.view).publish s))
-        (fun digit => Security.Phase3.trueRows scalar coins u digit) = (oI scalar coins u s τ).2.2.1 := by
+        (fun digit => NormRows.normTrueRows scalar coins u digit) = (oI scalar coins u s τ).2.2.1 := by
   have delivered := H8.crtReplayDelivered s u t valid
   have masks : ∀ r, (((Instance.view).replayProgram ((Instance.view).publish s) u ((Instance.view).labels s u)).eval
       (H8.tagHash t)).masks r = τ.2 r.1 := fun r => by
     rw [replayMasks_eq, ← congrArg Prod.snd reads]
     rfl
   funext c
-  unfold collectorMasks replayRowValues oI BMR.idealOut
+  unfold collectorMasks replayRowValues oI BMR.nIdealOut
   dsimp only
   rw [delivered, bmrColdOf_of_reads u reads]
-  have rowsEq : Security.Phase3.trueRows scalar coins u c.1.1 =
-      BMR.rowTarget ((BmrEntry.bmrContextOf scalar coins).rows c.1.1) u := trueRows_eq scalar coins u c.1.1
-  have gammaEq : (Instance.view).gammaOf ((Instance.view).publish s) c.1.1 = s.rows c.1.1 := by
+  have gammaEq : (Instance.view).gammaOf ((Instance.view).publish s) c.1.1 =
+      BMR.srcRow (s.rows c.1.1) (s.signs c.1.1) := by
     rw [view_gammaOf, view_publish]
     unfold Kriterion.CRT.Entry.gammaOf
     rw [publish_rows]
     exact Vector.get_ofFn _ _
-  rw [rowsEq, gammaEq]
+  rw [gammaEq]
   simp only [masks]
   unfold BmrOff.srcOf visOf
   rw [view_publish]
@@ -869,15 +858,15 @@ theorem collectorMasks_eq (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Sc
 theorem reveal_iff (scalar : NonZeroScalar) (coins : Kriterion.ArgoMAC.Scheme.Coins) (u : AffineInput)
     (s : Kriterion.CRT.Entry.Source) {τ : TargetLaw.Targets} {t : TagTable} (reads : bmrTargetsOf t = τ)
     (drawn : List (BMR.Collector × ((Block × Block × Block) × Block))) :
-    H8.crtRevealOn s u (fun digit => Security.Phase3.trueRows scalar coins u digit) (H8.programmedTable t drawn) ↔
+    H8.crtRevealOn s u (fun digit => NormRows.normTrueRows scalar coins u digit) (H8.programmedTable t drawn) ↔
       BmrSplit.revealP45 scalar coins u (BmrOff.srcOf s, visOf u τ) := by
-  unfold H8.crtRevealOn BmrSplit.revealP45
+  unfold H8.crtRevealOn BmrSplit.revealP45 BmrSplit.revealAt
   refine or_congr Iff.rfl ?_
   rw [← Flags.replayWraps_programmed_iff s u t drawn, BmrOff.replayWraps_iff, bmrColdOf_of_reads u reads]
   rfl
 
 /-- Two outputs with the same published cells and hints publish the same part. -/
-theorem bmrOf_congr (u : AffineInput) {o o' : BMR.Out Tb u} (same : o.1 = o'.1)
+theorem bmrOf_congr (u : AffineInput) {o o' : BMR.NOut Tb u} (same : o.1 = o'.1)
     (answers : H8.BmrTags Tb u → Block × Block) : BmrSplit.bmrOf u o answers = BmrSplit.bmrOf u o' answers := by
   unfold BmrSplit.bmrOf
   rw [same]
@@ -945,13 +934,13 @@ theorem uniform_visOf (u : AffineInput) :
   exact BMR.WrapMass.uniform_map_addHom (visHom u) (visHom_surjective u)
 
 /-- **A uniform source's P45 cells and uniform visible cells are uniform cells.** -/
-theorem uniform_cells (u : AffineInput) {β : Type} (F : BMR.Source Tb × BMR.Visible Tb u → PMF β) :
+theorem uniform_cells (u : AffineInput) {β : Type} (F : BMR.NSource Tb × BMR.Visible Tb u → PMF β) :
     (letI := Fintype.ofFinite Kriterion.CRT.Entry.Source
      haveI : Nonempty Kriterion.CRT.Entry.Source := inferInstance
      (PMF.uniformOfFintype Kriterion.CRT.Entry.Source).bind fun s =>
       (PMF.uniformOfFintype (BMR.Visible Tb u)).bind fun vis => F (BmrOff.srcOf s, vis)) =
-      (PMF.uniformOfFintype (BMR.Source Tb × BMR.Visible Tb u)).bind F := by
-  rw [EntrySplit.uniform_prod_eq_bind (A := BMR.Source Tb) (B := BMR.Visible Tb u), PMF.bind_bind,
+      (PMF.uniformOfFintype (BMR.NSource Tb × BMR.Visible Tb u)).bind F := by
+  rw [EntrySplit.uniform_prod_eq_bind (A := BMR.NSource Tb) (B := BMR.Visible Tb u), PMF.bind_bind,
     ← BmrOff.uniform_srcOf, PMF.bind_map]
   refine congrArg _ (funext fun s => ?_)
   rw [Function.comp_apply, PMF.bind_map]
@@ -990,13 +979,13 @@ theorem idealCore_eq (scalar : NonZeroScalar) (u : AffineInput) (Q : Point) :
 open Classical in
 /-- P45's ideal flagged part at coins and cells (the body of `IdealReading`'s right side). -/
 def G (scalar : NonZeroScalar) (u : AffineInput) (coins : Kriterion.ArgoMAC.Scheme.Coins)
-    (cells : BMR.Source Tb × BMR.Visible Tb u) : PMF (Option (BmrSplit.BmrPart u)) :=
+    (cells : BMR.NSource Tb × BMR.Visible Tb u) : PMF (Option (BmrSplit.BmrPart u)) :=
   if BmrSplit.revealP45 scalar coins u cells then PMF.pure none
-  else (BmrSplit.bmrLaw BmrSplit.crtKernel u (BMR.idealOut (BmrEntry.bmrContextOf scalar coins) u cells)).map some
+  else (BmrSplit.bmrLaw BmrSplit.crtKernel u (BMR.nIdealOut (NormRows.normTrueRows scalar coins u) u cells)).map some
 
 theorem realRows_eq (scalar : NonZeroScalar) (u : AffineInput) (Q : Point) :
     (Instance.view).realRows scalar u Q =
-      BmrSplit.coinLaw.map fun coins => some fun digit => Security.Phase3.trueRows scalar coins u digit := rfl
+      BmrSplit.coinLaw.map fun coins => some fun digit => NormRows.normTrueRows scalar coins u digit := rfl
 
 /-- A law pushed through a map that is `none` everywhere. -/
 theorem map_none_of {α β : Type} (p : PMF α) (f : α → Option β) (h : ∀ a, f a = none) :
@@ -1072,7 +1061,7 @@ theorem perSource (scalar : NonZeroScalar) (u : AffineInput) (valid : validate u
       have heart := programmed_given u valid τ (oI scalar coins u s τ).2.2.1
       rw [show BmrSplit.crtKernel.given = BmrSplit.BmrKernel.given from rfl, heart, PMF.map_comp]
       unfold BmrSplit.bmrLaw
-      rw [show BMR.idealOut (BmrEntry.bmrContextOf scalar coins) u (BmrOff.srcOf s, visOf u τ) =
+      rw [show BMR.nIdealOut (NormRows.normTrueRows scalar coins u) u (BmrOff.srcOf s, visOf u τ) =
         oI scalar coins u s τ from rfl, ← merged_kernel scalar coins u s τ, PMF.map_comp, PMF.map_comp]
       rfl
   rw [funext perTargets, PMF.bind_comm]
